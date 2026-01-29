@@ -13,14 +13,11 @@
     <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
 
-    <!-- デフォルトのRevitバージョン（環境変数で上書き可能） -->
+    <!-- デフォルトのRevitバージョン -->
     <RevitVersion Condition="'$(RevitVersion)' == ''">2024</RevitVersion>
 
-    <!-- NuGetパッケージを使用するかどうか（CI/CD環境ではtrue） -->
-    <UseNuGetRevitAPI Condition="'$(UseNuGetRevitAPI)' == ''">false</UseNuGetRevitAPI>
-
-    <!-- PackageReferenceを使用するための設定 -->
-    <RestoreProjectStyle>PackageReference</RestoreProjectStyle>
+    <!-- CI/CD環境でのRevit APIパス（指定がない場合はローカルパス） -->
+    <RevitAPIPath Condition="'$(RevitAPIPath)' == ''">C:\Program Files\Autodesk\Revit $(RevitVersion)</RevitAPIPath>
   </PropertyGroup>
 
   <!-- バージョン別の出力パス設定 -->
@@ -53,97 +50,14 @@
     <Reference Include="WindowsBase" />
   </ItemGroup>
 
-  <!-- =====================================================
-       NuGetパッケージを使用する場合（CI/CD環境）
-       パッケージ: Revit_All_Main_Versions_API_x64
-       https://www.nuget.org/packages/Revit_All_Main_Versions_API_x64
-       ===================================================== -->
-
-  <!-- Revit 2022 - NuGet -->
-  <ItemGroup Condition="'$(RevitVersion)' == '2022' AND '$(UseNuGetRevitAPI)' == 'true'">
-    <PackageReference Include="Revit_All_Main_Versions_API_x64" Version="2022.0.0" />
-  </ItemGroup>
-
-  <!-- Revit 2023 - NuGet -->
-  <ItemGroup Condition="'$(RevitVersion)' == '2023' AND '$(UseNuGetRevitAPI)' == 'true'">
-    <PackageReference Include="Revit_All_Main_Versions_API_x64" Version="2023.0.0" />
-  </ItemGroup>
-
-  <!-- Revit 2024 - NuGet -->
-  <ItemGroup Condition="'$(RevitVersion)' == '2024' AND '$(UseNuGetRevitAPI)' == 'true'">
-    <PackageReference Include="Revit_All_Main_Versions_API_x64" Version="2024.0.0" />
-  </ItemGroup>
-
-  <!-- Revit 2025 - NuGet -->
-  <ItemGroup Condition="'$(RevitVersion)' == '2025' AND '$(UseNuGetRevitAPI)' == 'true'">
-    <PackageReference Include="Revit_All_Main_Versions_API_x64" Version="2025.0.0" />
-  </ItemGroup>
-
-  <!-- Revit 2026 - NuGet -->
-  <ItemGroup Condition="'$(RevitVersion)' == '2026' AND '$(UseNuGetRevitAPI)' == 'true'">
-    <PackageReference Include="Revit_All_Main_Versions_API_x64" Version="2026.0.0" />
-  </ItemGroup>
-
-  <!-- =====================================================
-       ローカル開発環境（Revitがインストールされている場合）
-       ===================================================== -->
-
-  <!-- Revit 2022用の参照 - ローカル -->
-  <ItemGroup Condition="'$(RevitVersion)' == '2022' AND '$(UseNuGetRevitAPI)' != 'true'">
+  <!-- Revit API参照（RevitAPIPathプロパティで指定されたパスを使用） -->
+  <ItemGroup>
     <Reference Include="RevitAPI">
-      <HintPath>C:\Program Files\Autodesk\Revit 2022\RevitAPI.dll</HintPath>
+      <HintPath>$(RevitAPIPath)\RevitAPI.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="RevitAPIUI">
-      <HintPath>C:\Program Files\Autodesk\Revit 2022\RevitAPIUI.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-  </ItemGroup>
-
-  <!-- Revit 2023用の参照 - ローカル -->
-  <ItemGroup Condition="'$(RevitVersion)' == '2023' AND '$(UseNuGetRevitAPI)' != 'true'">
-    <Reference Include="RevitAPI">
-      <HintPath>C:\Program Files\Autodesk\Revit 2023\RevitAPI.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="RevitAPIUI">
-      <HintPath>C:\Program Files\Autodesk\Revit 2023\RevitAPIUI.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-  </ItemGroup>
-
-  <!-- Revit 2024用の参照 - ローカル -->
-  <ItemGroup Condition="'$(RevitVersion)' == '2024' AND '$(UseNuGetRevitAPI)' != 'true'">
-    <Reference Include="RevitAPI">
-      <HintPath>C:\Program Files\Autodesk\Revit 2024\RevitAPI.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="RevitAPIUI">
-      <HintPath>C:\Program Files\Autodesk\Revit 2024\RevitAPIUI.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-  </ItemGroup>
-
-  <!-- Revit 2025用の参照 - ローカル -->
-  <ItemGroup Condition="'$(RevitVersion)' == '2025' AND '$(UseNuGetRevitAPI)' != 'true'">
-    <Reference Include="RevitAPI">
-      <HintPath>C:\Program Files\Autodesk\Revit 2025\RevitAPI.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="RevitAPIUI">
-      <HintPath>C:\Program Files\Autodesk\Revit 2025\RevitAPIUI.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-  </ItemGroup>
-
-  <!-- Revit 2026用の参照 - ローカル -->
-  <ItemGroup Condition="'$(RevitVersion)' == '2026' AND '$(UseNuGetRevitAPI)' != 'true'">
-    <Reference Include="RevitAPI">
-      <HintPath>C:\Program Files\Autodesk\Revit 2026\RevitAPI.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="RevitAPIUI">
-      <HintPath>C:\Program Files\Autodesk\Revit 2026\RevitAPIUI.dll</HintPath>
+      <HintPath>$(RevitAPIPath)\RevitAPIUI.dll</HintPath>
       <Private>False</Private>
     </Reference>
   </ItemGroup>
