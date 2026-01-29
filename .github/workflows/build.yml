@@ -3,7 +3,7 @@ name: Build and Package
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ '**' ]  # すべてのブランチでビルド
   pull_request:
     branches: [ main ]
   workflow_dispatch:  # 手動実行も可能
@@ -62,7 +62,7 @@ jobs:
   package:
     needs: build
     runs-on: windows-latest
-    if: github.ref == 'refs/heads/main'
+    # すべてのブランチでパッケージ作成を実行
 
     steps:
     - name: Checkout repository
