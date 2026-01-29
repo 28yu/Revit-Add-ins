@@ -1,0 +1,40 @@
+{
+    "name": "Tools28 Revit Addin Development",
+    "image": "mcr.microsoft.com/dotnet/sdk:8.0",
+
+    "features": {
+        "ghcr.io/devcontainers/features/powershell:1": {},
+        "ghcr.io/devcontainers/features/github-cli:1": {}
+    },
+
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-dotnettools.csharp",
+                "ms-dotnettools.csdevkit",
+                "formulahendry.dotnet-test-explorer",
+                "jchannon.csharpextensions",
+                "kreativ-software.csharpextensions",
+                "ms-vscode.powershell",
+                "eamodio.gitlens",
+                "mhutchie.git-graph",
+                "GitHub.copilot"
+            ],
+            "settings": {
+                "editor.formatOnSave": true,
+                "editor.defaultFormatter": "ms-dotnettools.csharp",
+                "files.exclude": {
+                    "**/bin": true,
+                    "**/obj": true,
+                    "**/*.user": true
+                }
+            }
+        }
+    },
+
+    "postCreateCommand": "echo 'Development environment ready! Note: Full build requires Windows with Revit installed or GitHub Actions CI/CD.'",
+
+    "forwardPorts": [],
+
+    "remoteUser": "vscode"
+}
