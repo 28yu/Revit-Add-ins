@@ -30,27 +30,13 @@ jobs:
     - name: Setup NuGet
       uses: NuGet/setup-nuget@v2
 
-    - name: Create NuGet.config for Revit packages
-      run: |
-        @"
-        <?xml version="1.0" encoding="utf-8"?>
-        <configuration>
-          <packageSources>
-            <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
-          </packageSources>
-        </configuration>
-        "@ | Out-File -FilePath NuGet.config -Encoding UTF8
-
     - name: Restore NuGet packages
-      run: nuget restore ${{ env.SOLUTION_NAME }} -PackagesDirectory packages
+      run: |
+        msbuild ${{ env.SOLUTION_NAME }} /t:Restore /p:RevitVersion=${{ matrix.revit-version }} /p:UseNuGetRevitAPI=true
 
     - name: Build for Revit ${{ matrix.revit-version }}
       run: |
-        msbuild ${{ env.SOLUTION_NAME }} `
-          /p:Configuration=Release `
-          /p:RevitVersion=${{ matrix.revit-version }} `
-          /p:UseNuGetRevitAPI=true `
-          /verbosity:minimal
+        msbuild ${{ env.SOLUTION_NAME }} /p:Configuration=Release /p:RevitVersion=${{ matrix.revit-version }} /p:UseNuGetRevitAPI=true /verbosity:minimal
 
     - name: Upload build artifact
       uses: actions/upload-artifact@v4
@@ -91,18 +77,18 @@ jobs:
 
             # .addinファイルを生成
             $addinContent = @"
-        <?xml version="1.0" encoding="utf-8"?>
-        <RevitAddIns>
-          <AddIn Type="Application">
-            <Name>Tools28</Name>
-            <Assembly>Tools28.dll</Assembly>
-            <FullClassName>Tools28.Application</FullClassName>
-            <ClientId>E40A22D9-DD80-4387-BA5D-8F9E4DF157D6</ClientId>
-            <VendorId>Tools28</VendorId>
-            <VendorDescription>Tools28 Revit Addin</VendorDescription>
-          </AddIn>
-        </RevitAddIns>
-        "@
+<?xml version="1.0" encoding="utf-8"?>
+<RevitAddIns>
+  <AddIn Type="Application">
+    <Name>Tools28</Name>
+    <Assembly>Tools28.dll</Assembly>
+    <FullClassName>Tools28.Application</FullClassName>
+    <ClientId>E40A22D9-DD80-4387-BA5D-8F9E4DF157D6</ClientId>
+    <VendorId>Tools28</VendorId>
+    <VendorDescription>Tools28 Revit Addin</VendorDescription>
+  </AddIn>
+</RevitAddIns>
+"@
             $addinContent | Out-File -FilePath "$packageDir/Tools28.addin" -Encoding UTF8
 
             # ZIPに圧縮
