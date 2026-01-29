@@ -3,10 +3,10 @@ name: Build and Package
 
 on:
   push:
-    branches: [ '**' ]  # すべてのブランチでビルド
+    branches: [ '**' ]
   pull_request:
     branches: [ main ]
-  workflow_dispatch:  # 手動実行も可能
+  workflow_dispatch:
 
 env:
   SOLUTION_NAME: Tools28.csproj
@@ -18,7 +18,6 @@ jobs:
     strategy:
       matrix:
         revit-version: [2022, 2023, 2024, 2025]
-        # 2026は現時点でNuGetパッケージがない可能性があるため除外
 
     steps:
     - name: Checkout repository
@@ -31,12 +30,10 @@ jobs:
       uses: NuGet/setup-nuget@v2
 
     - name: Restore NuGet packages
-      run: |
-        msbuild ${{ env.SOLUTION_NAME }} /t:Restore /p:RevitVersion=${{ matrix.revit-version }} /p:UseNuGetRevitAPI=true
+      run: msbuild ${{ env.SOLUTION_NAME }} /t:Restore /p:RevitVersion=${{ matrix.revit-version }} /p:UseNuGetRevitAPI=true
 
     - name: Build for Revit ${{ matrix.revit-version }}
-      run: |
-        msbuild ${{ env.SOLUTION_NAME }} /p:Configuration=Release /p:RevitVersion=${{ matrix.revit-version }} /p:UseNuGetRevitAPI=true /verbosity:minimal
+      run: msbuild ${{ env.SOLUTION_NAME }} /p:Configuration=Release /p:RevitVersion=${{ matrix.revit-version }} /p:UseNuGetRevitAPI=true /verbosity:minimal
 
     - name: Upload build artifact
       uses: actions/upload-artifact@v4
@@ -48,7 +45,6 @@ jobs:
   package:
     needs: build
     runs-on: windows-latest
-    # すべてのブランチでパッケージ作成を実行
 
     steps:
     - name: Checkout repository
@@ -60,8 +56,8 @@ jobs:
         path: artifacts
 
     - name: Generate addin files and create packages
+      shell: pwsh
       run: |
-        # 各バージョンのパッケージを作成
         $versions = @(2022, 2023, 2024, 2025)
 
         foreach ($version in $versions) {
@@ -69,31 +65,24 @@ jobs:
           $packageDir = "Packages/Tools28_Revit$version"
 
           if (Test-Path $artifactPath) {
-            # パッケージディレクトリ作成
-            New-Item -ItemType Directory -Force -Path $packageDir
-
-            # DLLをコピー
+            New-Item -ItemType Directory -Force -Path $packageDir | Out-Null
             Copy-Item "$artifactPath/*" $packageDir -Recurse
 
-            # .addinファイルを生成
-            $addinContent = @"
-<?xml version="1.0" encoding="utf-8"?>
-<RevitAddIns>
-  <AddIn Type="Application">
-    <Name>Tools28</Name>
-    <Assembly>Tools28.dll</Assembly>
-    <FullClassName>Tools28.Application</FullClassName>
-    <ClientId>E40A22D9-DD80-4387-BA5D-8F9E4DF157D6</ClientId>
-    <VendorId>Tools28</VendorId>
-    <VendorDescription>Tools28 Revit Addin</VendorDescription>
-  </AddIn>
-</RevitAddIns>
-"@
-            $addinContent | Out-File -FilePath "$packageDir/Tools28.addin" -Encoding UTF8
+            # Create .addin file
+            $addinXml = '<?xml version="1.0" encoding="utf-8"?>'
+            $addinXml += "`n<RevitAddIns>"
+            $addinXml += "`n  <AddIn Type=`"Application`">"
+            $addinXml += "`n    <Name>Tools28</Name>"
+            $addinXml += "`n    <Assembly>Tools28.dll</Assembly>"
+            $addinXml += "`n    <FullClassName>Tools28.Application</FullClassName>"
+            $addinXml += "`n    <ClientId>E40A22D9-DD80-4387-BA5D-8F9E4DF157D6</ClientId>"
+            $addinXml += "`n    <VendorId>Tools28</VendorId>"
+            $addinXml += "`n    <VendorDescription>Tools28 Revit Addin</VendorDescription>"
+            $addinXml += "`n  </AddIn>"
+            $addinXml += "`n</RevitAddIns>"
 
-            # ZIPに圧縮
+            $addinXml | Out-File -FilePath "$packageDir/Tools28.addin" -Encoding UTF8
             Compress-Archive -Path "$packageDir/*" -DestinationPath "Packages/Tools28_Revit$version.zip" -Force
-
             Write-Host "Created package for Revit $version"
           }
         }
