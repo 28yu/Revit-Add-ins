@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{E40A22D9-DD80-4387-BA5D-8F9E4DF157D6}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>Tools28</RootNamespace>
+    <AssemblyName>Tools28</AssemblyName>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    
+    <!-- デフォルトのRevitバージョン（環境変数で上書き可能） -->
+    <RevitVersion Condition="'$(RevitVersion)' == ''">2024</RevitVersion>
+  </PropertyGroup>
+
+  <!-- バージョン別の出力パス設定 -->
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\Revit$(RevitVersion)\</OutputPath>
+    <DefineConstants>DEBUG;TRACE;REVIT$(RevitVersion)</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\Revit$(RevitVersion)\</OutputPath>
+    <DefineConstants>TRACE;REVIT$(RevitVersion)</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+
+  <!-- WPF参照 -->
+  <ItemGroup>
+    <Reference Include="PresentationCore" />
+    <Reference Include="PresentationFramework" />
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Xaml" />
+    <Reference Include="WindowsBase" />
+  </ItemGroup>
+
+  <!-- Revit 2022用の参照 -->
+  <ItemGroup Condition="'$(RevitVersion)' == '2022'">
+    <Reference Include="RevitAPI">
+      <HintPath>C:\Program Files\Autodesk\Revit 2022\RevitAPI.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="RevitAPIUI">
+      <HintPath>C:\Program Files\Autodesk\Revit 2022\RevitAPIUI.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+  </ItemGroup>
+
+  <!-- Revit 2023用の参照 -->
+  <ItemGroup Condition="'$(RevitVersion)' == '2023'">
+    <Reference Include="RevitAPI">
+      <HintPath>C:\Program Files\Autodesk\Revit 2023\RevitAPI.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="RevitAPIUI">
+      <HintPath>C:\Program Files\Autodesk\Revit 2023\RevitAPIUI.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+  </ItemGroup>
+
+  <!-- Revit 2024用の参照 -->
+  <ItemGroup Condition="'$(RevitVersion)' == '2024'">
+    <Reference Include="RevitAPI">
+      <HintPath>C:\Program Files\Autodesk\Revit 2024\RevitAPI.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="RevitAPIUI">
+      <HintPath>C:\Program Files\Autodesk\Revit 2024\RevitAPIUI.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+  </ItemGroup>
+
+  <!-- Revit 2025用の参照 -->
+  <ItemGroup Condition="'$(RevitVersion)' == '2025'">
+    <Reference Include="RevitAPI">
+      <HintPath>C:\Program Files\Autodesk\Revit 2025\RevitAPI.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="RevitAPIUI">
+      <HintPath>C:\Program Files\Autodesk\Revit 2025\RevitAPIUI.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+  </ItemGroup>
+
+  <!-- Revit 2026用の参照 -->
+  <ItemGroup Condition="'$(RevitVersion)' == '2026'">
+    <Reference Include="RevitAPI">
+      <HintPath>C:\Program Files\Autodesk\Revit 2026\RevitAPI.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="RevitAPIUI">
+      <HintPath>C:\Program Files\Autodesk\Revit 2026\RevitAPIUI.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+  </ItemGroup>
+
+  <!-- ソースファイル -->
+  <ItemGroup>
+    <Compile Include="Application.cs" />
+    <Compile Include="Commands\GridBubble\GridBubbleCommands.cs" />
+    <Compile Include="Commands\ViewCopy\ViewCopyCommands.cs" />
+    <Compile Include="Commands\SectionBoxCopy\SectionBoxCopyCommands.cs" />
+    <Compile Include="Commands\ViewportPosition\ViewportPositionCommands.cs" />
+    <Compile Include="Commands\CropBoxCopy\CropBoxCopyCommands.cs" />
+    <Compile Include="Commands\SheetCreation\SheetCreationCommands.cs" />
+    <Compile Include="Commands\SheetCreation\SheetCreationDialog.xaml.cs">
+      <DependentUpon>SheetCreationDialog.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+
+  <!-- XAMLファイル -->
+  <ItemGroup>
+    <Page Include="Commands\SheetCreation\SheetCreationDialog.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+  </ItemGroup>
+
+  <!-- リソースファイル -->
+  <ItemGroup>
+    <Resource Include="Resources\Icons\both_32.png" />
+    <Resource Include="Resources\Icons\left_32.png" />
+    <Resource Include="Resources\Icons\right_32.png" />
+    <Resource Include="Resources\Icons\sheet_creation_32.png" />
+    <Resource Include="Resources\Icons\view_copy_32.png" />
+    <Resource Include="Resources\Icons\view_paste_32.png" />
+    <Resource Include="Resources\Icons\sectionbox_copy_32.png" />
+    <Resource Include="Resources\Icons\sectionbox_paste_32.png" />
+    <Resource Include="Resources\Icons\viewport_copy_32.png" />
+    <Resource Include="Resources\Icons\viewport_paste_32.png" />
+    <Resource Include="Resources\Icons\cropbox_copy_32.png" />
+    <Resource Include="Resources\Icons\cropbox_paste_32.png" />
+  </ItemGroup>
+
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+</Project>
