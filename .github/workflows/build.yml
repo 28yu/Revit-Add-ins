@@ -79,10 +79,12 @@ jobs:
       shell: pwsh
       run: |
         $versions = @(2022, 2023, 2024, 2025, 2026)
+        $appVersion = "v1.0"
 
         foreach ($version in $versions) {
           $artifactPath = "artifacts/Tools28-Revit$version"
-          $packageDir = "Packages/Tools28_Revit$version"
+          $packageName = "Tools28_Revit${version}_${appVersion}"
+          $packageDir = "Packages/$packageName"
 
           if (Test-Path $artifactPath) {
             New-Item -ItemType Directory -Force -Path $packageDir | Out-Null
@@ -101,8 +103,8 @@ jobs:
             $addinXml += "`n</RevitAddIns>"
 
             $addinXml | Out-File -FilePath "$packageDir/Tools28.addin" -Encoding UTF8
-            Compress-Archive -Path "$packageDir/*" -DestinationPath "Packages/Tools28_Revit$version.zip" -Force
-            Write-Host "Created package for Revit $version"
+            Compress-Archive -Path "$packageDir/*" -DestinationPath "Packages/$packageName.zip" -Force
+            Write-Host "Created package: $packageName.zip"
           }
         }
 
