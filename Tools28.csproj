@@ -26,6 +26,10 @@
 
     <!-- プロジェクト情報 -->
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+
+    <!-- SDKスタイルの自動インクルードを無効化（重複防止） -->
+    <EnableDefaultPageItems>false</EnableDefaultPageItems>
+    <EnableDefaultApplicationDefinition>false</EnableDefaultApplicationDefinition>
   </PropertyGroup>
 
   <!-- .NET 8 (Revit 2025+) 用の追加設定 -->
