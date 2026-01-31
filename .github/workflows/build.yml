@@ -27,6 +27,9 @@ jobs:
           - revit-version: 2025
             target-framework: net8.0-windows
             nuget-lib-folder: net8.0-windows10.0.17763
+          - revit-version: 2026
+            target-framework: net8.0-windows
+            nuget-lib-folder: net8.0-windows10.0.17763
 
     steps:
     - name: Checkout repository
@@ -75,7 +78,7 @@ jobs:
     - name: Generate addin files and create packages
       shell: pwsh
       run: |
-        $versions = @(2022, 2023, 2024, 2025)
+        $versions = @(2022, 2023, 2024, 2025, 2026)
 
         foreach ($version in $versions) {
           $artifactPath = "artifacts/Tools28-Revit$version"
