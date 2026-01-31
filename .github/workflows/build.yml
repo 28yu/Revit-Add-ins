@@ -14,11 +14,28 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        revit-version: [2022, 2023, 2024, 2025]
+        include:
+          - revit-version: 2022
+            target-framework: net48
+            nuget-lib-folder: net48
+          - revit-version: 2023
+            target-framework: net48
+            nuget-lib-folder: net48
+          - revit-version: 2024
+            target-framework: net48
+            nuget-lib-folder: net48
+          - revit-version: 2025
+            target-framework: net8.0-windows
+            nuget-lib-folder: net8.0-windows10.0.17763
 
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
+
+    - name: Setup .NET SDK
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
 
     - name: Setup MSBuild
       uses: microsoft/setup-msbuild@v2
@@ -32,7 +49,7 @@ jobs:
 
     - name: Build for Revit ${{ matrix.revit-version }}
       run: |
-        msbuild Tools28.csproj /p:Configuration=Release /p:RevitVersion=${{ matrix.revit-version }} /p:RevitAPIPath="${{ github.workspace }}\packages\Revit_All_Main_Versions_API_x64.${{ matrix.revit-version }}.0.0\lib\net48" /verbosity:minimal
+        dotnet build Tools28.csproj -c Release -p:RevitVersion=${{ matrix.revit-version }} -p:RevitAPIPath="${{ github.workspace }}\packages\Revit_All_Main_Versions_API_x64.${{ matrix.revit-version }}.0.0\lib\${{ matrix.nuget-lib-folder }}"
 
     - name: Upload build artifact
       uses: actions/upload-artifact@v4

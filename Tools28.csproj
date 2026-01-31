@@ -1,56 +1,39 @@
-<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{E40A22D9-DD80-4387-BA5D-8F9E4DF157D6}</ProjectGuid>
+    <!-- デフォルト設定 -->
+    <RevitVersion Condition="'$(RevitVersion)' == ''">2024</RevitVersion>
+    <RevitAPIPath Condition="'$(RevitAPIPath)' == ''">C:\Program Files\Autodesk\Revit $(RevitVersion)</RevitAPIPath>
+
+    <!-- Revit 2025以降は.NET 8、それ以前は.NET Framework 4.8 -->
+    <TargetFramework Condition="'$(RevitVersion)' &lt; '2025'">net48</TargetFramework>
+    <TargetFramework Condition="'$(RevitVersion)' &gt;= '2025'">net8.0-windows</TargetFramework>
+
     <OutputType>Library</OutputType>
-    <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>Tools28</RootNamespace>
     <AssemblyName>Tools28</AssemblyName>
-    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
-    <FileAlignment>512</FileAlignment>
+    <UseWPF>true</UseWPF>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
 
-    <!-- デフォルトのRevitバージョン -->
-    <RevitVersion Condition="'$(RevitVersion)' == ''">2024</RevitVersion>
+    <!-- 出力パス -->
+    <OutputPath>bin\$(Configuration)\Revit$(RevitVersion)\</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
 
-    <!-- CI/CD環境でのRevit APIパス（指定がない場合はローカルパス） -->
-    <RevitAPIPath Condition="'$(RevitAPIPath)' == ''">C:\Program Files\Autodesk\Revit $(RevitVersion)</RevitAPIPath>
+    <!-- 定数定義 -->
+    <DefineConstants>$(DefineConstants);REVIT$(RevitVersion)</DefineConstants>
+
+    <!-- プロジェクト情報 -->
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
   </PropertyGroup>
 
-  <!-- バージョン別の出力パス設定 -->
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <DebugSymbols>true</DebugSymbols>
-    <DebugType>full</DebugType>
-    <Optimize>false</Optimize>
-    <OutputPath>bin\Debug\Revit$(RevitVersion)\</OutputPath>
-    <DefineConstants>DEBUG;TRACE;REVIT$(RevitVersion)</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
+  <!-- .NET 8 (Revit 2025+) 用の追加設定 -->
+  <PropertyGroup Condition="'$(RevitVersion)' &gt;= '2025'">
+    <PlatformTarget>x64</PlatformTarget>
   </PropertyGroup>
 
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugType>pdbonly</DebugType>
-    <Optimize>true</Optimize>
-    <OutputPath>bin\Release\Revit$(RevitVersion)\</OutputPath>
-    <DefineConstants>TRACE;REVIT$(RevitVersion)</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-  </PropertyGroup>
-
-  <!-- WPF参照 -->
-  <ItemGroup>
-    <Reference Include="PresentationCore" />
-    <Reference Include="PresentationFramework" />
-    <Reference Include="System" />
-    <Reference Include="System.Core" />
-    <Reference Include="System.Xaml" />
-    <Reference Include="WindowsBase" />
-  </ItemGroup>
-
-  <!-- Revit API参照（RevitAPIPathプロパティで指定されたパスを使用） -->
+  <!-- Revit API参照 -->
   <ItemGroup>
     <Reference Include="RevitAPI">
       <HintPath>$(RevitAPIPath)\RevitAPI.dll</HintPath>
@@ -62,44 +45,20 @@
     </Reference>
   </ItemGroup>
 
-  <!-- ソースファイル -->
-  <ItemGroup>
-    <Compile Include="Application.cs" />
-    <Compile Include="Commands\GridBubble\GridBubbleCommands.cs" />
-    <Compile Include="Commands\ViewCopy\ViewCopyCommands.cs" />
-    <Compile Include="Commands\SectionBoxCopy\SectionBoxCopyCommands.cs" />
-    <Compile Include="Commands\ViewportPosition\ViewportPositionCommands.cs" />
-    <Compile Include="Commands\CropBoxCopy\CropBoxCopyCommands.cs" />
-    <Compile Include="Commands\SheetCreation\SheetCreationCommands.cs" />
-    <Compile Include="Commands\SheetCreation\SheetCreationDialog.xaml.cs">
-      <DependentUpon>SheetCreationDialog.xaml</DependentUpon>
-    </Compile>
-    <Compile Include="Properties\AssemblyInfo.cs" />
-  </ItemGroup>
-
   <!-- XAMLファイル -->
   <ItemGroup>
     <Page Include="Commands\SheetCreation\SheetCreationDialog.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
+    <Compile Update="Commands\SheetCreation\SheetCreationDialog.xaml.cs">
+      <DependentUpon>SheetCreationDialog.xaml</DependentUpon>
+    </Compile>
   </ItemGroup>
 
   <!-- リソースファイル -->
   <ItemGroup>
-    <Resource Include="Resources\Icons\both_32.png" />
-    <Resource Include="Resources\Icons\left_32.png" />
-    <Resource Include="Resources\Icons\right_32.png" />
-    <Resource Include="Resources\Icons\sheet_creation_32.png" />
-    <Resource Include="Resources\Icons\view_copy_32.png" />
-    <Resource Include="Resources\Icons\view_paste_32.png" />
-    <Resource Include="Resources\Icons\sectionbox_copy_32.png" />
-    <Resource Include="Resources\Icons\sectionbox_paste_32.png" />
-    <Resource Include="Resources\Icons\viewport_copy_32.png" />
-    <Resource Include="Resources\Icons\viewport_paste_32.png" />
-    <Resource Include="Resources\Icons\cropbox_copy_32.png" />
-    <Resource Include="Resources\Icons\cropbox_paste_32.png" />
+    <Resource Include="Resources\Icons\*.png" />
   </ItemGroup>
 
-  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
