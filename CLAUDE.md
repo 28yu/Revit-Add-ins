@@ -23,9 +23,16 @@ Revit-Add-ins/
 │   └── CropBoxCopy/            # トリミング領域コピー
 ├── Resources/Icons/            # 32x32アイコン (12個)
 ├── Properties/                 # AssemblyInfo.cs
-├── Packages/                   # 配布パッケージ (バージョン別)
-│   ├── 2021/ ~ 2026/           # 各バージョン用 install.bat, uninstall.bat, README.txt
-├── BuildAll.ps1                # 全バージョン一括ビルド
+├── Packages/                   # 配布パッケージテンプレート (バージョン別)
+│   ├── 2021/ ~ 2026/           # 各バージョン用
+│   │   ├── 28Tools/            #   Tools28.addin (DLLはビルド時にコピー)
+│   │   ├── install.bat         #   自動インストール
+│   │   ├── uninstall.bat       #   アンインストール
+│   │   └── README.txt          #   インストール手順
+├── .github/workflows/          # GitHub Actions (自動ビルド・リリース)
+│   └── build-and-release.yml   #   タグ push or 手動実行で配布ZIP生成
+├── Dist/                       # 配布ZIP出力先 (git管理外)
+├── BuildAll.ps1                # 全バージョン一括ビルド (2021-2026)
 ├── GenerateAddins.ps1          # .addinマニフェスト生成
 ├── CreatePackages.ps1          # 配布ZIP作成
 └── Deploy-For-Testing.ps1      # テスト用デプロイ
@@ -50,19 +57,40 @@ msbuild Tools28.csproj /p:Configuration=Release /p:RevitVersion=2024
 
 ## 配布パッケージ
 
-### 構成 (Packages/{VERSION}/)
-各バージョン (2021-2026) に以下のファイルを格納:
-- `install.bat` - 管理者実行でアドインをインストール
-- `uninstall.bat` - アドインをアンインストール
-- `README.txt` - ユーザー向けインストール手順
+### テンプレート構成 (Packages/{VERSION}/)
+各バージョン (2021-2026) に以下を格納:
+```
+Packages/{VERSION}/
+├── 28Tools/
+│   └── Tools28.addin    # マニフェスト (全バージョン共通内容)
+├── install.bat           # Addins\{VERSION} へ DLL/addin をコピー
+├── uninstall.bat         # Addins\{VERSION} から DLL/addin を削除
+└── README.txt            # ユーザー向けインストール手順
+```
+
+### 配布ZIP構成 (CreatePackages.ps1 が生成)
+```
+28Tools_Revit{VERSION}_vX.X.zip
+├── 28Tools/
+│   ├── Tools28.dll       # ビルド成果物 (自動コピー)
+│   └── Tools28.addin     # マニフェスト
+├── install.bat
+├── uninstall.bat
+└── README.txt
+```
 
 ### インストール先
 `C:\ProgramData\Autodesk\Revit\Addins\{VERSION}\`
 
 ### 配布ZIP作成手順
 ```powershell
-.\GenerateAddins.ps1
-.\CreatePackages.ps1
+# 1. 全バージョンをビルド
+.\BuildAll.ps1
+
+# 2. 配布ZIPを作成 (バージョン番号を指定)
+.\CreatePackages.ps1 -Version "1.0"
+
+# 出力先: .\Dist\28Tools_Revit20XX_v1.0.zip
 ```
 
 ## 新機能追加手順
@@ -79,9 +107,27 @@ msbuild Tools28.csproj /p:Configuration=Release /p:RevitVersion=2024
 - **配布サイト**: https://28yu.github.io/28tools-download/
 - **リポジトリ**: https://github.com/28yu/Revit-Add-ins
 
+## CI/CD (GitHub Actions)
+
+### 自動リリース (タグ push)
+```bash
+git tag v1.0
+git push --tags
+```
+GitHub Actions が自動的に:
+1. 全6バージョン (2021-2026) をビルド
+2. 配布ZIP (`28Tools_Revit20XX_v1.0.zip`) を作成
+3. GitHub Releases にアップロード
+
+### 手動実行
+GitHub → Actions → "Build and Release" → Run workflow → バージョン番号を入力
+
+### Revit API 参照
+NuGet パッケージ `Nice3point.Revit.Api` を使用 (ローカル Revit 不要)
+
 ## 注意事項
 
-- Revit API の `RevitAPI.dll` / `RevitAPIUI.dll` は `Private=False` で参照 (ローカルコピーしない)
+- Revit API は NuGet パッケージ経由で取得 (`Nice3point.Revit.Api.RevitAPI` / `RevitAPIUI`)
 - トランザクションは `TransactionMode.Manual` を使用
 - デバッグログは `C:\temp\Tools28_debug.txt` に出力
 - WPFダイアログを使用するコマンドは XAML + コードビハインドで構成

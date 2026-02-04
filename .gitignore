@@ -1,0 +1,17 @@
+# ビルド成果物
+bin/
+obj/
+
+# 配布ZIP出力
+Dist/
+
+# GenerateAddins.ps1 の出力
+Addins/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+
+# デバッグログ
+*.log

@@ -7,7 +7,7 @@ Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
 # ビルドするRevitバージョンのリスト
-$revitVersions = @("2022", "2023", "2024", "2025", "2026")
+$revitVersions = @("2021", "2022", "2023", "2024", "2025", "2026")
 
 # MSBuildのパスを検索
 $msbuildPath = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" `
