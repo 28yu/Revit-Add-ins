@@ -18,6 +18,7 @@ jobs:
     runs-on: windows-latest
 
     strategy:
+      fail-fast: false
       matrix:
         revit-version: ['2021', '2022', '2023', '2024', '2025', '2026']
 
@@ -25,23 +26,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup .NET 8 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
 
-      - name: Setup NuGet
-        uses: NuGet/setup-nuget@v2
-
-      - name: Restore NuGet packages
-        run: nuget restore Tools28.csproj -PackagesDirectory packages
-
       - name: Build for Revit ${{ matrix.revit-version }}
         run: |
-          msbuild Tools28.csproj `
-            /p:Configuration=Release `
-            /p:RevitVersion=${{ matrix.revit-version }} `
-            /p:Platform=AnyCPU `
-            /restore `
-            /v:minimal
+          dotnet build Tools28.csproj `
+            -c Release `
+            /p:RevitVersion=${{ matrix.revit-version }}
 
       - name: Create package
         shell: pwsh
