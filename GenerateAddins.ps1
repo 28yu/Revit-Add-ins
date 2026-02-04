@@ -6,7 +6,7 @@ Write-Host "Tools28 - .addinファイル生成" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
-$revitVersions = @("2022", "2023", "2024", "2025", "2026")
+$revitVersions = @("2021", "2022", "2023", "2024", "2025", "2026")
 $outputDir = ".\Addins"
 
 # 出力ディレクトリを作成
