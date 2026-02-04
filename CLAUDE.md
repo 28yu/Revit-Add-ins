@@ -6,14 +6,14 @@
 - **対応バージョン**: Revit 2021, 2022, 2023, 2024, 2025, 2026
 - **名前空間**: `Tools28`
 - **アセンブリ名**: `Tools28`
-- **プロジェクトファイル**: `Tools28.csproj` (MSBuild, マルチバージョン対応)
+- **プロジェクトファイル**: `Tools28.csproj` (SDK-style, マルチバージョン対応)
 
 ## リポジトリ構成
 
 ```
 Revit-Add-ins/
 ├── Application.cs              # メインアプリ (IExternalApplication) - リボンUI構築
-├── Tools28.csproj              # マルチバージョン対応プロジェクトファイル
+├── Tools28.csproj              # SDK-style マルチバージョン対応プロジェクトファイル
 ├── Commands/                   # 機能コマンド群
 │   ├── GridBubble/             # 通り芯・レベルの符号表示切替
 │   ├── SheetCreation/          # シート一括作成 (WPFダイアログ付き)
@@ -32,13 +32,19 @@ Revit-Add-ins/
 ├── .github/workflows/          # GitHub Actions (自動ビルド・リリース)
 │   └── build-and-release.yml   #   タグ push or 手動実行で配布ZIP生成
 ├── Dist/                       # 配布ZIP出力先 (git管理外)
-├── BuildAll.ps1                # 全バージョン一括ビルド (2021-2026)
+├── BuildAll.ps1                # 全バージョン一括ビルド
 ├── GenerateAddins.ps1          # .addinマニフェスト生成
 ├── CreatePackages.ps1          # 配布ZIP作成
 └── Deploy-For-Testing.ps1      # テスト用デプロイ
 ```
 
 ## ビルド
+
+### ターゲットフレームワーク (SDK-style csproj)
+- **Revit 2021-2024**: `net48` (.NET Framework 4.8)
+- **Revit 2025-2026**: `net8.0-windows` (.NET 8)
+
+バージョンに応じて `Tools28.csproj` 内で自動切替え。
 
 ### 条件付きコンパイルシンボル
 `REVIT2021`, `REVIT2022`, `REVIT2023`, `REVIT2024`, `REVIT2025`, `REVIT2026`
@@ -114,9 +120,10 @@ Packages/{VERSION}/
 
 1. `Commands/` に新しいフォルダを作成
 2. `IExternalCommand` を実装するコマンドクラスを作成
-3. `Tools28.csproj` の `<Compile Include="...">` にファイルを追加
-4. `Application.cs` のリボンにボタンを登録
-5. アイコンが必要な場合は `Resources/Icons/` に32x32 PNGを追加し `.csproj` に `<Resource>` を追加
+3. `Application.cs` のリボンにボタンを登録
+4. アイコンが必要な場合は `Resources/Icons/` に32x32 PNGを追加し `.csproj` に `<Resource>` を追加
+
+※ SDK-style csproj のため `.cs` ファイルは自動認識される（`<Compile Include>` は不要）
 
 ## 外部参照
 
