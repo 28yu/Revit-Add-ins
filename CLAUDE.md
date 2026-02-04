@@ -57,27 +57,44 @@ msbuild Tools28.csproj /p:Configuration=Release /p:RevitVersion=2024
 
 ## 配布パッケージ
 
-### テンプレート構成 (Packages/{VERSION}/)
-各バージョン (2021-2026) に以下を格納:
-```
-Packages/{VERSION}/
-├── 28Tools/
-│   └── Tools28.addin    # マニフェスト (全バージョン共通内容)
-├── install.bat           # Addins\{VERSION} へ DLL/addin をコピー
-├── uninstall.bat         # Addins\{VERSION} から DLL/addin を削除
-└── README.txt            # ユーザー向けインストール手順
-```
-
-### 配布ZIP構成 (CreatePackages.ps1 が生成)
+### 配布ZIP構成
+配布ZIPのファイル名は `28Tools_Revit{VERSION}_vX.X.zip`。
 ```
 28Tools_Revit{VERSION}_vX.X.zip
 ├── 28Tools/
-│   ├── Tools28.dll       # ビルド成果物 (自動コピー)
-│   └── Tools28.addin     # マニフェスト
+│   ├── Tools28.dll              # メインDLL
+│   └── Tools28.addin            # マニフェストファイル
+├── install.bat                  # 自動インストール
+├── uninstall.bat                # アンインストール
+└── README.txt                   # インストール手順
+```
+
+### テンプレート構成 (Packages/{VERSION}/)
+各バージョン (2021-2026) に以下を格納 (DLLはビルド時に自動コピー):
+```
+Packages/{VERSION}/
+├── 28Tools/
+│   └── Tools28.addin
 ├── install.bat
 ├── uninstall.bat
 └── README.txt
 ```
+
+### install.bat の内容
+- `chcp 65001` でUTF-8対応
+- `C:\ProgramData\Autodesk\Revit\Addins\{VERSION}\` へ DLL/addin をコピー
+- ディレクトリ不在時は自動作成
+- 28Tools フォルダ、DLL、addin の存在確認とエラーハンドリング
+- コピー結果の表示
+
+### uninstall.bat の内容
+- `C:\ProgramData\Autodesk\Revit\Addins\{VERSION}\` から Tools28.dll / Tools28.addin を削除
+
+### README.txt の内容
+- クイックスタート手順 (install.bat を管理者実行 → Revit 再起動)
+- 機能一覧
+- アンインストール手順
+- 対応バージョン
 
 ### インストール先
 `C:\ProgramData\Autodesk\Revit\Addins\{VERSION}\`
