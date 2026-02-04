@@ -29,6 +29,8 @@ Revit-Add-ins/
 │   │   ├── install.bat         #   自動インストール
 │   │   ├── uninstall.bat       #   アンインストール
 │   │   └── README.txt          #   インストール手順
+├── .github/workflows/          # GitHub Actions (自動ビルド・リリース)
+│   └── build-and-release.yml   #   タグ push or 手動実行で配布ZIP生成
 ├── Dist/                       # 配布ZIP出力先 (git管理外)
 ├── BuildAll.ps1                # 全バージョン一括ビルド (2021-2026)
 ├── GenerateAddins.ps1          # .addinマニフェスト生成
@@ -105,9 +107,27 @@ Packages/{VERSION}/
 - **配布サイト**: https://28yu.github.io/28tools-download/
 - **リポジトリ**: https://github.com/28yu/Revit-Add-ins
 
+## CI/CD (GitHub Actions)
+
+### 自動リリース (タグ push)
+```bash
+git tag v1.0
+git push --tags
+```
+GitHub Actions が自動的に:
+1. 全6バージョン (2021-2026) をビルド
+2. 配布ZIP (`28Tools_Revit20XX_v1.0.zip`) を作成
+3. GitHub Releases にアップロード
+
+### 手動実行
+GitHub → Actions → "Build and Release" → Run workflow → バージョン番号を入力
+
+### Revit API 参照
+NuGet パッケージ `Nice3point.Revit.Api` を使用 (ローカル Revit 不要)
+
 ## 注意事項
 
-- Revit API の `RevitAPI.dll` / `RevitAPIUI.dll` は `Private=False` で参照 (ローカルコピーしない)
+- Revit API は NuGet パッケージ経由で取得 (`Nice3point.Revit.Api.RevitAPI` / `RevitAPIUI`)
 - トランザクションは `TransactionMode.Manual` を使用
 - デバッグログは `C:\temp\Tools28_debug.txt` に出力
 - WPFダイアログを使用するコマンドは XAML + コードビハインドで構成

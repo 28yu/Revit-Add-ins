@@ -1,0 +1,136 @@
+name: Build and Release
+
+on:
+  # タグ push で自動リリース (例: git tag v1.0 && git push --tags)
+  push:
+    tags:
+      - 'v*'
+  # 手動実行も可能
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'リリースバージョン (例: 1.0)'
+        required: true
+        default: '1.0'
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    strategy:
+      matrix:
+        revit-version: ['2021', '2022', '2023', '2024', '2025', '2026']
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Setup NuGet
+        uses: NuGet/setup-nuget@v2
+
+      - name: Restore NuGet packages
+        run: nuget restore Tools28.csproj -PackagesDirectory packages
+
+      - name: Build for Revit ${{ matrix.revit-version }}
+        run: |
+          msbuild Tools28.csproj `
+            /p:Configuration=Release `
+            /p:RevitVersion=${{ matrix.revit-version }} `
+            /p:Platform=AnyCPU `
+            /restore `
+            /v:minimal
+
+      - name: Create package
+        shell: pwsh
+        run: |
+          $ver = "${{ matrix.revit-version }}"
+          $outDir = "artifact"
+          $tools28Dir = "$outDir/28Tools"
+
+          New-Item -ItemType Directory -Path $tools28Dir -Force | Out-Null
+
+          # DLL を 28Tools/ にコピー
+          Copy-Item "bin/Release/Revit$ver/Tools28.dll" "$tools28Dir/Tools28.dll"
+
+          # .addin を 28Tools/ にコピー
+          Copy-Item "Packages/$ver/28Tools/Tools28.addin" "$tools28Dir/Tools28.addin"
+
+          # install.bat, uninstall.bat, README.txt をルートにコピー
+          Copy-Item "Packages/$ver/install.bat" "$outDir/install.bat"
+          Copy-Item "Packages/$ver/uninstall.bat" "$outDir/uninstall.bat"
+          Copy-Item "Packages/$ver/README.txt" "$outDir/README.txt"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: 28Tools_Revit${{ matrix.revit-version }}
+          path: artifact/
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: write
+
+    steps:
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            # タグ名から v を除去 (v1.0 -> 1.0)
+            TAG="${{ github.ref_name }}"
+            echo "version=${TAG#v}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create ZIP packages
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          mkdir -p dist
+
+          for dir in artifacts/28Tools_Revit*/; do
+            REVIT_VER=$(basename "$dir" | sed 's/28Tools_Revit//')
+            ZIP_NAME="28Tools_Revit${REVIT_VER}_v${VERSION}.zip"
+            cd "$dir"
+            zip -r "../../dist/$ZIP_NAME" .
+            cd ../..
+            echo "Created: $ZIP_NAME"
+          done
+
+          ls -la dist/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "28 Tools v${{ steps.version.outputs.version }}"
+          body: |
+            ## 28 Tools v${{ steps.version.outputs.version }}
+
+            ### ダウンロード
+            お使いの Revit バージョンに対応する ZIP をダウンロードしてください。
+
+            ### インストール方法
+            1. ZIP を解凍
+            2. `install.bat` を **管理者として実行**
+            3. Revit を再起動
+
+            ### 機能
+            - 符号ON/OFF（通り芯・レベルの符号表示切り替え）
+            - シート一括作成（図枠指定で複数シート一括作成）
+            - 3D視点コピペ（3Dビューの視点を他のビューにコピー）
+            - 切断ボックスコピペ（3Dビューの切断ボックスをコピー）
+            - ビューポート位置コピペ（シート上のビューポート位置をコピー）
+            - トリミング領域コピペ（ビューのトリミング領域をコピー）
+          files: dist/*.zip
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', steps.version.outputs.version) || github.ref_name }}
+          generate_release_notes: false
