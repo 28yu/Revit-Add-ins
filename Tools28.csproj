@@ -46,6 +46,15 @@
     <Resource Include="Resources\Icons\viewport_paste_32.png" />
     <Resource Include="Resources\Icons\cropbox_copy_32.png" />
     <Resource Include="Resources\Icons\cropbox_paste_32.png" />
+    <Resource Include="Resources\Icons\filled_region_32.png" />
+  </ItemGroup>
+
+  <!-- WPF XAML -->
+  <ItemGroup>
+    <Page Include="Commands\FilledRegionSplitMerge\FilledRegionSplitMergeDialog.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
   </ItemGroup>
 
 </Project>

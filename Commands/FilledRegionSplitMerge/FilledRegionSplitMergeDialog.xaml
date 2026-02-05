@@ -1,0 +1,75 @@
+<Window x:Class="Tools28.Commands.FilledRegionSplitMerge.FilledRegionSplitMergeDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="塗潰し領域 分割/統合"
+        Height="280"
+        Width="400"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="NoResize">
+    <Grid Margin="15">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="15"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="15"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- 操作選択 -->
+        <GroupBox Header="操作" Grid.Row="0" Padding="10">
+            <StackPanel>
+                <RadioButton x:Name="RadioSplit"
+                             Content="分割（複数エリアを持つ領域を個別の領域に分割）"
+                             GroupName="Operation"
+                             Margin="0,5,0,5"
+                             Checked="RadioOperation_Checked"/>
+                <RadioButton x:Name="RadioMerge"
+                             Content="統合（複数の領域を1つの領域に統合）"
+                             GroupName="Operation"
+                             Margin="0,5,0,5"
+                             Checked="RadioOperation_Checked"/>
+            </StackPanel>
+        </GroupBox>
+
+        <!-- パターン選択（統合時のみ） -->
+        <GroupBox x:Name="GroupPattern"
+                  Header="塗り潰しパターン"
+                  Grid.Row="2"
+                  Padding="10"
+                  IsEnabled="False">
+            <StackPanel>
+                <TextBlock Text="統合後の塗り潰しパターンを選択してください："
+                           Margin="0,0,0,5"/>
+                <ComboBox x:Name="ComboPattern"
+                          Height="25"
+                          DisplayMemberPath="Name"/>
+            </StackPanel>
+        </GroupBox>
+
+        <!-- 選択情報 -->
+        <TextBlock x:Name="TextInfo"
+                   Grid.Row="4"
+                   TextWrapping="Wrap"
+                   Foreground="Gray"
+                   FontSize="11"/>
+
+        <!-- ボタン -->
+        <StackPanel Grid.Row="6"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right">
+            <Button Content="OK"
+                    Width="80"
+                    Height="28"
+                    Margin="0,0,10,0"
+                    IsDefault="True"
+                    Click="BtnOk_Click"/>
+            <Button Content="キャンセル"
+                    Width="80"
+                    Height="28"
+                    IsCancel="True"
+                    Click="BtnCancel_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>
