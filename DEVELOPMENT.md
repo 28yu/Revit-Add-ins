@@ -36,6 +36,31 @@ git checkout claude/setup-addon-workflow-yO1Uz
 
 ---
 
+## 📐 新機能の設計
+
+新機能を実装する前に、設計書を作成することを推奨します。
+
+### 設計書テンプレートの使用
+
+```bash
+# 1. テンプレートをコピー
+cp .github/FEATURE_TEMPLATE.md Docs/Features/YourFeature.md
+
+# 2. 設計書を記入
+# - 基本情報（機能名、クラス名）
+# - UI設計（リボンパネル、ボタン名、アイコン）
+# - 技術仕様（対象要素、API）
+# - 処理フロー
+# - テストケース
+
+# 3. サンプルを参照
+# Docs/Features/WallHeight-Example.md に完成したサンプルあり
+```
+
+詳細は `Docs/README.md` を参照してください。
+
+---
+
 ## 📝 日常的な開発フロー
 
 ### 基本サイクル
