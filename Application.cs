@@ -22,6 +22,7 @@ namespace Tools28
                 CreateSheetPanel(application, tabName, assemblyPath);
                 CreateThreeDViewPanel(application, tabName, assemblyPath);
                 CreateViewPanel(application, tabName, assemblyPath);
+                CreateDetailPanel(application, tabName, assemblyPath);
 
                 return Result.Succeeded;
             }
@@ -193,6 +194,24 @@ namespace Tools28
             cropBoxPasteButtonData.ToolTip = "コピーしたトリミング領域を他のビューに適用します";
             cropBoxPasteButtonData.LargeImage = LoadImage("cropbox_paste_32.png");
             panel.AddItem(cropBoxPasteButtonData);
+        }
+
+        /// <summary>
+        /// 詳細パネルを作成
+        /// </summary>
+        private void CreateDetailPanel(UIControlledApplication application, string tabName, string assemblyPath)
+        {
+            RibbonPanel panel = application.CreateRibbonPanel(tabName, "詳細");
+
+            // 塗潰し領域 分割/統合ボタン
+            PushButtonData filledRegionButtonData = new PushButtonData(
+                "FilledRegionSplitMerge",
+                "領域",
+                assemblyPath,
+                "Tools28.Commands.FilledRegionSplitMerge.FilledRegionSplitMergeCommand");
+            filledRegionButtonData.ToolTip = "配置されている塗潰領域を分割/統合します";
+            filledRegionButtonData.LargeImage = LoadImage("filled_region_32.png");
+            panel.AddItem(filledRegionButtonData);
         }
 
         /// <summary>
