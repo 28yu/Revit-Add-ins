@@ -14,6 +14,7 @@
 Revit-Add-ins/
 ├── Application.cs              # メインアプリ (IExternalApplication) - リボンUI構築
 ├── Tools28.csproj              # SDK-style マルチバージョン対応プロジェクトファイル
+├── dev-config.json             # 開発設定（開発用Revitバージョン指定）
 ├── Commands/                   # 機能コマンド群
 │   ├── GridBubble/             # 通り芯・レベルの符号表示切替
 │   ├── SheetCreation/          # シート一括作成 (WPFダイアログ付き)
@@ -32,10 +33,13 @@ Revit-Add-ins/
 ├── .github/workflows/          # GitHub Actions (自動ビルド・リリース)
 │   └── build-and-release.yml   #   タグ push or 手動実行で配布ZIP生成
 ├── Dist/                       # 配布ZIP出力先 (git管理外)
-├── BuildAll.ps1                # 全バージョン一括ビルド
+├── QuickBuild.ps1              # 🚀 高速ビルド＆デプロイ（開発用）
+├── BuildAll.ps1                # 全バージョン一括ビルド（リリース用）
 ├── GenerateAddins.ps1          # .addinマニフェスト生成
 ├── CreatePackages.ps1          # 配布ZIP作成
-└── Deploy-For-Testing.ps1      # テスト用デプロイ
+├── Deploy-For-Testing.ps1      # テスト用デプロイ（手動）
+├── DEVELOPMENT.md              # 開発者ガイド（詳細手順）
+└── CLAUDE.md                   # このファイル
 ```
 
 ## ビルド
@@ -116,12 +120,102 @@ Packages/{VERSION}/
 # 出力先: .\Dist\28Tools_Revit20XX_v1.0.zip
 ```
 
+## 開発ワークフロー
+
+### 日常的な開発サイクル（Revit 2022ベース）
+
+```powershell
+# 1. 機能の実装・修正
+#    Commands/ 配下にコマンドクラスを作成
+#    Application.cs にリボンボタンを登録
+
+# 2. クイックビルド＆デプロイ（Revit 2022のみ）
+.\QuickBuild.ps1
+
+# 3. Revit 2022を起動してテスト
+
+# 4. 問題があれば修正して再度 QuickBuild.ps1
+```
+
+### リリース準備（完成後）
+
+```powershell
+# 1. 全バージョン（2021-2026）をビルド
+.\BuildAll.ps1
+
+# 2. 配布ZIPを作成
+.\CreatePackages.ps1 -Version "1.1"
+
+# 3. 動作確認（必要に応じて複数バージョンで検証）
+
+# 4. コミット＆プッシュ
+git add .
+git commit -m "Add new feature"
+git push -u origin claude/setup-addon-workflow-yO1Uz
+
+# 5. GitHub Releasesで公開（自動）
+git tag v1.1
+git push --tags
+```
+
 ## 新機能追加手順
 
-1. `Commands/` に新しいフォルダを作成
-2. `IExternalCommand` を実装するコマンドクラスを作成
-3. `Application.cs` のリボンにボタンを登録
-4. アイコンが必要な場合は `Resources/Icons/` に32x32 PNGを追加し `.csproj` に `<Resource>` を追加
+### 1. コマンドクラスの作成
+
+`Commands/` に新しいフォルダを作成し、`IExternalCommand` を実装：
+
+```csharp
+// Commands/FeatureName/FeatureNameCommand.cs
+using Autodesk.Revit.Attributes;
+using Autodesk.Revit.DB;
+using Autodesk.Revit.UI;
+
+namespace Tools28.Commands.FeatureName
+{
+    [Transaction(TransactionMode.Manual)]
+    public class FeatureNameCommand : IExternalCommand
+    {
+        public Result Execute(
+            ExternalCommandData commandData,
+            ref string message,
+            ElementSet elements)
+        {
+            // 実装
+            return Result.Succeeded;
+        }
+    }
+}
+```
+
+### 2. リボンへの登録
+
+`Application.cs` の `OnStartup()` メソッド内でボタンを追加：
+
+```csharp
+PushButton btn = panel.AddItem(new PushButtonData(
+    "FeatureName",
+    "機能名",
+    assemblyPath,
+    "Tools28.Commands.FeatureName.FeatureNameCommand"
+)) as PushButton;
+btn.ToolTip = "機能の説明";
+```
+
+### 3. アイコンの追加（オプション）
+
+`Resources/Icons/` に32x32 PNGを追加し、`.csproj` に `<Resource>` を追加
+
+```xml
+<ItemGroup>
+  <Resource Include="Resources\Icons\FeatureName.png" />
+</ItemGroup>
+```
+
+### 4. ビルド＆テスト
+
+```powershell
+.\QuickBuild.ps1  # Revit 2022でビルド→デプロイ
+```
 
 ※ SDK-style csproj のため `.cs` ファイルは自動認識される（`<Compile Include>` は不要）
 
