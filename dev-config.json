@@ -1,0 +1,4 @@
+{
+  "defaultRevitVersion": "2022",
+  "description": "開発時に主に使用するRevitバージョン。QuickBuild.ps1はこの設定を使用します。"
+}
