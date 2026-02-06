@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <!-- デフォルトのRevitバージョン（ビルド時に /p:RevitVersion=20XX で上書き） -->
-    <RevitVersion Condition="'$(RevitVersion)' == ''">2024</RevitVersion>
+    <RevitVersion Condition="'$(RevitVersion)' == ''">2025</RevitVersion>
 
     <!-- Revit 2021-2024: .NET Framework 4.8 / Revit 2025-2026: .NET 8 -->
     <TargetFramework Condition="'$(RevitVersion)' &lt; '2025'">net48</TargetFramework>
@@ -47,14 +47,6 @@
     <Resource Include="Resources\Icons\cropbox_copy_32.png" />
     <Resource Include="Resources\Icons\cropbox_paste_32.png" />
     <Resource Include="Resources\Icons\filled_region_32.png" />
-  </ItemGroup>
-
-  <!-- WPF XAML -->
-  <ItemGroup>
-    <Page Include="Commands\FilledRegionSplitMerge\FilledRegionSplitMergeDialog.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
   </ItemGroup>
 
 </Project>

@@ -120,6 +120,8 @@ namespace Tools28.Commands.FilledRegionSplitMerge
             foreach (var curveLoop in boundaries)
             {
                 var loops = new List<CurveLoop> { curveLoop };
+                // TODO: Revit API調査が必要 - NewFilledRegionメソッドの正しい使用方法を確認
+                // エラー: CS1061 'Document' に 'NewFilledRegion' の定義が含まれていない
                 doc.Create.NewFilledRegion(view, typeId, loops);
                 createdCount++;
             }
@@ -162,6 +164,7 @@ namespace Tools28.Commands.FilledRegionSplitMerge
             }
 
             // 新しい統合領域を作成
+            // TODO: Revit API調査が必要 - NewFilledRegionメソッドの正しい使用方法を確認
             doc.Create.NewFilledRegion(view, newTypeId, allBoundaries);
 
             // 元の領域を全て削除
