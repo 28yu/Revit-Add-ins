@@ -218,7 +218,7 @@
     </div>
 
     <script>
-        // Revitスタイルのアイコンデザイン（立体的な四角 + ハッチング）
+        // シンプルな2D矩形 + ハッチングのアイコンデザイン
         function createIcon(canvasId, size) {
             const canvas = document.getElementById(canvasId);
             const ctx = canvas.getContext('2d');
@@ -236,86 +236,41 @@
 
             // Revitカラーパレット
             const colors = {
-                main: '#0066CC',      // Revitブルー
-                accent: '#3399FF',    // 明るいブルー
                 line: '#333333',      // 濃いグレー
-                bg: '#F0F0F0'         // 背景
+                hatch: '#333333'      // ハッチング線
             };
 
-            // アイソメトリック投影のヘルパー関数
-            function isoX(x, y) {
-                return x - y;
-            }
+            // ハッチング付き矩形を描画
+            function drawRectWithHatch(x, y, width, height) {
+                // 矩形の枠線
+                ctx.strokeStyle = colors.line;
+                ctx.lineWidth = 1.0;
+                ctx.strokeRect(x, y, width, height);
 
-            function isoY(x, y) {
-                return (x + y) * 0.5;
-            }
-
-            // 立体的な四角を描画（Revitスタイル）
-            function drawIsometricBox(baseX, baseY, width, height, depth, fillColor, showHatch = true) {
+                // ハッチング（斜め線）
                 ctx.save();
-
-                // 上面
                 ctx.beginPath();
-                ctx.moveTo(baseX + isoX(0, 0), baseY + isoY(0, 0));
-                ctx.lineTo(baseX + isoX(width, 0), baseY + isoY(width, 0));
-                ctx.lineTo(baseX + isoX(width, depth), baseY + isoY(width, depth));
-                ctx.lineTo(baseX + isoX(0, depth), baseY + isoY(0, depth));
-                ctx.closePath();
-                ctx.fillStyle = showHatch ? fillColor : '#FFFFFF';
-                ctx.fill();
-                ctx.strokeStyle = colors.line;
-                ctx.lineWidth = 0.8;
-                ctx.stroke();
+                ctx.rect(x, y, width, height);
+                ctx.clip();
 
-                // ハッチングパターン（斜め線）
-                if (showHatch) {
-                    ctx.save();
-                    ctx.clip();
-                    ctx.strokeStyle = colors.line;
-                    ctx.lineWidth = 0.5;
-                    for (let i = -depth; i < width + depth; i += 2) {
-                        ctx.beginPath();
-                        ctx.moveTo(baseX + isoX(i, 0), baseY + isoY(i, 0));
-                        ctx.lineTo(baseX + isoX(i - depth, depth), baseY + isoY(i - depth, depth));
-                        ctx.stroke();
-                    }
-                    ctx.restore();
+                ctx.strokeStyle = colors.hatch;
+                ctx.lineWidth = 0.6;
+                const spacing = 3; // ハッチング線の間隔
+
+                for (let i = -height; i < width + height; i += spacing) {
+                    ctx.beginPath();
+                    ctx.moveTo(x + i, y);
+                    ctx.lineTo(x + i - height, y + height);
+                    ctx.stroke();
                 }
-
-                // 右側面
-                ctx.beginPath();
-                ctx.moveTo(baseX + isoX(width, 0), baseY + isoY(width, 0));
-                ctx.lineTo(baseX + isoX(width, 0) + 0, baseY + isoY(width, 0) + height);
-                ctx.lineTo(baseX + isoX(width, depth) + 0, baseY + isoY(width, depth) + height);
-                ctx.lineTo(baseX + isoX(width, depth), baseY + isoY(width, depth));
-                ctx.closePath();
-                ctx.fillStyle = '#E6E6E6';
-                ctx.fill();
-                ctx.strokeStyle = colors.line;
-                ctx.lineWidth = 0.8;
-                ctx.stroke();
-
-                // 前面
-                ctx.beginPath();
-                ctx.moveTo(baseX + isoX(0, depth), baseY + isoY(0, depth));
-                ctx.lineTo(baseX + isoX(width, depth), baseY + isoY(width, depth));
-                ctx.lineTo(baseX + isoX(width, depth), baseY + isoY(width, depth) + height);
-                ctx.lineTo(baseX + isoX(0, depth), baseY + isoY(0, depth) + height);
-                ctx.closePath();
-                ctx.fillStyle = '#F5F5F5';
-                ctx.fill();
-                ctx.strokeStyle = colors.line;
-                ctx.lineWidth = 0.8;
-                ctx.stroke();
 
                 ctx.restore();
             }
 
             // 双方向矢印を描画
-            function drawArrow(x1, y1, x2, y2, headSize = 2) {
+            function drawDoubleArrow(x1, y1, x2, y2, headSize) {
                 ctx.strokeStyle = colors.line;
-                ctx.lineWidth = 1.2;
+                ctx.lineWidth = 1.5;
                 ctx.lineCap = 'round';
                 ctx.lineJoin = 'round';
 
@@ -325,22 +280,9 @@
                 ctx.lineTo(x2, y2);
                 ctx.stroke();
 
-                // 矢印の先端（右向き）
                 const angle = Math.atan2(y2 - y1, x2 - x1);
-                ctx.beginPath();
-                ctx.moveTo(x2, y2);
-                ctx.lineTo(
-                    x2 - headSize * Math.cos(angle - Math.PI / 6),
-                    y2 - headSize * Math.sin(angle - Math.PI / 6)
-                );
-                ctx.moveTo(x2, y2);
-                ctx.lineTo(
-                    x2 - headSize * Math.cos(angle + Math.PI / 6),
-                    y2 - headSize * Math.sin(angle + Math.PI / 6)
-                );
-                ctx.stroke();
 
-                // 矢印の先端（左向き）
+                // 左向き矢印の先端
                 ctx.beginPath();
                 ctx.moveTo(x1, y1);
                 ctx.lineTo(
@@ -353,34 +295,45 @@
                     y1 + headSize * Math.sin(angle + Math.PI / 6)
                 );
                 ctx.stroke();
+
+                // 右向き矢印の先端
+                ctx.beginPath();
+                ctx.moveTo(x2, y2);
+                ctx.lineTo(
+                    x2 - headSize * Math.cos(angle - Math.PI / 6),
+                    y2 - headSize * Math.sin(angle - Math.PI / 6)
+                );
+                ctx.moveTo(x2, y2);
+                ctx.lineTo(
+                    x2 - headSize * Math.cos(angle + Math.PI / 6),
+                    y2 - headSize * Math.sin(angle + Math.PI / 6)
+                );
+                ctx.stroke();
             }
 
             // アイコンサイズに応じたスケーリング
             const s = size / 32; // スケール係数
 
-            // 左側: 4つに分割された小さな四角（2x2配置）
-            const boxSize = 5 * s;
-            const gap = 1.5 * s;
-            const leftBase = 4 * s;
-            const topBase = 8 * s;
+            // 左側の縦長矩形
+            const rectWidth = 9 * s;
+            const rectHeight = 20 * s;
+            const leftX = 4 * s;
+            const topY = (size - rectHeight) / 2;
 
-            drawIsometricBox(leftBase, topBase, boxSize, boxSize * 0.6, boxSize, colors.accent);
-            drawIsometricBox(leftBase + boxSize + gap, topBase, boxSize, boxSize * 0.6, boxSize, colors.accent);
-            drawIsometricBox(leftBase, topBase + boxSize + gap, boxSize, boxSize * 0.6, boxSize, colors.accent);
-            drawIsometricBox(leftBase + boxSize + gap, topBase + boxSize + gap, boxSize, boxSize * 0.6, boxSize, colors.accent);
+            drawRectWithHatch(leftX, topY, rectWidth, rectHeight);
 
-            // 右側: 統合された大きな四角
-            const bigBoxSize = boxSize * 2 + gap;
-            const rightBase = size - leftBase - bigBoxSize;
+            // 右側の縦長矩形
+            const rightX = size - leftX - rectWidth;
 
-            drawIsometricBox(rightBase, topBase, bigBoxSize, bigBoxSize * 0.6, bigBoxSize, colors.main);
+            drawRectWithHatch(rightX, topY, rectWidth, rectHeight);
 
             // 中央の双方向矢印
-            const centerX = size / 2;
-            const arrowY = size / 2 + 2 * s;
-            const arrowWidth = 6 * s;
+            const centerY = size / 2;
+            const arrowX1 = leftX + rectWidth + 2 * s;
+            const arrowX2 = rightX - 2 * s;
+            const arrowHeadSize = 3 * s;
 
-            drawArrow(centerX - arrowWidth, arrowY, centerX + arrowWidth, arrowY, 2.5 * s);
+            drawDoubleArrow(arrowX1, centerY, arrowX2, centerY, arrowHeadSize);
         }
 
         // PNG形式でダウンロード
