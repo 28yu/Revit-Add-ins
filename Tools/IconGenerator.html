@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>28Tools - Revitアイコンジェネレーター</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 40px;
+            max-width: 900px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .icon-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .icon-card {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .icon-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+
+        .icon-preview {
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 120px;
+        }
+
+        .icon-name {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .icon-size {
+            font-size: 12px;
+            color: #999;
+            margin-bottom: 15px;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: transform 0.2s, box-shadow 0.2s;
+            width: 100%;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .specs {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 30px;
+        }
+
+        .specs h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+
+        .specs ul {
+            list-style: none;
+            color: #666;
+            font-size: 13px;
+            line-height: 1.8;
+        }
+
+        .specs ul li:before {
+            content: "✓ ";
+            color: #667eea;
+            font-weight: bold;
+            margin-right: 8px;
+        }
+
+        .color-palette {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .color-swatch {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .color-box {
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎨 28Tools - Revitアイコンジェネレーター</h1>
+        <p class="subtitle">Revitスタイルのアイコンを32×32pxと64×64pxで自動生成</p>
+
+        <div class="icon-grid">
+            <!-- 32x32アイコン -->
+            <div class="icon-card">
+                <div class="icon-preview">
+                    <svg id="icon-32" width="32" height="32" viewBox="0 0 32 32"></svg>
+                </div>
+                <div class="icon-name">塗り潰し領域 分割/統合</div>
+                <div class="icon-size">32 × 32 px</div>
+                <button onclick="downloadIcon('icon-32', 32, 'filled_region_32.png')">
+                    32×32をダウンロード
+                </button>
+            </div>
+
+            <!-- 64x64アイコン -->
+            <div class="icon-card">
+                <div class="icon-preview">
+                    <svg id="icon-64" width="64" height="64" viewBox="0 0 32 32"></svg>
+                </div>
+                <div class="icon-name">塗り潰し領域 分割/統合</div>
+                <div class="icon-size">64 × 64 px (高解像度)</div>
+                <button onclick="downloadIcon('icon-64', 64, 'filled_region_64.png')">
+                    64×64をダウンロード
+                </button>
+            </div>
+        </div>
+
+        <div class="specs">
+            <h3>📋 デザイン仕様</h3>
+            <ul>
+                <li>分割と統合を表現する双方向矢印デザイン</li>
+                <li>4つの矩形を使用して領域を表現</li>
+                <li>Revitブルー (#0066CC) をメインカラーに使用</li>
+                <li>線の太さ: 1.2px（視認性重視）</li>
+                <li>透明背景（PNG形式）</li>
+            </ul>
+
+            <h3 style="margin-top: 20px;">🎨 カラーパレット</h3>
+            <div class="color-palette">
+                <div class="color-swatch">
+                    <div class="color-box" style="background: #0066CC;"></div>
+                    <span>Revitブルー #0066CC</span>
+                </div>
+                <div class="color-swatch">
+                    <div class="color-box" style="background: #3399FF;"></div>
+                    <span>アクセント #3399FF</span>
+                </div>
+                <div class="color-swatch">
+                    <div class="color-box" style="background: #333333;"></div>
+                    <span>線 #333333</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // アイコンデザイン（SVG）
+        function createIcon(svgId) {
+            const svg = document.getElementById(svgId);
+            const size = 32; // 基準サイズ
+
+            // SVGの内容をクリア
+            svg.innerHTML = '';
+
+            // 背景（デバッグ用、実際は透明）
+            // const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            // bg.setAttribute('width', size);
+            // bg.setAttribute('height', size);
+            // bg.setAttribute('fill', '#ffffff');
+            // svg.appendChild(bg);
+
+            // デザイン: 4つの矩形を2x2配置 + 双方向矢印
+            const rectSize = 6;
+            const gap = 2;
+            const padding = 6;
+
+            // 左上の矩形グループ (2x2)
+            const positions = [
+                {x: padding, y: padding}, // 左上
+                {x: padding + rectSize + gap, y: padding}, // 右上
+                {x: padding, y: padding + rectSize + gap}, // 左下
+                {x: padding + rectSize + gap, y: padding + rectSize + gap} // 右下
+            ];
+
+            // 左側の4つの矩形（分割前）
+            positions.forEach(pos => {
+                const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                rect.setAttribute('x', pos.x);
+                rect.setAttribute('y', pos.y);
+                rect.setAttribute('width', rectSize);
+                rect.setAttribute('height', rectSize);
+                rect.setAttribute('fill', '#3399FF');
+                rect.setAttribute('stroke', '#333333');
+                rect.setAttribute('stroke-width', '1.2');
+                svg.appendChild(rect);
+            });
+
+            // 右側の統合後の大きな矩形
+            const rightX = size - padding - (rectSize * 2 + gap);
+            const rightY = padding;
+            const rightSize = rectSize * 2 + gap;
+
+            const bigRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            bigRect.setAttribute('x', rightX);
+            bigRect.setAttribute('y', rightY);
+            bigRect.setAttribute('width', rightSize);
+            bigRect.setAttribute('height', rightSize);
+            bigRect.setAttribute('fill', '#0066CC');
+            bigRect.setAttribute('stroke', '#333333');
+            bigRect.setAttribute('stroke-width', '1.2');
+            svg.appendChild(bigRect);
+
+            // 中央の双方向矢印
+            const centerX = size / 2;
+            const centerY = size / 2;
+            const arrowWidth = 8;
+            const arrowHeadSize = 3;
+
+            // 左向き矢印（統合）
+            const leftArrow = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            const leftArrowPath = `
+                M ${centerX - arrowWidth/2} ${centerY - 2}
+                L ${centerX + arrowWidth/2} ${centerY - 2}
+                M ${centerX - arrowWidth/2} ${centerY - 2}
+                L ${centerX - arrowWidth/2 + arrowHeadSize} ${centerY - 2 - arrowHeadSize}
+                M ${centerX - arrowWidth/2} ${centerY - 2}
+                L ${centerX - arrowWidth/2 + arrowHeadSize} ${centerY - 2 + arrowHeadSize}
+            `;
+            leftArrow.setAttribute('d', leftArrowPath);
+            leftArrow.setAttribute('stroke', '#333333');
+            leftArrow.setAttribute('stroke-width', '1.5');
+            leftArrow.setAttribute('fill', 'none');
+            leftArrow.setAttribute('stroke-linecap', 'round');
+            leftArrow.setAttribute('stroke-linejoin', 'round');
+            svg.appendChild(leftArrow);
+
+            // 右向き矢印（分割）
+            const rightArrow = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            const rightArrowPath = `
+                M ${centerX - arrowWidth/2} ${centerY + 2}
+                L ${centerX + arrowWidth/2} ${centerY + 2}
+                M ${centerX + arrowWidth/2} ${centerY + 2}
+                L ${centerX + arrowWidth/2 - arrowHeadSize} ${centerY + 2 - arrowHeadSize}
+                M ${centerX + arrowWidth/2} ${centerY + 2}
+                L ${centerX + arrowWidth/2 - arrowHeadSize} ${centerY + 2 + arrowHeadSize}
+            `;
+            rightArrow.setAttribute('d', rightArrowPath);
+            rightArrow.setAttribute('stroke', '#333333');
+            rightArrow.setAttribute('stroke-width', '1.5');
+            rightArrow.setAttribute('fill', 'none');
+            rightArrow.setAttribute('stroke-linecap', 'round');
+            rightArrow.setAttribute('stroke-linejoin', 'round');
+            svg.appendChild(rightArrow);
+        }
+
+        // PNG形式でダウンロード
+        function downloadIcon(svgId, size, filename) {
+            const svg = document.getElementById(svgId);
+            const svgData = new XMLSerializer().serializeToString(svg);
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+
+            const img = new Image();
+            const svgBlob = new Blob([svgData], {type: 'image/svg+xml;charset=utf-8'});
+            const url = URL.createObjectURL(svgBlob);
+
+            img.onload = function() {
+                ctx.drawImage(img, 0, 0, size, size);
+                URL.revokeObjectURL(url);
+
+                canvas.toBlob(function(blob) {
+                    const link = document.createElement('a');
+                    link.download = filename;
+                    link.href = URL.createObjectURL(blob);
+                    link.click();
+                    URL.revokeObjectURL(link.href);
+                }, 'image/png');
+            };
+
+            img.src = url;
+        }
+
+        // ページ読み込み時にアイコンを生成
+        window.onload = function() {
+            createIcon('icon-32');
+            createIcon('icon-64');
+        };
+    </script>
+</body>
+</html>
