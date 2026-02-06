@@ -2,7 +2,7 @@
 <RevitAddIns>
   <AddIn Type="Application">
     <Name>Tools28</Name>
-    <Assembly>Tools28.dll</Assembly>
+    <Assembly>.\28Tools\Tools28.dll</Assembly>
     <AddInId>E40A22D9-DD80-4387-BA5D-8F9E4DF157D6</AddInId>
     <FullClassName>Tools28.Application</FullClassName>
     <VendorId>Tools28</VendorId>

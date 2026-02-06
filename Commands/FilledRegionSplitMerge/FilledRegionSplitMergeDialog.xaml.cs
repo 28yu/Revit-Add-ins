@@ -137,5 +137,42 @@ namespace Tools28.Commands.FilledRegionSplitMerge
             DialogResult = false;
             Close();
         }
+
+        private void ComboPattern_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+        {
+            if (RectPreview == null || ComboPattern.SelectedItem == null)
+                return;
+
+            var selectedType = ComboPattern.SelectedItem as FilledRegionType;
+            if (selectedType == null)
+                return;
+
+            // パターン名をプレビューエリアに表示
+            // 注: Revit APIでは実際のパターンビジュアルを簡単に取得できないため、
+            //     パターン名を表示する簡易プレビューとして実装
+            UpdatePatternPreview(selectedType);
+        }
+
+        private void UpdatePatternPreview(FilledRegionType patternType)
+        {
+            if (BorderPreview == null || RectPreview == null)
+                return;
+
+            // パターン名を取得
+            string patternName = patternType.Name;
+
+            // プレビューエリアにパターン名を表示
+            // （実際のビジュアルパターンはRevit API制限により表示困難）
+            BorderPreview.Child = new System.Windows.Controls.TextBlock
+            {
+                Text = patternName,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                FontSize = 14,
+                FontWeight = FontWeights.Bold,
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(5)
+            };
+        }
     }
 }

@@ -2,8 +2,8 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="塗潰し領域 分割/統合"
-        Height="280"
-        Width="400"
+        Height="400"
+        Width="450"
         WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize">
     <Grid Margin="15">
@@ -44,7 +44,24 @@
                            Margin="0,0,0,5"/>
                 <ComboBox x:Name="ComboPattern"
                           Height="25"
-                          DisplayMemberPath="Name"/>
+                          DisplayMemberPath="Name"
+                          SelectionChanged="ComboPattern_SelectionChanged"/>
+
+                <!-- パターンプレビュー -->
+                <TextBlock Text="プレビュー："
+                           Margin="0,10,0,5"/>
+                <Border x:Name="BorderPreview"
+                        Height="60"
+                        BorderBrush="LightGray"
+                        BorderThickness="1"
+                        Background="White">
+                    <Rectangle x:Name="RectPreview"
+                               Margin="5">
+                        <Rectangle.Fill>
+                            <SolidColorBrush Color="Black" />
+                        </Rectangle.Fill>
+                    </Rectangle>
+                </Border>
             </StackPanel>
         </GroupBox>
 
