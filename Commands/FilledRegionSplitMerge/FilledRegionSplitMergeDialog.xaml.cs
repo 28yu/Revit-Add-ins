@@ -219,8 +219,8 @@ namespace Tools28.Commands.FilledRegionSplitMerge
 
         private void DrawFillPattern(FillPattern fillPattern, string patternName)
         {
-            var width = BorderPreview.ActualWidth > 0 ? BorderPreview.ActualWidth : 420;
-            var height = BorderPreview.ActualHeight > 0 ? BorderPreview.ActualHeight : 80;
+            var width = 400.0;  // 固定幅
+            var height = 80.0;  // 固定高さ
 
             // 実線パターンの場合
             if (fillPattern.IsSolidFill)
@@ -283,9 +283,9 @@ namespace Tools28.Commands.FilledRegionSplitMerge
 
                 var line = new System.Windows.Shapes.Line
                 {
-                    X1 = -canvasWidth,
+                    X1 = 0,
                     Y1 = y,
-                    X2 = canvasWidth * 2,
+                    X2 = canvasWidth,
                     Y2 = y,
                     Stroke = System.Windows.Media.Brushes.Black,
                     StrokeThickness = 0.5
