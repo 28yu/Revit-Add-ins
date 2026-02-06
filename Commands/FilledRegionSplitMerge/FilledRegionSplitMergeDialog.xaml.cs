@@ -225,7 +225,7 @@ namespace Tools28.Commands.FilledRegionSplitMerge
             // 実線パターンの場合
             if (fillPattern.IsSolidFill)
             {
-                var rect = new Rectangle
+                var rect = new System.Windows.Shapes.Rectangle
                 {
                     Width = width - 10,
                     Height = height - 10,
@@ -248,7 +248,7 @@ namespace Tools28.Commands.FilledRegionSplitMerge
             }
 
             // 背景を白で塗りつぶし
-            var background = new Rectangle
+            var background = new System.Windows.Shapes.Rectangle
             {
                 Width = width,
                 Height = height,
@@ -269,19 +269,11 @@ namespace Tools28.Commands.FilledRegionSplitMerge
             double angleRad = grid.Angle;
             double angleDeg = angleRad * 180.0 / Math.PI;
 
-            // オフセットと間隔を取得（Revit単位からピクセルに変換、スケール調整）
+            // オフセットを取得（Revit単位からピクセルに変換、スケール調整）
             double offset = grid.Offset * 100; // スケール調整
-            double shift = grid.Shift * 100;
 
-            // 間隔を取得
-            double spacing = 10; // デフォルト値
-            if (grid.GetSegments().Count > 0)
-            {
-                var segment = grid.GetSegments()[0];
-                spacing = segment.Length * 100; // スケール調整
-                if (spacing < 5) spacing = 10; // 最小値
-                if (spacing > 30) spacing = 15; // 最大値
-            }
+            // 間隔を取得（デフォルト値を使用）
+            double spacing = 15; // デフォルト間隔
 
             // ハッチング線を描画
             int lineCount = (int)(canvasHeight / spacing) + 10;
@@ -289,7 +281,7 @@ namespace Tools28.Commands.FilledRegionSplitMerge
             {
                 double y = i * spacing + offset;
 
-                var line = new Line
+                var line = new System.Windows.Shapes.Line
                 {
                     X1 = -canvasWidth,
                     Y1 = y,
