@@ -218,7 +218,7 @@
     </div>
 
     <script>
-        // シンプルな2D矩形 + ハッチングのアイコンデザイン
+        // 4つの正方形 + ハッチングのアイコンデザイン
         function createIcon(canvasId, size) {
             const canvas = document.getElementById(canvasId);
             const ctx = canvas.getContext('2d');
@@ -240,11 +240,11 @@
                 hatch: '#333333'      // ハッチング線
             };
 
-            // ハッチング付き矩形を描画
+            // ハッチング付き正方形を描画
             function drawRectWithHatch(x, y, width, height) {
-                // 矩形の枠線
+                // 正方形の枠線
                 ctx.strokeStyle = colors.line;
-                ctx.lineWidth = 1.0;
+                ctx.lineWidth = 0.9;
                 ctx.strokeRect(x, y, width, height);
 
                 // ハッチング（斜め線）
@@ -254,86 +254,41 @@
                 ctx.clip();
 
                 ctx.strokeStyle = colors.hatch;
-                ctx.lineWidth = 0.6;
-                const spacing = 3; // ハッチング線の間隔
+                ctx.lineWidth = 0.5;
+                const spacing = 2.5; // ハッチング線の間隔
 
-                for (let i = -height; i < width + height; i += spacing) {
+                const maxDim = Math.max(width, height);
+                for (let i = -maxDim; i < maxDim * 2; i += spacing) {
                     ctx.beginPath();
                     ctx.moveTo(x + i, y);
-                    ctx.lineTo(x + i - height, y + height);
+                    ctx.lineTo(x + i - maxDim, y + maxDim);
                     ctx.stroke();
                 }
 
                 ctx.restore();
             }
 
-            // 双方向矢印を描画
-            function drawDoubleArrow(x1, y1, x2, y2, headSize) {
-                ctx.strokeStyle = colors.line;
-                ctx.lineWidth = 1.5;
-                ctx.lineCap = 'round';
-                ctx.lineJoin = 'round';
-
-                // 矢印の線
-                ctx.beginPath();
-                ctx.moveTo(x1, y1);
-                ctx.lineTo(x2, y2);
-                ctx.stroke();
-
-                const angle = Math.atan2(y2 - y1, x2 - x1);
-
-                // 左向き矢印の先端
-                ctx.beginPath();
-                ctx.moveTo(x1, y1);
-                ctx.lineTo(
-                    x1 + headSize * Math.cos(angle - Math.PI / 6),
-                    y1 + headSize * Math.sin(angle - Math.PI / 6)
-                );
-                ctx.moveTo(x1, y1);
-                ctx.lineTo(
-                    x1 + headSize * Math.cos(angle + Math.PI / 6),
-                    y1 + headSize * Math.sin(angle + Math.PI / 6)
-                );
-                ctx.stroke();
-
-                // 右向き矢印の先端
-                ctx.beginPath();
-                ctx.moveTo(x2, y2);
-                ctx.lineTo(
-                    x2 - headSize * Math.cos(angle - Math.PI / 6),
-                    y2 - headSize * Math.sin(angle - Math.PI / 6)
-                );
-                ctx.moveTo(x2, y2);
-                ctx.lineTo(
-                    x2 - headSize * Math.cos(angle + Math.PI / 6),
-                    y2 - headSize * Math.sin(angle + Math.PI / 6)
-                );
-                ctx.stroke();
-            }
-
             // アイコンサイズに応じたスケーリング
             const s = size / 32; // スケール係数
 
-            // 左側の縦長矩形
-            const rectWidth = 9 * s;
-            const rectHeight = 20 * s;
-            const leftX = 4 * s;
-            const topY = (size - rectHeight) / 2;
+            // 4つの正方形を2×2配置
+            const squareSize = 11 * s;  // 各正方形のサイズ
+            const gap = 2 * s;          // 正方形間の隙間
+            const totalSize = squareSize * 2 + gap;
+            const startX = (size - totalSize) / 2;
+            const startY = (size - totalSize) / 2;
 
-            drawRectWithHatch(leftX, topY, rectWidth, rectHeight);
+            // 左上
+            drawRectWithHatch(startX, startY, squareSize, squareSize);
 
-            // 右側の縦長矩形
-            const rightX = size - leftX - rectWidth;
+            // 右上
+            drawRectWithHatch(startX + squareSize + gap, startY, squareSize, squareSize);
 
-            drawRectWithHatch(rightX, topY, rectWidth, rectHeight);
+            // 左下
+            drawRectWithHatch(startX, startY + squareSize + gap, squareSize, squareSize);
 
-            // 中央の双方向矢印
-            const centerY = size / 2;
-            const arrowX1 = leftX + rectWidth + 2 * s;
-            const arrowX2 = rightX - 2 * s;
-            const arrowHeadSize = 3 * s;
-
-            drawDoubleArrow(arrowX1, centerY, arrowX2, centerY, arrowHeadSize);
+            // 右下
+            drawRectWithHatch(startX + squareSize + gap, startY + squareSize + gap, squareSize, squareSize);
         }
 
         // PNG形式でダウンロード
