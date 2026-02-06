@@ -192,11 +192,11 @@
         <div class="specs">
             <h3>📋 デザイン仕様</h3>
             <ul>
-                <li>分割と統合を表現する双方向矢印デザイン</li>
-                <li>4つの矩形を使用して領域を表現</li>
-                <li>Revitブルー (#0066CC) をメインカラーに使用</li>
-                <li>線の太さ: 1.2px（視認性重視）</li>
-                <li>透明背景（PNG形式）</li>
+                <li>4つの正方形を2×2配置（領域分割/統合を表現）</li>
+                <li>正方形サイズ: 6×6px（32px版）/ 12×12px（64px版）</li>
+                <li>枠線: 0.6px / ハッチング線: 0.4px</li>
+                <li>ハッチング間隔: 1.8px（斜め45度）</li>
+                <li>透明背景（PNG形式）/ 2x解像度レンダリング</li>
             </ul>
 
             <h3 style="margin-top: 20px;">🎨 カラーパレット</h3>
@@ -244,7 +244,7 @@
             function drawRectWithHatch(x, y, width, height) {
                 // 正方形の枠線
                 ctx.strokeStyle = colors.line;
-                ctx.lineWidth = 0.9;
+                ctx.lineWidth = 0.6;  // 細くした（0.9 → 0.6）
                 ctx.strokeRect(x, y, width, height);
 
                 // ハッチング（斜め線）
@@ -254,8 +254,8 @@
                 ctx.clip();
 
                 ctx.strokeStyle = colors.hatch;
-                ctx.lineWidth = 0.5;
-                const spacing = 2.5; // ハッチング線の間隔
+                ctx.lineWidth = 0.4;  // 細くした（0.5 → 0.4）
+                const spacing = 1.8; // ハッチング線の間隔（小さい正方形に合わせて調整）
 
                 const maxDim = Math.max(width, height);
                 for (let i = -maxDim; i < maxDim * 2; i += spacing) {
@@ -272,8 +272,8 @@
             const s = size / 32; // スケール係数
 
             // 4つの正方形を2×2配置
-            const squareSize = 11 * s;  // 各正方形のサイズ
-            const gap = 2 * s;          // 正方形間の隙間
+            const squareSize = 6 * s;   // 各正方形のサイズ（11 → 6に縮小）
+            const gap = 1.5 * s;        // 正方形間の隙間（2 → 1.5に調整）
             const totalSize = squareSize * 2 + gap;
             const startX = (size - totalSize) / 2;
             const startY = (size - totalSize) / 2;
