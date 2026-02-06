@@ -206,7 +206,7 @@ namespace Tools28
             // 塗潰し領域 分割/統合ボタン
             PushButtonData filledRegionButtonData = new PushButtonData(
                 "FilledRegionSplitMerge",
-                "領域",
+                "塗り潰し\n分割/統合",
                 assemblyPath,
                 "Tools28.Commands.FilledRegionSplitMerge.FilledRegionSplitMergeCommand");
             filledRegionButtonData.ToolTip = "配置されている塗潰領域を分割/統合します";
