@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="塗潰し領域 分割/統合"
-        Height="400"
+        Height="520"
         Width="450"
         WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize">
@@ -51,16 +51,14 @@
                 <TextBlock Text="プレビュー："
                            Margin="0,10,0,5"/>
                 <Border x:Name="BorderPreview"
-                        Height="60"
+                        Height="80"
                         BorderBrush="LightGray"
                         BorderThickness="1"
                         Background="White">
-                    <Rectangle x:Name="RectPreview"
-                               Margin="5">
-                        <Rectangle.Fill>
-                            <SolidColorBrush Color="Black" />
-                        </Rectangle.Fill>
-                    </Rectangle>
+                    <Canvas x:Name="CanvasPreview"
+                            ClipToBounds="True">
+                        <!-- パターンがここに描画されます -->
+                    </Canvas>
                 </Border>
             </StackPanel>
         </GroupBox>
@@ -75,7 +73,8 @@
         <!-- ボタン -->
         <StackPanel Grid.Row="6"
                     Orientation="Horizontal"
-                    HorizontalAlignment="Right">
+                    HorizontalAlignment="Right"
+                    Margin="0,15,0,0">
             <Button Content="OK"
                     Width="80"
                     Height="28"

@@ -1,5 +1,8 @@
+using System;
 using System.Linq;
 using System.Windows;
+using System.Windows.Media;
+using System.Windows.Shapes;
 using Autodesk.Revit.DB;
 
 namespace Tools28.Commands.FilledRegionSplitMerge
@@ -140,39 +143,168 @@ namespace Tools28.Commands.FilledRegionSplitMerge
 
         private void ComboPattern_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
         {
-            if (RectPreview == null || ComboPattern.SelectedItem == null)
+            if (CanvasPreview == null || ComboPattern.SelectedItem == null)
                 return;
 
             var selectedType = ComboPattern.SelectedItem as FilledRegionType;
             if (selectedType == null)
                 return;
 
-            // パターン名をプレビューエリアに表示
-            // 注: Revit APIでは実際のパターンビジュアルを簡単に取得できないため、
-            //     パターン名を表示する簡易プレビューとして実装
             UpdatePatternPreview(selectedType);
         }
 
         private void UpdatePatternPreview(FilledRegionType patternType)
         {
-            if (BorderPreview == null || RectPreview == null)
+            if (BorderPreview == null || CanvasPreview == null)
                 return;
 
-            // パターン名を取得
-            string patternName = patternType.Name;
+            // Canvasをクリア
+            CanvasPreview.Children.Clear();
 
-            // プレビューエリアにパターン名を表示
-            // （実際のビジュアルパターンはRevit API制限により表示困難）
-            BorderPreview.Child = new System.Windows.Controls.TextBlock
+            try
+            {
+                // FillPatternElementを取得
+                var patternId = patternType.ForegroundPatternId;
+                if (patternId == null || patternId == ElementId.InvalidElementId)
+                {
+                    patternId = patternType.BackgroundPatternId;
+                }
+
+                if (patternId == null || patternId == ElementId.InvalidElementId)
+                {
+                    ShowPatternName(patternType.Name);
+                    return;
+                }
+
+                var doc = patternType.Document;
+                var fillPatternElement = doc.GetElement(patternId) as FillPatternElement;
+                if (fillPatternElement == null)
+                {
+                    ShowPatternName(patternType.Name);
+                    return;
+                }
+
+                var fillPattern = fillPatternElement.GetFillPattern();
+                if (fillPattern == null)
+                {
+                    ShowPatternName(patternType.Name);
+                    return;
+                }
+
+                // パターンを描画
+                DrawFillPattern(fillPattern, patternType.Name);
+            }
+            catch
+            {
+                // エラー時はパターン名を表示
+                ShowPatternName(patternType.Name);
+            }
+        }
+
+        private void ShowPatternName(string patternName)
+        {
+            var textBlock = new System.Windows.Controls.TextBlock
             {
                 Text = patternName,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
-                FontSize = 14,
-                FontWeight = FontWeights.Bold,
-                TextWrapping = TextWrapping.Wrap,
-                Margin = new Thickness(5)
+                FontSize = 12,
+                Foreground = System.Windows.Media.Brushes.Gray
             };
+
+            CanvasPreview.Children.Add(textBlock);
+            System.Windows.Controls.Canvas.SetLeft(textBlock, 10);
+            System.Windows.Controls.Canvas.SetTop(textBlock, 30);
+        }
+
+        private void DrawFillPattern(FillPattern fillPattern, string patternName)
+        {
+            var width = BorderPreview.ActualWidth > 0 ? BorderPreview.ActualWidth : 420;
+            var height = BorderPreview.ActualHeight > 0 ? BorderPreview.ActualHeight : 80;
+
+            // 実線パターンの場合
+            if (fillPattern.IsSolidFill)
+            {
+                var rect = new Rectangle
+                {
+                    Width = width - 10,
+                    Height = height - 10,
+                    Fill = System.Windows.Media.Brushes.Black,
+                    Stroke = System.Windows.Media.Brushes.Gray,
+                    StrokeThickness = 1
+                };
+                CanvasPreview.Children.Add(rect);
+                System.Windows.Controls.Canvas.SetLeft(rect, 5);
+                System.Windows.Controls.Canvas.SetTop(rect, 5);
+                return;
+            }
+
+            // ハッチングパターンの場合
+            var gridSegments = fillPattern.GetFillGrids();
+            if (gridSegments == null || gridSegments.Count == 0)
+            {
+                ShowPatternName(patternName);
+                return;
+            }
+
+            // 背景を白で塗りつぶし
+            var background = new Rectangle
+            {
+                Width = width,
+                Height = height,
+                Fill = System.Windows.Media.Brushes.White
+            };
+            CanvasPreview.Children.Add(background);
+
+            // 各グリッドセグメントを描画
+            foreach (var grid in gridSegments)
+            {
+                DrawGridSegment(grid, width, height);
+            }
+        }
+
+        private void DrawGridSegment(FillGrid grid, double canvasWidth, double canvasHeight)
+        {
+            // 角度を取得（ラジアンから度に変換）
+            double angleRad = grid.Angle;
+            double angleDeg = angleRad * 180.0 / Math.PI;
+
+            // オフセットと間隔を取得（Revit単位からピクセルに変換、スケール調整）
+            double offset = grid.Offset * 100; // スケール調整
+            double shift = grid.Shift * 100;
+
+            // 間隔を取得
+            double spacing = 10; // デフォルト値
+            if (grid.GetSegments().Count > 0)
+            {
+                var segment = grid.GetSegments()[0];
+                spacing = segment.Length * 100; // スケール調整
+                if (spacing < 5) spacing = 10; // 最小値
+                if (spacing > 30) spacing = 15; // 最大値
+            }
+
+            // ハッチング線を描画
+            int lineCount = (int)(canvasHeight / spacing) + 10;
+            for (int i = -5; i < lineCount; i++)
+            {
+                double y = i * spacing + offset;
+
+                var line = new Line
+                {
+                    X1 = -canvasWidth,
+                    Y1 = y,
+                    X2 = canvasWidth * 2,
+                    Y2 = y,
+                    Stroke = System.Windows.Media.Brushes.Black,
+                    StrokeThickness = 0.5
+                };
+
+                // 回転変換を適用
+                var rotateTransform = new RotateTransform(angleDeg, canvasWidth / 2, canvasHeight / 2);
+                line.RenderTransform = rotateTransform;
+
+                CanvasPreview.Children.Add(line);
+            }
         }
     }
 }
