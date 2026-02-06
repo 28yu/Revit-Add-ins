@@ -164,26 +164,26 @@
         <p class="subtitle">Revitスタイルのアイコンを32×32pxと64×64pxで自動生成</p>
 
         <div class="icon-grid">
-            <!-- 32x32アイコン -->
+            <!-- 32x32アイコン（2xレンダリング） -->
             <div class="icon-card">
                 <div class="icon-preview">
-                    <svg id="icon-32" width="32" height="32" viewBox="0 0 32 32"></svg>
+                    <canvas id="preview-32" width="32" height="32" style="width: 32px; height: 32px;"></canvas>
                 </div>
                 <div class="icon-name">塗り潰し領域 分割/統合</div>
-                <div class="icon-size">32 × 32 px</div>
-                <button onclick="downloadIcon('icon-32', 32, 'filled_region_32.png')">
+                <div class="icon-size">32 × 32 px (2x解像度)</div>
+                <button onclick="downloadIcon('canvas-32', 32, 'filled_region_32.png')">
                     32×32をダウンロード
                 </button>
             </div>
 
-            <!-- 64x64アイコン -->
+            <!-- 64x64アイコン（2xレンダリング） -->
             <div class="icon-card">
                 <div class="icon-preview">
-                    <svg id="icon-64" width="64" height="64" viewBox="0 0 32 32"></svg>
+                    <canvas id="preview-64" width="64" height="64" style="width: 64px; height: 64px;"></canvas>
                 </div>
                 <div class="icon-name">塗り潰し領域 分割/統合</div>
-                <div class="icon-size">64 × 64 px (高解像度)</div>
-                <button onclick="downloadIcon('icon-64', 64, 'filled_region_64.png')">
+                <div class="icon-size">64 × 64 px (2x解像度)</div>
+                <button onclick="downloadIcon('canvas-64', 64, 'filled_region_64.png')">
                     64×64をダウンロード
                 </button>
             </div>
@@ -218,138 +218,188 @@
     </div>
 
     <script>
-        // アイコンデザイン（SVG）
-        function createIcon(svgId) {
-            const svg = document.getElementById(svgId);
-            const size = 32; // 基準サイズ
+        // Revitスタイルのアイコンデザイン（立体的な四角 + ハッチング）
+        function createIcon(canvasId, size) {
+            const canvas = document.getElementById(canvasId);
+            const ctx = canvas.getContext('2d');
 
-            // SVGの内容をクリア
-            svg.innerHTML = '';
+            // 2倍解像度でレンダリング（アンチエイリアシング向上）
+            const scale = 2;
+            canvas.width = size * scale;
+            canvas.height = size * scale;
+            canvas.style.width = size + 'px';
+            canvas.style.height = size + 'px';
+            ctx.scale(scale, scale);
 
-            // 背景（デバッグ用、実際は透明）
-            // const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-            // bg.setAttribute('width', size);
-            // bg.setAttribute('height', size);
-            // bg.setAttribute('fill', '#ffffff');
-            // svg.appendChild(bg);
+            // 背景を透明に
+            ctx.clearRect(0, 0, size, size);
 
-            // デザイン: 4つの矩形を2x2配置 + 双方向矢印
-            const rectSize = 6;
-            const gap = 2;
-            const padding = 6;
+            // Revitカラーパレット
+            const colors = {
+                main: '#0066CC',      // Revitブルー
+                accent: '#3399FF',    // 明るいブルー
+                line: '#333333',      // 濃いグレー
+                bg: '#F0F0F0'         // 背景
+            };
 
-            // 左上の矩形グループ (2x2)
-            const positions = [
-                {x: padding, y: padding}, // 左上
-                {x: padding + rectSize + gap, y: padding}, // 右上
-                {x: padding, y: padding + rectSize + gap}, // 左下
-                {x: padding + rectSize + gap, y: padding + rectSize + gap} // 右下
-            ];
+            // アイソメトリック投影のヘルパー関数
+            function isoX(x, y) {
+                return x - y;
+            }
 
-            // 左側の4つの矩形（分割前）
-            positions.forEach(pos => {
-                const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-                rect.setAttribute('x', pos.x);
-                rect.setAttribute('y', pos.y);
-                rect.setAttribute('width', rectSize);
-                rect.setAttribute('height', rectSize);
-                rect.setAttribute('fill', '#3399FF');
-                rect.setAttribute('stroke', '#333333');
-                rect.setAttribute('stroke-width', '1.2');
-                svg.appendChild(rect);
-            });
+            function isoY(x, y) {
+                return (x + y) * 0.5;
+            }
 
-            // 右側の統合後の大きな矩形
-            const rightX = size - padding - (rectSize * 2 + gap);
-            const rightY = padding;
-            const rightSize = rectSize * 2 + gap;
+            // 立体的な四角を描画（Revitスタイル）
+            function drawIsometricBox(baseX, baseY, width, height, depth, fillColor, showHatch = true) {
+                ctx.save();
 
-            const bigRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-            bigRect.setAttribute('x', rightX);
-            bigRect.setAttribute('y', rightY);
-            bigRect.setAttribute('width', rightSize);
-            bigRect.setAttribute('height', rightSize);
-            bigRect.setAttribute('fill', '#0066CC');
-            bigRect.setAttribute('stroke', '#333333');
-            bigRect.setAttribute('stroke-width', '1.2');
-            svg.appendChild(bigRect);
+                // 上面
+                ctx.beginPath();
+                ctx.moveTo(baseX + isoX(0, 0), baseY + isoY(0, 0));
+                ctx.lineTo(baseX + isoX(width, 0), baseY + isoY(width, 0));
+                ctx.lineTo(baseX + isoX(width, depth), baseY + isoY(width, depth));
+                ctx.lineTo(baseX + isoX(0, depth), baseY + isoY(0, depth));
+                ctx.closePath();
+                ctx.fillStyle = showHatch ? fillColor : '#FFFFFF';
+                ctx.fill();
+                ctx.strokeStyle = colors.line;
+                ctx.lineWidth = 0.8;
+                ctx.stroke();
+
+                // ハッチングパターン（斜め線）
+                if (showHatch) {
+                    ctx.save();
+                    ctx.clip();
+                    ctx.strokeStyle = colors.line;
+                    ctx.lineWidth = 0.5;
+                    for (let i = -depth; i < width + depth; i += 2) {
+                        ctx.beginPath();
+                        ctx.moveTo(baseX + isoX(i, 0), baseY + isoY(i, 0));
+                        ctx.lineTo(baseX + isoX(i - depth, depth), baseY + isoY(i - depth, depth));
+                        ctx.stroke();
+                    }
+                    ctx.restore();
+                }
+
+                // 右側面
+                ctx.beginPath();
+                ctx.moveTo(baseX + isoX(width, 0), baseY + isoY(width, 0));
+                ctx.lineTo(baseX + isoX(width, 0) + 0, baseY + isoY(width, 0) + height);
+                ctx.lineTo(baseX + isoX(width, depth) + 0, baseY + isoY(width, depth) + height);
+                ctx.lineTo(baseX + isoX(width, depth), baseY + isoY(width, depth));
+                ctx.closePath();
+                ctx.fillStyle = '#E6E6E6';
+                ctx.fill();
+                ctx.strokeStyle = colors.line;
+                ctx.lineWidth = 0.8;
+                ctx.stroke();
+
+                // 前面
+                ctx.beginPath();
+                ctx.moveTo(baseX + isoX(0, depth), baseY + isoY(0, depth));
+                ctx.lineTo(baseX + isoX(width, depth), baseY + isoY(width, depth));
+                ctx.lineTo(baseX + isoX(width, depth), baseY + isoY(width, depth) + height);
+                ctx.lineTo(baseX + isoX(0, depth), baseY + isoY(0, depth) + height);
+                ctx.closePath();
+                ctx.fillStyle = '#F5F5F5';
+                ctx.fill();
+                ctx.strokeStyle = colors.line;
+                ctx.lineWidth = 0.8;
+                ctx.stroke();
+
+                ctx.restore();
+            }
+
+            // 双方向矢印を描画
+            function drawArrow(x1, y1, x2, y2, headSize = 2) {
+                ctx.strokeStyle = colors.line;
+                ctx.lineWidth = 1.2;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+
+                // 矢印の線
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.stroke();
+
+                // 矢印の先端（右向き）
+                const angle = Math.atan2(y2 - y1, x2 - x1);
+                ctx.beginPath();
+                ctx.moveTo(x2, y2);
+                ctx.lineTo(
+                    x2 - headSize * Math.cos(angle - Math.PI / 6),
+                    y2 - headSize * Math.sin(angle - Math.PI / 6)
+                );
+                ctx.moveTo(x2, y2);
+                ctx.lineTo(
+                    x2 - headSize * Math.cos(angle + Math.PI / 6),
+                    y2 - headSize * Math.sin(angle + Math.PI / 6)
+                );
+                ctx.stroke();
+
+                // 矢印の先端（左向き）
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(
+                    x1 + headSize * Math.cos(angle - Math.PI / 6),
+                    y1 + headSize * Math.sin(angle - Math.PI / 6)
+                );
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(
+                    x1 + headSize * Math.cos(angle + Math.PI / 6),
+                    y1 + headSize * Math.sin(angle + Math.PI / 6)
+                );
+                ctx.stroke();
+            }
+
+            // アイコンサイズに応じたスケーリング
+            const s = size / 32; // スケール係数
+
+            // 左側: 4つに分割された小さな四角（2x2配置）
+            const boxSize = 5 * s;
+            const gap = 1.5 * s;
+            const leftBase = 4 * s;
+            const topBase = 8 * s;
+
+            drawIsometricBox(leftBase, topBase, boxSize, boxSize * 0.6, boxSize, colors.accent);
+            drawIsometricBox(leftBase + boxSize + gap, topBase, boxSize, boxSize * 0.6, boxSize, colors.accent);
+            drawIsometricBox(leftBase, topBase + boxSize + gap, boxSize, boxSize * 0.6, boxSize, colors.accent);
+            drawIsometricBox(leftBase + boxSize + gap, topBase + boxSize + gap, boxSize, boxSize * 0.6, boxSize, colors.accent);
+
+            // 右側: 統合された大きな四角
+            const bigBoxSize = boxSize * 2 + gap;
+            const rightBase = size - leftBase - bigBoxSize;
+
+            drawIsometricBox(rightBase, topBase, bigBoxSize, bigBoxSize * 0.6, bigBoxSize, colors.main);
 
             // 中央の双方向矢印
             const centerX = size / 2;
-            const centerY = size / 2;
-            const arrowWidth = 8;
-            const arrowHeadSize = 3;
+            const arrowY = size / 2 + 2 * s;
+            const arrowWidth = 6 * s;
 
-            // 左向き矢印（統合）
-            const leftArrow = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            const leftArrowPath = `
-                M ${centerX - arrowWidth/2} ${centerY - 2}
-                L ${centerX + arrowWidth/2} ${centerY - 2}
-                M ${centerX - arrowWidth/2} ${centerY - 2}
-                L ${centerX - arrowWidth/2 + arrowHeadSize} ${centerY - 2 - arrowHeadSize}
-                M ${centerX - arrowWidth/2} ${centerY - 2}
-                L ${centerX - arrowWidth/2 + arrowHeadSize} ${centerY - 2 + arrowHeadSize}
-            `;
-            leftArrow.setAttribute('d', leftArrowPath);
-            leftArrow.setAttribute('stroke', '#333333');
-            leftArrow.setAttribute('stroke-width', '1.5');
-            leftArrow.setAttribute('fill', 'none');
-            leftArrow.setAttribute('stroke-linecap', 'round');
-            leftArrow.setAttribute('stroke-linejoin', 'round');
-            svg.appendChild(leftArrow);
-
-            // 右向き矢印（分割）
-            const rightArrow = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            const rightArrowPath = `
-                M ${centerX - arrowWidth/2} ${centerY + 2}
-                L ${centerX + arrowWidth/2} ${centerY + 2}
-                M ${centerX + arrowWidth/2} ${centerY + 2}
-                L ${centerX + arrowWidth/2 - arrowHeadSize} ${centerY + 2 - arrowHeadSize}
-                M ${centerX + arrowWidth/2} ${centerY + 2}
-                L ${centerX + arrowWidth/2 - arrowHeadSize} ${centerY + 2 + arrowHeadSize}
-            `;
-            rightArrow.setAttribute('d', rightArrowPath);
-            rightArrow.setAttribute('stroke', '#333333');
-            rightArrow.setAttribute('stroke-width', '1.5');
-            rightArrow.setAttribute('fill', 'none');
-            rightArrow.setAttribute('stroke-linecap', 'round');
-            rightArrow.setAttribute('stroke-linejoin', 'round');
-            svg.appendChild(rightArrow);
+            drawArrow(centerX - arrowWidth, arrowY, centerX + arrowWidth, arrowY, 2.5 * s);
         }
 
         // PNG形式でダウンロード
-        function downloadIcon(svgId, size, filename) {
-            const svg = document.getElementById(svgId);
-            const svgData = new XMLSerializer().serializeToString(svg);
-            const canvas = document.createElement('canvas');
-            canvas.width = size;
-            canvas.height = size;
-            const ctx = canvas.getContext('2d');
+        function downloadIcon(canvasId, size, filename) {
+            const canvas = document.getElementById(canvasId.replace('canvas-', 'preview-'));
 
-            const img = new Image();
-            const svgBlob = new Blob([svgData], {type: 'image/svg+xml;charset=utf-8'});
-            const url = URL.createObjectURL(svgBlob);
-
-            img.onload = function() {
-                ctx.drawImage(img, 0, 0, size, size);
-                URL.revokeObjectURL(url);
-
-                canvas.toBlob(function(blob) {
-                    const link = document.createElement('a');
-                    link.download = filename;
-                    link.href = URL.createObjectURL(blob);
-                    link.click();
-                    URL.revokeObjectURL(link.href);
-                }, 'image/png');
-            };
-
-            img.src = url;
+            canvas.toBlob(function(blob) {
+                const link = document.createElement('a');
+                link.download = filename;
+                link.href = URL.createObjectURL(blob);
+                link.click();
+                URL.revokeObjectURL(link.href);
+            }, 'image/png');
         }
 
         // ページ読み込み時にアイコンを生成
         window.onload = function() {
-            createIcon('icon-32');
-            createIcon('icon-64');
+            createIcon('preview-32', 32);
+            createIcon('preview-64', 64);
         };
     </script>
 </body>
