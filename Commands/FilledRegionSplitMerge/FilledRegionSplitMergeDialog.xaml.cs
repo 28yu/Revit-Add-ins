@@ -270,29 +270,35 @@ namespace Tools28.Commands.FilledRegionSplitMerge
             double angleDeg = angleRad * 180.0 / Math.PI;
 
             // オフセットを取得（Revit単位からピクセルに変換、スケール調整）
-            double offset = grid.Offset * 100; // スケール調整
+            double offset = (grid.Offset * 100) % 20; // スケール調整と正規化
 
-            // 間隔を取得（デフォルト値を使用）
-            double spacing = 15; // デフォルト間隔
+            // 間隔を取得（より密なパターンにするため間隔を小さく）
+            double spacing = 10; // デフォルト間隔を15から10に変更
 
-            // ハッチング線を描画
-            int lineCount = (int)(canvasHeight / spacing) + 10;
-            for (int i = -5; i < lineCount; i++)
+            // ハッチング線を描画（キャンバス全体をカバー）
+            int lineCount = (int)(Math.Max(canvasWidth, canvasHeight) * 1.5 / spacing);
+
+            for (int i = -lineCount / 2; i < lineCount / 2; i++)
             {
                 double y = i * spacing + offset;
 
+                // 線の長さを十分に長くして、回転後もキャンバスを完全にカバー
+                double lineLength = Math.Max(canvasWidth, canvasHeight) * 2;
+                double centerX = canvasWidth / 2;
+                double centerY = canvasHeight / 2;
+
                 var line = new System.Windows.Shapes.Line
                 {
-                    X1 = 0,
+                    X1 = centerX - lineLength / 2,
                     Y1 = y,
-                    X2 = canvasWidth,
+                    X2 = centerX + lineLength / 2,
                     Y2 = y,
                     Stroke = System.Windows.Media.Brushes.Black,
-                    StrokeThickness = 0.5
+                    StrokeThickness = 0.8  // 少し太く
                 };
 
-                // 回転変換を適用
-                var rotateTransform = new RotateTransform(angleDeg, canvasWidth / 2, canvasHeight / 2);
+                // 回転変換を中心点を基準に適用
+                var rotateTransform = new RotateTransform(angleDeg, centerX, centerY);
                 line.RenderTransform = rotateTransform;
 
                 CanvasPreview.Children.Add(line);
