@@ -2,11 +2,11 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="塗潰し領域 分割/統合"
-        Height="470"
+        SizeToContent="Height"
         Width="450"
         WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize">
-    <Grid Margin="15,15,15,10">
+    <Grid Margin="15,15,15,15">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="15"/>
