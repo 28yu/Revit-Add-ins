@@ -49,12 +49,6 @@
     <Resource Include="Resources\Icons\filled_region_32.png" />
   </ItemGroup>
 
-  <!-- WPF XAML -->
-  <ItemGroup>
-    <Page Include="Commands\FilledRegionSplitMerge\FilledRegionSplitMergeDialog.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-  </ItemGroup>
+  <!-- WPF XAML は自動認識されるため、明示的な指定は不要 -->
 
 </Project>
