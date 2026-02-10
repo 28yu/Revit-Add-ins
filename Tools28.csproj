@@ -56,10 +56,18 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
+    <!-- FilledRegion機能を一時的に無効化：ビルドエラー回避のため -->
+    <!--
     <Page Include="Commands\FilledRegionSplitMerge\FilledRegionSplitMergeDialog.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
+    -->
+  </ItemGroup>
+
+  <!-- FilledRegion関連のファイルを一時的に除外 -->
+  <ItemGroup>
+    <Compile Remove="Commands\FilledRegionSplitMerge\**\*.cs" />
   </ItemGroup>
 
 </Project>
