@@ -249,3 +249,107 @@ NuGet パッケージ `Nice3point.Revit.Api` を使用 (ローカル Revit 不�
 - トランザクションは `TransactionMode.Manual` を使用
 - デバッグログは `C:\temp\Tools28_debug.txt` に出力
 - WPFダイアログを使用するコマンドは XAML + コードビハインドで構成
+
+---
+
+## 🚨 重要：FilledRegion機能の現状（2026-02-10）
+
+### 現状
+**FilledRegion機能（塗り潰し領域 分割/統合）は一時的に無効化されています。**
+
+理由：Revit 2022でのビルドエラーを回避するため
+
+### 無効化した箇所
+1. **Application.cs**: `CreateDetailPanel()` メソッド内のFilledRegionボタン登録をコメントアウト
+2. **Tools28.csproj**:
+   - FilledRegionSplitMergeDialog.xaml をコメントアウト
+   - `Commands\FilledRegionSplitMerge\**\*.cs` を除外
+
+### ビルドエラーの詳細
+
+#### エラー内容
+```
+error CS1061: 'Document' に 'NewFilledRegion' の定義が含まれておらず、
+型 'Document' の最初の引数を受け付けるアクセス可能な拡張メソッド 'NewFilledRegion' が見つかりませんでした。
+```
+
+#### エラー発生場所
+- `Commands\FilledRegionSplitMerge\FilledRegionHelper.cs` (123行目, 165行目)
+
+#### 調査結果
+- **コードは正しい**: `doc.Create.NewFilledRegion(view, typeId, loops);` を使用
+- **using文も正しい**: `using Autodesk.Revit.DB;` が存在
+- **Revit 2022特有の問題**: Revit 2021では動作する可能性あり
+- **NuGetパッケージ**: Nice3point.Revit.Api.RevitAPI バージョン 2022.* を使用
+
+### 影響範囲
+- ✅ **他の全機能は正常に動作**（シート作成、ビューコピー、グリッドバブル等）
+- ✅ **アイコン更新は完了**（`filled_region_32.png` は最新版）
+- ❌ **FilledRegion機能のみ使用不可**（「詳細」パネルに「領域」ボタンが表示されない）
+
+### 次のステップ（未対応）
+
+#### プランB：Revit 2022での問題を詳細調査
+1. **Revit 2022 API仕様の確認**
+   - `Document.Create.NewFilledRegion` メソッドの署名を確認
+   - パラメータの型や順序が正しいか検証
+   - Revit 2022で変更があったか調査
+
+2. **段階的なデバッグ**
+   - 最小限のコードでテスト
+   - using文の再確認
+   - NuGetパッケージのバージョン確認
+
+3. **代替APIの検討**
+   - Revit 2022で推奨される別の方法があるか調査
+   - 条件付きコンパイルで2022専用コードを作成
+
+4. **コードの修正と検証**
+   - 必要に応じてFilledRegionHelper.csを修正
+   - Revit 2022でビルド＆テスト
+   - Revit 2021でも動作確認（後方互換性）
+
+### 再有効化手順（問題解決後）
+
+1. **Tools28.csprojの修正**
+   ```xml
+   <!-- コメントアウトを解除 -->
+   <Page Include="Commands\FilledRegionSplitMerge\FilledRegionSplitMergeDialog.xaml">
+
+   <!-- 除外を削除 -->
+   <Compile Remove="Commands\FilledRegionSplitMerge\**\*.cs" />  <!-- この行を削除 -->
+   ```
+
+2. **Application.csの修正**
+   ```csharp
+   // CreateDetailPanel() メソッド内のコメントアウトを解除
+   PushButtonData filledRegionButtonData = new PushButtonData(...);
+   ```
+
+3. **ビルド＆デプロイ**
+   ```powershell
+   .\QuickBuild.ps1
+   ```
+
+4. **Revit 2022で動作確認**
+
+### 関連ファイル
+- `Commands/FilledRegionSplitMerge/FilledRegionHelper.cs` - 主要ロジック
+- `Commands/FilledRegionSplitMerge/FilledRegionSplitMergeCommand.cs` - コマンドエントリポイント
+- `Commands/FilledRegionSplitMerge/FilledRegionSplitMergeDialog.xaml(.cs)` - WPFダイアログ
+- `Docs/Features/FilledRegionSplitMerge.md` - 機能仕様書
+
+### アイコン更新作業（完了）✅
+
+#### 実施内容
+- `Tools/IconGenerator.html` を作成（アイコン生成ツール）
+- `filled_region_32.png` を更新（4つの小さな正方形、2×2配置、ハッチング付き）
+- squareSize: 8px (4px × 2)、lineWidth: 1.0px、hatchWidth: 0.6px
+- `Tools/README.md` を作成（アイコン生成手順）
+- `QUICK_START.md` を作成（ビルド＆デプロイの詳細ガイド）
+
+#### 成果
+- 全機能のアイコンが正常に表示
+- ビルドが成功（FilledRegion機能を除く）
+- Revit 2022で動作確認済み
+
