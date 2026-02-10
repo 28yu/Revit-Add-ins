@@ -41,6 +41,8 @@ Resources\Icons\filled_region_32.png
 #### 4. ビルド＆デプロイ
 
 ```powershell
+# PowerShellを開く（プロジェクトフォルダで Shift + 右クリック → "PowerShellウィンドウをここで開く"）
+
 # クイックビルド（Revit 2022のみ）
 .\QuickBuild.ps1
 
@@ -48,14 +50,17 @@ Resources\Icons\filled_region_32.png
 .\BuildAll.ps1
 ```
 
+> **📖 ビルド方法が分からない方は [QUICK_START.md](../QUICK_START.md) を参照してください**
+> - 初めての方向けの詳細な手順（スクリーンショット付き）
+> - PowerShellの実行方法
+> - トラブルシューティング（エラー解決方法）
+> - Visual Studioでのビルド方法
+
 #### 5. 動作確認
 
-```powershell
-# Revit 2022を起動
-# → "28Tools" タブ → "詳細" パネル → "領域" ボタンのアイコンを確認
-```
-
-Revit起動中の場合は、一度終了して再起動してください。
+1. **Revit 2022を起動**（既に起動中の場合は一度終了して再起動）
+2. リボンの **"28Tools" タブ** → **"詳細" パネル** → **"領域" ボタン** を確認
+3. 新しいアイコン（4つのハッチング付き正方形が2×2配置）が表示されていればOK ✅
 
 ### トラブルシューティング
 

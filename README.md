@@ -32,6 +32,11 @@ Tools28は、Autodesk Revitの作業効率を向上させる便利なツール�
 
 ## 開発環境のセットアップ
 
+> **🚀 初めての方は [QUICK_START.md](QUICK_START.md) を参照してください**
+> - PowerShellの使い方
+> - ビルド＆デプロイの詳細手順
+> - トラブルシューティング
+
 ### 必要な環境
 - Windows 10/11
 - Visual Studio 2019以降（MSBuildが必要）
@@ -87,26 +92,59 @@ Tools28/
 
 ## 開発ワークフロー
 
-### 1. コードの修正
+### 日常的な開発（推奨）
+
+```powershell
+# 1. コードを修正
+
+# 2. クイックビルド＆デプロイ（Revit 2022向け、高速）
+.\QuickBuild.ps1
+
+# 3. Revit 2022を起動してテスト
+```
+
+### リリース前の準備
+
+```powershell
+# 1. 全バージョン（2021-2026）をビルド
+.\BuildAll.ps1
+
+# 2. 配布パッケージを作成
+.\CreatePackages.ps1 -Version "1.0"
+
+# 3. Dist\ フォルダに配布ZIPが生成される
+```
+
+### 詳細な開発ワークフロー
+
+#### 1. コードの修正
 任意のエディタまたはVisual Studioでソースコードを編集します。
 
-### 2. ビルド
+#### 2. ビルド＆デプロイ
+
+**開発時（高速）**:
 ```powershell
+# Revit 2022向けにビルド＆デプロイ（自動）
+.\QuickBuild.ps1
+
+# 別のバージョンを指定
+.\QuickBuild.ps1 -RevitVersion 2024
+```
+
+**リリース時（全バージョン）**:
+```powershell
+# 全バージョンビルド
 .\BuildAll.ps1
 ```
 
-### 3. テスト
-テストしたいRevitバージョンで以下を実行：
-```powershell
-# DLLをRevitのアドインフォルダにコピー
-Copy-Item ".\bin\Release\Revit2024\Tools28.dll" `
-          "$env:APPDATA\Autodesk\Revit\Addins\2024\"
-```
+#### 3. テスト
+- **QuickBuild.ps1の場合**: 自動デプロイ済み、Revitを起動/再起動するだけ
+- **BuildAll.ps1の場合**: 手動でDLLをコピーが必要
 
-### 4. パッケージ作成
+#### 4. パッケージ作成
 ```powershell
-.\GenerateAddins.ps1
-.\CreatePackages.ps1
+.\CreatePackages.ps1 -Version "1.0"
+# → Dist\28Tools_Revit20XX_v1.0.zip が生成される
 ```
 
 ## Claude Codeでの開発
