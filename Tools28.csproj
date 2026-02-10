@@ -52,6 +52,10 @@
 
   <!-- WPF XAML -->
   <ItemGroup>
+    <Page Include="Commands\SheetCreation\SheetCreationDialog.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="Commands\FilledRegionSplitMerge\FilledRegionSplitMergeDialog.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
