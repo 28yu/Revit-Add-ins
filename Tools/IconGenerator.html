@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>塗潰し領域アイコン生成</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #0078d4;
+            padding-bottom: 10px;
+        }
+        .canvas-container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin: 20px 0;
+            text-align: center;
+        }
+        canvas {
+            border: 1px solid #ddd;
+            margin: 10px;
+            image-rendering: pixelated;
+        }
+        .controls {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin: 20px 0;
+        }
+        button {
+            background: #0078d4;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #106ebe;
+        }
+        .info {
+            background: #e7f3ff;
+            border-left: 4px solid #0078d4;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .spec {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin: 20px 0;
+        }
+        .spec h3 {
+            color: #0078d4;
+            margin-top: 0;
+        }
+        .spec ul {
+            line-height: 1.8;
+        }
+        code {
+            background: #f0f0f0;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Consolas', 'Monaco', monospace;
+        }
+    </style>
+</head>
+<body>
+    <h1>塗潰し領域アイコン生成</h1>
+
+    <div class="info">
+        <strong>用途:</strong> Tools28 Revitアドイン「塗潰し領域 分割/統合」機能のリボンアイコン
+    </div>
+
+    <div class="spec">
+        <h3>アイコン仕様</h3>
+        <ul>
+            <li><strong>デザイン:</strong> 4つの正方形（ハッチング付き）を2×2配置</li>
+            <li><strong>正方形サイズ:</strong> 6×6px（2x解像度: 12×12px）</li>
+            <li><strong>枠線:</strong> 0.6px（2x解像度: 1.2px）</li>
+            <li><strong>ハッチング線:</strong> 0.4px（2x解像度: 0.8px）、間隔1.8px（2x解像度: 3.6px）</li>
+            <li><strong>レンダリング:</strong> 64×64pxで描画 → 32×32pxにダウンスケール（高品質）</li>
+            <li><strong>色:</strong> 黒（#000000）</li>
+        </ul>
+    </div>
+
+    <div class="canvas-container">
+        <h3>プレビュー</h3>
+        <div>
+            <div>実サイズ (32×32px)</div>
+            <canvas id="previewCanvas" width="32" height="32"></canvas>
+        </div>
+        <div>
+            <div>拡大表示 (128×128px)</div>
+            <canvas id="largeCanvas" width="128" height="128"></canvas>
+        </div>
+    </div>
+
+    <div class="controls">
+        <h3>ダウンロード</h3>
+        <button onclick="downloadIcon()">32×32をダウンロード</button>
+        <p style="color: #666; margin-top: 10px;">
+            ダウンロード後、<code>Resources\Icons\filled_region_32.png</code> に上書き保存してください
+        </p>
+    </div>
+
+    <script>
+        // 2x解像度で描画（64×64px）
+        function drawIcon() {
+            // 2x解像度キャンバス（64×64px）
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = 64;
+            tempCanvas.height = 64;
+            const ctx = tempCanvas.getContext('2d');
+
+            // アンチエイリアシング無効化（クリスプなエッジ）
+            ctx.imageSmoothingEnabled = false;
+
+            // 背景透明
+            ctx.clearRect(0, 0, 64, 64);
+
+            // 2x解像度パラメータ
+            const squareSize = 12;      // 6px × 2
+            const lineWidth = 1.2;       // 0.6px × 2
+            const hatchWidth = 0.8;      // 0.4px × 2
+            const hatchSpacing = 3.6;    // 1.8px × 2
+            const gap = 4;               // 正方形間の隙間
+
+            // 正方形を描画する関数
+            function drawSquare(x, y) {
+                // ハッチングパターン（45度斜線）
+                ctx.save();
+                ctx.beginPath();
+                ctx.rect(x, y, squareSize, squareSize);
+                ctx.clip();
+
+                ctx.strokeStyle = '#000000';
+                ctx.lineWidth = hatchWidth;
+
+                // 左上から右下への斜線
+                for (let i = -squareSize; i < squareSize * 2; i += hatchSpacing) {
+                    ctx.beginPath();
+                    ctx.moveTo(x + i, y);
+                    ctx.lineTo(x + i + squareSize, y + squareSize);
+                    ctx.stroke();
+                }
+
+                ctx.restore();
+
+                // 枠線
+                ctx.strokeStyle = '#000000';
+                ctx.lineWidth = lineWidth;
+                ctx.strokeRect(x + lineWidth/2, y + lineWidth/2,
+                               squareSize - lineWidth, squareSize - lineWidth);
+            }
+
+            // 2×2配置の開始位置を計算（中央配置）
+            const totalSize = squareSize * 2 + gap;
+            const startX = (64 - totalSize) / 2;
+            const startY = (64 - totalSize) / 2;
+
+            // 4つの正方形を2×2配置
+            drawSquare(startX, startY);                           // 左上
+            drawSquare(startX + squareSize + gap, startY);        // 右上
+            drawSquare(startX, startY + squareSize + gap);        // 左下
+            drawSquare(startX + squareSize + gap, startY + squareSize + gap);  // 右下
+
+            return tempCanvas;
+        }
+
+        // プレビュー更新
+        function updatePreview() {
+            const tempCanvas = drawIcon();
+
+            // 32×32pxプレビュー（高品質ダウンスケール）
+            const previewCanvas = document.getElementById('previewCanvas');
+            const previewCtx = previewCanvas.getContext('2d');
+            previewCtx.imageSmoothingEnabled = true;
+            previewCtx.imageSmoothingQuality = 'high';
+            previewCtx.clearRect(0, 0, 32, 32);
+            previewCtx.drawImage(tempCanvas, 0, 0, 64, 64, 0, 0, 32, 32);
+
+            // 128×128px拡大プレビュー
+            const largeCanvas = document.getElementById('largeCanvas');
+            const largeCtx = largeCanvas.getContext('2d');
+            largeCtx.imageSmoothingEnabled = false;
+            largeCtx.clearRect(0, 0, 128, 128);
+            largeCtx.drawImage(tempCanvas, 0, 0, 64, 64, 0, 0, 128, 128);
+        }
+
+        // ダウンロード
+        function downloadIcon() {
+            const tempCanvas = drawIcon();
+
+            // 32×32pxに高品質ダウンスケール
+            const finalCanvas = document.createElement('canvas');
+            finalCanvas.width = 32;
+            finalCanvas.height = 32;
+            const finalCtx = finalCanvas.getContext('2d');
+            finalCtx.imageSmoothingEnabled = true;
+            finalCtx.imageSmoothingQuality = 'high';
+            finalCtx.drawImage(tempCanvas, 0, 0, 64, 64, 0, 0, 32, 32);
+
+            // ダウンロード
+            finalCanvas.toBlob(function(blob) {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'filled_region_32.png';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            });
+        }
+
+        // 初期描画
+        updatePreview();
+    </script>
+</body>
+</html>
