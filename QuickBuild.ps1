@@ -1,4 +1,4 @@
-# Tools28 - クイックビルド＆デプロイスクリプト
+﻿# Tools28 - クイックビルド＆デプロイスクリプト
 # 使用方法:
 #   .\QuickBuild.ps1                    # dev-config.jsonの設定を使用
 #   .\QuickBuild.ps1 -RevitVersion 2024 # 特定バージョンを指定

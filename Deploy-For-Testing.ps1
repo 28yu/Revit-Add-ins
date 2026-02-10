@@ -1,4 +1,4 @@
-# Tools28 - テスト用デプロイスクリプト
+﻿# Tools28 - テスト用デプロイスクリプト
 # 使用方法: .\Deploy-For-Testing.ps1 -RevitVersion 2024
 
 param(
