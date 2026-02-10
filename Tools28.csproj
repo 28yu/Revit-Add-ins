@@ -9,6 +9,7 @@
     <TargetFramework Condition="'$(RevitVersion)' &gt;= '2025'">net8.0-windows</TargetFramework>
 
     <UseWPF>true</UseWPF>
+    <EnableDefaultPageItems>false</EnableDefaultPageItems>
     <RootNamespace>Tools28</RootNamespace>
     <AssemblyName>Tools28</AssemblyName>
     <ProjectGuid>{E40A22D9-DD80-4387-BA5D-8F9E4DF157D6}</ProjectGuid>
