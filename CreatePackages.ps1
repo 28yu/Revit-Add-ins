@@ -1,4 +1,4 @@
-# Tools28 - 配布パッケージ作成スクリプト
+﻿# Tools28 - 配布パッケージ作成スクリプト
 # 使用方法: .\CreatePackages.ps1
 # 前提: .\BuildAll.ps1 を事前に実行してDLLをビルド済みであること
 #

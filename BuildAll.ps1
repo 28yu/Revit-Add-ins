@@ -1,4 +1,4 @@
-# Tools28 - 全バージョンビルドスクリプト
+﻿# Tools28 - 全バージョンビルドスクリプト
 # 使用方法: .\BuildAll.ps1
 
 Write-Host "========================================" -ForegroundColor Cyan

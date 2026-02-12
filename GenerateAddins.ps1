@@ -1,4 +1,4 @@
-# Tools28 - .addinファイル生成スクリプト
+﻿# Tools28 - .addinファイル生成スクリプト
 # 使用方法: .\GenerateAddins.ps1
 
 Write-Host "========================================" -ForegroundColor Cyan

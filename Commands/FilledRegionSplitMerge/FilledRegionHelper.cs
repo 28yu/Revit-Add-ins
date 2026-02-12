@@ -120,7 +120,7 @@ namespace Tools28.Commands.FilledRegionSplitMerge
             foreach (var curveLoop in boundaries)
             {
                 var loops = new List<CurveLoop> { curveLoop };
-                doc.Create.NewFilledRegion(view, typeId, loops);
+                FilledRegion.Create(doc, typeId, view.Id, loops);
                 createdCount++;
             }
 
@@ -162,7 +162,7 @@ namespace Tools28.Commands.FilledRegionSplitMerge
             }
 
             // 新しい統合領域を作成
-            doc.Create.NewFilledRegion(view, newTypeId, allBoundaries);
+            FilledRegion.Create(doc, newTypeId, view.Id, allBoundaries);
 
             // 元の領域を全て削除
             var idsToDelete = filledRegions.Select(fr => fr.Id).ToList();
