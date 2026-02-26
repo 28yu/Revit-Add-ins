@@ -4,560 +4,379 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Tools28 開発ワークフロー 相関図</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
-    font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif;
-    background: linear-gradient(160deg, #f8fafc 0%, #e8eef6 100%);
-    color: #333;
-    min-height: 100vh;
-  }
+*{margin:0;padding:0;box-sizing:border-box}
+body{
+  font-family:'Zen Maru Gothic','Hiragino Sans','Meiryo',sans-serif;
+  background-color:#fef9ef;
+  background-image:radial-gradient(circle,#e8dcc8 0.8px,transparent 0.8px);
+  background-size:22px 22px;
+  min-height:100vh;
+  color:#3d3229;
+}
 
-  /* ========== Header ========== */
-  .header {
-    text-align: center;
-    padding: 36px 20px 20px;
-  }
-  .header h1 {
-    font-size: 1.5rem;
-    font-weight: 800;
-    color: #1e293b;
-    letter-spacing: 0.02em;
-  }
-  .header p {
-    font-size: 0.88rem;
-    color: #64748b;
-    margin-top: 6px;
-  }
+/* ===== Title ===== */
+.title-area{text-align:center;padding:28px 16px 2px}
+.title-area h1{
+  display:inline;
+  font-size:1.6rem;font-weight:900;color:#2d2d2d;
+  background:linear-gradient(transparent 60%,rgba(252,211,77,0.5) 60%);
+  padding:0 6px;
+}
+.subtitle{
+  text-align:center;font-size:0.88rem;color:#8d7e6e;
+  padding:8px 16px 0;font-weight:700;
+}
 
-  /* ========== Legend ========== */
-  .legend {
-    display: flex;
-    justify-content: center;
-    gap: 28px;
-    padding: 10px 20px 24px;
-    flex-wrap: wrap;
-  }
-  .legend-item {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    font-size: 0.82rem;
-    font-weight: 600;
-    color: #475569;
-  }
-  .legend-dot {
-    width: 12px; height: 12px;
-    border-radius: 50%;
-  }
-  .dot-you { background: #3b82f6; }
-  .dot-ai { background: #a855f7; }
-  .dot-auto { background: #64748b; }
+/* ===== Legend ===== */
+.legend{
+  display:flex;justify-content:center;gap:20px;flex-wrap:wrap;
+  padding:14px 16px 6px;
+}
+.legend-item{display:flex;align-items:center;gap:6px;font-size:0.78rem;font-weight:700;color:#6b5e50}
+.legend-dot{width:13px;height:13px;border-radius:50%;border:2px solid}
+.ld-you{background:#dbeafe;border-color:#3b82f6}
+.ld-ai{background:#ede9fe;border-color:#8b5cf6}
+.ld-auto{background:#f1f5f9;border-color:#94a3b8}
 
-  /* ========== Diagram Canvas ========== */
-  .diagram {
-    position: relative;
-    max-width: 880px;
-    margin: 0 auto;
-    padding: 0 16px 48px;
-  }
+/* ===== Canvas ===== */
+.canvas-wrap{
+  width:100%;overflow:hidden;
+  display:flex;justify-content:center;
+  padding:8px 0 32px;
+}
+.canvas{
+  position:relative;width:920px;height:700px;
+  transform-origin:top center;flex-shrink:0;
+}
 
-  /* ========== SVG Arrows ========== */
-  .arrows-svg {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-    z-index: 0;
-  }
+/* ===== SVG Arrows ===== */
+.canvas>svg{
+  position:absolute;top:0;left:0;
+  width:100%;height:100%;
+  pointer-events:none;z-index:1;
+}
 
-  /* ========== Phase Section ========== */
-  .phase-section {
-    position: relative;
-    z-index: 1;
-    margin-bottom: 8px;
-  }
-  .phase-label {
-    text-align: center;
-    margin-bottom: 20px;
-  }
-  .phase-badge {
-    display: inline-block;
-    font-size: 0.72rem;
-    font-weight: 700;
-    color: #fff;
-    padding: 5px 18px;
-    border-radius: 20px;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-  .badge-develop { background: linear-gradient(135deg, #6366f1, #4f46e5); }
-  .badge-build { background: linear-gradient(135deg, #0891b2, #0e7490); }
-  .badge-release { background: linear-gradient(135deg, #059669, #047857); }
+/* ===== Nodes ===== */
+.node{
+  position:absolute;display:flex;flex-direction:column;
+  align-items:center;text-align:center;z-index:2;
+  cursor:default;transition:transform 0.2s ease;
+}
+.node:hover{transform:scale(1.07)}
 
-  /* ========== Node ========== */
-  .node {
-    position: relative;
-    z-index: 1;
-    background: #fff;
-    border-radius: 16px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-    padding: 18px 14px 14px;
-    transition: transform 0.15s, box-shadow 0.15s;
-    border: 2px solid transparent;
-  }
-  .node:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 8px 30px rgba(0,0,0,0.1);
-  }
-  .node.border-you { border-color: #93bbfc; }
-  .node.border-ai { border-color: #c4b5fd; }
-  .node.border-auto { border-color: #cbd5e1; }
+.node-circle{
+  border-radius:50%;overflow:hidden;
+  background:#fff;
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 3px 14px rgba(0,0,0,0.08);
+  position:relative;
+}
+.node-circle img{
+  width:100%;height:100%;object-fit:cover;
+  display:block;
+}
+.node-circle .fb{
+  display:none;
+  font-size:2rem;width:100%;height:100%;
+  align-items:center;justify-content:center;
+  background:#fff;
+}
+.node-name{
+  margin-top:7px;font-size:0.88rem;font-weight:900;
+  color:#2d2d2d;line-height:1.25;
+}
+.node-sub{
+  font-size:0.68rem;font-weight:700;color:#a09585;
+  margin-top:1px;line-height:1.3;
+}
 
-  .node-icon {
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
-    overflow: hidden;
-    margin-bottom: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-  }
-  .node-icon img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-  /* Fallback colored circles when no image */
-  .node-icon.fallback {
-    color: #fff;
-    font-size: 1.5rem;
-  }
-  .fi-you { background: linear-gradient(135deg, #3b82f6, #2563eb); }
-  .fi-claude { background: linear-gradient(135deg, #d4a373, #bc6c25); }
-  .fi-ps { background: linear-gradient(135deg, #2563eb, #1d4ed8); }
-  .fi-revit { background: linear-gradient(135deg, #0ea5e9, #0284c7); }
-  .fi-github { background: linear-gradient(135deg, #374151, #111827); }
-  .fi-nuget { background: linear-gradient(135deg, #004880, #003366); }
-  .fi-actions { background: linear-gradient(135deg, #6366f1, #4f46e5); }
-  .fi-users { background: linear-gradient(135deg, #f59e0b, #d97706); }
+/* Node sizes */
+.node.sz-lg .node-circle{width:130px;height:130px;border:5px solid}
+.node.sz-md .node-circle{width:100px;height:100px;border:4px solid}
+.node.sz-sm .node-circle{width:78px;height:78px;border:3px solid}
 
-  .node-name {
-    font-size: 0.92rem;
-    font-weight: 700;
-    color: #1e293b;
-    margin-bottom: 2px;
-  }
-  .node-role {
-    font-size: 0.7rem;
-    font-weight: 600;
-    color: #94a3b8;
-    margin-bottom: 4px;
-    letter-spacing: 0.04em;
-  }
-  .node-desc {
-    font-size: 0.78rem;
-    color: #64748b;
-    line-height: 1.45;
-  }
+/* Border colors */
+.bc-pink{border-color:#f472b6 !important}
+.bc-purple{border-color:#a78bfa !important}
+.bc-blue{border-color:#60a5fa !important}
+.bc-cyan{border-color:#22d3ee !important}
+.bc-dark{border-color:#475569 !important}
+.bc-gray{border-color:#94a3b8 !important}
+.bc-gold{border-color:#fbbf24 !important}
 
-  /* ========== Grid Layouts ========== */
+/* ===== Arrow Labels ===== */
+.arrow-label{
+  position:absolute;z-index:5;pointer-events:none;
+  font-size:0.7rem;font-weight:700;
+  padding:3px 10px;border-radius:10px;
+  white-space:nowrap;
+  box-shadow:0 1px 4px rgba(0,0,0,0.06);
+}
+.al-blue{background:#dbeafe;color:#1d4ed8}
+.al-purple{background:#ede9fe;color:#6d28d9}
+.al-gray{background:#f1f5f9;color:#475569}
+.al-green{background:#dcfce7;color:#166534}
+.al-red{background:#fee2e2;color:#991b1b}
 
-  /* Phase 1: develop — single column center */
-  .develop-grid {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0;
-  }
-  .develop-grid .node {
-    width: 200px;
-  }
+/* ===== Decorations ===== */
+.deco{
+  position:absolute;z-index:0;pointer-events:none;
+  font-size:1.1rem;opacity:0.35;
+  animation:float 4s ease-in-out infinite;
+}
+@keyframes float{
+  0%,100%{transform:translateY(0)}
+  50%{transform:translateY(-6px)}
+}
 
-  /* Arrow connector (vertical, between centered nodes) */
-  .connector {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 4px 0;
-    z-index: 1;
-    position: relative;
-  }
-  .connector-line {
-    width: 2px;
-    height: 22px;
-    background: #94a3b8;
-  }
-  .connector-arrow {
-    width: 0; height: 0;
-    border-left: 6px solid transparent;
-    border-right: 6px solid transparent;
-    border-top: 8px solid #94a3b8;
-  }
-  .connector-label {
-    font-size: 0.72rem;
-    font-weight: 700;
-    padding: 2px 10px;
-    border-radius: 10px;
-    margin: 2px 0;
-    white-space: nowrap;
-  }
-  .cl-you { background: #dbeafe; color: #1d4ed8; }
-  .cl-ai { background: #ede9fe; color: #6d28d9; }
-  .cl-auto { background: #f1f5f9; color: #475569; }
-
-  /* Phase 2: build — complex layout */
-  .build-area {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0;
-  }
-  .build-row {
-    display: flex;
-    justify-content: center;
-    align-items: flex-start;
-    gap: 48px;
-    position: relative;
-  }
-  .build-row .node {
-    width: 180px;
-  }
-
-  /* NuGet small card */
-  .nuget-attach {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    justify-content: center;
-    margin-top: 12px;
-    position: relative;
-    z-index: 1;
-  }
-  .nuget-attach .node {
-    width: 150px;
-    padding: 12px 10px 10px;
-  }
-  .nuget-attach .node .node-icon {
-    width: 40px; height: 40px;
-  }
-  .nuget-attach .node .node-name { font-size: 0.82rem; }
-  .nuget-line {
-    font-size: 0.7rem;
-    color: #94a3b8;
-    font-weight: 600;
-    border-top: 2px dashed #cbd5e1;
-    padding-top: 4px;
-    text-align: center;
-    width: 100px;
-  }
-
-  /* Feedback badges */
-  .feedback-row {
-    display: flex;
-    justify-content: center;
-    gap: 14px;
-    margin: 16px 0 8px;
-    flex-wrap: wrap;
-    position: relative;
-    z-index: 1;
-  }
-  .fb {
-    font-size: 0.78rem;
-    font-weight: 700;
-    padding: 6px 16px;
-    border-radius: 20px;
-    display: flex;
-    align-items: center;
-    gap: 5px;
-  }
-  .fb-ok { background: #dcfce7; color: #166534; }
-  .fb-ng { background: #fef2f2; color: #991b1b; }
-
-  /* Phase divider */
-  .phase-divider {
-    border: none;
-    border-top: 1px solid #e2e8f0;
-    margin: 24px auto;
-    max-width: 700px;
-    position: relative;
-    z-index: 1;
-  }
-
-  /* Phase 3: release — single column */
-  .release-grid {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0;
-  }
-  .release-grid .node {
-    width: 200px;
-  }
-
-  /* Horizontal connector for build row */
-  .h-connector {
-    display: flex;
-    align-items: center;
-    gap: 0;
-    position: relative;
-    z-index: 1;
-    margin: 8px 0;
-  }
-  .h-line {
-    width: 30px;
-    height: 2px;
-    background: #94a3b8;
-  }
-  .h-arrow-right {
-    width: 0; height: 0;
-    border-top: 6px solid transparent;
-    border-bottom: 6px solid transparent;
-    border-left: 8px solid #94a3b8;
-  }
-
-  /* Split connector from one to two */
-  .split-connector {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    position: relative;
-    z-index: 1;
-    padding: 4px 0;
-  }
-  .split-connector .connector-line { height: 14px; }
-  .split-branches {
-    display: flex;
-    align-items: flex-start;
-    position: relative;
-  }
-  .split-branch-line {
-    width: 2px;
-    height: 18px;
-    background: #94a3b8;
-  }
-  .split-h-bar {
-    height: 2px;
-    background: #94a3b8;
-  }
-
-  /* Build row with connected nodes */
-  .build-connected {
-    display: flex;
-    justify-content: center;
-    align-items: flex-start;
-    gap: 0;
-    position: relative;
-    z-index: 1;
-  }
-  .build-col {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-  }
-
-  /* ========== Responsive ========== */
-  @media (max-width: 640px) {
-    .build-row { gap: 20px; flex-wrap: wrap; }
-    .build-row .node { width: 160px; }
-    .header h1 { font-size: 1.25rem; }
-    .node { padding: 14px 10px 12px; }
-    .node-icon { width: 44px; height: 44px; }
-    .legend { gap: 16px; }
-    .build-connected { flex-wrap: wrap; justify-content: center; gap: 12px; }
-  }
+/* ===== Footer ===== */
+.footer{
+  text-align:center;padding:0 16px 28px;
+  font-size:0.75rem;color:#a09585;font-weight:700;
+}
+.footer a{color:#6366f1;text-decoration:none}
+.footer a:hover{text-decoration:underline}
 </style>
 </head>
 <body>
 
-<div class="header">
-  <h1>Tools28 開発ワークフロー 相関図</h1>
-  <p>あなたが考えて指示 &rarr; AI が書く &rarr; 自動でビルド &rarr; あなたが確認</p>
-</div>
+<div class="title-area"><h1>Tools28 開発ワークフロー 相関図</h1></div>
+<p class="subtitle">あなたが考えて指示 &rarr; AI が全て書く &rarr; 自動でビルド &rarr; あなたが確認</p>
 
 <div class="legend">
-  <div class="legend-item"><div class="legend-dot dot-you"></div>あなたが行う</div>
-  <div class="legend-item"><div class="legend-dot dot-ai"></div>AI が行う</div>
-  <div class="legend-item"><div class="legend-dot dot-auto"></div>自動で動く</div>
+  <div class="legend-item"><div class="legend-dot ld-you"></div>あなたが行う</div>
+  <div class="legend-item"><div class="legend-dot ld-ai"></div>AI が行う</div>
+  <div class="legend-item"><div class="legend-dot ld-auto"></div>自動で動く</div>
 </div>
 
-<div class="diagram">
+<div class="canvas-wrap">
+<div class="canvas" id="canvas">
+  <svg id="arrow-svg" xmlns="http://www.w3.org/2000/svg"></svg>
 
-  <!-- ==================== PHASE 1: 開発 ==================== -->
-  <div class="phase-section">
-    <div class="phase-label"><span class="phase-badge badge-develop">PHASE 1 &mdash; 開発フェーズ</span></div>
+  <!-- ===== Nodes ===== -->
 
-    <div class="develop-grid">
-
-      <!-- あなた -->
-      <div class="node border-you" style="width:220px;">
-        <div class="node-icon fallback fi-you">
-          <img src="icons/you.png" onerror="this.style.display='none';this.parentNode.innerHTML='&#x1F464;';" alt="あなた">
-        </div>
-        <div class="node-name">あなた（開発者）</div>
-        <div class="node-role">監督・プロデューサー</div>
-        <div class="node-desc">作りたい機能を考えて<br>仕様をまとめる</div>
-      </div>
-
-      <div class="connector">
-        <div class="connector-line"></div>
-        <div class="connector-label cl-you">指示を出す</div>
-        <div class="connector-line"></div>
-        <div class="connector-arrow"></div>
-      </div>
-
-      <!-- Claude Code -->
-      <div class="node border-ai" style="width:220px;">
-        <div class="node-icon fallback fi-claude">
-          <img src="icons/claude.png" onerror="this.style.display='none';this.parentNode.innerHTML='&#x1F916;';" alt="Claude Code">
-        </div>
-        <div class="node-name">Claude Code</div>
-        <div class="node-role">AI 脚本家</div>
-        <div class="node-desc">指示に基づいてコードを<strong>全て</strong>書く<br>修正も全て AI が行う</div>
-      </div>
-
-      <div class="connector">
-        <div class="connector-line"></div>
-        <div class="connector-label cl-ai">コードを自動生成</div>
-        <div class="connector-line"></div>
-        <div class="connector-arrow"></div>
-      </div>
-
-      <!-- GitHub（保管） -->
-      <div class="node border-you" style="width:220px;">
-        <div class="node-icon fallback fi-github">
-          <img src="icons/github.png" onerror="this.style.display='none';this.parentNode.innerHTML='&#x1F4BE;';" alt="GitHub">
-        </div>
-        <div class="node-name">GitHub</div>
-        <div class="node-role">台本倉庫</div>
-        <div class="node-desc">git push でコードを保管・共有</div>
-      </div>
-
-    </div><!-- develop-grid -->
+  <!-- あなた (center) -->
+  <div class="node sz-lg" id="n-you" style="left:395px;top:228px;width:130px">
+    <div class="node-circle bc-pink">
+      <img src="icons/you.png" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+      <span class="fb">🙂</span>
+    </div>
+    <div class="node-name">あなた</div>
+    <div class="node-sub">監督・プロデューサー</div>
   </div>
 
-  <hr class="phase-divider">
-
-  <!-- ==================== PHASE 2: ビルド＆テスト ==================== -->
-  <div class="phase-section">
-    <div class="phase-label"><span class="phase-badge badge-build">PHASE 2 &mdash; ビルド＆テストフェーズ</span></div>
-
-    <div class="build-area">
-
-      <!-- PowerShell -->
-      <div class="node border-you" style="width:220px;">
-        <div class="node-icon fallback fi-ps">
-          <img src="icons/powershell.png" onerror="this.style.display='none';this.parentNode.innerHTML='&gt;_';" alt="PowerShell">
-        </div>
-        <div class="node-name">PowerShell</div>
-        <div class="node-role">現場スタッフ</div>
-        <div class="node-desc">QuickBuild.ps1 を実行</div>
-      </div>
-
-      <div class="connector">
-        <div class="connector-line"></div>
-        <div class="connector-label cl-auto">自動でビルド＆デプロイ</div>
-        <div class="connector-line"></div>
-        <div class="connector-arrow"></div>
-      </div>
-
-      <!-- Revit + NuGet row -->
-      <div class="build-row">
-
-        <!-- NuGet -->
-        <div class="node border-auto" style="width:170px;">
-          <div class="node-icon fallback fi-nuget" style="width:44px;height:44px;">
-            <img src="icons/nuget.png" onerror="this.style.display='none';this.parentNode.innerHTML='&#x1F4E6;';" alt="NuGet">
-          </div>
-          <div class="node-name">NuGet</div>
-          <div class="node-role">小道具係</div>
-          <div class="node-desc">API 部品を<br>自動で調達</div>
-        </div>
-
-        <!-- Revit -->
-        <div class="node border-you" style="width:200px;">
-          <div class="node-icon fallback fi-revit">
-            <img src="icons/revit.png" onerror="this.style.display='none';this.parentNode.innerHTML='<b>R</b>';" alt="Revit">
-          </div>
-          <div class="node-name">Revit</div>
-          <div class="node-role">舞台</div>
-          <div class="node-desc">アドインが実際に動く場所<br>ここで動作を確認する</div>
-        </div>
-
-      </div>
-
-      <!-- Feedback -->
-      <div class="feedback-row">
-        <div class="fb fb-ok">&#x2714;&#xFE0F; OK &rarr; リリースへ進む</div>
-        <div class="fb fb-ng">&#x2716;&#xFE0F; NG &rarr; Claude Code に修正を指示</div>
-      </div>
-
-    </div><!-- build-area -->
+  <!-- Claude Code (upper-left) -->
+  <div class="node sz-md" id="n-claude" style="left:100px;top:60px;width:120px">
+    <div class="node-circle bc-purple">
+      <img src="icons/claude.png" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+      <span class="fb">🤖</span>
+    </div>
+    <div class="node-name">Claude Code</div>
+    <div class="node-sub">AI 脚本家</div>
   </div>
 
-  <hr class="phase-divider">
-
-  <!-- ==================== PHASE 3: リリース ==================== -->
-  <div class="phase-section">
-    <div class="phase-label"><span class="phase-badge badge-release">PHASE 3 &mdash; リリースフェーズ</span></div>
-
-    <div class="release-grid">
-
-      <!-- GitHub (タグ push) -->
-      <div class="node border-you" style="width:220px;">
-        <div class="node-icon fallback fi-github">
-          <img src="icons/github.png" onerror="this.style.display='none';this.parentNode.innerHTML='&#x1F4BE;';" alt="GitHub">
-        </div>
-        <div class="node-name">GitHub</div>
-        <div class="node-role">台本倉庫</div>
-        <div class="node-desc">タグを付けて push</div>
-      </div>
-
-      <div class="connector">
-        <div class="connector-line"></div>
-        <div class="connector-label cl-auto">自動でトリガー</div>
-        <div class="connector-line"></div>
-        <div class="connector-arrow"></div>
-      </div>
-
-      <!-- GitHub Actions -->
-      <div class="node border-auto" style="width:240px;">
-        <div class="node-icon fallback fi-actions">
-          <img src="icons/actions.png" onerror="this.style.display='none';this.parentNode.innerHTML='&#x26A1;';" alt="GitHub Actions">
-        </div>
-        <div class="node-name">GitHub Actions</div>
-        <div class="node-role">自動スタッフ</div>
-        <div class="node-desc">全6バージョンを自動ビルド<br>配布 ZIP を作成</div>
-      </div>
-
-      <div class="connector">
-        <div class="connector-line"></div>
-        <div class="connector-label cl-auto">自動で公開</div>
-        <div class="connector-line"></div>
-        <div class="connector-arrow"></div>
-      </div>
-
-      <!-- ユーザー -->
-      <div class="node" style="width:220px; border-color:#fcd34d;">
-        <div class="node-icon fallback fi-users">
-          <img src="icons/users.png" onerror="this.style.display='none';this.parentNode.innerHTML='&#x1F465;';" alt="ユーザー">
-        </div>
-        <div class="node-name">ユーザー</div>
-        <div class="node-desc">GitHub Releases から<br>ZIP をダウンロードして使う</div>
-      </div>
-
-    </div><!-- release-grid -->
+  <!-- Revit (right) -->
+  <div class="node sz-md" id="n-revit" style="left:700px;top:165px;width:120px">
+    <div class="node-circle bc-cyan">
+      <img src="icons/revit.png" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+      <span class="fb" style="font-weight:900;font-size:1.8rem;color:#0891b2">R</span>
+    </div>
+    <div class="node-name">Revit</div>
+    <div class="node-sub">舞台（動作確認）</div>
   </div>
 
-</div><!-- diagram -->
+  <!-- PowerShell (lower-left) -->
+  <div class="node sz-md" id="n-ps" style="left:95px;top:415px;width:120px">
+    <div class="node-circle bc-blue">
+      <img src="icons/powershell.png" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+      <span class="fb" style="font-size:1.3rem;font-weight:900;color:#2563eb">&gt;_</span>
+    </div>
+    <div class="node-name">PowerShell</div>
+    <div class="node-sub">現場スタッフ</div>
+  </div>
 
+  <!-- NuGet (far-left, small) -->
+  <div class="node sz-sm" id="n-nuget" style="left:25px;top:248px;width:95px">
+    <div class="node-circle bc-gray">
+      <img src="icons/nuget.png" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+      <span class="fb">📦</span>
+    </div>
+    <div class="node-name">NuGet</div>
+    <div class="node-sub">小道具係</div>
+  </div>
+
+  <!-- GitHub (bottom-center) -->
+  <div class="node sz-md" id="n-github" style="left:350px;top:510px;width:120px">
+    <div class="node-circle bc-dark">
+      <img src="icons/github.png" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+      <span class="fb">🐙</span>
+    </div>
+    <div class="node-name">GitHub</div>
+    <div class="node-sub">台本倉庫</div>
+  </div>
+
+  <!-- GitHub Actions (bottom-right) -->
+  <div class="node sz-sm" id="n-actions" style="left:590px;top:530px;width:105px">
+    <div class="node-circle bc-gray">
+      <img src="icons/actions.png" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+      <span class="fb">⚡</span>
+    </div>
+    <div class="node-name">GitHub Actions</div>
+    <div class="node-sub">自動スタッフ</div>
+  </div>
+
+  <!-- ユーザー (far-right) -->
+  <div class="node sz-sm" id="n-users" style="left:770px;top:430px;width:105px">
+    <div class="node-circle bc-gold">
+      <img src="icons/users.png" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+      <span class="fb">👥</span>
+    </div>
+    <div class="node-name">ユーザー</div>
+    <div class="node-sub">ダウンロードして使う</div>
+  </div>
+
+  <!-- ===== Decorative doodles ===== -->
+  <span class="deco" style="left:310px;top:55px;animation-delay:0s">✦</span>
+  <span class="deco" style="left:540px;top:170px;animation-delay:0.8s">✧</span>
+  <span class="deco" style="left:850px;top:330px;animation-delay:1.6s">✦</span>
+  <span class="deco" style="left:260px;top:480px;animation-delay:2.4s">✧</span>
+  <span class="deco" style="left:720px;top:620px;animation-delay:0.4s">✦</span>
+  <span class="deco" style="left:50px;top:160px;animation-delay:1.2s">✧</span>
+  <span class="deco" style="left:480px;top:420px;animation-delay:2s">✦</span>
+
+</div><!-- canvas -->
+</div><!-- canvas-wrap -->
+
+<div class="footer">
+  Tools28 — Revit Add-in 開発プロジェクト ｜ <a href="https://github.com/28yu/Revit-Add-ins" target="_blank">GitHub</a>
+</div>
+
+<script>
+(function(){
+  // ========== Node center coordinates ==========
+  function getCenter(id){
+    const el=document.getElementById(id);
+    const circle=el.querySelector('.node-circle');
+    const r=circle.offsetWidth/2;
+    const x=el.offsetLeft+el.offsetWidth/2;
+    const y=el.offsetTop+r;
+    return {x,y,r};
+  }
+
+  // ========== Arrow definitions ==========
+  const arrows=[
+    {from:'n-you',to:'n-claude',label:'指示を出す 💬',cls:'al-blue',curve:40},
+    {from:'n-claude',to:'n-you',label:'コードを全て書く ✨',cls:'al-purple',curve:40},
+    {from:'n-you',to:'n-ps',label:'ビルドを実行 🔨',cls:'al-blue',curve:25},
+    {from:'n-nuget',to:'n-ps',label:'部品を自動調達',cls:'al-gray',curve:0,dashed:true},
+    {from:'n-you',to:'n-revit',label:'動作を確認 🔍',cls:'al-blue',curve:-30},
+    {from:'n-revit',to:'n-you',label:'OK! 👍',cls:'al-green',curve:-30},
+    {from:'n-revit',to:'n-claude',label:'NG → 修正を指示 🔄',cls:'al-red',curve:-25,dashed:true},
+    {from:'n-you',to:'n-github',label:'git push で保管 💾',cls:'al-blue',curve:-15},
+    {from:'n-github',to:'n-actions',label:'タグで自動トリガー ⚡',cls:'al-gray',curve:-15},
+    {from:'n-actions',to:'n-users',label:'ZIP 自動配布 📦',cls:'al-gray',curve:-25},
+  ];
+
+  // ========== SVG helpers ==========
+  const NS='http://www.w3.org/2000/svg';
+  const svg=document.getElementById('arrow-svg');
+
+  function createMarker(color,id){
+    const defs=svg.querySelector('defs')||svg.appendChild(document.createElementNS(NS,'defs'));
+    const m=document.createElementNS(NS,'marker');
+    m.setAttribute('id',id);
+    m.setAttribute('viewBox','0 0 10 7');
+    m.setAttribute('refX','9');
+    m.setAttribute('refY','3.5');
+    m.setAttribute('markerWidth','8');
+    m.setAttribute('markerHeight','6');
+    m.setAttribute('orient','auto');
+    const p=document.createElementNS(NS,'path');
+    p.setAttribute('d','M0 0 L10 3.5 L0 7 Z');
+    p.setAttribute('fill',color);
+    m.appendChild(p);
+    defs.appendChild(m);
+    return id;
+  }
+
+  // Color map
+  const colorMap={
+    'al-blue':'#3b82f6',
+    'al-purple':'#8b5cf6',
+    'al-gray':'#94a3b8',
+    'al-green':'#22c55e',
+    'al-red':'#ef4444',
+  };
+
+  // Create markers for each color
+  const markers={};
+  Object.entries(colorMap).forEach(([cls,col])=>{
+    const mid='mk-'+cls;
+    createMarker(col,mid);
+    markers[cls]=mid;
+  });
+
+  // ========== Draw arrows ==========
+  const canvas=document.getElementById('canvas');
+
+  arrows.forEach(a=>{
+    const f=getCenter(a.from);
+    const t=getCenter(a.to);
+    const dx=t.x-f.x, dy=t.y-f.y;
+    const dist=Math.sqrt(dx*dx+dy*dy);
+    const ux=dx/dist, uy=dy/dist;
+
+    // Start/end on circle edge (with small gap for arrowhead)
+    const sx=f.x+ux*(f.r+4), sy=f.y+uy*(f.r+4);
+    const ex=t.x-ux*(t.r+10), ey=t.y-uy*(t.r+10);
+
+    // Perpendicular for curve
+    const nx=-uy, ny=ux;
+    const cv=a.curve||0;
+    const cx2=(sx+ex)/2+nx*cv;
+    const cy2=(sy+ey)/2+ny*cv;
+
+    // SVG path
+    const path=document.createElementNS(NS,'path');
+    path.setAttribute('d',`M${sx} ${sy} Q${cx2} ${cy2} ${ex} ${ey}`);
+    path.setAttribute('fill','none');
+    path.setAttribute('stroke',colorMap[a.cls]);
+    path.setAttribute('stroke-width','2.8');
+    path.setAttribute('stroke-linecap','round');
+    if(a.dashed) path.setAttribute('stroke-dasharray','7 5');
+    path.setAttribute('marker-end',`url(#${markers[a.cls]})`);
+    svg.appendChild(path);
+
+    // Label position (midpoint of quadratic bezier)
+    const lx=(sx+2*cx2+ex)/4;
+    const ly=(sy+2*cy2+ey)/4;
+
+    const lbl=document.createElement('div');
+    lbl.className='arrow-label '+a.cls;
+    lbl.textContent=a.label;
+    lbl.style.left=lx+'px';
+    lbl.style.top=ly+'px';
+    lbl.style.transform='translate(-50%,-50%)';
+    canvas.appendChild(lbl);
+  });
+
+  // ========== Responsive scaling ==========
+  function scaleCanvas(){
+    const wrap=document.querySelector('.canvas-wrap');
+    const c=document.getElementById('canvas');
+    const avail=wrap.clientWidth-16;
+    const s=Math.min(1,avail/920);
+    c.style.transform='scale('+s+')';
+    wrap.style.height=(700*s+20)+'px';
+  }
+  window.addEventListener('resize',scaleCanvas);
+  scaleCanvas();
+
+})();
+</script>
 </body>
 </html>
