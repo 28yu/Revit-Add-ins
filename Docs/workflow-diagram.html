@@ -394,6 +394,24 @@ body{
 @media print{
   body{background:#fff}
   .page{box-shadow:none;padding:10mm 12mm 8mm;min-height:auto}
+
+  /* 背景色・配色を印刷で強制出力 */
+  .phase-header,
+  .node-you,
+  .node-auto,
+  .node-auto .node-icon,
+  .node-ai .node-icon,
+  .node-result,
+  .node-result .node-icon,
+  .badge-ok,
+  .badge-ng,
+  .legend-dot,
+  .browser-bar,
+  .node-icon,
+  .callout{
+    -webkit-print-color-adjust:exact;
+    print-color-adjust:exact;
+  }
 }
 
 /* ===== Responsive ===== */
