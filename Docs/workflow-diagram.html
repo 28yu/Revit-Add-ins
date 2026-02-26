@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Tools28 開発ワークフロー 相関図</title>
+<title>Revitアドイン開発ワークフロー</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700;900&display=swap" rel="stylesheet">
@@ -305,6 +305,61 @@ body{
   font-weight:700;
 }
 
+/* ===== Browser Frame ===== */
+.browser-frame{
+  border:1.5px solid #c4baa8;
+  border-radius:7px;
+  overflow:hidden;
+  background:#fff;
+}
+.browser-bar{
+  background:#f0ece5;
+  padding:1mm 3mm;
+  display:flex;
+  align-items:center;
+  gap:2mm;
+  border-bottom:1px solid #d8d2c8;
+}
+.browser-dots{
+  display:flex;
+  gap:1mm;
+}
+.browser-dots span{
+  width:1.8mm;height:1.8mm;
+  border-radius:50%;
+  background:#c4baa8;
+}
+.browser-bar-label{
+  font-size:5.5pt;
+  font-weight:700;
+  color:#8a8078;
+}
+.browser-frame .node{
+  border:none;
+  border-radius:0;
+  width:100%;
+}
+/* Compact browser frame for small nodes in hrow */
+.browser-frame-sm{
+  border:1.5px solid #c4baa8;
+  border-radius:6px;
+  overflow:hidden;
+  background:#fff;
+}
+.browser-frame-sm .browser-bar{
+  padding:0.6mm 2mm;
+}
+.browser-frame-sm .browser-dots span{
+  width:1.3mm;height:1.3mm;
+}
+.browser-frame-sm .browser-bar-label{
+  font-size:5pt;
+}
+.browser-frame-sm .node{
+  border:none;
+  border-radius:0;
+}
+
 /* ===== Callout ===== */
 .callout{
   margin-top:3.5mm;
@@ -351,7 +406,7 @@ body{
 
   <!-- Title -->
   <div class="title">
-    <h1>Tools28 開発ワークフロー 相関図</h1>
+    <h1>Revitアドイン開発ワークフロー</h1>
     <span class="title-sub">あなたが考えて指示 → AI が全て書く → 自動でビルド → あなたが確認</span>
   </div>
 
@@ -360,6 +415,7 @@ body{
     <div class="legend-item"><div class="legend-dot ld-you"></div>あなたが行う</div>
     <div class="legend-item"><div class="legend-dot ld-ai"></div>AI が行う</div>
     <div class="legend-item"><div class="legend-dot ld-auto"></div>自動で動く</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#f0ece5;border-color:#c4baa8;border-radius:2px"></div>🌐 ブラウザで操作</div>
   </div>
 
   <!-- ============================== -->
@@ -384,13 +440,19 @@ body{
         <span class="arrow-label">指示を出す</span>
       </div>
 
-      <!-- Claude Code -->
-      <div class="node node-ai">
-        <div class="node-icon"><img src="icons/workflow/claude.png" alt="Claude Code"></div>
-        <div class="node-text">
-          <div class="node-role">Claude Code ─ AI 脚本家</div>
-          <div class="node-name">コードを全て書く</div>
-          <div class="node-desc">コマンドクラス (.cs) / WPF (XAML) / Application.cs / csproj</div>
+      <!-- Claude Code (ブラウザ操作) -->
+      <div class="browser-frame" style="width:72mm">
+        <div class="browser-bar">
+          <div class="browser-dots"><span></span><span></span><span></span></div>
+          <span class="browser-bar-label">🌐 ブラウザ ─ Claude Code</span>
+        </div>
+        <div class="node node-ai">
+          <div class="node-icon"><img src="icons/workflow/claude.png" alt="Claude Code"></div>
+          <div class="node-text">
+            <div class="node-role">Claude Code ─ AI 脚本家</div>
+            <div class="node-name">コードを全て書く</div>
+            <div class="node-desc">コマンドクラス (.cs) / WPF (XAML) / Application.cs / csproj</div>
+          </div>
         </div>
       </div>
 
@@ -519,11 +581,17 @@ body{
       <!-- Horizontal: GitHub → Actions → Releases → Users -->
       <div class="hrow">
 
-        <div class="node node-auto node-sm">
-          <div class="node-icon"><img src="icons/workflow/github.png" alt="GitHub"></div>
-          <div class="node-text">
-            <div class="node-name">GitHub</div>
-            <div class="node-desc">台本倉庫</div>
+        <div class="browser-frame-sm">
+          <div class="browser-bar">
+            <div class="browser-dots"><span></span><span></span><span></span></div>
+            <span class="browser-bar-label">🌐</span>
+          </div>
+          <div class="node node-auto node-sm">
+            <div class="node-icon"><img src="icons/workflow/github.png" alt="GitHub"></div>
+            <div class="node-text">
+              <div class="node-name">GitHub</div>
+              <div class="node-desc">台本倉庫</div>
+            </div>
           </div>
         </div>
 
