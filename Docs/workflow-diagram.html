@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tools28 開発ワークフロー 相関図</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif;
+    background: #f0f4f8;
+    color: #333;
+    min-height: 100vh;
+  }
+  .container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 32px 20px 48px;
+  }
+  h1 {
+    text-align: center;
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: #1a2a3a;
+    margin-bottom: 8px;
+  }
+  .subtitle {
+    text-align: center;
+    font-size: 0.9rem;
+    color: #667;
+    margin-bottom: 32px;
+  }
+
+  /* Legend */
+  .legend {
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    margin-bottom: 28px;
+    flex-wrap: wrap;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.85rem;
+    color: #555;
+  }
+  .legend-dot {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .dot-manual { background: #3b82f6; }
+  .dot-ai { background: #a855f7; }
+  .dot-auto { background: #6b7280; }
+
+  /* Phase labels */
+  .phase {
+    text-align: center;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #fff;
+    background: #475569;
+    border-radius: 20px;
+    padding: 4px 20px;
+    display: inline-block;
+    margin: 0 auto 18px;
+    letter-spacing: 0.05em;
+  }
+  .phase-wrap {
+    text-align: center;
+    margin-bottom: 0;
+  }
+
+  /* Cards */
+  .card {
+    background: #fff;
+    border-radius: 14px;
+    padding: 16px 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    position: relative;
+    border-left: 5px solid #ccc;
+    max-width: 420px;
+    margin: 0 auto;
+  }
+  .card.manual { border-left-color: #3b82f6; }
+  .card.ai { border-left-color: #a855f7; }
+  .card.auto { border-left-color: #6b7280; }
+
+  .card-icon {
+    width: 52px; height: 52px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.6rem;
+    flex-shrink: 0;
+    color: #fff;
+  }
+  .icon-you { background: linear-gradient(135deg, #3b82f6, #2563eb); }
+  .icon-claude { background: linear-gradient(135deg, #d97706, #b45309); }
+  .icon-ps { background: linear-gradient(135deg, #2563eb, #1e40af); }
+  .icon-revit { background: linear-gradient(135deg, #0891b2, #0e7490); }
+  .icon-github { background: linear-gradient(135deg, #374151, #111827); }
+  .icon-nuget { background: linear-gradient(135deg, #004880, #003366); }
+  .icon-actions { background: linear-gradient(135deg, #6b7280, #4b5563); }
+  .icon-release { background: linear-gradient(135deg, #059669, #047857); }
+  .icon-code { background: linear-gradient(135deg, #8b5cf6, #7c3aed); }
+  .icon-users { background: linear-gradient(135deg, #f59e0b, #d97706); }
+
+  .card-text h3 {
+    font-size: 1rem;
+    font-weight: 700;
+    margin-bottom: 2px;
+  }
+  .card-text .role {
+    font-size: 0.75rem;
+    color: #888;
+    margin-bottom: 3px;
+  }
+  .card-text .desc {
+    font-size: 0.82rem;
+    color: #555;
+    line-height: 1.4;
+  }
+
+  /* Arrows */
+  .arrow-down {
+    text-align: center;
+    padding: 6px 0;
+    color: #94a3b8;
+    font-size: 1.4rem;
+    line-height: 1;
+  }
+  .arrow-label {
+    text-align: center;
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 2px 0;
+  }
+  .label-manual { color: #3b82f6; }
+  .label-ai { color: #a855f7; }
+  .label-auto { color: #6b7280; }
+
+  /* Split row */
+  .split-row {
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    max-width: 720px;
+    margin: 0 auto;
+  }
+  .split-row .card {
+    flex: 1;
+    max-width: 340px;
+  }
+
+  /* NuGet side note */
+  .side-note {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin: 8px auto;
+    max-width: 500px;
+  }
+  .side-note .dotted-line {
+    width: 40px;
+    border-top: 2px dashed #9ca3af;
+  }
+
+  /* Feedback loop */
+  .feedback {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    margin: 12px auto;
+    max-width: 500px;
+    flex-wrap: wrap;
+  }
+  .feedback-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 6px 14px;
+    border-radius: 20px;
+  }
+  .feedback-ok {
+    background: #d1fae5;
+    color: #065f46;
+  }
+  .feedback-ng {
+    background: #fee2e2;
+    color: #991b1b;
+  }
+
+  /* Divider */
+  .divider {
+    border: none;
+    border-top: 2px dashed #cbd5e1;
+    margin: 24px auto;
+    max-width: 600px;
+  }
+
+  /* SVG icons inside cards */
+  .card-icon svg {
+    width: 28px;
+    height: 28px;
+    fill: currentColor;
+  }
+
+  /* Responsive */
+  @media (max-width: 600px) {
+    .split-row {
+      flex-direction: column;
+      align-items: center;
+    }
+    .card { max-width: 100%; }
+    h1 { font-size: 1.3rem; }
+    .legend { gap: 12px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <h1>Tools28 開発ワークフロー 相関図</h1>
+  <p class="subtitle">あなたが考えて指示 → AI が書く → 自動でビルド → あなたが確認</p>
+
+  <!-- Legend -->
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot dot-manual"></div>あなたが行う</div>
+    <div class="legend-item"><div class="legend-dot dot-ai"></div>AI が行う</div>
+    <div class="legend-item"><div class="legend-dot dot-auto"></div>自動で動く</div>
+  </div>
+
+  <!-- ==================== Phase 1: DEVELOP ==================== -->
+  <div class="phase-wrap"><span class="phase">開発フェーズ</span></div>
+
+  <!-- あなた -->
+  <div class="card manual">
+    <div class="card-icon icon-you">
+      <svg viewBox="0 0 24 24"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/></svg>
+    </div>
+    <div class="card-text">
+      <h3>あなた（開発者）</h3>
+      <div class="role">監督・プロデューサー</div>
+      <div class="desc">作りたい機能を考えて、仕様をまとめる</div>
+    </div>
+  </div>
+
+  <div class="arrow-down">&#x25BC;</div>
+  <div class="arrow-label label-manual">指示を出す</div>
+  <div class="arrow-down">&#x25BC;</div>
+
+  <!-- Claude Code -->
+  <div class="card ai">
+    <div class="card-icon icon-claude">
+      <svg viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+    </div>
+    <div class="card-text">
+      <h3>Claude Code</h3>
+      <div class="role">AI 脚本家</div>
+      <div class="desc">指示に基づいてコードを<strong>全て</strong>書く。修正も全て AI が行う</div>
+    </div>
+  </div>
+
+  <div class="arrow-down">&#x25BC;</div>
+  <div class="arrow-label label-ai">コードを自動生成</div>
+  <div class="arrow-down">&#x25BC;</div>
+
+  <!-- コード -->
+  <div class="card auto">
+    <div class="card-icon icon-code">
+      <svg viewBox="0 0 24 24"><path d="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0L19.2 12l-4.6-4.6L16 6l6 6-6 6-1.4-1.4z"/></svg>
+    </div>
+    <div class="card-text">
+      <h3>コード（設計図）</h3>
+      <div class="role">C# / .NET</div>
+      <div class="desc">Claude Code が生成したプログラムのソースコード</div>
+    </div>
+  </div>
+
+  <div class="arrow-down">&#x25BC;</div>
+  <div class="arrow-label label-manual">git push で保管</div>
+
+  <hr class="divider">
+
+  <!-- ==================== Phase 2: BUILD & TEST ==================== -->
+  <div class="phase-wrap"><span class="phase">ビルド＆テストフェーズ</span></div>
+
+  <!-- PowerShell -->
+  <div class="card manual">
+    <div class="card-icon icon-ps">
+      <svg viewBox="0 0 24 24"><path d="M3.5 3A1.5 1.5 0 0 0 2 4.5v15A1.5 1.5 0 0 0 3.5 21h17a1.5 1.5 0 0 0 1.5-1.5v-15A1.5 1.5 0 0 0 20.5 3h-17zM6 15.5l5-4-5-4 1.4-1.4L13 11.5l-5.6 5.4L6 15.5zM13 17h5v-1.5h-5V17z"/></svg>
+    </div>
+    <div class="card-text">
+      <h3>PowerShell</h3>
+      <div class="role">現場スタッフ</div>
+      <div class="desc">QuickBuild.ps1 を実行してビルド＆デプロイ</div>
+    </div>
+  </div>
+
+  <div class="arrow-down">&#x25BC;</div>
+
+  <!-- Build + Revit split -->
+  <div class="split-row">
+    <div class="card auto">
+      <div class="card-icon" style="background: linear-gradient(135deg, #6b7280, #4b5563); font-size:1.4rem;">
+        <svg viewBox="0 0 24 24" style="width:26px;height:26px;"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94L14.4 3.12a.47.47 0 0 0-.48-.41h-3.84a.47.47 0 0 0-.47.41L9.25 5.35c-.59.24-1.13.57-1.62.94l-2.39-.96a.49.49 0 0 0-.59.22L2.73 8.87a.48.48 0 0 0 .12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.23c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.23c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z"/></svg>
+      </div>
+      <div class="card-text">
+        <h3>ビルド（変換）</h3>
+        <div class="role">自動</div>
+        <div class="desc">コードを実行可能な DLL に変換する</div>
+      </div>
+    </div>
+    <div class="card manual">
+      <div class="card-icon icon-revit">
+        <svg viewBox="0 0 24 24"><path d="M4 2h16a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z" fill="#0891b2"/><text x="12" y="16.5" text-anchor="middle" font-size="12" font-weight="bold" fill="#fff" font-family="Arial">R</text></svg>
+      </div>
+      <div class="card-text">
+        <h3>Revit</h3>
+        <div class="role">舞台</div>
+        <div class="desc">アドインが実際に動く場所で動作確認</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- NuGet side -->
+  <div class="side-note">
+    <div class="card auto" style="max-width: 300px; margin: 0;">
+      <div class="card-icon icon-nuget">
+        <svg viewBox="0 0 24 24"><path d="M4 4h7v7H4V4zm9 0h7v7h-7V4zm-9 9h7v7H4v-7zm12.5 0a3.5 3.5 0 1 1 0 7 3.5 3.5 0 0 1 0-7z"/></svg>
+      </div>
+      <div class="card-text">
+        <h3>NuGet</h3>
+        <div class="role">小道具係</div>
+        <div class="desc">API 部品を自動で調達</div>
+      </div>
+    </div>
+    <div class="dotted-line"></div>
+    <span style="font-size:0.75rem; color:#6b7280;">ビルド時に裏で<br>自動で届ける</span>
+  </div>
+
+  <!-- Feedback -->
+  <div class="feedback">
+    <div class="feedback-item feedback-ok">&#x2714; OK → 次のフェーズへ</div>
+    <div class="feedback-item feedback-ng">&#x2716; NG → Claude Code に修正を指示 → 最初に戻る</div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- ==================== Phase 3: RELEASE ==================== -->
+  <div class="phase-wrap"><span class="phase">リリースフェーズ</span></div>
+
+  <!-- GitHub -->
+  <div class="card manual">
+    <div class="card-icon icon-github">
+      <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12c0 4.42 2.87 8.17 6.84 9.5.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.89 1.52 2.34 1.08 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02A9.56 9.56 0 0 1 12 6.8c.85 0 1.71.11 2.5.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.75c0 .27.18.58.69.48A10 10 0 0 0 22 12c0-5.52-4.48-10-10-10z"/></svg>
+    </div>
+    <div class="card-text">
+      <h3>GitHub</h3>
+      <div class="role">台本倉庫 + 配達係</div>
+      <div class="desc">コードの保管・共有サービス</div>
+    </div>
+  </div>
+
+  <div class="arrow-down">&#x25BC;</div>
+  <div class="arrow-label label-manual">タグを付けて push</div>
+  <div class="arrow-down">&#x25BC;</div>
+
+  <!-- GitHub Actions -->
+  <div class="card auto">
+    <div class="card-icon icon-actions">
+      <svg viewBox="0 0 24 24"><path d="M12 2L4.5 20.3l.7.7L12 18l6.8 3 .7-.7L12 2z"/></svg>
+    </div>
+    <div class="card-text">
+      <h3>GitHub Actions</h3>
+      <div class="role">自動スタッフ</div>
+      <div class="desc">全6バージョンを自動ビルド → 配布 ZIP を作成</div>
+    </div>
+  </div>
+
+  <div class="arrow-down">&#x25BC;</div>
+  <div class="arrow-label label-auto">自動で公開</div>
+  <div class="arrow-down">&#x25BC;</div>
+
+  <!-- GitHub Releases -->
+  <div class="card auto">
+    <div class="card-icon icon-release">
+      <svg viewBox="0 0 24 24"><path d="M5 20h14v-2H5v2zm7-18L5.33 9h3.17v6h7v-6h3.17L12 2z"/></svg>
+    </div>
+    <div class="card-text">
+      <h3>GitHub Releases</h3>
+      <div class="role">完成品の受け渡し窓口</div>
+      <div class="desc">ユーザーが ZIP をダウンロード</div>
+    </div>
+  </div>
+
+  <div class="arrow-down">&#x25BC;</div>
+
+  <!-- Users -->
+  <div class="card" style="border-left-color: #f59e0b;">
+    <div class="card-icon icon-users">
+      <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+    </div>
+    <div class="card-text">
+      <h3>ユーザー</h3>
+      <div class="desc">完成したアドインをダウンロードして使う</div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
