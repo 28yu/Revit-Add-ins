@@ -14,6 +14,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Check for existing PR
         id: check-pr
@@ -40,11 +42,11 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Enable auto-merge
+      - name: Merge Pull Request
         run: |
           PR_NUMBER="${{ steps.check-pr.outputs.pr_number || steps.create-pr.outputs.pr_number }}"
           if [ -n "$PR_NUMBER" ]; then
-            gh pr merge "$PR_NUMBER" --squash --auto --delete-branch
+            gh pr merge "$PR_NUMBER" --squash --delete-branch
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
