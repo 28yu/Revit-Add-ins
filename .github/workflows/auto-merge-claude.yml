@@ -54,8 +54,27 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Wait for merge to propagate
+        if: steps.merge.outputs.merged == 'true'
+        run: |
+          echo "Waiting for merge to propagate to main..."
+          sleep 10
+
+      - name: Verify merge on main
+        if: steps.merge.outputs.merged == 'true'
+        run: |
+          MAIN_SHA=$(gh api repos/${{ github.repository }}/git/ref/heads/main --jq '.object.sha')
+          echo "Latest main SHA: $MAIN_SHA"
+          MAIN_MSG=$(gh api repos/${{ github.repository }}/commits/$MAIN_SHA --jq '.commit.message' | head -1)
+          echo "Latest main commit: $MAIN_MSG"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Trigger deploy workflow
         if: steps.merge.outputs.merged == 'true'
-        run: gh workflow run deploy-pages.yml --ref main
+        run: |
+          echo "Triggering deploy-pages.yml on main..."
+          gh workflow run deploy-pages.yml --ref main
+          echo "Deploy workflow triggered successfully"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
