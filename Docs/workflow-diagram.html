@@ -118,10 +118,15 @@ body{
   overflow:hidden;
 }
 .node-icon img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  display:block;
+}
+.node-icon img.icon-fit{
   width:80%;
   height:80%;
   object-fit:contain;
-  display:block;
 }
 .node-text{
   flex:1;
@@ -428,7 +433,7 @@ body{
 
       <!-- あなた -->
       <div class="node node-you">
-        <div class="node-icon"><img src="icons/workflow/you.png" alt="あなた"></div>
+        <div class="node-icon"><img src="icons/workflow/you.png" alt="あなた" class="icon-fit"></div>
         <div class="node-text">
           <div class="node-role">あなた ─ 監督・プロデューサー</div>
           <div class="node-name">作りたい機能を考える・仕様をまとめる</div>
@@ -566,7 +571,7 @@ body{
 
       <!-- Tag push -->
       <div class="node node-you" style="width:62mm">
-        <div class="node-icon"><img src="icons/workflow/you.png" alt="あなた"></div>
+        <div class="node-icon"><img src="icons/workflow/you.png" alt="あなた" class="icon-fit"></div>
         <div class="node-text">
           <div class="node-role">あなた</div>
           <div class="node-name">タグを付けて送る</div>
@@ -637,7 +642,7 @@ body{
         </div>
 
         <div class="node node-sm" style="background:#FFFDD0;border-color:#ddd8b0">
-          <div class="node-icon"><img src="icons/workflow/user.png" alt="ユーザー"></div>
+          <div class="node-icon"><img src="icons/workflow/user.png" alt="ユーザー" class="icon-fit"></div>
           <div class="node-text">
             <div class="node-name">ユーザー</div>
             <div class="node-desc">install.bat 実行</div>
