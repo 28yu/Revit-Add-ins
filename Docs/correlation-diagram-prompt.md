@@ -3,6 +3,19 @@
 > 以下のプロンプトを画像生成AI（ChatGPT / DALL-E、Midjourney、Adobe Firefly など）に貼り付けて使ってください。
 > 日本語テキストは画像生成AIでは文字化けしやすいため、**テキストなし版**と**テキストあり版**の2パターンを用意しました。
 
+### 登場人物（6人）
+
+| 登場人物 | アイコン | 役割 |
+|---|---|---|
+| あなた（開発者） | 人物アイコン | 監督・プロデューサー |
+| Claude Code | Anthropic の Claude ロゴ（オレンジ〜茶色の丸いアイコン） | AI脚本家（コードを全て書く） |
+| PowerShell | PowerShell ロゴ（青い背景に `>_` マーク） | 現場スタッフ（ビルド&デプロイ） |
+| Revit | Autodesk Revit ロゴ（青い `R` マーク） | 舞台（動作確認の場所） |
+| GitHub | GitHub ロゴ（黒い Octocat） | 台本倉庫 + 配達係 |
+| NuGet | NuGet ロゴ（青い立方体） | 小道具係（API部品の自動調達） |
+
+※ Visual Studio は不要です（コードは全て Claude Code が書きます）
+
 ---
 
 ## プロンプト A: テキストなし版（推奨）
@@ -11,50 +24,51 @@
 
 ```
 Create a clean, professional infographic-style flowchart diagram for a software development workflow.
-The diagram should have a white background with a modern flat design style.
+White background, modern flat design, 16:9 aspect ratio.
 
 Layout (top to bottom, 3 phases):
 
-【Phase 1 - Top section】
-- A person icon (developer) at the top center, highlighted with a BLUE circle
-- Two arrows going down-left and down-right from the person
-- Down-left arrow points to: a robot/AI icon (Claude Code) with a PURPLE circle
-- Down-right arrow points to: a monitor/IDE icon (Visual Studio) with a BLUE circle
-- Both the robot and monitor have arrows pointing down to a central document/code icon
+【Phase 1 - DEVELOP (top section)】
+- Top center: a PERSON icon (developer) in a large BLUE-bordered rounded rectangle
+- One arrow going straight down from the person to:
+- Center: the Anthropic Claude logo (a rounded orange-brown icon) in a PURPLE-bordered rounded rectangle — this represents "Claude Code", the AI that writes all the code
+- One arrow going straight down from Claude to:
+- Center: a DOCUMENT / CODE file icon in a light gray rounded rectangle — this represents the generated code
 
-【Phase 2 - Middle section】
-- A gear/terminal icon (PowerShell) with a BLUE circle, centered
-- Two arrows from the gear: one going down-left to a package/build icon, one going down-right to a building/architecture icon (Revit) with a BLUE circle
-- A small box icon (NuGet) with a GRAY circle, connected to the package icon with a dotted arrow
-- A circular arrow from Revit back up to the person icon (feedback loop), with a GREEN checkmark and RED X mark
+【Phase 2 - BUILD & TEST (middle section)】
+- The PowerShell logo (blue background with ">_" terminal symbol) in a BLUE-bordered rounded rectangle, centered
+- Two arrows from PowerShell splitting left and right:
+  - Left arrow to: a GEAR/BUILD icon (compile) in a GRAY-bordered rectangle
+  - Right arrow to: the Autodesk Revit logo (blue "R" icon) in a BLUE-bordered rounded rectangle
+- A small NuGet logo (blue cube icon) in a GRAY-bordered rectangle, connected to the gear/build icon with a DOTTED arrow (auto-supply)
+- A curved feedback arrow from Revit back up to the Person icon at the top, with a GREEN checkmark (OK) and RED X mark (NG)
 
-【Phase 3 - Bottom section】
-- A cloud/repository icon (GitHub) with a DARK circle
-- Arrow from GitHub to a rocket/automation icon (GitHub Actions) with a GRAY circle
-- Arrow from the rocket to a download/release icon
-- Arrow from the download icon to multiple user silhouettes
+【Phase 3 - RELEASE (bottom section)】
+- The GitHub logo (black Octocat) in a DARK-bordered rounded rectangle
+- Arrow from GitHub to: a ROCKET / automation icon (GitHub Actions) in a GRAY-bordered rectangle
+- Arrow from the rocket to: a DOWNLOAD / package icon
+- Arrow from the download icon to: multiple USER silhouettes
 
-Color coding for borders/backgrounds:
-- BLUE: things the developer does manually
-- PURPLE: AI-powered (Claude Code)
-- GRAY: runs automatically
-- Use soft rounded rectangles for each item
-- Arrows should be clean with slight curves
-- No text or labels anywhere in the image
+Each software element should display its ACTUAL RECOGNIZABLE LOGO/ICON inside the rounded rectangle.
+No text or labels anywhere in the image — only logos, icons, and arrows.
 
-Style: minimal, modern, flat design, slight drop shadows, pastel color palette, 16:9 aspect ratio
+Color coding for borders:
+- BLUE border: things the developer does manually
+- PURPLE border: AI-powered (Claude Code)
+- GRAY border: runs automatically
+
+Style: minimal, modern, flat design, slight drop shadows, pastel color palette, clean curved arrows
 ```
 
 > **生成後**: PowerPoint や Canva で以下のテキストを各アイコンの横に配置してください
 > - 人アイコン → 「あなた（監督）」
-> - ロボットアイコン → 「Claude Code（AI脚本家）」
-> - モニターアイコン → 「Visual Studio（もう一人の脚本家）」
-> - 歯車アイコン → 「PowerShell（現場スタッフ）」
-> - 建物アイコン → 「Revit（舞台）」
-> - 箱アイコン → 「NuGet（小道具係）」
-> - クラウドアイコン → 「GitHub（台本倉庫）」
+> - Claude ロゴ → 「Claude Code（AI脚本家）」
+> - PowerShell ロゴ → 「PowerShell（現場スタッフ）」
+> - Revit ロゴ → 「Revit（舞台）」
+> - NuGet ロゴ → 「NuGet（小道具係）」
+> - GitHub ロゴ → 「GitHub（台本倉庫）」
 > - ロケットアイコン → 「GitHub Actions（自動スタッフ）」
-> - 各矢印の横に動作説明（「指示を出す」「コードを書く」など）
+> - 矢印の横に：「指示を出す」「コードを全て書く」「ビルド実行」「動作確認」「OK/NG」など
 
 ---
 
@@ -66,39 +80,36 @@ Style: minimal, modern, flat design, slight drop shadows, pastel color palette, 
 Create a professional software development workflow diagram as an infographic.
 White background, modern flat design, 16:9 aspect ratio.
 
-The diagram flows top-to-bottom with 3 phases separated by thin horizontal lines.
-Each element is a soft rounded rectangle with an icon and a short English label inside.
+The diagram flows top-to-bottom with 3 phases separated by thin horizontal divider lines.
+Each element is a soft rounded rectangle containing the software's ACTUAL LOGO and a short English label.
 
 === PHASE 1: DEVELOP ===
 Top center:
   [Person icon] "YOU (Director)" — blue border, large size
 
-Two arrows from YOU going down:
-  Left arrow labeled "Give instructions" →
-    [Robot icon] "Claude Code (AI)" — purple border
-  Right arrow labeled "Write yourself" →
-    [Monitor icon] "Visual Studio" — blue border
+One arrow going down, labeled "Give instructions":
+  [Anthropic Claude logo - orange/brown rounded icon] "Claude Code (AI)" — purple border
 
-Both Claude Code and Visual Studio have arrows labeled "Write code" pointing down to:
-  [Document icon] "CODE" — centered, wide rectangle, light gray
+Arrow going down from Claude Code, labeled "Writes ALL code":
+  [Document/code icon] "CODE" — centered, wide rectangle, light gray
 
 === PHASE 2: BUILD & TEST ===
 Arrow from CODE down to:
-  [Gear icon] "PowerShell" — blue border, labeled "Run build"
+  [PowerShell logo - blue ">_" icon] "PowerShell" — blue border, labeled "Run build"
 
 PowerShell splits into two arrows:
-  Left: "Build" → [Package icon] "Build (compile)" — gray border
-  Right: "Deploy" → [Building icon] "Revit" — blue border, labeled "Test here"
+  Left: "Build" → [Gear icon] "Build (compile)" — gray border
+  Right: "Deploy" → [Autodesk Revit logo - blue "R"] "Revit" — blue border, labeled "Test here"
 
 Small dotted arrow into Build from:
-  [Box icon] "NuGet" — gray border, labeled "Auto-supply API parts"
+  [NuGet logo - blue cube] "NuGet" — gray border, labeled "Auto-supply"
 
 Curved arrow from Revit back up to YOU:
-  Labeled "OK → next" (green) and "NG → fix" (red)
+  Labeled "OK → next" (green) / "NG → tell Claude to fix" (red)
 
 === PHASE 3: RELEASE ===
 Arrow from YOU labeled "Push tag" to:
-  [Cloud icon] "GitHub" — dark border
+  [GitHub Octocat logo] "GitHub" — dark border
 
 Arrow from GitHub labeled "Triggers" to:
   [Rocket icon] "GitHub Actions" — gray border, labeled "Auto build + ZIP"
@@ -114,7 +125,8 @@ Blue border = You do this manually
 Purple border = AI does this
 Gray border = Runs automatically
 
-Style: clean, minimal, flat icons, pastel colors, thin arrows with labels, slight shadows
+IMPORTANT: Use the ACTUAL recognizable logo for each software tool (Claude, PowerShell, Revit, GitHub, NuGet).
+Style: clean, minimal, pastel colors, thin arrows with labels, slight shadows
 ```
 
 ---
@@ -126,54 +138,50 @@ TV番組の人物相関図のようなポップなデザインにしたい場合
 ```
 Create a Japanese TV drama-style character relationship diagram (相関図 / soukanzu) for a software development team.
 
-Style: colorful, pop, TV drama relationship chart style with character portraits in circles connected by labeled arrows. Bright pastel background with decorative elements. Fun and approachable, like a variety show graphic.
+Style: colorful, pop, TV drama relationship chart style. Each character is in a circular frame connected by labeled arrows. Bright pastel background with decorative elements. Fun and approachable, like a variety show graphic.
 
-Characters (each in a circular frame with a portrait):
+Characters (each in a circular frame with their ACTUAL SOFTWARE LOGO prominently displayed):
 
 1. "YOU" (top center, largest circle, gold border)
-   - Cartoon portrait: a smiling person at a desk with a lightbulb above their head
-   - Role badge: "Director & Producer"
+   - Icon: a smiling person at a desk with a lightbulb above their head
+   - Role badge below: "Director & Producer"
 
-2. "Claude Code" (left of YOU, purple border)
-   - Cartoon portrait: a friendly robot holding a pen and paper
-   - Role badge: "AI Scriptwriter"
+2. "Claude Code" (directly below YOU, purple border)
+   - Icon: the Anthropic Claude logo (orange-brown rounded icon) prominently displayed
+   - Role badge below: "AI Scriptwriter — writes ALL code"
 
-3. "Visual Studio" (right of YOU, blue border)
-   - Cartoon portrait: a computer monitor with code on screen
-   - Role badge: "Manual Scriptwriter"
+3. "PowerShell" (center-left, teal/blue border)
+   - Icon: the PowerShell logo (blue background with ">_" terminal symbol)
+   - Role badge below: "Build Staff"
 
-4. "PowerShell" (center, teal border)
-   - Cartoon portrait: a worker in a hard hat with a wrench
-   - Role badge: "Build Staff"
+4. "Revit" (center-right, blue border)
+   - Icon: the Autodesk Revit logo (blue "R" mark)
+   - Role badge below: "The Stage"
 
-5. "Revit" (right of PowerShell, orange border)
-   - Cartoon portrait: a grand theater stage
-   - Role badge: "The Stage"
+5. "GitHub" (bottom center, dark gray border)
+   - Icon: the GitHub Octocat logo
+   - Role badge below: "Script Vault & Delivery"
 
-6. "GitHub" (bottom left, dark gray border)
-   - Cartoon portrait: the GitHub octocat holding a filing cabinet
-   - Role badge: "Script Vault"
+6. "NuGet" (small circle, near PowerShell, light gray border)
+   - Icon: the NuGet logo (blue cube)
+   - Role badge below: "Props Supplier"
 
-7. "NuGet" (small, near PowerShell, light gray border)
-   - Cartoon portrait: a small delivery person carrying boxes
-   - Role badge: "Props Supplier"
+Arrows between characters (with relationship labels on the arrows):
+- YOU → Claude Code: "Gives instructions" (thick arrow going down)
+- Claude Code → CODE (small document icon between Claude and PowerShell): "Writes all code" (arrow)
+- YOU → PowerShell: "Runs build script" (arrow)
+- PowerShell → Revit: "Auto deploy" (arrow)
+- NuGet → PowerShell: "Auto-supply API parts" (dotted arrow)
+- Revit → YOU: "OK! / NG → fix it" (curved feedback arrow, green & red)
+- YOU → GitHub: "Push code & tags" (arrow)
+- GitHub → Users (small user silhouettes): "Auto release → Download" (arrow)
 
-Arrows between characters (with relationship labels):
-- YOU → Claude Code: "Gives instructions" (thick arrow)
-- YOU → Visual Studio: "Writes & debugs" (thick arrow)
-- Claude Code → CODE (center): "Writes code automatically"
-- Visual Studio → CODE: "Writes & fixes code"
-- YOU → PowerShell: "Runs build script"
-- PowerShell → Revit: "Deploys automatically"
-- NuGet → PowerShell: "Supplies API parts" (dotted arrow)
-- Revit → YOU: "Test OK / NG feedback" (curved arrow)
-- YOU → GitHub: "Pushes code & tags"
-- GitHub → "Users": "Auto release & download"
+IMPORTANT: Each circle must display the ACTUAL RECOGNIZABLE LOGO of the software, not a generic icon.
 
-Legend in corner:
-  Blue labels = Manual (you do it)
-  Purple labels = AI-powered
-  Gray labels = Fully automatic
+Legend in bottom-right corner:
+  Blue = Manual (you do it)
+  Purple = AI-powered
+  Gray = Fully automatic
 
 16:9 aspect ratio, high resolution, vibrant colors
 ```
@@ -194,3 +202,5 @@ Legend in corner:
 2. 生成された画像を **PowerPoint** や **Canva** に貼り付ける
 3. 日本語のテキストラベルと矢印の説明を手動で上に配置する
 4. 色の凡例（青=手動、紫=AI、灰=自動）を追加する
+
+> **注意**: 画像生成AIはロゴを正確に再現できないことがあります。その場合は、生成された図をベースにして、PowerPoint/Canva で各ソフトの公式ロゴ画像に差し替えてください。
