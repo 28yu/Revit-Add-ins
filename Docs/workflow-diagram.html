@@ -115,6 +115,13 @@ body{
   flex-shrink:0;
   background:#FFFDD0;
   border:1.5px solid #ddd8b0;
+  overflow:hidden;
+}
+.node-icon img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  display:block;
 }
 .node-text{
   flex:1;
@@ -364,7 +371,7 @@ body{
 
       <!-- あなた -->
       <div class="node node-you">
-        <div class="node-icon">🙂</div>
+        <div class="node-icon"><img src="icons/workflow/you.png" alt="あなた"></div>
         <div class="node-text">
           <div class="node-role">あなた ─ 監督・プロデューサー</div>
           <div class="node-name">作りたい機能を考える・仕様をまとめる</div>
@@ -379,7 +386,7 @@ body{
 
       <!-- Claude Code -->
       <div class="node node-ai">
-        <div class="node-icon">🤖</div>
+        <div class="node-icon"><img src="icons/workflow/claude.png" alt="Claude Code"></div>
         <div class="node-text">
           <div class="node-role">Claude Code ─ AI 脚本家</div>
           <div class="node-name">コードを全て書く</div>
@@ -416,7 +423,7 @@ body{
 
       <!-- PowerShell 実行 -->
       <div class="node node-you">
-        <div class="node-icon">🙂</div>
+        <div class="node-icon"><img src="icons/workflow/powershell.png" alt="PowerShell"></div>
         <div class="node-text">
           <div class="node-role">あなたが実行</div>
           <div class="node-name">QuickBuild.ps1 を起動</div>
@@ -432,7 +439,7 @@ body{
       <div class="branch">
         <div class="branch-col">
           <div class="node node-auto node-sm">
-            <div class="node-icon">⚙️</div>
+            <div class="node-icon"><img src="icons/workflow/nuget.png" alt="NuGet"></div>
             <div class="node-text">
               <div class="node-name">ビルド（変換）</div>
             </div>
@@ -449,7 +456,7 @@ body{
 
         <div class="branch-col">
           <div class="node node-auto node-sm">
-            <div class="node-icon">⚙️</div>
+            <div class="node-icon"><img src="icons/workflow/Revit.png" alt="Revit"></div>
             <div class="node-text">
               <div class="node-name">デプロイ（配置）</div>
             </div>
@@ -464,7 +471,7 @@ body{
 
       <!-- Revit 動作確認 -->
       <div class="node node-you">
-        <div class="node-icon">🔍</div>
+        <div class="node-icon"><img src="icons/workflow/Revit.png" alt="Revit"></div>
         <div class="node-text">
           <div class="node-role">あなたが操作</div>
           <div class="node-name">Revit を起動して動作確認</div>
@@ -496,7 +503,7 @@ body{
 
       <!-- Tag push -->
       <div class="node node-you" style="width:62mm">
-        <div class="node-icon">🏷️</div>
+        <div class="node-icon"><img src="icons/workflow/you.png" alt="あなた"></div>
         <div class="node-text">
           <div class="node-role">あなた</div>
           <div class="node-name">タグを付けて送る</div>
@@ -513,7 +520,7 @@ body{
       <div class="hrow">
 
         <div class="node node-auto node-sm">
-          <div class="node-icon">🐙</div>
+          <div class="node-icon"><img src="icons/workflow/github.png" alt="GitHub"></div>
           <div class="node-text">
             <div class="node-name">GitHub</div>
             <div class="node-desc">台本倉庫</div>
@@ -529,7 +536,7 @@ body{
         </div>
 
         <div class="node node-auto node-sm">
-          <div class="node-icon">⚡</div>
+          <div class="node-icon"><img src="icons/workflow/action.png" alt="GitHub Actions"></div>
           <div class="node-text">
             <div class="node-name">Actions</div>
             <div class="node-desc">全版ビルド+ZIP</div>
@@ -545,7 +552,7 @@ body{
         </div>
 
         <div class="node node-auto node-sm">
-          <div class="node-icon">📦</div>
+          <div class="node-icon"><img src="icons/workflow/github.png" alt="Releases"></div>
           <div class="node-text">
             <div class="node-name">Releases</div>
             <div class="node-desc">受け渡し窓口</div>
@@ -561,7 +568,7 @@ body{
         </div>
 
         <div class="node node-sm" style="background:#FFFDD0;border-color:#ddd8b0">
-          <div class="node-icon">👥</div>
+          <div class="node-icon"><img src="icons/workflow/you.png" alt="ユーザー"></div>
           <div class="node-text">
             <div class="node-name">ユーザー</div>
             <div class="node-desc">install.bat 実行</div>
