@@ -11,13 +11,31 @@ permissions:
   pages: write
   id-token: write
 
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
 jobs:
   auto-merge:
     runs-on: ubuntu-latest
+    outputs:
+      merged: ${{ steps.merge.outputs.merged }}
+      docs_changed: ${{ steps.check-docs.outputs.docs_changed }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Check for Docs changes in branch
+        id: check-docs
+        run: |
+          CHANGED=$(git diff origin/main --name-only -- 'Docs/' | head -1)
+          if [ -n "$CHANGED" ]; then
+            echo "docs_changed=true" >> $GITHUB_OUTPUT
+            echo "Docs changes detected"
+          else
+            echo "No Docs changes"
+          fi
 
       - name: Check for existing PR
         id: check-pr
@@ -55,31 +73,26 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Checkout main for deploy
-        if: steps.merge.outputs.merged == 'true'
-        uses: actions/checkout@v4
+  deploy:
+    needs: auto-merge
+    if: needs.auto-merge.outputs.merged == 'true' && needs.auto-merge.outputs.docs_changed == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
         with:
           ref: main
 
-      - name: Check if Docs changed
-        if: steps.merge.outputs.merged == 'true'
-        id: check-docs
-        run: |
-          CHANGED=$(git diff HEAD~1 --name-only -- 'Docs/' | head -1)
-          if [ -n "$CHANGED" ]; then
-            echo "docs_changed=true" >> $GITHUB_OUTPUT
-          fi
-
       - name: Setup Pages
-        if: steps.check-docs.outputs.docs_changed == 'true'
         uses: actions/configure-pages@v4
 
       - name: Upload artifact
-        if: steps.check-docs.outputs.docs_changed == 'true'
         uses: actions/upload-pages-artifact@v3
         with:
           path: Docs
 
       - name: Deploy to GitHub Pages
-        if: steps.check-docs.outputs.docs_changed == 'true'
+        id: deployment
         uses: actions/deploy-pages@v4
