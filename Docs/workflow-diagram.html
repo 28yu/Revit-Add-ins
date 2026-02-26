@@ -6,377 +6,594 @@
 <title>Tools28 開発ワークフロー 相関図</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;700;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700;900&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{
   font-family:'Zen Maru Gothic','Hiragino Sans','Meiryo',sans-serif;
-  background-color:#fef9ef;
-  background-image:radial-gradient(circle,#e8dcc8 0.8px,transparent 0.8px);
-  background-size:22px 22px;
+  background-color:#faf6ee;
   min-height:100vh;
-  color:#3d3229;
+  color:#33302b;
+  line-height:1.5;
+}
+
+/* ===== Container ===== */
+.container{
+  max-width:860px;
+  margin:0 auto;
+  padding:20px 16px 24px;
 }
 
 /* ===== Title ===== */
-.title-area{text-align:center;padding:28px 16px 2px}
-.title-area h1{
-  display:inline;
-  font-size:1.6rem;font-weight:900;color:#2d2d2d;
-  background:linear-gradient(transparent 60%,rgba(252,211,77,0.5) 60%);
-  padding:0 6px;
+.title-block{
+  text-align:center;
+  margin-bottom:14px;
 }
-.subtitle{
-  text-align:center;font-size:0.88rem;color:#8d7e6e;
-  padding:8px 16px 0;font-weight:700;
+.title-block h1{
+  display:inline;
+  font-size:1.5rem;
+  font-weight:900;
+  color:#2d2d2d;
+  background:linear-gradient(transparent 55%,#fcd34d 55%);
+  padding:0 8px;
+  line-height:1.6;
+}
+.title-sub{
+  display:block;
+  font-size:0.82rem;
+  color:#8b7e6e;
+  font-weight:700;
+  margin-top:6px;
+}
+
+/* ===== Flow Banner ===== */
+.flow-banner{
+  background:#fff;
+  border:2.5px solid #e8dcc8;
+  border-radius:14px;
+  padding:12px 10px;
+  margin-bottom:10px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:0;
+  flex-wrap:wrap;
+}
+.flow-step{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  padding:5px 10px;
+  border-radius:20px;
+  font-size:0.82rem;
+  font-weight:700;
+  white-space:nowrap;
+}
+.flow-step .icon{font-size:1.1rem}
+.fs-you{background:#fef3c7;color:#92400e}
+.fs-ai{background:#ede9fe;color:#5b21b6}
+.fs-build{background:#dbeafe;color:#1e40af}
+.fs-test{background:#d1fae5;color:#065f46}
+.fs-ship{background:#fce7f3;color:#9d174d}
+.flow-arrow{
+  font-size:1.1rem;
+  color:#c4b5a0;
+  margin:0 2px;
+  flex-shrink:0;
 }
 
 /* ===== Legend ===== */
-.legend{
-  display:flex;justify-content:center;gap:20px;flex-wrap:wrap;
-  padding:14px 16px 6px;
+.legend-row{
+  display:flex;
+  justify-content:center;
+  gap:14px;
+  margin-bottom:10px;
+  flex-wrap:wrap;
 }
-.legend-item{display:flex;align-items:center;gap:6px;font-size:0.78rem;font-weight:700;color:#6b5e50}
-.legend-dot{width:13px;height:13px;border-radius:50%;border:2px solid}
-.ld-you{background:#dbeafe;border-color:#3b82f6}
+.legend-item{
+  display:flex;
+  align-items:center;
+  gap:4px;
+  font-size:0.72rem;
+  font-weight:700;
+  color:#7a6e5e;
+}
+.legend-dot{
+  width:10px;height:10px;border-radius:50%;
+  border:2px solid;
+}
+.ld-you{background:#fef3c7;border-color:#f59e0b}
 .ld-ai{background:#ede9fe;border-color:#8b5cf6}
-.ld-auto{background:#f1f5f9;border-color:#94a3b8}
+.ld-auto{background:#e2e8f0;border-color:#94a3b8}
 
-/* ===== Canvas ===== */
-.canvas-wrap{
-  width:100%;overflow:hidden;
-  display:flex;justify-content:center;
-  padding:8px 0 32px;
-}
-.canvas{
-  position:relative;width:920px;height:700px;
-  transform-origin:top center;flex-shrink:0;
+/* ===== Card Grid ===== */
+.card-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
 }
 
-/* ===== SVG Arrows ===== */
-.canvas>svg{
-  position:absolute;top:0;left:0;
-  width:100%;height:100%;
-  pointer-events:none;z-index:1;
-}
-
-/* ===== Nodes ===== */
-.node{
-  position:absolute;display:flex;flex-direction:column;
-  align-items:center;text-align:center;z-index:2;
-  cursor:default;transition:transform 0.2s ease;
-}
-.node:hover{transform:scale(1.07)}
-
-.node-circle{
-  border-radius:50%;overflow:hidden;
+/* ===== Card ===== */
+.card{
   background:#fff;
+  border-radius:12px;
+  border:2.5px solid #e8dcc8;
+  overflow:hidden;
+}
+.card-header{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  padding:8px 12px;
+  font-size:0.85rem;
+  font-weight:900;
+  border-bottom:2px dashed #eee4d4;
+}
+.card-header .h-icon{
+  width:30px;height:30px;border-radius:50%;
   display:flex;align-items:center;justify-content:center;
-  box-shadow:0 3px 14px rgba(0,0,0,0.08);
+  font-size:1rem;flex-shrink:0;
+  border:2px solid;
+}
+.card-header .h-sub{
+  font-size:0.68rem;
+  font-weight:500;
+  color:#a09585;
+  margin-left:auto;
+  white-space:nowrap;
+}
+.card-body{
+  padding:8px 12px 10px;
+}
+.card-body ul{
+  list-style:none;
+  padding:0;
+}
+.card-body li{
+  font-size:0.76rem;
+  font-weight:500;
+  padding:2px 0;
+  display:flex;
+  align-items:flex-start;
+  gap:5px;
+  line-height:1.45;
+}
+.card-body li .bullet{
+  flex-shrink:0;
+  font-size:0.72rem;
+  margin-top:1px;
+}
+.card-body .note{
+  font-size:0.7rem;
+  color:#a09585;
+  font-weight:700;
+  margin-top:4px;
+  padding:4px 8px;
+  background:#faf6ee;
+  border-radius:6px;
+  display:inline-block;
+}
+
+/* ===== Card Theme Colors ===== */
+/* あなた */
+.card-you{border-color:#f59e0b}
+.card-you .card-header{background:#fef9e7;color:#92400e}
+.card-you .h-icon{background:#fef3c7;border-color:#f59e0b;color:#d97706}
+
+/* Claude Code */
+.card-claude{border-color:#8b5cf6}
+.card-claude .card-header{background:#f5f3ff;color:#5b21b6}
+.card-claude .h-icon{background:#ede9fe;border-color:#8b5cf6;color:#7c3aed}
+
+/* PowerShell */
+.card-ps{border-color:#3b82f6}
+.card-ps .card-header{background:#eff6ff;color:#1e40af}
+.card-ps .h-icon{background:#dbeafe;border-color:#3b82f6;color:#2563eb}
+
+/* Revit */
+.card-revit{border-color:#06b6d4}
+.card-revit .card-header{background:#ecfeff;color:#155e75}
+.card-revit .h-icon{background:#cffafe;border-color:#06b6d4;color:#0891b2}
+
+/* GitHub */
+.card-github{border-color:#475569}
+.card-github .card-header{background:#f1f5f9;color:#1e293b}
+.card-github .h-icon{background:#e2e8f0;border-color:#475569;color:#334155}
+
+/* NuGet */
+.card-nuget{border-color:#f97316}
+.card-nuget .card-header{background:#fff7ed;color:#9a3412}
+.card-nuget .h-icon{background:#ffedd5;border-color:#f97316;color:#ea580c}
+
+/* Actions */
+.card-actions{border-color:#64748b}
+.card-actions .card-header{background:#f8fafc;color:#334155}
+.card-actions .h-icon{background:#e2e8f0;border-color:#64748b;color:#475569}
+
+/* Users */
+.card-users{border-color:#ec4899}
+.card-users .card-header{background:#fdf2f8;color:#9d174d}
+.card-users .h-icon{background:#fce7f3;border-color:#ec4899;color:#db2777}
+
+/* ===== Workflow Steps ===== */
+.workflow-section{
+  margin-top:10px;
+}
+.workflow-title{
+  font-size:0.9rem;
+  font-weight:900;
+  color:#2d2d2d;
+  text-align:center;
+  margin-bottom:8px;
+}
+.workflow-title span{
+  background:linear-gradient(transparent 55%,#bfdbfe 55%);
+  padding:0 6px;
+}
+.steps{
+  display:grid;
+  grid-template-columns:repeat(5,1fr);
+  gap:6px;
+}
+.step{
+  background:#fff;
+  border-radius:10px;
+  border:2.5px solid #e8dcc8;
+  padding:8px 8px 10px;
+  text-align:center;
   position:relative;
 }
-.node-circle img{
-  width:100%;height:100%;object-fit:cover;
-  display:block;
-}
-.node-circle .fb{
-  display:none;
-  font-size:2rem;width:100%;height:100%;
+.step-num{
+  display:inline-flex;
   align-items:center;justify-content:center;
+  width:22px;height:22px;
+  border-radius:50%;
+  font-size:0.72rem;font-weight:900;
+  color:#fff;
+  margin-bottom:4px;
+}
+.step-label{
+  font-size:0.74rem;
+  font-weight:900;
+  line-height:1.3;
+  margin-bottom:2px;
+}
+.step-desc{
+  font-size:0.66rem;
+  font-weight:500;
+  color:#8b7e6e;
+  line-height:1.35;
+}
+.step-arrow{
+  position:absolute;
+  right:-11px;top:50%;
+  transform:translateY(-50%);
+  font-size:0.9rem;
+  color:#c4b5a0;
+  z-index:2;
+}
+
+.sn-1{background:#f59e0b}
+.sn-2{background:#8b5cf6}
+.sn-3{background:#3b82f6}
+.sn-4{background:#06b6d4}
+.sn-5{background:#22c55e}
+
+.step:nth-child(1){border-color:#f59e0b}
+.step:nth-child(2){border-color:#8b5cf6}
+.step:nth-child(3){border-color:#3b82f6}
+.step:nth-child(4){border-color:#06b6d4}
+.step:nth-child(5){border-color:#22c55e}
+
+/* ===== Release Flow (bottom row) ===== */
+.release-row{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:6px;
+  margin-top:6px;
+}
+.step-wide{
   background:#fff;
+  border-radius:10px;
+  border:2.5px solid;
+  padding:8px 10px;
+  text-align:center;
+  position:relative;
 }
-.node-name{
-  margin-top:7px;font-size:0.88rem;font-weight:900;
-  color:#2d2d2d;line-height:1.25;
-}
-.node-sub{
-  font-size:0.68rem;font-weight:700;color:#a09585;
-  margin-top:1px;line-height:1.3;
-}
+.step-wide .step-arrow{right:-11px}
 
-/* Node sizes */
-.node.sz-lg .node-circle{width:130px;height:130px;border:5px solid}
-.node.sz-md .node-circle{width:100px;height:100px;border:4px solid}
-.node.sz-sm .node-circle{width:78px;height:78px;border:3px solid}
-
-/* Border colors */
-.bc-pink{border-color:#f472b6 !important}
-.bc-purple{border-color:#a78bfa !important}
-.bc-blue{border-color:#60a5fa !important}
-.bc-cyan{border-color:#22d3ee !important}
-.bc-dark{border-color:#475569 !important}
-.bc-gray{border-color:#94a3b8 !important}
-.bc-gold{border-color:#fbbf24 !important}
-
-/* ===== Arrow Labels ===== */
-.arrow-label{
-  position:absolute;z-index:5;pointer-events:none;
-  font-size:0.7rem;font-weight:700;
-  padding:3px 10px;border-radius:10px;
-  white-space:nowrap;
-  box-shadow:0 1px 4px rgba(0,0,0,0.06);
+/* ===== Callout ===== */
+.callout{
+  margin-top:10px;
+  background:#fef9e7;
+  border:2.5px solid #fbbf24;
+  border-radius:12px;
+  padding:10px 14px;
+  display:flex;
+  align-items:flex-start;
+  gap:8px;
 }
-.al-blue{background:#dbeafe;color:#1d4ed8}
-.al-purple{background:#ede9fe;color:#6d28d9}
-.al-gray{background:#f1f5f9;color:#475569}
-.al-green{background:#dcfce7;color:#166534}
-.al-red{background:#fee2e2;color:#991b1b}
-
-/* ===== Decorations ===== */
-.deco{
-  position:absolute;z-index:0;pointer-events:none;
-  font-size:1.1rem;opacity:0.35;
-  animation:float 4s ease-in-out infinite;
+.callout-icon{
+  font-size:1.2rem;
+  flex-shrink:0;
+  margin-top:1px;
 }
-@keyframes float{
-  0%,100%{transform:translateY(0)}
-  50%{transform:translateY(-6px)}
+.callout-text{
+  font-size:0.76rem;
+  font-weight:700;
+  color:#78350f;
+  line-height:1.5;
 }
+.callout-text strong{color:#92400e}
 
 /* ===== Footer ===== */
 .footer{
-  text-align:center;padding:0 16px 28px;
-  font-size:0.75rem;color:#a09585;font-weight:700;
+  text-align:center;
+  padding:10px 16px 0;
+  font-size:0.7rem;
+  color:#a09585;
+  font-weight:700;
 }
 .footer a{color:#6366f1;text-decoration:none}
 .footer a:hover{text-decoration:underline}
+
+/* ===== Responsive ===== */
+@media(max-width:680px){
+  .card-grid{grid-template-columns:1fr}
+  .steps{grid-template-columns:1fr}
+  .step-arrow{display:none}
+  .release-row{grid-template-columns:1fr}
+  .flow-banner{flex-direction:column;gap:4px}
+  .flow-arrow{transform:rotate(90deg)}
+}
 </style>
 </head>
 <body>
 
-<div class="title-area"><h1>Tools28 開発ワークフロー 相関図</h1></div>
-<p class="subtitle">あなたが考えて指示 &rarr; AI が全て書く &rarr; 自動でビルド &rarr; あなたが確認</p>
+<div class="container">
 
-<div class="legend">
-  <div class="legend-item"><div class="legend-dot ld-you"></div>あなたが行う</div>
-  <div class="legend-item"><div class="legend-dot ld-ai"></div>AI が行う</div>
-  <div class="legend-item"><div class="legend-dot ld-auto"></div>自動で動く</div>
-</div>
-
-<div class="canvas-wrap">
-<div class="canvas" id="canvas">
-  <svg id="arrow-svg" xmlns="http://www.w3.org/2000/svg"></svg>
-
-  <!-- ===== Nodes ===== -->
-
-  <!-- あなた (center) -->
-  <div class="node sz-lg" id="n-you" style="left:395px;top:228px;width:130px">
-    <div class="node-circle bc-pink">
-      <img src="icons/you.png" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-      <span class="fb">🙂</span>
-    </div>
-    <div class="node-name">あなた</div>
-    <div class="node-sub">監督・プロデューサー</div>
+  <!-- ===== Title ===== -->
+  <div class="title-block">
+    <h1>Tools28 開発ワークフロー 相関図</h1>
+    <span class="title-sub">あなたが考えて指示 → AI が全て書く → 自動でビルド → あなたが確認</span>
   </div>
 
-  <!-- Claude Code (upper-left) -->
-  <div class="node sz-md" id="n-claude" style="left:100px;top:60px;width:120px">
-    <div class="node-circle bc-purple">
-      <img src="icons/claude.png" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-      <span class="fb">🤖</span>
-    </div>
-    <div class="node-name">Claude Code</div>
-    <div class="node-sub">AI 脚本家</div>
+  <!-- ===== Flow Banner ===== -->
+  <div class="flow-banner">
+    <div class="flow-step fs-you"><span class="icon">🙂</span> あなたが指示</div>
+    <span class="flow-arrow">▸</span>
+    <div class="flow-step fs-ai"><span class="icon">🤖</span> Claude が実装</div>
+    <span class="flow-arrow">▸</span>
+    <div class="flow-step fs-build"><span class="icon">⚡</span> ビルド＆デプロイ</div>
+    <span class="flow-arrow">▸</span>
+    <div class="flow-step fs-test"><span class="icon">🔍</span> Revit で確認</div>
+    <span class="flow-arrow">▸</span>
+    <div class="flow-step fs-ship"><span class="icon">📦</span> 自動配布</div>
   </div>
 
-  <!-- Revit (right) -->
-  <div class="node sz-md" id="n-revit" style="left:700px;top:165px;width:120px">
-    <div class="node-circle bc-cyan">
-      <img src="icons/revit.png" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-      <span class="fb" style="font-weight:900;font-size:1.8rem;color:#0891b2">R</span>
-    </div>
-    <div class="node-name">Revit</div>
-    <div class="node-sub">舞台（動作確認）</div>
+  <!-- ===== Legend ===== -->
+  <div class="legend-row">
+    <div class="legend-item"><div class="legend-dot ld-you"></div>あなたが行う</div>
+    <div class="legend-item"><div class="legend-dot ld-ai"></div>AI が行う</div>
+    <div class="legend-item"><div class="legend-dot ld-auto"></div>自動で動く</div>
   </div>
 
-  <!-- PowerShell (lower-left) -->
-  <div class="node sz-md" id="n-ps" style="left:95px;top:415px;width:120px">
-    <div class="node-circle bc-blue">
-      <img src="icons/powershell.png" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-      <span class="fb" style="font-size:1.3rem;font-weight:900;color:#2563eb">&gt;_</span>
+  <!-- ===== Card Grid: Roles ===== -->
+  <div class="card-grid">
+
+    <!-- あなた -->
+    <div class="card card-you">
+      <div class="card-header">
+        <div class="h-icon">🙂</div>
+        あなた
+        <span class="h-sub">監督・プロデューサー</span>
+      </div>
+      <div class="card-body">
+        <ul>
+          <li><span class="bullet">💬</span>Claude Code に日本語で指示を出す</li>
+          <li><span class="bullet">🔨</span>QuickBuild.ps1 でビルド＆デプロイ</li>
+          <li><span class="bullet">🔍</span>Revit を起動して動作確認</li>
+          <li><span class="bullet">✅</span>OK → コミット＆プッシュ</li>
+          <li><span class="bullet">🔄</span>NG → 修正を再指示</li>
+        </ul>
+      </div>
     </div>
-    <div class="node-name">PowerShell</div>
-    <div class="node-sub">現場スタッフ</div>
+
+    <!-- Claude Code -->
+    <div class="card card-claude">
+      <div class="card-header">
+        <div class="h-icon">🤖</div>
+        Claude Code
+        <span class="h-sub">AI 脚本家</span>
+      </div>
+      <div class="card-body">
+        <ul>
+          <li><span class="bullet">✨</span>コマンドクラス (.cs) を作成・修正</li>
+          <li><span class="bullet">🎨</span>WPF ダイアログ (XAML) を構築</li>
+          <li><span class="bullet">🎯</span>Application.cs にリボンボタン登録</li>
+          <li><span class="bullet">📝</span>csproj / スクリプトの更新</li>
+        </ul>
+        <div class="note">💡 コードは全て AI が書きます</div>
+      </div>
+    </div>
+
+    <!-- PowerShell -->
+    <div class="card card-ps">
+      <div class="card-header">
+        <div class="h-icon">&gt;_</div>
+        PowerShell
+        <span class="h-sub">現場スタッフ</span>
+      </div>
+      <div class="card-body">
+        <ul>
+          <li><span class="bullet">🚀</span>QuickBuild.ps1 — 高速ビルド＆デプロイ</li>
+          <li><span class="bullet">📦</span>BuildAll.ps1 — 全6版一括ビルド</li>
+          <li><span class="bullet">🗜️</span>CreatePackages.ps1 — 配布ZIP作成</li>
+        </ul>
+        <div class="note">Revit 2021〜2026 対応</div>
+      </div>
+    </div>
+
+    <!-- Revit -->
+    <div class="card card-revit">
+      <div class="card-header">
+        <div class="h-icon">R</div>
+        Revit
+        <span class="h-sub">舞台（動作確認）</span>
+      </div>
+      <div class="card-body">
+        <ul>
+          <li><span class="bullet">🏗️</span>ビルドしたアドインを読み込み</li>
+          <li><span class="bullet">🔍</span>実際に操作して動作を確認</li>
+          <li><span class="bullet">👍</span>OK → 次のステップへ</li>
+          <li><span class="bullet">❌</span>NG → Claude に修正指示</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- GitHub -->
+    <div class="card card-github">
+      <div class="card-header">
+        <div class="h-icon">🐙</div>
+        GitHub
+        <span class="h-sub">台本倉庫</span>
+      </div>
+      <div class="card-body">
+        <ul>
+          <li><span class="bullet">💾</span>ソースコードをバージョン管理</li>
+          <li><span class="bullet">🏷️</span>タグ push → 自動リリース開始</li>
+          <li><span class="bullet">📋</span>Issue / PR で変更を追跡</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- NuGet -->
+    <div class="card card-nuget">
+      <div class="card-header">
+        <div class="h-icon">📦</div>
+        NuGet
+        <span class="h-sub">小道具係</span>
+      </div>
+      <div class="card-body">
+        <ul>
+          <li><span class="bullet">🔧</span>Revit API パッケージを自動取得</li>
+          <li><span class="bullet">📚</span>Nice3point.Revit.Api 使用</li>
+          <li><span class="bullet">💻</span>ローカルに Revit 不要でビルド可能</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- GitHub Actions -->
+    <div class="card card-actions">
+      <div class="card-header">
+        <div class="h-icon">⚡</div>
+        GitHub Actions
+        <span class="h-sub">自動スタッフ</span>
+      </div>
+      <div class="card-body">
+        <ul>
+          <li><span class="bullet">🏗️</span>全6バージョンを自動ビルド</li>
+          <li><span class="bullet">📦</span>配布ZIP を自動生成</li>
+          <li><span class="bullet">🚀</span>GitHub Releases にアップロード</li>
+        </ul>
+        <div class="note">タグ push で自動起動</div>
+      </div>
+    </div>
+
+    <!-- ユーザー -->
+    <div class="card card-users">
+      <div class="card-header">
+        <div class="h-icon">👥</div>
+        ユーザー
+        <span class="h-sub">ダウンロードして使う</span>
+      </div>
+      <div class="card-body">
+        <ul>
+          <li><span class="bullet">⬇️</span>GitHub Releases から ZIP 取得</li>
+          <li><span class="bullet">📁</span>install.bat を管理者実行</li>
+          <li><span class="bullet">🎉</span>Revit 再起動でアドインが使える</li>
+        </ul>
+      </div>
+    </div>
+
+  </div><!-- /card-grid -->
+
+  <!-- ===== Workflow Steps ===== -->
+  <div class="workflow-section">
+    <div class="workflow-title"><span>📐 日常の開発サイクル</span></div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num sn-1">1</div>
+        <div class="step-label">指示を出す</div>
+        <div class="step-desc">Claude Code に<br>日本語で依頼</div>
+        <span class="step-arrow">▸</span>
+      </div>
+      <div class="step">
+        <div class="step-num sn-2">2</div>
+        <div class="step-label">AI が実装</div>
+        <div class="step-desc">コード作成<br>自動で完了</div>
+        <span class="step-arrow">▸</span>
+      </div>
+      <div class="step">
+        <div class="step-num sn-3">3</div>
+        <div class="step-label">ビルド</div>
+        <div class="step-desc">QuickBuild.ps1<br>を実行</div>
+        <span class="step-arrow">▸</span>
+      </div>
+      <div class="step">
+        <div class="step-num sn-4">4</div>
+        <div class="step-label">動作確認</div>
+        <div class="step-desc">Revit で<br>テスト</div>
+        <span class="step-arrow">▸</span>
+      </div>
+      <div class="step">
+        <div class="step-num sn-5">5</div>
+        <div class="step-label">完了!</div>
+        <div class="step-desc">OK なら<br>コミット</div>
+      </div>
+    </div>
   </div>
 
-  <!-- NuGet (far-left, small) -->
-  <div class="node sz-sm" id="n-nuget" style="left:25px;top:248px;width:95px">
-    <div class="node-circle bc-gray">
-      <img src="icons/nuget.png" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-      <span class="fb">📦</span>
+  <!-- ===== Release Flow ===== -->
+  <div class="workflow-section" style="margin-top:8px">
+    <div class="workflow-title"><span>🚀 リリースの流れ</span></div>
+    <div class="release-row">
+      <div class="step-wide" style="border-color:#475569">
+        <div class="step-num" style="background:#475569">1</div>
+        <div class="step-label">git tag & push</div>
+        <div class="step-desc">バージョンタグを付けてプッシュ</div>
+        <span class="step-arrow">▸</span>
+      </div>
+      <div class="step-wide" style="border-color:#64748b">
+        <div class="step-num" style="background:#64748b">2</div>
+        <div class="step-label">GitHub Actions</div>
+        <div class="step-desc">全版ビルド → ZIP自動生成</div>
+        <span class="step-arrow">▸</span>
+      </div>
+      <div class="step-wide" style="border-color:#ec4899">
+        <div class="step-num" style="background:#ec4899">3</div>
+        <div class="step-label">ユーザーに届く</div>
+        <div class="step-desc">Releases ページで公開・DL</div>
+      </div>
     </div>
-    <div class="node-name">NuGet</div>
-    <div class="node-sub">小道具係</div>
   </div>
 
-  <!-- GitHub (bottom-center) -->
-  <div class="node sz-md" id="n-github" style="left:350px;top:510px;width:120px">
-    <div class="node-circle bc-dark">
-      <img src="icons/github.png" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-      <span class="fb">🐙</span>
+  <!-- ===== Callout ===== -->
+  <div class="callout">
+    <span class="callout-icon">💡</span>
+    <div class="callout-text">
+      <strong>ポイント：</strong>あなたはコードを一行も書く必要はありません。
+      Claude Code に「こういう機能がほしい」と伝えるだけで、実装からテスト準備まで AI が担当します。
+      あなたの役割は<strong>「指示」と「確認」</strong>の2つだけ!
     </div>
-    <div class="node-name">GitHub</div>
-    <div class="node-sub">台本倉庫</div>
   </div>
 
-  <!-- GitHub Actions (bottom-right) -->
-  <div class="node sz-sm" id="n-actions" style="left:590px;top:530px;width:105px">
-    <div class="node-circle bc-gray">
-      <img src="icons/actions.png" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-      <span class="fb">⚡</span>
-    </div>
-    <div class="node-name">GitHub Actions</div>
-    <div class="node-sub">自動スタッフ</div>
+  <!-- ===== Footer ===== -->
+  <div class="footer">
+    Tools28 — Revit Add-in 開発プロジェクト ｜ <a href="https://github.com/28yu/Revit-Add-ins" target="_blank">GitHub</a>
   </div>
 
-  <!-- ユーザー (far-right) -->
-  <div class="node sz-sm" id="n-users" style="left:770px;top:430px;width:105px">
-    <div class="node-circle bc-gold">
-      <img src="icons/users.png" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-      <span class="fb">👥</span>
-    </div>
-    <div class="node-name">ユーザー</div>
-    <div class="node-sub">ダウンロードして使う</div>
-  </div>
+</div><!-- /container -->
 
-  <!-- ===== Decorative doodles ===== -->
-  <span class="deco" style="left:310px;top:55px;animation-delay:0s">✦</span>
-  <span class="deco" style="left:540px;top:170px;animation-delay:0.8s">✧</span>
-  <span class="deco" style="left:850px;top:330px;animation-delay:1.6s">✦</span>
-  <span class="deco" style="left:260px;top:480px;animation-delay:2.4s">✧</span>
-  <span class="deco" style="left:720px;top:620px;animation-delay:0.4s">✦</span>
-  <span class="deco" style="left:50px;top:160px;animation-delay:1.2s">✧</span>
-  <span class="deco" style="left:480px;top:420px;animation-delay:2s">✦</span>
-
-</div><!-- canvas -->
-</div><!-- canvas-wrap -->
-
-<div class="footer">
-  Tools28 — Revit Add-in 開発プロジェクト ｜ <a href="https://github.com/28yu/Revit-Add-ins" target="_blank">GitHub</a>
-</div>
-
-<script>
-(function(){
-  // ========== Node center coordinates ==========
-  function getCenter(id){
-    const el=document.getElementById(id);
-    const circle=el.querySelector('.node-circle');
-    const r=circle.offsetWidth/2;
-    const x=el.offsetLeft+el.offsetWidth/2;
-    const y=el.offsetTop+r;
-    return {x,y,r};
-  }
-
-  // ========== Arrow definitions ==========
-  const arrows=[
-    {from:'n-you',to:'n-claude',label:'指示を出す 💬',cls:'al-blue',curve:40},
-    {from:'n-claude',to:'n-you',label:'コードを全て書く ✨',cls:'al-purple',curve:40},
-    {from:'n-you',to:'n-ps',label:'ビルドを実行 🔨',cls:'al-blue',curve:25},
-    {from:'n-nuget',to:'n-ps',label:'部品を自動調達',cls:'al-gray',curve:0,dashed:true},
-    {from:'n-you',to:'n-revit',label:'動作を確認 🔍',cls:'al-blue',curve:-30},
-    {from:'n-revit',to:'n-you',label:'OK! 👍',cls:'al-green',curve:-30},
-    {from:'n-revit',to:'n-claude',label:'NG → 修正を指示 🔄',cls:'al-red',curve:-25,dashed:true},
-    {from:'n-you',to:'n-github',label:'git push で保管 💾',cls:'al-blue',curve:-15},
-    {from:'n-github',to:'n-actions',label:'タグで自動トリガー ⚡',cls:'al-gray',curve:-15},
-    {from:'n-actions',to:'n-users',label:'ZIP 自動配布 📦',cls:'al-gray',curve:-25},
-  ];
-
-  // ========== SVG helpers ==========
-  const NS='http://www.w3.org/2000/svg';
-  const svg=document.getElementById('arrow-svg');
-
-  function createMarker(color,id){
-    const defs=svg.querySelector('defs')||svg.appendChild(document.createElementNS(NS,'defs'));
-    const m=document.createElementNS(NS,'marker');
-    m.setAttribute('id',id);
-    m.setAttribute('viewBox','0 0 10 7');
-    m.setAttribute('refX','9');
-    m.setAttribute('refY','3.5');
-    m.setAttribute('markerWidth','8');
-    m.setAttribute('markerHeight','6');
-    m.setAttribute('orient','auto');
-    const p=document.createElementNS(NS,'path');
-    p.setAttribute('d','M0 0 L10 3.5 L0 7 Z');
-    p.setAttribute('fill',color);
-    m.appendChild(p);
-    defs.appendChild(m);
-    return id;
-  }
-
-  // Color map
-  const colorMap={
-    'al-blue':'#3b82f6',
-    'al-purple':'#8b5cf6',
-    'al-gray':'#94a3b8',
-    'al-green':'#22c55e',
-    'al-red':'#ef4444',
-  };
-
-  // Create markers for each color
-  const markers={};
-  Object.entries(colorMap).forEach(([cls,col])=>{
-    const mid='mk-'+cls;
-    createMarker(col,mid);
-    markers[cls]=mid;
-  });
-
-  // ========== Draw arrows ==========
-  const canvas=document.getElementById('canvas');
-
-  arrows.forEach(a=>{
-    const f=getCenter(a.from);
-    const t=getCenter(a.to);
-    const dx=t.x-f.x, dy=t.y-f.y;
-    const dist=Math.sqrt(dx*dx+dy*dy);
-    const ux=dx/dist, uy=dy/dist;
-
-    // Start/end on circle edge (with small gap for arrowhead)
-    const sx=f.x+ux*(f.r+4), sy=f.y+uy*(f.r+4);
-    const ex=t.x-ux*(t.r+10), ey=t.y-uy*(t.r+10);
-
-    // Perpendicular for curve
-    const nx=-uy, ny=ux;
-    const cv=a.curve||0;
-    const cx2=(sx+ex)/2+nx*cv;
-    const cy2=(sy+ey)/2+ny*cv;
-
-    // SVG path
-    const path=document.createElementNS(NS,'path');
-    path.setAttribute('d',`M${sx} ${sy} Q${cx2} ${cy2} ${ex} ${ey}`);
-    path.setAttribute('fill','none');
-    path.setAttribute('stroke',colorMap[a.cls]);
-    path.setAttribute('stroke-width','2.8');
-    path.setAttribute('stroke-linecap','round');
-    if(a.dashed) path.setAttribute('stroke-dasharray','7 5');
-    path.setAttribute('marker-end',`url(#${markers[a.cls]})`);
-    svg.appendChild(path);
-
-    // Label position (midpoint of quadratic bezier)
-    const lx=(sx+2*cx2+ex)/4;
-    const ly=(sy+2*cy2+ey)/4;
-
-    const lbl=document.createElement('div');
-    lbl.className='arrow-label '+a.cls;
-    lbl.textContent=a.label;
-    lbl.style.left=lx+'px';
-    lbl.style.top=ly+'px';
-    lbl.style.transform='translate(-50%,-50%)';
-    canvas.appendChild(lbl);
-  });
-
-  // ========== Responsive scaling ==========
-  function scaleCanvas(){
-    const wrap=document.querySelector('.canvas-wrap');
-    const c=document.getElementById('canvas');
-    const avail=wrap.clientWidth-16;
-    const s=Math.min(1,avail/920);
-    c.style.transform='scale('+s+')';
-    wrap.style.height=(700*s+20)+'px';
-  }
-  window.addEventListener('resize',scaleCanvas);
-  scaleCanvas();
-
-})();
-</script>
 </body>
 </html>
