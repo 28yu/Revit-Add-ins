@@ -20,22 +20,10 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       merged: ${{ steps.merge.outputs.merged }}
-      docs_changed: ${{ steps.check-docs.outputs.docs_changed }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Check for Docs changes in branch
-        id: check-docs
-        run: |
-          CHANGED=$(git diff origin/main --name-only -- 'Docs/' | head -1)
-          if [ -n "$CHANGED" ]; then
-            echo "docs_changed=true" >> $GITHUB_OUTPUT
-            echo "Docs changes detected"
-          else
-            echo "No Docs changes"
-          fi
 
       - name: Check for existing PR
         id: check-pr
@@ -75,7 +63,7 @@ jobs:
 
   deploy:
     needs: auto-merge
-    if: needs.auto-merge.outputs.merged == 'true' && needs.auto-merge.outputs.docs_changed == 'true'
+    if: needs.auto-merge.outputs.merged == 'true'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
