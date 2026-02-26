@@ -8,6 +8,8 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  pages: write
+  id-token: write
 
 jobs:
   auto-merge:
@@ -43,10 +45,41 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Merge Pull Request
+        id: merge
         run: |
           PR_NUMBER="${{ steps.check-pr.outputs.pr_number || steps.create-pr.outputs.pr_number }}"
           if [ -n "$PR_NUMBER" ]; then
             gh pr merge "$PR_NUMBER" --squash --delete-branch
+            echo "merged=true" >> $GITHUB_OUTPUT
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Checkout main for deploy
+        if: steps.merge.outputs.merged == 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Check if Docs changed
+        if: steps.merge.outputs.merged == 'true'
+        id: check-docs
+        run: |
+          CHANGED=$(git diff HEAD~1 --name-only -- 'Docs/' | head -1)
+          if [ -n "$CHANGED" ]; then
+            echo "docs_changed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Setup Pages
+        if: steps.check-docs.outputs.docs_changed == 'true'
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        if: steps.check-docs.outputs.docs_changed == 'true'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: Docs
+
+      - name: Deploy to GitHub Pages
+        if: steps.check-docs.outputs.docs_changed == 'true'
+        uses: actions/deploy-pages@v4
