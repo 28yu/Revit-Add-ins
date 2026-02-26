@@ -196,10 +196,10 @@ body{
   background:#b0d49a;
 }
 .arrow-head{
-  font-size:7pt;
-  line-height:1;
-  margin-top:-1px;
-  color:#93C572;
+  width:0;height:0;
+  border-left:3px solid transparent;
+  border-right:3px solid transparent;
+  border-top:5px solid #93C572;
 }
 .arrow-label{
   font-size:6.5pt;
@@ -224,7 +224,6 @@ body{
   display:flex;
   align-items:center;
   gap:0;
-  color:#93C572;
 }
 .harrow-line{
   width:4mm;
@@ -232,9 +231,11 @@ body{
   background:#b0d49a;
 }
 .harrow-head{
-  font-size:7pt;
-  line-height:1;
-  margin-left:-1px;
+  width:0;height:0;
+  border-top:2.5px solid transparent;
+  border-bottom:2.5px solid transparent;
+  border-left:4px solid #93C572;
+  flex-shrink:0;
 }
 .harrow-label{
   font-size:6pt;
@@ -436,7 +437,7 @@ body{
 
       <div class="arrow">
         <div class="arrow-line"></div>
-        <div class="arrow-head">▼</div>
+        <div class="arrow-head"></div>
         <span class="arrow-label">指示を出す</span>
       </div>
 
@@ -458,7 +459,7 @@ body{
 
       <div class="arrow">
         <div class="arrow-line"></div>
-        <div class="arrow-head">▼</div>
+        <div class="arrow-head"></div>
       </div>
 
       <!-- Code -->
@@ -469,7 +470,7 @@ body{
 
       <div class="arrow">
         <div class="arrow-line"></div>
-        <div class="arrow-head">▼</div>
+        <div class="arrow-head"></div>
         <span class="arrow-label">git push で保管</span>
       </div>
 
@@ -494,7 +495,7 @@ body{
 
       <div class="arrow">
         <div class="arrow-line"></div>
-        <div class="arrow-head">▼</div>
+        <div class="arrow-head"></div>
       </div>
 
       <!-- Branch: Build + Deploy -->
@@ -509,10 +510,10 @@ body{
           <div class="nuget-note">← NuGet が部品を自動調達</div>
         </div>
 
-        <div class="branch-col" style="justify-content:center;padding-top:1.5mm">
+        <div class="branch-col" style="justify-content:center;align-self:center">
           <div class="harrow">
             <div class="harrow-line"></div>
-            <div class="harrow-head">▸</div>
+            <div class="harrow-head"></div>
           </div>
         </div>
 
@@ -528,7 +529,7 @@ body{
 
       <div class="arrow">
         <div class="arrow-line"></div>
-        <div class="arrow-head">▼</div>
+        <div class="arrow-head"></div>
       </div>
 
       <!-- Revit 動作確認 -->
@@ -575,7 +576,7 @@ body{
 
       <div class="arrow">
         <div class="arrow-line"></div>
-        <div class="arrow-head">▼</div>
+        <div class="arrow-head"></div>
       </div>
 
       <!-- Horizontal: GitHub → Actions → Releases → Users -->
@@ -599,7 +600,7 @@ body{
           <div class="harrow-label">自動トリガー</div>
           <div class="harrow">
             <div class="harrow-line"></div>
-            <div class="harrow-head">▸</div>
+            <div class="harrow-head"></div>
           </div>
         </div>
 
@@ -615,7 +616,7 @@ body{
           <div class="harrow-label">自動公開</div>
           <div class="harrow">
             <div class="harrow-line"></div>
-            <div class="harrow-head">▸</div>
+            <div class="harrow-head"></div>
           </div>
         </div>
 
@@ -631,12 +632,12 @@ body{
           <div class="harrow-label">ダウンロード</div>
           <div class="harrow">
             <div class="harrow-line"></div>
-            <div class="harrow-head">▸</div>
+            <div class="harrow-head"></div>
           </div>
         </div>
 
         <div class="node node-sm" style="background:#FFFDD0;border-color:#ddd8b0">
-          <div class="node-icon"><img src="icons/workflow/you.png" alt="ユーザー"></div>
+          <div class="node-icon"><img src="icons/workflow/user.png" alt="ユーザー"></div>
           <div class="node-text">
             <div class="node-name">ユーザー</div>
             <div class="node-desc">install.bat 実行</div>
