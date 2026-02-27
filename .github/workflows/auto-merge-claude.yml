@@ -46,13 +46,20 @@ jobs:
             exit 1
           fi
 
-      - name: Close any open PR
+      - name: Close all open PRs for this branch
         if: steps.merge.outputs.merged == 'true'
         run: |
-          PR_NUMBER=$(gh pr list --head "${{ github.ref_name }}" --base main --json number --jq '.[0].number' 2>/dev/null || echo "")
-          if [ -n "$PR_NUMBER" ]; then
-            gh pr close "$PR_NUMBER" --comment "Auto-merged directly to main." || true
-            echo "Closed PR #$PR_NUMBER"
+          # ブランチに紐づく全PRを取得してクローズ（複数PR対応）
+          PR_NUMBERS=$(gh pr list --head "${{ github.ref_name }}" --base main --state open --json number --jq '.[].number' 2>/dev/null || echo "")
+          if [ -n "$PR_NUMBERS" ]; then
+            echo "$PR_NUMBERS" | while read -r PR_NUMBER; do
+              if [ -n "$PR_NUMBER" ]; then
+                gh pr close "$PR_NUMBER" --comment "Auto-merged directly to main (squash merge)." || true
+                echo "Closed PR #$PR_NUMBER"
+              fi
+            done
+          else
+            echo "No open PRs found for this branch."
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

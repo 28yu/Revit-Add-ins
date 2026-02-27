@@ -138,6 +138,33 @@ namespace Tools28.Commands.LineStyleCheck
         }
 
         /// <summary>
+        /// 要素のジオメトリからエッジの GraphicsStyleId を収集する
+        /// </summary>
+        private void CollectEdgeStyleIds(GeometryElement geomElem, HashSet<ElementId> styleIds)
+        {
+            if (geomElem == null) return;
+
+            foreach (GeometryObject geomObj in geomElem)
+            {
+                if (geomObj is Solid solid && solid.Faces.Size > 0)
+                {
+                    foreach (Edge edge in solid.Edges)
+                    {
+                        ElementId styleId = edge.GraphicsStyleId;
+                        if (styleId != null && styleId != ElementId.InvalidElementId)
+                            styleIds.Add(styleId);
+                    }
+                }
+                else if (geomObj is GeometryInstance instance)
+                {
+                    GeometryElement instanceGeom = instance.GetInstanceGeometry();
+                    if (instanceGeom != null)
+                        CollectEdgeStyleIds(instanceGeom, styleIds);
+                }
+            }
+        }
+
+        /// <summary>
         /// 個別要素のラインワーク変更を検出する
         /// </summary>
         private OverriddenElementInfo CheckElementForOverrides(
@@ -145,9 +172,31 @@ namespace Tools28.Commands.LineStyleCheck
             HashSet<ElementId> linesCategoryStyleIds)
         {
             // 要素カテゴリの既定スタイルIDを取得
-            HashSet<ElementId> categoryStyleIds = GetCategoryStyleIds(elem.Category);
+            HashSet<ElementId> naturalStyleIds = GetCategoryStyleIds(elem.Category);
 
-            // ビュー固有のジオメトリを取得
+            // ビューなしのジオメトリからエッジスタイルを収集
+            // （ラインワーク変更が適用されない素のスタイル）
+            // 複合要素（壁・床・屋根等）の内部レイヤー境界線のスタイルも含まれる
+            try
+            {
+                Options defaultOptions = new Options();
+                GeometryElement defaultGeom = elem.get_Geometry(defaultOptions);
+                CollectEdgeStyleIds(defaultGeom, naturalStyleIds);
+
+                // DetailLevel.Fine でも取得（断面表現等の追加エッジを捕捉）
+                Options fineOptions = new Options
+                {
+                    DetailLevel = ViewDetailLevel.Fine
+                };
+                GeometryElement fineGeom = elem.get_Geometry(fineOptions);
+                CollectEdgeStyleIds(fineGeom, naturalStyleIds);
+            }
+            catch
+            {
+                // ジオメトリ取得失敗時はカテゴリスタイルのみで続行
+            }
+
+            // ビュー固有のジオメトリを取得（ラインワーク変更が反映される）
             Options geomOptions = new Options
             {
                 View = view,
@@ -160,7 +209,7 @@ namespace Tools28.Commands.LineStyleCheck
             int overriddenEdgeCount = 0;
             var overriddenStyleNames = new HashSet<string>();
 
-            CheckGeometry(doc, geomElem, categoryStyleIds, linesCategoryStyleIds,
+            CheckGeometry(doc, geomElem, naturalStyleIds, linesCategoryStyleIds,
                 ref overriddenEdgeCount, overriddenStyleNames);
 
             if (overriddenEdgeCount > 0)
