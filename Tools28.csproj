@@ -47,6 +47,7 @@
     <Resource Include="Resources\Icons\cropbox_copy_32.png" />
     <Resource Include="Resources\Icons\cropbox_paste_32.png" />
     <Resource Include="Resources\Icons\filled_region_32.png" />
+    <Resource Include="Resources\Icons\linestyle_check_32.png" />
   </ItemGroup>
 
 
