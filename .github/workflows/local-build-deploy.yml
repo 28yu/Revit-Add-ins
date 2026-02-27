@@ -26,7 +26,7 @@ jobs:
         run: |
           $config = Get-Content "dev-config.json" -Raw | ConvertFrom-Json
           $ver = $config.defaultRevitVersion
-          echo "revit_version=$ver" >> $env:GITHUB_OUTPUT
+          "revit_version=$ver" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
           Write-Host "Target Revit version: $ver"
 
       - name: Restore & Build
@@ -119,13 +119,13 @@ jobs:
               if ("${{ job.status }}" -eq "success") {
                   $balloon.Icon = [System.Drawing.SystemIcons]::Information
                   $balloon.BalloonTipIcon  = "Info"
-                  $balloon.BalloonTipTitle = "Tools28 ビルド完了"
-                  $balloon.BalloonTipText  = "ビルド & デプロイが完了しました。Revit を再起動してテストしてください。"
+                  $balloon.BalloonTipTitle = "Tools28 Build Complete"
+                  $balloon.BalloonTipText  = "Build and deploy succeeded. Restart Revit to test."
               } else {
                   $balloon.Icon = [System.Drawing.SystemIcons]::Error
                   $balloon.BalloonTipIcon  = "Error"
-                  $balloon.BalloonTipTitle = "Tools28 ビルド失敗"
-                  $balloon.BalloonTipText  = "ビルドまたはデプロイに失敗しました。Actions ログを確認してください。"
+                  $balloon.BalloonTipTitle = "Tools28 Build Failed"
+                  $balloon.BalloonTipText  = "Build or deploy failed. Check Actions log."
               }
               $balloon.Visible = $true
               $balloon.ShowBalloonTip(10000)
