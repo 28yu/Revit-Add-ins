@@ -46,29 +46,33 @@ jobs:
             exit 1
           fi
 
-      - name: Close all open PRs for this branch
+      - name: Close all open claude PRs and delete stale branches
         if: steps.merge.outputs.merged == 'true'
         run: |
-          # ブランチに紐づく全PRを取得してクローズ（複数PR対応）
-          PR_NUMBERS=$(gh pr list --head "${{ github.ref_name }}" --base main --state open --json number --jq '.[].number' 2>/dev/null || echo "")
-          if [ -n "$PR_NUMBERS" ]; then
-            echo "$PR_NUMBERS" | while read -r PR_NUMBER; do
-              if [ -n "$PR_NUMBER" ]; then
-                gh pr close "$PR_NUMBER" --comment "Auto-merged directly to main (squash merge)." || true
-                echo "Closed PR #$PR_NUMBER"
+          echo "=== Closing all open PRs from claude/* branches ==="
+          PR_DATA=$(gh pr list --search "head:claude/" --state open --json number,headRefName 2>/dev/null || echo "[]")
+          echo "$PR_DATA" | jq -r '.[] | "\(.number) \(.headRefName)"' | while read -r PR_NUMBER BRANCH_NAME; do
+            if [ -n "$PR_NUMBER" ]; then
+              gh pr close "$PR_NUMBER" --comment "Auto-merged directly to main (squash merge)." || true
+              echo "Closed PR #$PR_NUMBER ($BRANCH_NAME)"
+            fi
+          done
+
+          echo ""
+          echo "=== Deleting all claude/* branches ==="
+          git fetch --prune origin
+          CLAUDE_BRANCHES=$(git branch -r --list 'origin/claude/*' | sed 's|origin/||' | tr -d ' ')
+          if [ -n "$CLAUDE_BRANCHES" ]; then
+            echo "$CLAUDE_BRANCHES" | while read -r BRANCH; do
+              if [ -n "$BRANCH" ]; then
+                git push origin --delete "$BRANCH" 2>/dev/null && echo "Deleted branch $BRANCH" || echo "Failed to delete $BRANCH (may already be deleted)"
               fi
             done
           else
-            echo "No open PRs found for this branch."
+            echo "No claude/* branches found."
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Delete source branch
-        if: steps.merge.outputs.merged == 'true'
-        run: |
-          git push origin --delete "${{ github.ref_name }}" || true
-          echo "Deleted branch ${{ github.ref_name }}"
 
       - name: Trigger deploy workflow
         if: steps.merge.outputs.merged == 'true'

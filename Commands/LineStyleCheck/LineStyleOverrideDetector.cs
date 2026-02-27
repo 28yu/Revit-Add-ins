@@ -20,6 +20,15 @@ namespace Tools28.Commands.LineStyleCheck
 
     /// <summary>
     /// ビュー内の要素のラインワーク変更を検出する
+    ///
+    /// 検出方式:
+    ///   ビュー固有ジオメトリの各エッジの GraphicsStyleId を検査し、
+    ///   Lines カテゴリに属するスタイルが、要素自身のカテゴリスタイルに
+    ///   含まれない場合、ラインワークによる変更と判定する。
+    ///
+    /// 注: 非ビュージオメトリとの比較は使用しない。
+    ///   Revit API では Options.View=null でもアクティブビューの
+    ///   ラインワーク変更がリークするため、正確な比較ができない。
     /// </summary>
     public class LineStyleOverrideDetector
     {
@@ -33,6 +42,7 @@ namespace Tools28.Commands.LineStyleCheck
             var collector = new FilteredElementCollector(doc, view.Id)
                 .WhereElementIsNotElementType();
 
+            // Lines カテゴリのサブカテゴリ GraphicsStyle ID を収集
             HashSet<ElementId> linesCategoryStyleIds = GetLinesCategoryStyleIds(doc);
 
             foreach (Element elem in collector)
@@ -40,9 +50,10 @@ namespace Tools28.Commands.LineStyleCheck
                 if (elem.Category == null) continue;
 
                 // ラインワークはモデル要素のエッジのみ変更可能
+                // 注釈要素（塗り潰し領域、マスキング領域等）はスキップ
                 if (elem.Category.CategoryType != CategoryType.Model) continue;
 
-                // Lines カテゴリ自体の要素はスキップ
+                // Lines カテゴリ自体の要素はスキップ（詳細線やモデル線分等）
                 if (elem.Category.Id.IntegerValue == (int)BuiltInCategory.OST_Lines) continue;
                 if (elem.Category.Id.IntegerValue == (int)BuiltInCategory.OST_SketchLines) continue;
 
@@ -133,93 +144,29 @@ namespace Tools28.Commands.LineStyleCheck
         }
 
         /// <summary>
-        /// 非ビュージオメトリからエッジの Reference → GraphicsStyleId マップを構築する
-        /// </summary>
-        private void BuildEdgeStyleMap(
-            Document doc,
-            GeometryElement geomElem,
-            Dictionary<string, ElementId> styleMap)
-        {
-            if (geomElem == null) return;
-
-            foreach (GeometryObject geomObj in geomElem)
-            {
-                if (geomObj is Solid solid && solid.Faces.Size > 0)
-                {
-                    foreach (Edge edge in solid.Edges)
-                    {
-                        Reference edgeRef = edge.Reference;
-                        if (edgeRef == null) continue;
-
-                        try
-                        {
-                            string key = edgeRef.ConvertToStableRepresentation(doc);
-                            ElementId styleId = edge.GraphicsStyleId;
-                            styleMap[key] = styleId ?? ElementId.InvalidElementId;
-                        }
-                        catch
-                        {
-                            // Reference 変換に失敗するエッジはスキップ
-                        }
-                    }
-                }
-                else if (geomObj is GeometryInstance instance)
-                {
-                    GeometryElement instanceGeom = instance.GetInstanceGeometry();
-                    if (instanceGeom != null)
-                        BuildEdgeStyleMap(doc, instanceGeom, styleMap);
-                }
-            }
-        }
-
-        /// <summary>
         /// 個別要素のラインワーク変更を検出する
-        ///
-        /// 検出方式:
-        /// 1. 非ビュージオメトリ（ラインワーク変更なし）の各エッジの Reference と StyleId を記録
-        /// 2. ビュージオメトリ（ラインワーク変更あり）の各エッジと比較
-        /// 3. 同一エッジ（Reference 一致）でスタイルが変わっていれば → ラインワーク変更
-        /// 4. ビューにしか存在しないエッジ（断面カット等）→ カテゴリスタイル比較でフォールバック
         /// </summary>
         private OverriddenElementInfo CheckElementForOverrides(
             Document doc, View view, Element elem,
             HashSet<ElementId> linesCategoryStyleIds)
         {
-            // カテゴリスタイル（フォールバック判定用）
+            // 要素カテゴリの既定スタイルIDを取得
             HashSet<ElementId> categoryStyleIds = GetCategoryStyleIds(elem.Category);
 
-            // 非ビュージオメトリから Reference → StyleId マップを構築
-            var defaultStyleByRef = new Dictionary<string, ElementId>();
-            try
-            {
-                Options defaultOptions = new Options
-                {
-                    ComputeReferences = true
-                };
-                GeometryElement defaultGeom = elem.get_Geometry(defaultOptions);
-                BuildEdgeStyleMap(doc, defaultGeom, defaultStyleByRef);
-            }
-            catch
-            {
-                // 非ビュージオメトリ取得失敗時はフォールバックのみで続行
-            }
-
             // ビュー固有のジオメトリを取得
-            Options viewOptions = new Options
+            Options geomOptions = new Options
             {
                 View = view,
                 ComputeReferences = true
             };
 
-            GeometryElement viewGeom = elem.get_Geometry(viewOptions);
-            if (viewGeom == null) return null;
+            GeometryElement geomElem = elem.get_Geometry(geomOptions);
+            if (geomElem == null) return null;
 
             int overriddenEdgeCount = 0;
             var overriddenStyleNames = new HashSet<string>();
 
-            CheckGeometryWithRefComparison(
-                doc, viewGeom, defaultStyleByRef,
-                categoryStyleIds, linesCategoryStyleIds,
+            CheckGeometry(doc, geomElem, categoryStyleIds, linesCategoryStyleIds,
                 ref overriddenEdgeCount, overriddenStyleNames);
 
             if (overriddenEdgeCount > 0)
@@ -242,12 +189,11 @@ namespace Tools28.Commands.LineStyleCheck
         }
 
         /// <summary>
-        /// ビュージオメトリのエッジを非ビュージオメトリと比較して検査する
+        /// ジオメトリを再帰的に検査する
         /// </summary>
-        private void CheckGeometryWithRefComparison(
+        private void CheckGeometry(
             Document doc,
             GeometryElement geomElem,
-            Dictionary<string, ElementId> defaultStyleByRef,
             HashSet<ElementId> categoryStyleIds,
             HashSet<ElementId> linesCategoryStyleIds,
             ref int overriddenEdgeCount,
@@ -259,47 +205,19 @@ namespace Tools28.Commands.LineStyleCheck
                 {
                     foreach (Edge edge in solid.Edges)
                     {
-                        ElementId viewStyleId = edge.GraphicsStyleId;
-                        if (viewStyleId == null || viewStyleId == ElementId.InvalidElementId)
+                        ElementId styleId = edge.GraphicsStyleId;
+                        if (styleId == null || styleId == ElementId.InvalidElementId)
                             continue;
 
-                        // Lines カテゴリに属するスタイルのみ検査対象
-                        if (!linesCategoryStyleIds.Contains(viewStyleId))
-                            continue;
-
-                        bool isOverride = false;
-                        Reference edgeRef = edge.Reference;
-                        string refKey = null;
-
-                        if (edgeRef != null)
-                        {
-                            try
-                            {
-                                refKey = edgeRef.ConvertToStableRepresentation(doc);
-                            }
-                            catch
-                            {
-                                refKey = null;
-                            }
-                        }
-
-                        if (refKey != null && defaultStyleByRef.TryGetValue(refKey, out ElementId defaultStyleId))
-                        {
-                            // 同一エッジが非ビューにも存在 → スタイル変化で判定
-                            isOverride = (viewStyleId != defaultStyleId);
-                        }
-                        else
-                        {
-                            // ビューにしか存在しないエッジ（断面カット等）
-                            // → カテゴリスタイルとの比較でフォールバック
-                            isOverride = !categoryStyleIds.Contains(viewStyleId);
-                        }
-
-                        if (isOverride)
+                        // エッジのスタイルが Lines カテゴリに属し、
+                        // かつ要素自身のカテゴリスタイルに含まれなければ、
+                        // ラインワークで変更されたと判定
+                        if (linesCategoryStyleIds.Contains(styleId)
+                            && !categoryStyleIds.Contains(styleId))
                         {
                             overriddenEdgeCount++;
                             GraphicsStyle style =
-                                doc.GetElement(viewStyleId) as GraphicsStyle;
+                                doc.GetElement(styleId) as GraphicsStyle;
                             if (style != null)
                             {
                                 overriddenStyleNames.Add(
@@ -313,10 +231,9 @@ namespace Tools28.Commands.LineStyleCheck
                     GeometryElement instanceGeom = instance.GetInstanceGeometry();
                     if (instanceGeom != null)
                     {
-                        CheckGeometryWithRefComparison(
-                            doc, instanceGeom, defaultStyleByRef,
-                            categoryStyleIds, linesCategoryStyleIds,
-                            ref overriddenEdgeCount, overriddenStyleNames);
+                        CheckGeometry(doc, instanceGeom, categoryStyleIds,
+                            linesCategoryStyleIds, ref overriddenEdgeCount,
+                            overriddenStyleNames);
                     }
                 }
             }
