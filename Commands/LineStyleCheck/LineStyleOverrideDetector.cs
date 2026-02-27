@@ -41,6 +41,10 @@ namespace Tools28.Commands.LineStyleCheck
             {
                 if (elem.Category == null) continue;
 
+                // ラインワークはモデル要素のエッジのみ変更可能
+                // 注釈要素（塗り潰し領域、マスキング領域等）はスキップ
+                if (elem.Category.CategoryType != CategoryType.Model) continue;
+
                 // カテゴリが Lines 自体の場合はスキップ（詳細線やモデル線分等）
                 if (elem.Category.Id.IntegerValue == (int)BuiltInCategory.OST_Lines) continue;
                 if (elem.Category.Id.IntegerValue == (int)BuiltInCategory.OST_SketchLines) continue;
