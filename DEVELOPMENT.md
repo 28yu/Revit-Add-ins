@@ -363,6 +363,57 @@ git push --tags
 
 ---
 
+## ⚠️ Revit API の既知の制限事項
+
+### ラインワークツールのオーバーライドは API で取得不可（2026年2月確認）
+
+**結論**: Revit の「ラインワーク」ツール（Linework Tool）で変更されたエッジの線種を、API で検出することは**現時点では不可能**。
+
+**背景**: ラインワークツールは、ビュー内の個別のエッジの表示スタイルを変更する機能。Revit の表示優先度で最上位（#1）に位置する。この変更を API で検出するために8つの異なるアプローチを試したが、すべて失敗した。
+
+#### 試したアプローチと結果
+
+| # | アプローチ | 結果 | 原因 |
+|---|---|---|---|
+| 1 | `Edge.GraphicsStyleId` 比較 | ✗ | ラインワーク変更を反映しない |
+| 2 | 非ビュージオメトリ (`Options.View = null`) との集合比較 | ✗ | 除外範囲が広すぎる（壁の層境界線と重複） |
+| 3 | Per-Edge Reference マッチング | ✗ | API がアクティブビューのデータをリーク |
+| 4 | カテゴリスタイル比較 | ✗ | 塗り潰し領域を誤検出 |
+| 5 | `View.Duplicate(Duplicate)` 比較 | ✗ | ラインワーク変更はモデルグラフィクス扱いで複製される |
+| 6 | `ViewPlan.Create()` + エッジ比較 | ✗ | `GraphicsStyleId` が変更を反映しない |
+| 7 | `FilteredElementCollector.OwnedByView()` スキャン | ✗ | ラインワークデータはビュー所有要素に存在しない |
+| 8 | `CustomExporter` + `IExportContext2D` 比較 | ✗ | 2Dエクスポートデータも同一 |
+
+#### 技術的な詳細
+
+- `Edge.GraphicsStyleId` は要素のベースカテゴリスタイルを返す（例: 壁のエッジは常に「壁」カテゴリのスタイル）。ラインワークで `<隠線>` や `<細線>` に変更しても、API からは元のスタイルが返される。
+- `IExportContext2D` はレンダリングパイプラインを通じてジオメトリを出力するが、要素ごとのエッジ数・カーブ数・線分数はオリジナルビューとクリーンビューで完全一致しており、ラインワークの影響は反映されない。
+- ビュー所有要素（`OwnedByView`）のスキャンでは、FilledRegion のスケッチ線分、寸法、SketchPlane のみが見つかり、ラインワークに関連する内部要素は存在しなかった。
+
+#### Autodesk の公式見解
+
+Autodesk Ideas Board で公式にこの API ギャップが認められている：
+
+> *"It looks like there is a gap here in the API. We didn't expect it to be an important workflow for API users - setting line-weights feels like a very graphical thing... but it looks like it is needed after all! We will review."*
+
+参考リンク:
+- [API access to Linework tool (Autodesk Ideas)](https://forums.autodesk.com/t5/revit-ideas/api-access-to-linework-tool-get-and-set-edge-line-overrides/idi-p/12618606)
+- [API Access to Linework Tool? (Revit API Forum)](https://forums.autodesk.com/t5/revit-api-forum/api-access-to-linework-tool/td-p/6939839)
+
+#### 今後の可能性
+
+将来の Revit API バージョンでこの機能が追加される可能性がある。Revit 2026 API で `ParameterTypeId.EdgeLinework` プロパティが追加されているが、これは鉄筋の詳細図用であり、ラインワークツールとは無関係。新しい Revit バージョンのリリースノートを確認すること。
+
+#### 教訓
+
+1. **Revit API には「表示専用」の機能が存在する** — ラインワーク、一部のグラフィックオーバーライドなど、画面上の表示にのみ影響し、API からはアクセスできない機能がある。
+2. **`Edge.GraphicsStyleId` は信頼できない** — ビュー固有のオーバーライドは反映されず、要素のベーススタイルのみを返す。
+3. **`IExportContext2D` も万能ではない** — レンダリングパイプライン経由でも、ラインワーク情報は取得できなかった。
+4. **Autodesk Ideas Board を事前に確認すること** — 実装前に API の制限事項を確認することで、無駄な開発時間を避けられる。
+5. **`View.Duplicate(Duplicate)` はラインワークを保持する** — これはモデルグラフィクス扱い（アノテーションではない）のため。`ViewDuplicateOption.AsDependent` でも同様。
+
+---
+
 ## 📞 サポート
 
 問題が発生した場合:

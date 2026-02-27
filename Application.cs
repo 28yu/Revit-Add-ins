@@ -23,7 +23,6 @@ namespace Tools28
                 CreateThreeDViewPanel(application, tabName, assemblyPath);
                 CreateViewPanel(application, tabName, assemblyPath);
                 CreateDetailPanel(application, tabName, assemblyPath);
-                CreateDrawingAssistPanel(application, tabName, assemblyPath);
 
                 return Result.Succeeded;
             }
@@ -213,24 +212,6 @@ namespace Tools28
             filledRegionButtonData.ToolTip = "配置されている塗潰領域を分割/統合します";
             filledRegionButtonData.LargeImage = LoadImage("filled_region_32.png");
             panel.AddItem(filledRegionButtonData);
-        }
-
-        /// <summary>
-        /// 作図補助パネルを作成
-        /// </summary>
-        private void CreateDrawingAssistPanel(UIControlledApplication application, string tabName, string assemblyPath)
-        {
-            RibbonPanel panel = application.CreateRibbonPanel(tabName, "作図補助");
-
-            // 線種変更確認ボタン
-            PushButtonData lineStyleCheckButtonData = new PushButtonData(
-                "LineStyleCheck",
-                "線種変更\n確認",
-                assemblyPath,
-                "Tools28.Commands.LineStyleCheck.ExecuteLineStyleCheckCommand");
-            lineStyleCheckButtonData.ToolTip = "ラインワークで線種を変更した箇所をハイライトします";
-            lineStyleCheckButtonData.LargeImage = LoadImage("linestyle_check_32.png");
-            panel.AddItem(lineStyleCheckButtonData);
         }
 
         /// <summary>

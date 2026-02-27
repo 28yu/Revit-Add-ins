@@ -295,3 +295,7 @@ git push -u origin claude/<branch-name>
 - トランザクションは `TransactionMode.Manual` を使用
 - デバッグログは `C:\temp\Tools28_debug.txt` に出力
 - WPFダイアログを使用するコマンドは XAML + コードビハインドで構成
+
+## Revit API の既知の制限事項
+
+- **ラインワークツール (Linework Tool) のオーバーライドは API で取得・設定不可** — `Edge.GraphicsStyleId` はビュー固有のラインワーク変更を反映しない。`IExportContext2D` でも同様。Autodesk が公式に API ギャップとして認めている。詳細は `DEVELOPMENT.md` の「Revit API の既知の制限事項」セクションを参照。
