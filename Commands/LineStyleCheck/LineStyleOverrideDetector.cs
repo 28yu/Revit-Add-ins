@@ -21,13 +21,10 @@ namespace Tools28.Commands.LineStyleCheck
     /// <summary>
     /// ビュー内の要素のラインワーク変更を検出する
     ///
-    /// 検出方式: 新規ビュー比較
-    ///   1. ViewPlan.Create() でラインワーク変更が一切ないクリーンなビューを新規作成
-    ///      （View.Duplicate はラインワーク変更を保持するため使用不可）
-    ///   2. 同一要素のジオメトリを両ビューから取得
-    ///   3. 同一位置のエッジのスタイルを1対1で比較
-    ///   4. スタイルが異なるエッジ = ラインワークによる変更
-    ///   5. TransactionGroup.RollBack() で一時ビューを自動削除
+    /// 検出方式: 新規ビュー比較 + ビュー所有要素スキャン
+    ///   方式A: ViewPlan.Create() で新規ビューを作成し、エッジスタイルを比較
+    ///   方式B: OwnedByView でビュー所有要素を検索してラインワーク情報を探す
+    ///   診断: エッジスタイルの実際の値をダンプして、GraphicsStyleId の挙動を確認
     /// </summary>
     public class LineStyleOverrideDetector
     {
@@ -40,13 +37,241 @@ namespace Tools28.Commands.LineStyleCheck
         {
             var result = new List<OverriddenElementInfo>();
             _log = new System.Text.StringBuilder();
-            _log.AppendLine("=== LineStyleCheck Debug Log ===");
+            _log.AppendLine("=== LineStyleCheck Debug Log v7 (Diagnostic) ===");
             _log.AppendLine($"Date: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-            _log.AppendLine($"View: {view.Name} (Type: {view.ViewType})");
+            _log.AppendLine($"View: {view.Name} (Type: {view.ViewType}, Id: {view.Id})");
 
             var sw = System.Diagnostics.Stopwatch.StartNew();
 
-            using (TransactionGroup tg = new TransactionGroup(doc, "ラインワーク検出"))
+            // === 方式B: ビュー所有要素スキャン ===
+            _log.AppendLine("");
+            _log.AppendLine("=== Phase B: View-Owned Elements Scan ===");
+            ScanViewOwnedElements(doc, view, result);
+
+            // === 方式A: 新規ビュー比較 (診断用) ===
+            _log.AppendLine("");
+            _log.AppendLine("=== Phase A: Fresh View Comparison (Diagnostic) ===");
+            DiagnosticFreshViewComparison(doc, view);
+
+            sw.Stop();
+            _log.AppendLine("");
+            _log.AppendLine($"=== Result: {result.Count} elements with overrides ===");
+            _log.AppendLine($"Elapsed: {sw.ElapsedMilliseconds}ms");
+            WriteDebugLog();
+
+            return result;
+        }
+
+        /// <summary>
+        /// ビュー所有要素をスキャンしてラインワークオーバーライド情報を検出する
+        /// </summary>
+        private void ScanViewOwnedElements(Document doc, View view,
+            List<OverriddenElementInfo> result)
+        {
+            try
+            {
+                // ビューが所有する全要素を取得
+                var ownedCollector = new FilteredElementCollector(doc)
+                    .OwnedByView(view.Id);
+
+                int totalOwned = 0;
+                var categoryCount = new Dictionary<string, int>();
+                var classCount = new Dictionary<string, int>();
+
+                // ラインワーク関連の要素を探す
+                var lineworkElements = new List<Element>();
+
+                foreach (Element elem in ownedCollector)
+                {
+                    totalOwned++;
+
+                    string catName = elem.Category?.Name ?? "(no category)";
+                    string className = elem.GetType().Name;
+                    string key = $"{catName} [{className}]";
+
+                    if (!categoryCount.ContainsKey(key))
+                        categoryCount[key] = 0;
+                    categoryCount[key]++;
+
+                    if (!classCount.ContainsKey(className))
+                        classCount[className] = 0;
+                    classCount[className]++;
+
+                    // ラインワーク関連と思われる要素を収集
+                    // BuiltInCategory.OST_Lines, OST_SketchLines, or any Line-related
+                    bool isLineRelated = false;
+                    if (elem.Category != null)
+                    {
+                        int catId = elem.Category.Id.IntegerValue;
+                        if (catId == (int)BuiltInCategory.OST_Lines
+                            || catId == (int)BuiltInCategory.OST_LinesHiddenLines
+                            || catId == (int)BuiltInCategory.OST_SketchLines
+                            || catId == (int)BuiltInCategory.OST_MEPSpaceSeparationLines
+                            || catId == (int)BuiltInCategory.OST_RoomSeparationLines
+                            || catId == (int)BuiltInCategory.OST_AreaSchemeLines)
+                        {
+                            isLineRelated = true;
+                        }
+                    }
+
+                    // CurveElement や GenericForm なども調査
+                    if (isLineRelated || elem is CurveElement)
+                    {
+                        lineworkElements.Add(elem);
+                    }
+                }
+
+                _log.AppendLine($"Total view-owned elements: {totalOwned}");
+                _log.AppendLine("--- By Category+Class ---");
+                foreach (var kvp in categoryCount.OrderByDescending(x => x.Value))
+                {
+                    _log.AppendLine($"  {kvp.Key}: {kvp.Value}");
+                }
+                _log.AppendLine("--- By Class ---");
+                foreach (var kvp in classCount.OrderByDescending(x => x.Value))
+                {
+                    _log.AppendLine($"  {kvp.Key}: {kvp.Value}");
+                }
+
+                // ラインワーク要素の詳細をダンプ
+                _log.AppendLine($"--- Line-Related Elements: {lineworkElements.Count} ---");
+                int dumpCount = 0;
+                foreach (var elem in lineworkElements)
+                {
+                    if (dumpCount >= 30) // 最大30個
+                    {
+                        _log.AppendLine("  ... (truncated)");
+                        break;
+                    }
+
+                    string catName = elem.Category?.Name ?? "(null)";
+                    string className = elem.GetType().Name;
+                    _log.AppendLine($"  [{elem.Id}] {catName} / {className} / Name=\"{elem.Name}\"");
+
+                    // GraphicsStyle を確認
+                    if (elem is CurveElement curveElem)
+                    {
+                        try
+                        {
+                            var lineStyle = curveElem.LineStyle;
+                            _log.AppendLine($"    LineStyle: {lineStyle?.Name ?? "(null)"} [{lineStyle?.Id}]");
+                        }
+                        catch (Exception ex)
+                        {
+                            _log.AppendLine($"    LineStyle error: {ex.Message}");
+                        }
+                    }
+
+                    // パラメータをダンプ
+                    DumpElementParameters(elem);
+
+                    dumpCount++;
+                }
+
+                // ラインワーク要素からホスト要素を特定
+                _log.AppendLine("");
+                _log.AppendLine("--- Attempting to find linework host elements ---");
+                var hostElementIds = new HashSet<ElementId>();
+                foreach (var elem in lineworkElements)
+                {
+                    // ParameterSet から HOST_ID などを探す
+                    try
+                    {
+                        foreach (Parameter param in elem.Parameters)
+                        {
+                            if (param.StorageType == StorageType.ElementId)
+                            {
+                                ElementId refId = param.AsElementId();
+                                if (refId != null
+                                    && refId != ElementId.InvalidElementId
+                                    && refId.IntegerValue > 0)
+                                {
+                                    Element refElem = doc.GetElement(refId);
+                                    if (refElem != null
+                                        && refElem.Category != null
+                                        && refElem.Category.CategoryType == CategoryType.Model)
+                                    {
+                                        if (hostElementIds.Add(refId))
+                                        {
+                                            _log.AppendLine($"  Potential host: [{refId}] " +
+                                                $"{refElem.Category.Name} \"{refElem.Name}\" " +
+                                                $"(via param: {param.Definition.Name})");
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    catch { }
+                }
+
+                // ビューが所有する要素の中で、カテゴリが "Lines" で
+                // かつ通常の詳細線分やモデル線分ではないものを検出
+                _log.AppendLine("");
+                _log.AppendLine("--- All owned elements full dump (first 50) ---");
+                var allOwnedCollector2 = new FilteredElementCollector(doc)
+                    .OwnedByView(view.Id);
+                int dumpCount2 = 0;
+                foreach (Element elem in allOwnedCollector2)
+                {
+                    if (dumpCount2 >= 50) break;
+                    string catName = elem.Category?.Name ?? "(null)";
+                    int catId = elem.Category?.Id?.IntegerValue ?? 0;
+                    string className = elem.GetType().Name;
+                    _log.AppendLine($"  [{elem.Id}] cat={catName} catId={catId} " +
+                        $"class={className} name=\"{elem.Name}\"");
+                    dumpCount2++;
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.AppendLine($"ScanViewOwnedElements ERROR: {ex.Message}");
+                _log.AppendLine(ex.StackTrace);
+            }
+        }
+
+        /// <summary>
+        /// 要素のパラメータをダンプする（診断用）
+        /// </summary>
+        private void DumpElementParameters(Element elem)
+        {
+            try
+            {
+                foreach (Parameter param in elem.Parameters)
+                {
+                    string val = "(unreadable)";
+                    try
+                    {
+                        switch (param.StorageType)
+                        {
+                            case StorageType.String:
+                                val = param.AsString() ?? "(null)";
+                                break;
+                            case StorageType.Integer:
+                                val = param.AsInteger().ToString();
+                                break;
+                            case StorageType.Double:
+                                val = param.AsDouble().ToString("F4");
+                                break;
+                            case StorageType.ElementId:
+                                val = param.AsElementId()?.ToString() ?? "(null)";
+                                break;
+                        }
+                    }
+                    catch { }
+
+                    _log.AppendLine($"    P: {param.Definition.Name} = {val} ({param.StorageType})");
+                }
+            }
+            catch { }
+        }
+
+        /// <summary>
+        /// 新規ビューとの比較による診断ログ（エッジスタイル値をダンプ）
+        /// </summary>
+        private void DiagnosticFreshViewComparison(Document doc, View view)
+        {
+            using (TransactionGroup tg = new TransactionGroup(doc, "診断用比較"))
             {
                 tg.Start();
 
@@ -60,31 +285,139 @@ namespace Tools28.Commands.LineStyleCheck
 
                 if (cleanView != null)
                 {
-                    DetectOverrides(doc, view, cleanView, result);
+                    DiagnosticEdgeComparison(doc, view, cleanView);
                 }
                 else
                 {
-                    _log.AppendLine("ERROR: Could not create clean view. Detection aborted.");
+                    _log.AppendLine("Could not create clean view for diagnostics.");
                 }
 
-                // RollBack で一時ビューを自動削除（ドキュメントに変更を残さない）
                 tg.RollBack();
             }
+        }
 
-            sw.Stop();
-            _log.AppendLine($"Detected: {result.Count} elements with overrides");
-            _log.AppendLine($"Elapsed: {sw.ElapsedMilliseconds}ms");
-            WriteDebugLog();
+        /// <summary>
+        /// 最初の数要素のエッジスタイルを詳細にダンプする（診断用）
+        /// </summary>
+        private void DiagnosticEdgeComparison(Document doc, View origView, View cleanView)
+        {
+            var collector = new FilteredElementCollector(doc, origView.Id)
+                .WhereElementIsNotElementType();
 
-            return result;
+            int logged = 0;
+
+            foreach (Element elem in collector)
+            {
+                if (logged >= 5) break; // 最初の5要素だけ
+
+                if (elem.Category == null) continue;
+                if (elem.Category.CategoryType != CategoryType.Model) continue;
+                if (elem.Category.Id.IntegerValue == (int)BuiltInCategory.OST_Lines) continue;
+                if (elem.Category.Id.IntegerValue == (int)BuiltInCategory.OST_SketchLines) continue;
+
+                Options origOpts = new Options { View = origView };
+                GeometryElement origGeom = elem.get_Geometry(origOpts);
+                if (origGeom == null) continue;
+
+                Options cleanOpts = new Options { View = cleanView };
+                GeometryElement cleanGeom = elem.get_Geometry(cleanOpts);
+                if (cleanGeom == null) continue;
+
+                Options noViewOpts = new Options();
+                GeometryElement noViewGeom = elem.get_Geometry(noViewOpts);
+
+                _log.AppendLine($"");
+                _log.AppendLine($"--- Element: {elem.Category.Name} \"{elem.Name}\" [{elem.Id}] ---");
+
+                // エッジスタイルをダンプ
+                DumpEdgeStyles(doc, "OrigView", origGeom);
+                DumpEdgeStyles(doc, "CleanView", cleanGeom);
+                if (noViewGeom != null)
+                {
+                    DumpEdgeStyles(doc, "NoView", noViewGeom);
+                }
+
+                logged++;
+            }
+
+            _log.AppendLine($"");
+            _log.AppendLine($"Diagnostic elements logged: {logged}");
+        }
+
+        /// <summary>
+        /// ジオメトリのエッジスタイルをダンプする
+        /// </summary>
+        private void DumpEdgeStyles(Document doc, string label, GeometryElement geom)
+        {
+            _log.AppendLine($"  [{label}] Edge styles:");
+            int edgeIndex = 0;
+
+            foreach (GeometryObject gObj in geom)
+            {
+                if (gObj is Solid solid && solid.Faces.Size > 0)
+                {
+                    foreach (Edge edge in solid.Edges)
+                    {
+                        if (edgeIndex >= 10) // 最初の10エッジだけ
+                        {
+                            _log.AppendLine($"    ... (truncated at {solid.Edges.Size} edges)");
+                            break;
+                        }
+
+                        ElementId styleId = edge.GraphicsStyleId;
+                        string styleName = "(null)";
+                        string catName = "(null)";
+
+                        if (styleId != null && styleId != ElementId.InvalidElementId)
+                        {
+                            GraphicsStyle gs = doc.GetElement(styleId) as GraphicsStyle;
+                            if (gs != null)
+                            {
+                                styleName = gs.Name;
+                                catName = gs.GraphicsStyleCategory?.Name ?? "(no cat)";
+                            }
+                        }
+
+                        // エッジの位置も出力（同一エッジの特定用）
+                        XYZ midpoint = null;
+                        try
+                        {
+                            var curve = edge.AsCurve();
+                            midpoint = curve.Evaluate(0.5, true);
+                        }
+                        catch { }
+
+                        string posStr = midpoint != null
+                            ? $"({midpoint.X:F2},{midpoint.Y:F2},{midpoint.Z:F2})"
+                            : "(?)";
+
+                        _log.AppendLine($"    E{edgeIndex}: id={styleId} " +
+                            $"style=\"{styleName}\" cat=\"{catName}\" pos={posStr}");
+
+                        edgeIndex++;
+                    }
+
+                    if (edgeIndex >= 10) break;
+                }
+                else if (gObj is GeometryInstance inst)
+                {
+                    GeometryElement instGeom = inst.GetInstanceGeometry();
+                    if (instGeom != null)
+                    {
+                        _log.AppendLine($"    (GeometryInstance - nested)");
+                        DumpEdgeStyles(doc, $"{label}/Inst", instGeom);
+                    }
+                }
+            }
+
+            if (edgeIndex == 0)
+            {
+                _log.AppendLine($"    (no edges found)");
+            }
         }
 
         /// <summary>
         /// ラインワーク変更を一切持たないクリーンなビューを新規作成する
-        ///
-        /// View.Duplicate(Duplicate) はラインワーク変更を保持するため使用不可。
-        /// ViewPlan.Create() で完全に新規のビューを作成し、
-        /// オリジナルビューの設定（ビュー範囲、スケール、詳細レベル等）をコピーする。
         /// </summary>
         private View CreateCleanView(Document doc, View view)
         {
@@ -113,9 +446,6 @@ namespace Tools28.Commands.LineStyleCheck
             }
         }
 
-        /// <summary>
-        /// クリーンな平面図ビューを作成する（FloorPlan / CeilingPlan / AreaPlan 対応）
-        /// </summary>
         private View CreateCleanPlanView(Document doc, ViewPlan viewPlan)
         {
             Level level = viewPlan.GenLevel;
@@ -125,7 +455,6 @@ namespace Tools28.Commands.LineStyleCheck
                 return null;
             }
 
-            // ビュータイプに合った ViewFamilyType を取得
             ViewFamily family;
             switch (viewPlan.ViewType)
             {
@@ -152,29 +481,19 @@ namespace Tools28.Commands.LineStyleCheck
             }
 
             ViewPlan freshView = ViewPlan.Create(doc, vft.Id, level.Id);
-
-            // オリジナルの設定をコピー
             CopyViewSettings(viewPlan, freshView);
 
-            // ビュー範囲をコピー（平面図固有）
             try
             {
                 PlanViewRange origRange = viewPlan.GetViewRange();
                 freshView.SetViewRange(origRange);
-                _log.AppendLine("View range copied");
             }
-            catch (Exception ex)
-            {
-                _log.AppendLine($"View range copy failed: {ex.Message}");
-            }
+            catch { }
 
             _log.AppendLine($"Clean PlanView created: {freshView.Name} [{freshView.Id}]");
             return freshView;
         }
 
-        /// <summary>
-        /// クリーンな断面図ビューを作成する（Section / Elevation 対応）
-        /// </summary>
         private View CreateCleanSectionView(Document doc, ViewSection viewSection)
         {
             ViewFamilyType vft = new FilteredElementCollector(doc)
@@ -188,19 +507,14 @@ namespace Tools28.Commands.LineStyleCheck
                 return null;
             }
 
-            // オリジナルの CropBox（断面の位置・方向・範囲を含む）を使用して断面図を作成
             BoundingBoxXYZ sectionBox = viewSection.CropBox;
             ViewSection freshView = ViewSection.CreateSection(doc, vft.Id, sectionBox);
-
             CopyViewSettings(viewSection, freshView);
 
             _log.AppendLine($"Clean SectionView created: {freshView.Name} [{freshView.Id}]");
             return freshView;
         }
 
-        /// <summary>
-        /// クリーンな3Dビューを作成する
-        /// </summary>
         private View CreateClean3DView(Document doc, View3D view3D)
         {
             ViewFamilyType vft = new FilteredElementCollector(doc)
@@ -215,10 +529,8 @@ namespace Tools28.Commands.LineStyleCheck
             }
 
             View3D freshView = View3D.CreateIsometric(doc, vft.Id);
-
             CopyViewSettings(view3D, freshView);
 
-            // セクションボックスをコピー
             if (view3D.IsSectionBoxActive)
             {
                 try
@@ -233,15 +545,11 @@ namespace Tools28.Commands.LineStyleCheck
             return freshView;
         }
 
-        /// <summary>
-        /// ビューの共通設定をコピーする
-        /// </summary>
         private void CopyViewSettings(View source, View target)
         {
             try { target.Scale = source.Scale; } catch { }
             try { target.DetailLevel = source.DetailLevel; } catch { }
 
-            // トリミング領域をコピー
             try
             {
                 target.CropBoxActive = source.CropBoxActive;
@@ -250,7 +558,6 @@ namespace Tools28.Commands.LineStyleCheck
             }
             catch { }
 
-            // フェーズをコピー
             try
             {
                 Parameter srcPhase = source.get_Parameter(BuiltInParameter.VIEW_PHASE);
@@ -261,147 +568,6 @@ namespace Tools28.Commands.LineStyleCheck
             catch { }
         }
 
-        /// <summary>
-        /// オリジナルビューとクリーンビューを比較してラインワーク変更を検出する
-        /// </summary>
-        private void DetectOverrides(
-            Document doc, View origView, View cleanView,
-            List<OverriddenElementInfo> result)
-        {
-            var collector = new FilteredElementCollector(doc, origView.Id)
-                .WhereElementIsNotElementType();
-
-            int totalCount = 0;
-            int checkedCount = 0;
-
-            foreach (Element elem in collector)
-            {
-                totalCount++;
-                if (elem.Category == null) continue;
-                if (elem.Category.CategoryType != CategoryType.Model) continue;
-                if (elem.Category.Id.IntegerValue == (int)BuiltInCategory.OST_Lines) continue;
-                if (elem.Category.Id.IntegerValue == (int)BuiltInCategory.OST_SketchLines) continue;
-
-                try
-                {
-                    // クリーンビュー（ラインワークなし）でジオメトリ取得
-                    Options cleanOpts = new Options { View = cleanView };
-                    GeometryElement cleanGeom = elem.get_Geometry(cleanOpts);
-                    if (cleanGeom == null) continue;
-
-                    // オリジナルビュー（ラインワークあり）でジオメトリ取得
-                    Options origOpts = new Options { View = origView };
-                    GeometryElement origGeom = elem.get_Geometry(origOpts);
-                    if (origGeom == null) continue;
-
-                    checkedCount++;
-
-                    int overriddenEdgeCount = 0;
-                    var overriddenStyleNames = new HashSet<string>();
-
-                    CompareGeometry(doc, origGeom, cleanGeom,
-                        ref overriddenEdgeCount, overriddenStyleNames);
-
-                    if (overriddenEdgeCount > 0)
-                    {
-                        OverrideGraphicSettings originalOgs =
-                            origView.GetElementOverrides(elem.Id);
-
-                        result.Add(new OverriddenElementInfo
-                        {
-                            ElementId = elem.Id,
-                            CategoryName = elem.Category?.Name ?? "不明",
-                            ElementName = elem.Name ?? "",
-                            OverriddenEdgeCount = overriddenEdgeCount,
-                            OverriddenStyleNames = overriddenStyleNames.ToList(),
-                            OriginalOverrides = originalOgs
-                        });
-
-                        _log.AppendLine($"  HIT: {elem.Category.Name} \"{elem.Name}\" [{elem.Id}] " +
-                            $"- {overriddenEdgeCount} edges → {string.Join(", ", overriddenStyleNames)}");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _log.AppendLine($"  ERR: {elem.Category?.Name} [{elem.Id}]: {ex.Message}");
-                }
-            }
-
-            _log.AppendLine($"Elements in view: {totalCount}");
-            _log.AppendLine($"Model elements checked: {checkedCount}");
-        }
-
-        /// <summary>
-        /// 2つのジオメトリのエッジスタイルを1対1で比較する
-        /// </summary>
-        private void CompareGeometry(
-            Document doc,
-            GeometryElement origGeom, GeometryElement cleanGeom,
-            ref int overriddenEdgeCount,
-            HashSet<string> overriddenStyleNames)
-        {
-            var origObjs = origGeom.ToList();
-            var cleanObjs = cleanGeom.ToList();
-
-            int count = Math.Min(origObjs.Count, cleanObjs.Count);
-
-            for (int i = 0; i < count; i++)
-            {
-                if (origObjs[i] is Solid origSolid && cleanObjs[i] is Solid cleanSolid
-                    && origSolid.Faces.Size > 0 && cleanSolid.Faces.Size > 0)
-                {
-                    CompareEdges(doc, origSolid.Edges, cleanSolid.Edges,
-                        ref overriddenEdgeCount, overriddenStyleNames);
-                }
-                else if (origObjs[i] is GeometryInstance origInst
-                    && cleanObjs[i] is GeometryInstance cleanInst)
-                {
-                    GeometryElement origInstGeom = origInst.GetInstanceGeometry();
-                    GeometryElement cleanInstGeom = cleanInst.GetInstanceGeometry();
-
-                    if (origInstGeom != null && cleanInstGeom != null)
-                    {
-                        CompareGeometry(doc, origInstGeom, cleanInstGeom,
-                            ref overriddenEdgeCount, overriddenStyleNames);
-                    }
-                }
-            }
-        }
-
-        /// <summary>
-        /// 2つの EdgeArray を1対1で比較する
-        /// </summary>
-        private void CompareEdges(
-            Document doc,
-            EdgeArray origEdges, EdgeArray cleanEdges,
-            ref int overriddenEdgeCount,
-            HashSet<string> overriddenStyleNames)
-        {
-            int edgeCount = Math.Min(origEdges.Size, cleanEdges.Size);
-
-            for (int j = 0; j < edgeCount; j++)
-            {
-                ElementId origStyleId = origEdges.get_Item(j).GraphicsStyleId;
-                ElementId cleanStyleId = cleanEdges.get_Item(j).GraphicsStyleId;
-
-                if (origStyleId == null || cleanStyleId == null) continue;
-                if (origStyleId == cleanStyleId) continue;
-
-                // スタイルが異なる → ラインワークで変更されている
-                overriddenEdgeCount++;
-
-                GraphicsStyle origStyle = doc.GetElement(origStyleId) as GraphicsStyle;
-                if (origStyle != null)
-                {
-                    overriddenStyleNames.Add(
-                        origStyle.GraphicsStyleCategory?.Name ?? origStyle.Name);
-                }
-            }
-        }
-
-        /// <summary>
-        /// デバッグログを出力する
-        /// </summary>
         private void WriteDebugLog()
         {
             try
