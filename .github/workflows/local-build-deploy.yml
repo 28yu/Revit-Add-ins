@@ -22,7 +22,7 @@ jobs:
 
       - name: Read dev config
         id: config
-        shell: pwsh
+        shell: powershell
         run: |
           $config = Get-Content "dev-config.json" -Raw | ConvertFrom-Json
           $ver = $config.defaultRevitVersion
@@ -30,7 +30,7 @@ jobs:
           Write-Host "Target Revit version: $ver"
 
       - name: Restore & Build
-        shell: pwsh
+        shell: powershell
         run: |
           $ver = "${{ steps.config.outputs.revit_version }}"
           Write-Host "Building for Revit $ver ..."
@@ -62,7 +62,7 @@ jobs:
           }
 
       - name: Deploy to local Revit
-        shell: pwsh
+        shell: powershell
         run: |
           $ver = "${{ steps.config.outputs.revit_version }}"
           $sourceDll   = "bin\Release\Revit$ver\Tools28.dll"
@@ -111,7 +111,7 @@ jobs:
 
       - name: Desktop notification
         if: always()
-        shell: pwsh
+        shell: powershell
         run: |
           try {
               Add-Type -AssemblyName System.Windows.Forms
