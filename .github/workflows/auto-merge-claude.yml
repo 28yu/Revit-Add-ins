@@ -11,46 +11,81 @@ permissions:
   actions: write
 
 jobs:
-  auto-merge:
+  create-pr:
     runs-on: ubuntu-latest
+    outputs:
+      pr_number: ${{ steps.get-pr.outputs.pr_number }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Check for existing PR
-        id: check-pr
+      - name: Create or find PR
+        id: get-pr
         run: |
+          # Check for existing PR
           PR_NUMBER=$(gh pr list --head "${{ github.ref_name }}" --base main --json number --jq '.[0].number' 2>/dev/null || echo "")
-          echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Create Pull Request
-        id: create-pr
-        if: steps.check-pr.outputs.pr_number == ''
-        run: |
-          PR_URL=$(gh pr create \
-            --base main \
-            --head "${{ github.ref_name }}" \
-            --title "Auto: ${{ github.event.head_commit.message }}" \
-            --body "Claude Code による自動PR
+          if [ -n "$PR_NUMBER" ]; then
+            echo "Found existing PR #$PR_NUMBER"
+          else
+            echo "Creating new PR..."
+            PR_URL=$(gh pr create \
+              --base main \
+              --head "${{ github.ref_name }}" \
+              --title "Auto: ${{ github.event.head_commit.message }}" \
+              --body "Claude Code による自動PR
 
           **ブランチ**: \`${{ github.ref_name }}\`
           **コミット**: ${{ github.event.head_commit.message }}")
-          PR_NUMBER=$(echo "$PR_URL" | grep -oP '\d+$')
+            PR_NUMBER=$(echo "$PR_URL" | grep -oP '\d+$')
+            echo "Created PR #$PR_NUMBER"
+          fi
+
           echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  auto-merge:
+    needs: create-pr
+    runs-on: ubuntu-latest
+    if: needs.create-pr.outputs.pr_number != ''
+    steps:
+      - uses: actions/checkout@v4
 
       - name: Merge Pull Request
         id: merge
         run: |
-          PR_NUMBER="${{ steps.check-pr.outputs.pr_number || steps.create-pr.outputs.pr_number }}"
-          if [ -n "$PR_NUMBER" ]; then
-            gh pr merge "$PR_NUMBER" --squash --delete-branch
-            echo "merged=true" >> $GITHUB_OUTPUT
+          PR_NUMBER="${{ needs.create-pr.outputs.pr_number }}"
+          echo "Attempting to merge PR #$PR_NUMBER..."
+
+          # Retry merge with exponential backoff
+          MERGED=false
+          for i in 1 2 3 4; do
+            echo "Merge attempt $i/4..."
+            if gh pr merge "$PR_NUMBER" --squash --delete-branch 2>&1; then
+              echo "Merged successfully on attempt $i"
+              MERGED=true
+              break
+            fi
+            WAIT=$((i * 5))
+            echo "Merge attempt $i failed. Waiting ${WAIT}s before retry..."
+            sleep $WAIT
+          done
+
+          # Fallback: enable GitHub auto-merge (merges when all checks pass)
+          if [ "$MERGED" = "false" ]; then
+            echo "Direct merge failed after 4 attempts."
+            echo "Enabling GitHub auto-merge as fallback..."
+            if gh pr merge "$PR_NUMBER" --squash --delete-branch --auto 2>&1; then
+              echo "Auto-merge enabled. PR will merge when all checks pass."
+              MERGED=true
+            else
+              echo "::warning::Failed to enable auto-merge for PR #$PR_NUMBER"
+            fi
           fi
+
+          echo "merged=$MERGED" >> $GITHUB_OUTPUT
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
