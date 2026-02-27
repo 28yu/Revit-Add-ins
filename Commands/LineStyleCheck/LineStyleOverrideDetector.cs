@@ -21,221 +21,238 @@ namespace Tools28.Commands.LineStyleCheck
     /// <summary>
     /// ビュー内の要素のラインワーク変更を検出する
     ///
-    /// 検出方式:
-    ///   ビュー固有ジオメトリの各エッジの GraphicsStyleId を検査し、
-    ///   Lines カテゴリに属するスタイルが、要素自身のカテゴリスタイルに
-    ///   含まれない場合、ラインワークによる変更と判定する。
-    ///
-    /// 注: 非ビュージオメトリとの比較は使用しない。
-    ///   Revit API では Options.View=null でもアクティブビューの
-    ///   ラインワーク変更がリークするため、正確な比較ができない。
+    /// 検出方式: ビュー複製比較
+    ///   1. ViewDuplicateOption.Duplicate で一時ビューを作成
+    ///      （ラインワーク変更・注釈・詳細項目を含まないクリーンなビュー）
+    ///   2. 同一要素のジオメトリを両ビューから取得
+    ///   3. 同一位置のエッジのスタイルを1対1で比較
+    ///   4. スタイルが異なるエッジ = ラインワークによる変更
+    ///   5. TransactionGroup.RollBack() で一時ビューを自動削除
     /// </summary>
     public class LineStyleOverrideDetector
     {
+        private System.Text.StringBuilder _log;
+
         /// <summary>
         /// ビュー内でラインワーク変更されている要素を検出する
         /// </summary>
         public List<OverriddenElementInfo> FindOverriddenElements(Document doc, View view)
         {
             var result = new List<OverriddenElementInfo>();
+            _log = new System.Text.StringBuilder();
+            _log.AppendLine("=== LineStyleCheck Debug Log ===");
+            _log.AppendLine($"Date: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+            _log.AppendLine($"View: {view.Name} (Type: {view.ViewType})");
 
-            var collector = new FilteredElementCollector(doc, view.Id)
-                .WhereElementIsNotElementType();
+            var sw = System.Diagnostics.Stopwatch.StartNew();
 
-            // Lines カテゴリのサブカテゴリ GraphicsStyle ID を収集
-            HashSet<ElementId> linesCategoryStyleIds = GetLinesCategoryStyleIds(doc);
-
-            foreach (Element elem in collector)
+            using (TransactionGroup tg = new TransactionGroup(doc, "ラインワーク検出"))
             {
-                if (elem.Category == null) continue;
+                tg.Start();
 
-                // ラインワークはモデル要素のエッジのみ変更可能
-                // 注釈要素（塗り潰し領域、マスキング領域等）はスキップ
-                if (elem.Category.CategoryType != CategoryType.Model) continue;
-
-                // Lines カテゴリ自体の要素はスキップ（詳細線やモデル線分等）
-                if (elem.Category.Id.IntegerValue == (int)BuiltInCategory.OST_Lines) continue;
-                if (elem.Category.Id.IntegerValue == (int)BuiltInCategory.OST_SketchLines) continue;
-
-                try
+                // ラインワーク変更を含まないクリーンなビューを作成
+                View cleanView = null;
+                using (Transaction trans = new Transaction(doc, "一時ビュー作成"))
                 {
-                    var info = CheckElementForOverrides(doc, view, elem, linesCategoryStyleIds);
-                    if (info != null)
+                    trans.Start();
+                    try
                     {
-                        result.Add(info);
+                        ElementId dupId = view.Duplicate(ViewDuplicateOption.Duplicate);
+                        cleanView = doc.GetElement(dupId) as View;
+                        _log.AppendLine($"Clean view created: {cleanView?.Name} [{dupId}]");
                     }
+                    catch (Exception ex)
+                    {
+                        _log.AppendLine($"View.Duplicate failed: {ex.Message}");
+                    }
+                    trans.Commit();
                 }
-                catch
+
+                if (cleanView != null)
                 {
-                    // ジオメトリ取得に失敗する要素はスキップ
+                    DetectOverrides(doc, view, cleanView, result);
                 }
+                else
+                {
+                    _log.AppendLine("FALLBACK: Clean view creation failed. No detection possible.");
+                }
+
+                // RollBack で一時ビューを自動削除（ドキュメントに変更を残さない）
+                tg.RollBack();
             }
+
+            sw.Stop();
+            _log.AppendLine($"Detected: {result.Count} elements with overrides");
+            _log.AppendLine($"Elapsed: {sw.ElapsedMilliseconds}ms");
+            WriteDebugLog();
 
             return result;
         }
 
         /// <summary>
-        /// Lines カテゴリの全サブカテゴリの GraphicsStyle ID を収集する
+        /// オリジナルビューとクリーンビューを比較してラインワーク変更を検出する
         /// </summary>
-        private HashSet<ElementId> GetLinesCategoryStyleIds(Document doc)
+        private void DetectOverrides(
+            Document doc, View origView, View cleanView,
+            List<OverriddenElementInfo> result)
         {
-            var styleIds = new HashSet<ElementId>();
+            var collector = new FilteredElementCollector(doc, origView.Id)
+                .WhereElementIsNotElementType();
 
-            Category linesCat = doc.Settings.Categories
-                .get_Item(BuiltInCategory.OST_Lines);
-            if (linesCat == null) return styleIds;
+            int totalCount = 0;
+            int checkedCount = 0;
 
-            foreach (Category subCat in linesCat.SubCategories)
+            foreach (Element elem in collector)
             {
-                GraphicsStyle projStyle =
-                    subCat.GetGraphicsStyle(GraphicsStyleType.Projection);
-                if (projStyle != null)
-                    styleIds.Add(projStyle.Id);
+                totalCount++;
+                if (elem.Category == null) continue;
 
-                GraphicsStyle cutStyle =
-                    subCat.GetGraphicsStyle(GraphicsStyleType.Cut);
-                if (cutStyle != null)
-                    styleIds.Add(cutStyle.Id);
-            }
+                // モデル要素のみ対象（注釈要素は Lines のスタイルを自然に持つため除外）
+                if (elem.Category.CategoryType != CategoryType.Model) continue;
 
-            GraphicsStyle linesProjStyle =
-                linesCat.GetGraphicsStyle(GraphicsStyleType.Projection);
-            if (linesProjStyle != null)
-                styleIds.Add(linesProjStyle.Id);
+                // Lines カテゴリ自体の要素はスキップ
+                if (elem.Category.Id.IntegerValue == (int)BuiltInCategory.OST_Lines) continue;
+                if (elem.Category.Id.IntegerValue == (int)BuiltInCategory.OST_SketchLines) continue;
 
-            return styleIds;
-        }
-
-        /// <summary>
-        /// 要素のカテゴリおよびサブカテゴリの GraphicsStyle ID を収集する
-        /// </summary>
-        private HashSet<ElementId> GetCategoryStyleIds(Category category)
-        {
-            var styleIds = new HashSet<ElementId>();
-            if (category == null) return styleIds;
-
-            GraphicsStyle projStyle =
-                category.GetGraphicsStyle(GraphicsStyleType.Projection);
-            if (projStyle != null)
-                styleIds.Add(projStyle.Id);
-
-            GraphicsStyle cutStyle =
-                category.GetGraphicsStyle(GraphicsStyleType.Cut);
-            if (cutStyle != null)
-                styleIds.Add(cutStyle.Id);
-
-            if (category.SubCategories != null)
-            {
-                foreach (Category subCat in category.SubCategories)
+                try
                 {
-                    GraphicsStyle subProjStyle =
-                        subCat.GetGraphicsStyle(GraphicsStyleType.Projection);
-                    if (subProjStyle != null)
-                        styleIds.Add(subProjStyle.Id);
+                    // クリーンビュー（ラインワークなし）でジオメトリ取得
+                    Options cleanOpts = new Options { View = cleanView };
+                    GeometryElement cleanGeom = elem.get_Geometry(cleanOpts);
+                    if (cleanGeom == null) continue;
 
-                    GraphicsStyle subCutStyle =
-                        subCat.GetGraphicsStyle(GraphicsStyleType.Cut);
-                    if (subCutStyle != null)
-                        styleIds.Add(subCutStyle.Id);
+                    // オリジナルビュー（ラインワークあり）でジオメトリ取得
+                    Options origOpts = new Options { View = origView };
+                    GeometryElement origGeom = elem.get_Geometry(origOpts);
+                    if (origGeom == null) continue;
+
+                    checkedCount++;
+
+                    int overriddenEdgeCount = 0;
+                    var overriddenStyleNames = new HashSet<string>();
+
+                    CompareGeometry(doc, origGeom, cleanGeom,
+                        ref overriddenEdgeCount, overriddenStyleNames);
+
+                    if (overriddenEdgeCount > 0)
+                    {
+                        OverrideGraphicSettings originalOgs =
+                            origView.GetElementOverrides(elem.Id);
+
+                        result.Add(new OverriddenElementInfo
+                        {
+                            ElementId = elem.Id,
+                            CategoryName = elem.Category?.Name ?? "不明",
+                            ElementName = elem.Name ?? "",
+                            OverriddenEdgeCount = overriddenEdgeCount,
+                            OverriddenStyleNames = overriddenStyleNames.ToList(),
+                            OriginalOverrides = originalOgs
+                        });
+
+                        _log.AppendLine($"  HIT: {elem.Category.Name} \"{elem.Name}\" [{elem.Id}] " +
+                            $"- {overriddenEdgeCount} edges → {string.Join(", ", overriddenStyleNames)}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _log.AppendLine($"  ERR: {elem.Category?.Name} [{elem.Id}]: {ex.Message}");
                 }
             }
 
-            return styleIds;
+            _log.AppendLine($"Elements in view: {totalCount}");
+            _log.AppendLine($"Model elements checked: {checkedCount}");
         }
 
         /// <summary>
-        /// 個別要素のラインワーク変更を検出する
+        /// 2つのジオメトリのエッジスタイルを1対1で比較する
+        ///
+        /// 同一ビュー設定（crop/scale/detail level 等）から取得したジオメトリは
+        /// 同一の構造（Solid数、Edge数、Edge順序）を持つため、
+        /// インデックスベースの1対1比較が可能。
         /// </summary>
-        private OverriddenElementInfo CheckElementForOverrides(
-            Document doc, View view, Element elem,
-            HashSet<ElementId> linesCategoryStyleIds)
-        {
-            // 要素カテゴリの既定スタイルIDを取得
-            HashSet<ElementId> categoryStyleIds = GetCategoryStyleIds(elem.Category);
-
-            // ビュー固有のジオメトリを取得
-            Options geomOptions = new Options
-            {
-                View = view,
-                ComputeReferences = true
-            };
-
-            GeometryElement geomElem = elem.get_Geometry(geomOptions);
-            if (geomElem == null) return null;
-
-            int overriddenEdgeCount = 0;
-            var overriddenStyleNames = new HashSet<string>();
-
-            CheckGeometry(doc, geomElem, categoryStyleIds, linesCategoryStyleIds,
-                ref overriddenEdgeCount, overriddenStyleNames);
-
-            if (overriddenEdgeCount > 0)
-            {
-                OverrideGraphicSettings originalOgs =
-                    view.GetElementOverrides(elem.Id);
-
-                return new OverriddenElementInfo
-                {
-                    ElementId = elem.Id,
-                    CategoryName = elem.Category?.Name ?? "不明",
-                    ElementName = elem.Name ?? "",
-                    OverriddenEdgeCount = overriddenEdgeCount,
-                    OverriddenStyleNames = overriddenStyleNames.ToList(),
-                    OriginalOverrides = originalOgs
-                };
-            }
-
-            return null;
-        }
-
-        /// <summary>
-        /// ジオメトリを再帰的に検査する
-        /// </summary>
-        private void CheckGeometry(
+        private void CompareGeometry(
             Document doc,
-            GeometryElement geomElem,
-            HashSet<ElementId> categoryStyleIds,
-            HashSet<ElementId> linesCategoryStyleIds,
+            GeometryElement origGeom, GeometryElement cleanGeom,
             ref int overriddenEdgeCount,
             HashSet<string> overriddenStyleNames)
         {
-            foreach (GeometryObject geomObj in geomElem)
-            {
-                if (geomObj is Solid solid && solid.Faces.Size > 0)
-                {
-                    foreach (Edge edge in solid.Edges)
-                    {
-                        ElementId styleId = edge.GraphicsStyleId;
-                        if (styleId == null || styleId == ElementId.InvalidElementId)
-                            continue;
+            var origObjs = origGeom.ToList();
+            var cleanObjs = cleanGeom.ToList();
 
-                        // エッジのスタイルが Lines カテゴリに属し、
-                        // かつ要素自身のカテゴリスタイルに含まれなければ、
-                        // ラインワークで変更されたと判定
-                        if (linesCategoryStyleIds.Contains(styleId)
-                            && !categoryStyleIds.Contains(styleId))
-                        {
-                            overriddenEdgeCount++;
-                            GraphicsStyle style =
-                                doc.GetElement(styleId) as GraphicsStyle;
-                            if (style != null)
-                            {
-                                overriddenStyleNames.Add(
-                                    style.GraphicsStyleCategory?.Name ?? style.Name);
-                            }
-                        }
-                    }
-                }
-                else if (geomObj is GeometryInstance instance)
+            int count = Math.Min(origObjs.Count, cleanObjs.Count);
+
+            for (int i = 0; i < count; i++)
+            {
+                if (origObjs[i] is Solid origSolid && cleanObjs[i] is Solid cleanSolid
+                    && origSolid.Faces.Size > 0 && cleanSolid.Faces.Size > 0)
                 {
-                    GeometryElement instanceGeom = instance.GetInstanceGeometry();
-                    if (instanceGeom != null)
+                    CompareEdges(doc, origSolid.Edges, cleanSolid.Edges,
+                        ref overriddenEdgeCount, overriddenStyleNames);
+                }
+                else if (origObjs[i] is GeometryInstance origInst
+                    && cleanObjs[i] is GeometryInstance cleanInst)
+                {
+                    GeometryElement origInstGeom = origInst.GetInstanceGeometry();
+                    GeometryElement cleanInstGeom = cleanInst.GetInstanceGeometry();
+
+                    if (origInstGeom != null && cleanInstGeom != null)
                     {
-                        CheckGeometry(doc, instanceGeom, categoryStyleIds,
-                            linesCategoryStyleIds, ref overriddenEdgeCount,
-                            overriddenStyleNames);
+                        CompareGeometry(doc, origInstGeom, cleanInstGeom,
+                            ref overriddenEdgeCount, overriddenStyleNames);
                     }
                 }
+            }
+        }
+
+        /// <summary>
+        /// 2つの EdgeArray を1対1で比較する
+        /// </summary>
+        private void CompareEdges(
+            Document doc,
+            EdgeArray origEdges, EdgeArray cleanEdges,
+            ref int overriddenEdgeCount,
+            HashSet<string> overriddenStyleNames)
+        {
+            int edgeCount = Math.Min(origEdges.Size, cleanEdges.Size);
+
+            for (int j = 0; j < edgeCount; j++)
+            {
+                ElementId origStyleId = origEdges.get_Item(j).GraphicsStyleId;
+                ElementId cleanStyleId = cleanEdges.get_Item(j).GraphicsStyleId;
+
+                if (origStyleId == null || cleanStyleId == null) continue;
+                if (origStyleId == cleanStyleId) continue;
+
+                // スタイルが異なる → ラインワークで変更されている
+                overriddenEdgeCount++;
+
+                GraphicsStyle origStyle = doc.GetElement(origStyleId) as GraphicsStyle;
+                if (origStyle != null)
+                {
+                    overriddenStyleNames.Add(
+                        origStyle.GraphicsStyleCategory?.Name ?? origStyle.Name);
+                }
+            }
+        }
+
+        /// <summary>
+        /// デバッグログを出力する
+        /// </summary>
+        private void WriteDebugLog()
+        {
+            try
+            {
+                string dir = @"C:\temp";
+                if (!System.IO.Directory.Exists(dir))
+                    System.IO.Directory.CreateDirectory(dir);
+
+                System.IO.File.WriteAllText(
+                    System.IO.Path.Combine(dir, "Tools28_LineStyleCheck_debug.txt"),
+                    _log.ToString());
+            }
+            catch
+            {
+                // ログ出力失敗は無視
             }
         }
     }
