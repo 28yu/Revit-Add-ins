@@ -1,0 +1,136 @@
+name: Local Build & Deploy
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '**.cs'
+      - '**.xaml'
+      - '**.csproj'
+      - 'Resources/**'
+
+  workflow_dispatch:
+
+jobs:
+  build-deploy:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Read dev config
+        id: config
+        shell: pwsh
+        run: |
+          $config = Get-Content "dev-config.json" -Raw | ConvertFrom-Json
+          $ver = $config.defaultRevitVersion
+          echo "revit_version=$ver" >> $env:GITHUB_OUTPUT
+          Write-Host "Target Revit version: $ver"
+
+      - name: Restore & Build
+        shell: pwsh
+        run: |
+          $ver = "${{ steps.config.outputs.revit_version }}"
+          Write-Host "Building for Revit $ver ..."
+
+          # MSBuild を vswhere で検索
+          $msbuildPath = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" `
+              -latest -requires Microsoft.Component.MSBuild -find MSBuild\**\Bin\MSBuild.exe `
+              -prerelease | Select-Object -First 1
+
+          if ($msbuildPath) {
+              Write-Host "Using MSBuild: $msbuildPath"
+              & $msbuildPath "Tools28.csproj" `
+                  /t:Restore`;Build `
+                  /p:Configuration=Release `
+                  /p:RevitVersion=$ver `
+                  /p:Platform=AnyCPU `
+                  /v:minimal `
+                  /nologo
+          } else {
+              Write-Host "MSBuild not found, trying dotnet build..."
+              dotnet build Tools28.csproj `
+                  -c Release `
+                  /p:RevitVersion=$ver
+          }
+
+          if ($LASTEXITCODE -ne 0) {
+              Write-Host "::error::Build failed"
+              exit 1
+          }
+
+      - name: Deploy to local Revit
+        shell: pwsh
+        run: |
+          $ver = "${{ steps.config.outputs.revit_version }}"
+          $sourceDll   = "bin\Release\Revit$ver\Tools28.dll"
+          $sourcePdb   = "bin\Release\Revit$ver\Tools28.pdb"
+          $sourceAddin = "Packages\$ver\28Tools\Tools28.addin"
+          $targetDir   = "$env:ProgramData\Autodesk\Revit\Addins\$ver\"
+
+          if (-not (Test-Path $sourceDll)) {
+              Write-Host "::error::DLL not found: $sourceDll"
+              exit 1
+          }
+
+          # ターゲットディレクトリ作成
+          if (-not (Test-Path $targetDir)) {
+              New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
+          }
+
+          # バックアップ
+          $targetDll = Join-Path $targetDir "Tools28.dll"
+          if (Test-Path $targetDll) {
+              $backupDir = Join-Path $targetDir "backup"
+              if (-not (Test-Path $backupDir)) {
+                  New-Item -ItemType Directory -Path $backupDir | Out-Null
+              }
+              $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+              Copy-Item $targetDll (Join-Path $backupDir "Tools28_$timestamp.dll") -Force
+              Write-Host "Backed up existing DLL"
+          }
+
+          # デプロイ
+          Copy-Item $sourceDll $targetDir -Force
+          Write-Host "Deployed: Tools28.dll"
+
+          if (Test-Path $sourcePdb) {
+              Copy-Item $sourcePdb $targetDir -Force
+              Write-Host "Deployed: Tools28.pdb"
+          }
+
+          if (Test-Path $sourceAddin) {
+              Copy-Item $sourceAddin (Join-Path $targetDir "Tools28.addin") -Force
+              Write-Host "Deployed: Tools28.addin"
+          }
+
+          Write-Host ""
+          Write-Host "Deploy complete: $targetDir"
+
+      - name: Desktop notification
+        if: always()
+        shell: pwsh
+        run: |
+          try {
+              Add-Type -AssemblyName System.Windows.Forms
+              $balloon = New-Object System.Windows.Forms.NotifyIcon
+              if ("${{ job.status }}" -eq "success") {
+                  $balloon.Icon = [System.Drawing.SystemIcons]::Information
+                  $balloon.BalloonTipIcon  = "Info"
+                  $balloon.BalloonTipTitle = "Tools28 ビルド完了"
+                  $balloon.BalloonTipText  = "ビルド & デプロイが完了しました。Revit を再起動してテストしてください。"
+              } else {
+                  $balloon.Icon = [System.Drawing.SystemIcons]::Error
+                  $balloon.BalloonTipIcon  = "Error"
+                  $balloon.BalloonTipTitle = "Tools28 ビルド失敗"
+                  $balloon.BalloonTipText  = "ビルドまたはデプロイに失敗しました。Actions ログを確認してください。"
+              }
+              $balloon.Visible = $true
+              $balloon.ShowBalloonTip(10000)
+              Start-Sleep -Seconds 3
+              $balloon.Dispose()
+          } catch {
+              Write-Host "Desktop notification skipped: $_"
+          }
