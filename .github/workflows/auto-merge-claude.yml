@@ -25,9 +25,10 @@ jobs:
 
       - name: Merge branch into main
         id: merge
+        env:
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
         run: |
           BRANCH="${{ github.ref_name }}"
-          COMMIT_MSG="${{ github.event.head_commit.message }}"
 
           echo "Merging $BRANCH into main..."
 
@@ -36,7 +37,9 @@ jobs:
 
           # Squash merge
           if git merge --squash "origin/$BRANCH"; then
-            git commit -m "Auto: $COMMIT_MSG"
+            # Extract first line of commit message for squash commit
+            FIRST_LINE=$(echo "$COMMIT_MSG" | head -n 1)
+            git commit -m "Auto: $FIRST_LINE"
             git push origin main
             echo "merged=true" >> $GITHUB_OUTPUT
             echo "Successfully merged $BRANCH into main!"

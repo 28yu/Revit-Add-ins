@@ -24,7 +24,7 @@ jobs:
         id: config
         shell: powershell
         run: |
-          $config = Get-Content "dev-config.json" -Raw | ConvertFrom-Json
+          $config = Get-Content "dev-config.json" -Raw -Encoding UTF8 | ConvertFrom-Json
           $ver = $config.defaultRevitVersion
           "revit_version=$ver" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
           Write-Host "Target Revit version: $ver"
