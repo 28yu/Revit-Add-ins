@@ -188,8 +188,8 @@ namespace Tools28.Commands.LineStyleCheck
                 return null;
             }
 
-            // オリジナルの断面ボックスを使用して断面図を作成
-            BoundingBoxXYZ sectionBox = viewSection.GetSectionBox();
+            // オリジナルの CropBox（断面の位置・方向・範囲を含む）を使用して断面図を作成
+            BoundingBoxXYZ sectionBox = viewSection.CropBox;
             ViewSection freshView = ViewSection.CreateSection(doc, vft.Id, sectionBox);
 
             CopyViewSettings(viewSection, freshView);
