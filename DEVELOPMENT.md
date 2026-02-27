@@ -255,6 +255,85 @@ System.IO.File.AppendAllText(logPath, $"[{DateTime.Now}] メッセージ\n");
 
 ---
 
+## 🤖 自動ビルド & デプロイ（セルフホストランナー）
+
+Claude Code で開発指示を出すだけで、ローカル PC 上で自動ビルド & デプロイが行われる仕組みです。
+
+### ワークフロー
+
+```
+あなた: 開発指示 → Claude: コード編集 → push
+  → GitHub Actions (auto-merge): main へ squash merge
+  → GitHub Actions (local-deploy): ローカルPCでビルド & デプロイ（全自動）
+  → Windows 通知「ビルド完了」
+  → あなた: Revitを再起動してテスト
+```
+
+### 初回セットアップ（10分程度）
+
+#### 1. GitHub でランナートークンを取得
+
+1. GitHub で `28yu/Revit-Add-ins` リポジトリを開く
+2. **Settings** → **Actions** → **Runners** → **New self-hosted runner**
+3. OS: **Windows**、Architecture: **x64** を選択
+4. 表示されるトークン（`--token XXXXX`の部分）をコピー
+
+#### 2. Windows PC でランナーをインストール
+
+PowerShell を**管理者として実行**し、以下を実行：
+
+```powershell
+# 1. インストール先ディレクトリを作成
+mkdir C:\actions-runner
+cd C:\actions-runner
+
+# 2. ランナーをダウンロード（GitHub の画面に表示される最新版URLを使用）
+Invoke-WebRequest -Uri https://github.com/actions/runner/releases/download/v2.322.0/actions-runner-win-x64-2.322.0.zip -OutFile actions-runner.zip
+
+# 3. 解凍
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+[System.IO.Compression.ZipFile]::ExtractToDirectory("$PWD\actions-runner.zip", "$PWD")
+
+# 4. ランナーを登録（トークンは GitHub の画面からコピー）
+.\config.cmd --url https://github.com/28yu/Revit-Add-ins --token YOUR_TOKEN_HERE
+
+# 5. Windows サービスとして登録（PC 起動時に自動実行）
+.\svc.cmd install
+.\svc.cmd start
+```
+
+#### 3. 動作確認
+
+```powershell
+# サービスの状態を確認
+.\svc.cmd status
+
+# GitHub の Settings → Actions → Runners で「Idle」と表示されればOK
+```
+
+### 使い方（セットアップ後）
+
+セットアップ完了後は、以下の流れが**完全自動**です：
+
+1. Claude Code で開発指示を出す
+2. Claude がコード編集 → push
+3. auto-merge → main へ反映
+4. **ローカル PC で自動ビルド & デプロイ**
+5. Windows デスクトップ通知が表示される
+6. Revit を再起動してテスト
+
+### 手動実行
+
+GitHub → Actions → **Local Build & Deploy** → **Run workflow** で手動実行も可能。
+
+### 注意事項
+
+- **Revit 起動中の場合**: DLL がロックされてデプロイが失敗します。先に Revit を閉じてから手動で再実行してください。
+- **ランナーのバージョン**: GitHub の画面に表示される最新版を使用してください（上記URLはv2.322.0の例）。
+- **セキュリティ**: セルフホストランナーはプライベートリポジトリでの使用が推奨されます。パブリックリポジトリの場合、悪意ある PR からのワークフロー実行に注意が必要です。
+
+---
+
 ## 🚢 リリース準備
 
 開発が完了し、リリースする場合：

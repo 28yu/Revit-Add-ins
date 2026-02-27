@@ -1,0 +1,64 @@
+name: Local Build & Deploy
+
+# auto-merge 完了後に自動実行、または手動実行
+on:
+  workflow_run:
+    workflows: ["Auto-merge Claude branches"]
+    types: [completed]
+  workflow_dispatch:
+
+jobs:
+  local-deploy:
+    runs-on: [self-hosted, Windows]
+    # auto-merge が成功した場合のみ実行（手動実行時は常に実行）
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Build & Deploy
+        shell: pwsh
+        run: |
+          Write-Host ""
+          Write-Host "========================================"
+          Write-Host "  Tools28 - 自動ビルド & デプロイ"
+          Write-Host "  トリガー: ${{ github.event_name }}"
+          Write-Host "========================================"
+          Write-Host ""
+
+          .\QuickBuild.ps1
+
+      - name: Notify (success)
+        if: success()
+        shell: pwsh
+        run: |
+          # Windows デスクトップ通知
+          Add-Type -AssemblyName System.Windows.Forms
+          $balloon = New-Object System.Windows.Forms.NotifyIcon
+          $balloon.Icon = [System.Drawing.SystemIcons]::Information
+          $balloon.BalloonTipIcon = "Info"
+          $balloon.BalloonTipTitle = "Tools28 ビルド完了"
+          $balloon.BalloonTipText = "ビルド & デプロイが完了しました。Revit を再起動してテストしてください。"
+          $balloon.Visible = $true
+          $balloon.ShowBalloonTip(10000)
+          Start-Sleep -Seconds 5
+          $balloon.Dispose()
+
+      - name: Notify (failure)
+        if: failure()
+        shell: pwsh
+        run: |
+          Add-Type -AssemblyName System.Windows.Forms
+          $balloon = New-Object System.Windows.Forms.NotifyIcon
+          $balloon.Icon = [System.Drawing.SystemIcons]::Error
+          $balloon.BalloonTipIcon = "Error"
+          $balloon.BalloonTipTitle = "Tools28 ビルド失敗"
+          $balloon.BalloonTipText = "ビルドまたはデプロイに失敗しました。GitHub Actions のログを確認してください。"
+          $balloon.Visible = $true
+          $balloon.ShowBalloonTip(10000)
+          Start-Sleep -Seconds 5
+          $balloon.Dispose()
