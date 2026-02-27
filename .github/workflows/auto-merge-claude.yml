@@ -11,105 +11,63 @@ permissions:
   actions: write
 
 jobs:
-  create-pr:
+  auto-merge:
     runs-on: ubuntu-latest
-    outputs:
-      pr_number: ${{ steps.get-pr.outputs.pr_number }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Create or find PR
-        id: get-pr
+      - name: Configure git
         run: |
-          # Check for existing PR
-          PR_NUMBER=$(gh pr list --head "${{ github.ref_name }}" --base main --json number --jq '.[0].number' 2>/dev/null || echo "")
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          if [ -n "$PR_NUMBER" ]; then
-            echo "Found existing PR #$PR_NUMBER"
-          else
-            echo "Creating new PR..."
-            PR_URL=$(gh pr create \
-              --base main \
-              --head "${{ github.ref_name }}" \
-              --title "Auto: ${{ github.event.head_commit.message }}" \
-              --body "Claude Code による自動PR
-
-          **ブランチ**: \`${{ github.ref_name }}\`
-          **コミット**: ${{ github.event.head_commit.message }}")
-            PR_NUMBER=$(echo "$PR_URL" | grep -oP '\d+$')
-            echo "Created PR #$PR_NUMBER"
-          fi
-
-          echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  auto-merge:
-    needs: create-pr
-    runs-on: ubuntu-latest
-    if: needs.create-pr.outputs.pr_number != ''
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Merge Pull Request
+      - name: Merge branch into main
         id: merge
         run: |
-          PR_NUMBER="${{ needs.create-pr.outputs.pr_number }}"
-          echo "Attempting to merge PR #$PR_NUMBER..."
+          BRANCH="${{ github.ref_name }}"
+          COMMIT_MSG="${{ github.event.head_commit.message }}"
 
-          # Retry merge with exponential backoff
-          MERGED=false
-          for i in 1 2 3 4; do
-            echo "Merge attempt $i/4..."
-            if gh pr merge "$PR_NUMBER" --squash --delete-branch 2>&1; then
-              echo "Merged successfully on attempt $i"
-              MERGED=true
-              break
-            fi
-            WAIT=$((i * 5))
-            echo "Merge attempt $i failed. Waiting ${WAIT}s before retry..."
-            sleep $WAIT
-          done
+          echo "Merging $BRANCH into main..."
 
-          # Fallback: enable GitHub auto-merge (merges when all checks pass)
-          if [ "$MERGED" = "false" ]; then
-            echo "Direct merge failed after 4 attempts."
-            echo "Enabling GitHub auto-merge as fallback..."
-            if gh pr merge "$PR_NUMBER" --squash --delete-branch --auto 2>&1; then
-              echo "Auto-merge enabled. PR will merge when all checks pass."
-              MERGED=true
-            else
-              echo "::warning::Failed to enable auto-merge for PR #$PR_NUMBER"
-            fi
+          git checkout main
+          git pull origin main
+
+          # Squash merge
+          if git merge --squash "origin/$BRANCH"; then
+            git commit -m "Auto: $COMMIT_MSG"
+            git push origin main
+            echo "merged=true" >> $GITHUB_OUTPUT
+            echo "Successfully merged $BRANCH into main!"
+          else
+            echo "::error::Merge failed. Rebase the branch onto main and push again."
+            echo "merged=false" >> $GITHUB_OUTPUT
+            exit 1
           fi
 
-          echo "merged=$MERGED" >> $GITHUB_OUTPUT
+      - name: Close any open PR
+        if: steps.merge.outputs.merged == 'true'
+        run: |
+          PR_NUMBER=$(gh pr list --head "${{ github.ref_name }}" --base main --json number --jq '.[0].number' 2>/dev/null || echo "")
+          if [ -n "$PR_NUMBER" ]; then
+            gh pr close "$PR_NUMBER" --comment "Auto-merged directly to main." || true
+            echo "Closed PR #$PR_NUMBER"
+          fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Wait for merge to propagate
+      - name: Delete source branch
         if: steps.merge.outputs.merged == 'true'
         run: |
-          echo "Waiting for merge to propagate to main..."
-          sleep 10
-
-      - name: Verify merge on main
-        if: steps.merge.outputs.merged == 'true'
-        run: |
-          MAIN_SHA=$(gh api repos/${{ github.repository }}/git/ref/heads/main --jq '.object.sha')
-          echo "Latest main SHA: $MAIN_SHA"
-          MAIN_MSG=$(gh api repos/${{ github.repository }}/commits/$MAIN_SHA --jq '.commit.message' | head -1)
-          echo "Latest main commit: $MAIN_MSG"
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          git push origin --delete "${{ github.ref_name }}" || true
+          echo "Deleted branch ${{ github.ref_name }}"
 
       - name: Trigger deploy workflow
         if: steps.merge.outputs.merged == 'true'
         run: |
           echo "Triggering deploy-pages.yml on main..."
-          gh workflow run deploy-pages.yml --ref main
-          echo "Deploy workflow triggered successfully"
+          gh workflow run deploy-pages.yml --ref main || true
+          echo "Deploy workflow triggered"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
