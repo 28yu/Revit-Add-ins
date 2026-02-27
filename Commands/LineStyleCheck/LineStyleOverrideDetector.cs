@@ -21,10 +21,15 @@ namespace Tools28.Commands.LineStyleCheck
     /// <summary>
     /// ビュー内の要素のラインワーク変更を検出する
     ///
-    /// 検出方式: 新規ビュー比較 + ビュー所有要素スキャン
-    ///   方式A: ViewPlan.Create() で新規ビューを作成し、エッジスタイルを比較
-    ///   方式B: OwnedByView でビュー所有要素を検索してラインワーク情報を探す
-    ///   診断: エッジスタイルの実際の値をダンプして、GraphicsStyleId の挙動を確認
+    /// 検出方式: IExportContext2D による2Dカスタムエクスポート比較
+    ///   1. CustomExporter + IExportContext2D でオリジナルビューの表示ジオメトリを出力
+    ///   2. ViewPlan.Create() でクリーンビューを作成し、同じく2Dエクスポート
+    ///   3. 各要素のエクスポートデータ（エッジ数、カーブ数、線分数）を比較
+    ///   4. 差異がある要素 = ラインワークによる変更
+    ///
+    /// IExportContext2D はレンダリングパイプラインを使用するため、
+    /// 通常のジオメトリ API (Edge.GraphicsStyleId) では取得できない
+    /// ラインワークオーバーライドの影響が反映される可能性がある。
     /// </summary>
     public class LineStyleOverrideDetector
     {
@@ -37,21 +42,16 @@ namespace Tools28.Commands.LineStyleCheck
         {
             var result = new List<OverriddenElementInfo>();
             _log = new System.Text.StringBuilder();
-            _log.AppendLine("=== LineStyleCheck Debug Log v7 (Diagnostic) ===");
+            _log.AppendLine("=== LineStyleCheck Debug Log v8 (IExportContext2D) ===");
             _log.AppendLine($"Date: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
             _log.AppendLine($"View: {view.Name} (Type: {view.ViewType}, Id: {view.Id})");
 
             var sw = System.Diagnostics.Stopwatch.StartNew();
 
-            // === 方式B: ビュー所有要素スキャン ===
+            // === IExportContext2D 比較方式 ===
             _log.AppendLine("");
-            _log.AppendLine("=== Phase B: View-Owned Elements Scan ===");
-            ScanViewOwnedElements(doc, view, result);
-
-            // === 方式A: 新規ビュー比較 (診断用) ===
-            _log.AppendLine("");
-            _log.AppendLine("=== Phase A: Fresh View Comparison (Diagnostic) ===");
-            DiagnosticFreshViewComparison(doc, view);
+            _log.AppendLine("=== Phase C: IExportContext2D Comparison ===");
+            DetectVia2DExport(doc, view, result);
 
             sw.Stop();
             _log.AppendLine("");
@@ -63,380 +63,274 @@ namespace Tools28.Commands.LineStyleCheck
         }
 
         /// <summary>
-        /// ビュー所有要素をスキャンしてラインワークオーバーライド情報を検出する
+        /// IExportContext2D を使用してラインワーク変更を検出する
         /// </summary>
-        private void ScanViewOwnedElements(Document doc, View view,
+        private void DetectVia2DExport(Document doc, View view,
             List<OverriddenElementInfo> result)
         {
             try
             {
-                // ビューが所有する全要素を取得
-                var ownedCollector = new FilteredElementCollector(doc)
-                    .OwnedByView(view.Id);
-
-                int totalOwned = 0;
-                var categoryCount = new Dictionary<string, int>();
-                var classCount = new Dictionary<string, int>();
-
-                // ラインワーク関連の要素を探す
-                var lineworkElements = new List<Element>();
-
-                foreach (Element elem in ownedCollector)
+                // 2Dエクスポート対応ビューかチェック
+                if (!Is2DExportableView(view))
                 {
-                    totalOwned++;
-
-                    string catName = elem.Category?.Name ?? "(no category)";
-                    string className = elem.GetType().Name;
-                    string key = $"{catName} [{className}]";
-
-                    if (!categoryCount.ContainsKey(key))
-                        categoryCount[key] = 0;
-                    categoryCount[key]++;
-
-                    if (!classCount.ContainsKey(className))
-                        classCount[className] = 0;
-                    classCount[className]++;
-
-                    // ラインワーク関連と思われる要素を収集
-                    // BuiltInCategory.OST_Lines, OST_SketchLines, or any Line-related
-                    bool isLineRelated = false;
-                    if (elem.Category != null)
-                    {
-                        int catId = elem.Category.Id.IntegerValue;
-                        if (catId == (int)BuiltInCategory.OST_Lines
-                            || catId == (int)BuiltInCategory.OST_LinesHiddenLines
-                            || catId == (int)BuiltInCategory.OST_SketchLines
-                            || catId == (int)BuiltInCategory.OST_MEPSpaceSeparationLines
-                            || catId == (int)BuiltInCategory.OST_RoomSeparationLines
-                            || catId == (int)BuiltInCategory.OST_AreaSchemeLines)
-                        {
-                            isLineRelated = true;
-                        }
-                    }
-
-                    // CurveElement や GenericForm なども調査
-                    if (isLineRelated || elem is CurveElement)
-                    {
-                        lineworkElements.Add(elem);
-                    }
+                    _log.AppendLine($"View type {view.ViewType} does not support 2D export.");
+                    _log.AppendLine("Falling back to geometry comparison.");
+                    FallbackGeometryComparison(doc, view, result);
+                    return;
                 }
 
-                _log.AppendLine($"Total view-owned elements: {totalOwned}");
-                _log.AppendLine("--- By Category+Class ---");
-                foreach (var kvp in categoryCount.OrderByDescending(x => x.Value))
-                {
-                    _log.AppendLine($"  {kvp.Key}: {kvp.Value}");
-                }
-                _log.AppendLine("--- By Class ---");
-                foreach (var kvp in classCount.OrderByDescending(x => x.Value))
-                {
-                    _log.AppendLine($"  {kvp.Key}: {kvp.Value}");
-                }
+                // オリジナルビューの2Dエクスポート
+                _log.AppendLine("Exporting original view...");
+                var origData = Export2DView(doc, view);
+                _log.AppendLine($"  Original: {origData.Count} elements exported");
 
-                // ラインワーク要素の詳細をダンプ
-                _log.AppendLine($"--- Line-Related Elements: {lineworkElements.Count} ---");
-                int dumpCount = 0;
-                foreach (var elem in lineworkElements)
+                // クリーンビューの作成とエクスポート
+                Dictionary<int, ElementExportData> cleanData = null;
+
+                using (TransactionGroup tg = new TransactionGroup(doc, "ラインワーク検出"))
                 {
-                    if (dumpCount >= 30) // 最大30個
+                    tg.Start();
+
+                    View cleanView = null;
+                    using (Transaction trans = new Transaction(doc, "一時ビュー作成"))
                     {
-                        _log.AppendLine("  ... (truncated)");
-                        break;
+                        trans.Start();
+                        cleanView = CreateCleanView(doc, view);
+                        trans.Commit();
                     }
 
-                    string catName = elem.Category?.Name ?? "(null)";
-                    string className = elem.GetType().Name;
-                    _log.AppendLine($"  [{elem.Id}] {catName} / {className} / Name=\"{elem.Name}\"");
-
-                    // GraphicsStyle を確認
-                    if (elem is CurveElement curveElem)
+                    if (cleanView != null)
                     {
-                        try
-                        {
-                            var lineStyle = curveElem.LineStyle;
-                            _log.AppendLine($"    LineStyle: {lineStyle?.Name ?? "(null)"} [{lineStyle?.Id}]");
-                        }
-                        catch (Exception ex)
-                        {
-                            _log.AppendLine($"    LineStyle error: {ex.Message}");
-                        }
+                        _log.AppendLine("Exporting clean view...");
+                        cleanData = Export2DView(doc, cleanView);
+                        _log.AppendLine($"  Clean: {cleanData.Count} elements exported");
+                    }
+                    else
+                    {
+                        _log.AppendLine("ERROR: Could not create clean view.");
                     }
 
-                    // パラメータをダンプ
-                    DumpElementParameters(elem);
-
-                    dumpCount++;
+                    tg.RollBack();
                 }
 
-                // ラインワーク要素からホスト要素を特定
+                if (cleanData == null)
+                {
+                    _log.AppendLine("Clean view export failed. Cannot compare.");
+                    return;
+                }
+
+                // 比較
                 _log.AppendLine("");
-                _log.AppendLine("--- Attempting to find linework host elements ---");
-                var hostElementIds = new HashSet<ElementId>();
-                foreach (var elem in lineworkElements)
-                {
-                    // ParameterSet から HOST_ID などを探す
-                    try
-                    {
-                        foreach (Parameter param in elem.Parameters)
-                        {
-                            if (param.StorageType == StorageType.ElementId)
-                            {
-                                ElementId refId = param.AsElementId();
-                                if (refId != null
-                                    && refId != ElementId.InvalidElementId
-                                    && refId.IntegerValue > 0)
-                                {
-                                    Element refElem = doc.GetElement(refId);
-                                    if (refElem != null
-                                        && refElem.Category != null
-                                        && refElem.Category.CategoryType == CategoryType.Model)
-                                    {
-                                        if (hostElementIds.Add(refId))
-                                        {
-                                            _log.AppendLine($"  Potential host: [{refId}] " +
-                                                $"{refElem.Category.Name} \"{refElem.Name}\" " +
-                                                $"(via param: {param.Definition.Name})");
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    catch { }
-                }
-
-                // ビューが所有する要素の中で、カテゴリが "Lines" で
-                // かつ通常の詳細線分やモデル線分ではないものを検出
-                _log.AppendLine("");
-                _log.AppendLine("--- All owned elements full dump (first 50) ---");
-                var allOwnedCollector2 = new FilteredElementCollector(doc)
-                    .OwnedByView(view.Id);
-                int dumpCount2 = 0;
-                foreach (Element elem in allOwnedCollector2)
-                {
-                    if (dumpCount2 >= 50) break;
-                    string catName = elem.Category?.Name ?? "(null)";
-                    int catId = elem.Category?.Id?.IntegerValue ?? 0;
-                    string className = elem.GetType().Name;
-                    _log.AppendLine($"  [{elem.Id}] cat={catName} catId={catId} " +
-                        $"class={className} name=\"{elem.Name}\"");
-                    dumpCount2++;
-                }
+                _log.AppendLine("=== Comparing export data ===");
+                CompareExportData(doc, view, origData, cleanData, result);
             }
             catch (Exception ex)
             {
-                _log.AppendLine($"ScanViewOwnedElements ERROR: {ex.Message}");
+                _log.AppendLine($"DetectVia2DExport ERROR: {ex.Message}");
                 _log.AppendLine(ex.StackTrace);
             }
         }
 
         /// <summary>
-        /// 要素のパラメータをダンプする（診断用）
+        /// 2Dエクスポート対応ビューか判定
         /// </summary>
-        private void DumpElementParameters(Element elem)
+        private bool Is2DExportableView(View view)
         {
-            try
-            {
-                foreach (Parameter param in elem.Parameters)
-                {
-                    string val = "(unreadable)";
-                    try
-                    {
-                        switch (param.StorageType)
-                        {
-                            case StorageType.String:
-                                val = param.AsString() ?? "(null)";
-                                break;
-                            case StorageType.Integer:
-                                val = param.AsInteger().ToString();
-                                break;
-                            case StorageType.Double:
-                                val = param.AsDouble().ToString("F4");
-                                break;
-                            case StorageType.ElementId:
-                                val = param.AsElementId()?.ToString() ?? "(null)";
-                                break;
-                        }
-                    }
-                    catch { }
-
-                    _log.AppendLine($"    P: {param.Definition.Name} = {val} ({param.StorageType})");
-                }
-            }
-            catch { }
+            return view.ViewType == ViewType.FloorPlan
+                || view.ViewType == ViewType.CeilingPlan
+                || view.ViewType == ViewType.Section
+                || view.ViewType == ViewType.Elevation
+                || view.ViewType == ViewType.Detail
+                || view.ViewType == ViewType.AreaPlan
+                || view.ViewType == ViewType.EngineeringPlan;
         }
 
         /// <summary>
-        /// 新規ビューとの比較による診断ログ（エッジスタイル値をダンプ）
+        /// IExportContext2D を使用してビューの2Dジオメトリをエクスポートする
         /// </summary>
-        private void DiagnosticFreshViewComparison(Document doc, View view)
+        private Dictionary<int, ElementExportData> Export2DView(Document doc, View view)
         {
-            using (TransactionGroup tg = new TransactionGroup(doc, "診断用比較"))
+            var context = new LineworkExportContext(doc, _log);
+            using (var exporter = new CustomExporter(doc, context))
             {
-                tg.Start();
-
-                View cleanView = null;
-                using (Transaction trans = new Transaction(doc, "一時ビュー作成"))
-                {
-                    trans.Start();
-                    cleanView = CreateCleanView(doc, view);
-                    trans.Commit();
-                }
-
-                if (cleanView != null)
-                {
-                    DiagnosticEdgeComparison(doc, view, cleanView);
-                }
-                else
-                {
-                    _log.AppendLine("Could not create clean view for diagnostics.");
-                }
-
-                tg.RollBack();
+                exporter.IncludeGeometricObjects = true;
+                exporter.Export2DIncludingAnnotationObjects = false;
+                exporter.Export2DGeometricObjectsIncludingPatternLines = false;
+                exporter.ShouldStopOnError = false;
+                exporter.Export(view);
             }
+            return context.Elements;
         }
 
         /// <summary>
-        /// 最初の数要素のエッジスタイルを詳細にダンプする（診断用）
+        /// 2つのエクスポートデータを比較してラインワーク変更を検出する
         /// </summary>
-        private void DiagnosticEdgeComparison(Document doc, View origView, View cleanView)
+        private void CompareExportData(
+            Document doc, View view,
+            Dictionary<int, ElementExportData> origData,
+            Dictionary<int, ElementExportData> cleanData,
+            List<OverriddenElementInfo> result)
         {
-            var collector = new FilteredElementCollector(doc, origView.Id)
-                .WhereElementIsNotElementType();
+            int comparedCount = 0;
+            int diffCount = 0;
 
-            int logged = 0;
+            // 全要素の詳細ログ（最初の20要素）
+            _log.AppendLine("--- Per-element export comparison (first 20 with data) ---");
+            int loggedCount = 0;
 
-            foreach (Element elem in collector)
+            foreach (var kvp in origData)
             {
-                if (logged >= 5) break; // 最初の5要素だけ
+                int elemId = kvp.Key;
+                var origEd = kvp.Value;
 
+                // モデル要素のみ比較
+                Element elem = doc.GetElement(new ElementId(elemId));
+                if (elem == null) continue;
                 if (elem.Category == null) continue;
                 if (elem.Category.CategoryType != CategoryType.Model) continue;
-                if (elem.Category.Id.IntegerValue == (int)BuiltInCategory.OST_Lines) continue;
-                if (elem.Category.Id.IntegerValue == (int)BuiltInCategory.OST_SketchLines) continue;
 
-                Options origOpts = new Options { View = origView };
-                GeometryElement origGeom = elem.get_Geometry(origOpts);
-                if (origGeom == null) continue;
+                comparedCount++;
 
-                Options cleanOpts = new Options { View = cleanView };
-                GeometryElement cleanGeom = elem.get_Geometry(cleanOpts);
-                if (cleanGeom == null) continue;
+                // クリーンビューのデータと比較
+                ElementExportData cleanEd = null;
+                if (cleanData.ContainsKey(elemId))
+                    cleanEd = cleanData[elemId];
 
-                Options noViewOpts = new Options();
-                GeometryElement noViewGeom = elem.get_Geometry(noViewOpts);
+                bool hasDifference = false;
+                string diffDesc = "";
 
-                _log.AppendLine($"");
-                _log.AppendLine($"--- Element: {elem.Category.Name} \"{elem.Name}\" [{elem.Id}] ---");
-
-                // エッジスタイルをダンプ
-                DumpEdgeStyles(doc, "OrigView", origGeom);
-                DumpEdgeStyles(doc, "CleanView", cleanGeom);
-                if (noViewGeom != null)
+                if (cleanEd == null)
                 {
-                    DumpEdgeStyles(doc, "NoView", noViewGeom);
+                    // クリーンビューに存在しない → 比較不可
+                    if (loggedCount < 20)
+                    {
+                        _log.AppendLine($"  [{elemId}] {elem.Category.Name} \"{elem.Name}\" " +
+                            $"- NOT in clean view (orig: C={origEd.CurveCount} E={origEd.FaceEdgeCount} " +
+                            $"S={origEd.SilhouetteCount} L={origEd.LineSegmentCount} P={origEd.PolylineSegmentCount})");
+                        loggedCount++;
+                    }
+                    continue;
                 }
 
-                logged++;
+                // 各カウントを比較
+                if (origEd.CurveCount != cleanEd.CurveCount)
+                {
+                    hasDifference = true;
+                    diffDesc += $"Curve:{origEd.CurveCount}→{cleanEd.CurveCount} ";
+                }
+                if (origEd.FaceEdgeCount != cleanEd.FaceEdgeCount)
+                {
+                    hasDifference = true;
+                    diffDesc += $"FaceEdge:{origEd.FaceEdgeCount}→{cleanEd.FaceEdgeCount} ";
+                }
+                if (origEd.SilhouetteCount != cleanEd.SilhouetteCount)
+                {
+                    hasDifference = true;
+                    diffDesc += $"Silhouette:{origEd.SilhouetteCount}→{cleanEd.SilhouetteCount} ";
+                }
+                if (origEd.LineSegmentCount != cleanEd.LineSegmentCount)
+                {
+                    hasDifference = true;
+                    diffDesc += $"LineSeg:{origEd.LineSegmentCount}→{cleanEd.LineSegmentCount} ";
+                }
+                if (origEd.PolylineSegmentCount != cleanEd.PolylineSegmentCount)
+                {
+                    hasDifference = true;
+                    diffDesc += $"PolySeg:{origEd.PolylineSegmentCount}→{cleanEd.PolylineSegmentCount} ";
+                }
+
+                // エッジスタイルの比較
+                if (origEd.EdgeStyleIds.Count > 0 || (cleanEd != null && cleanEd.EdgeStyleIds.Count > 0))
+                {
+                    string origStyles = string.Join(",", origEd.EdgeStyleIds.OrderBy(x => x));
+                    string cleanStyles = string.Join(",", cleanEd.EdgeStyleIds.OrderBy(x => x));
+                    if (origStyles != cleanStyles)
+                    {
+                        hasDifference = true;
+                        diffDesc += $"EdgeStyles differ ";
+                    }
+                }
+
+                if (loggedCount < 20)
+                {
+                    string status = hasDifference ? "*** DIFF ***" : "same";
+                    _log.AppendLine($"  [{elemId}] {elem.Category.Name} \"{elem.Name}\" - {status}");
+                    _log.AppendLine($"    Orig:  C={origEd.CurveCount} E={origEd.FaceEdgeCount} " +
+                        $"S={origEd.SilhouetteCount} L={origEd.LineSegmentCount} P={origEd.PolylineSegmentCount} " +
+                        $"Styles=[{string.Join(",", origEd.EdgeStyleIds.Take(10))}]");
+                    _log.AppendLine($"    Clean: C={cleanEd.CurveCount} E={cleanEd.FaceEdgeCount} " +
+                        $"S={cleanEd.SilhouetteCount} L={cleanEd.LineSegmentCount} P={cleanEd.PolylineSegmentCount} " +
+                        $"Styles=[{string.Join(",", cleanEd.EdgeStyleIds.Take(10))}]");
+                    loggedCount++;
+                }
+
+                if (hasDifference)
+                {
+                    diffCount++;
+
+                    OverrideGraphicSettings originalOgs =
+                        view.GetElementOverrides(elem.Id);
+
+                    result.Add(new OverriddenElementInfo
+                    {
+                        ElementId = elem.Id,
+                        CategoryName = elem.Category?.Name ?? "不明",
+                        ElementName = elem.Name ?? "",
+                        OverriddenEdgeCount = 1,
+                        OverriddenStyleNames = new List<string> { diffDesc.Trim() },
+                        OriginalOverrides = originalOgs
+                    });
+
+                    _log.AppendLine($"  *** HIT: [{elemId}] {elem.Category.Name} \"{elem.Name}\" - {diffDesc}");
+                }
+            }
+
+            // クリーンビューにのみ存在する要素をチェック
+            int cleanOnlyCount = 0;
+            foreach (var kvp in cleanData)
+            {
+                if (!origData.ContainsKey(kvp.Key))
+                {
+                    cleanOnlyCount++;
+                    if (cleanOnlyCount <= 5)
+                    {
+                        Element elem = doc.GetElement(new ElementId(kvp.Key));
+                        string name = elem != null
+                            ? $"{elem.Category?.Name ?? "?"} \"{elem.Name}\""
+                            : "?";
+                        _log.AppendLine($"  Clean-only: [{kvp.Key}] {name}");
+                    }
+                }
             }
 
             _log.AppendLine($"");
-            _log.AppendLine($"Diagnostic elements logged: {logged}");
+            _log.AppendLine($"Model elements compared: {comparedCount}");
+            _log.AppendLine($"Elements with differences: {diffCount}");
+            _log.AppendLine($"Clean-only elements: {cleanOnlyCount}");
         }
 
         /// <summary>
-        /// ジオメトリのエッジスタイルをダンプする
+        /// 2Dエクスポート非対応ビュー向けのフォールバック
         /// </summary>
-        private void DumpEdgeStyles(Document doc, string label, GeometryElement geom)
+        private void FallbackGeometryComparison(Document doc, View view,
+            List<OverriddenElementInfo> result)
         {
-            _log.AppendLine($"  [{label}] Edge styles:");
-            int edgeIndex = 0;
-
-            foreach (GeometryObject gObj in geom)
-            {
-                if (gObj is Solid solid && solid.Faces.Size > 0)
-                {
-                    foreach (Edge edge in solid.Edges)
-                    {
-                        if (edgeIndex >= 10) // 最初の10エッジだけ
-                        {
-                            _log.AppendLine($"    ... (truncated at {solid.Edges.Size} edges)");
-                            break;
-                        }
-
-                        ElementId styleId = edge.GraphicsStyleId;
-                        string styleName = "(null)";
-                        string catName = "(null)";
-
-                        if (styleId != null && styleId != ElementId.InvalidElementId)
-                        {
-                            GraphicsStyle gs = doc.GetElement(styleId) as GraphicsStyle;
-                            if (gs != null)
-                            {
-                                styleName = gs.Name;
-                                catName = gs.GraphicsStyleCategory?.Name ?? "(no cat)";
-                            }
-                        }
-
-                        // エッジの位置も出力（同一エッジの特定用）
-                        XYZ midpoint = null;
-                        try
-                        {
-                            var curve = edge.AsCurve();
-                            midpoint = curve.Evaluate(0.5, true);
-                        }
-                        catch { }
-
-                        string posStr = midpoint != null
-                            ? $"({midpoint.X:F2},{midpoint.Y:F2},{midpoint.Z:F2})"
-                            : "(?)";
-
-                        _log.AppendLine($"    E{edgeIndex}: id={styleId} " +
-                            $"style=\"{styleName}\" cat=\"{catName}\" pos={posStr}");
-
-                        edgeIndex++;
-                    }
-
-                    if (edgeIndex >= 10) break;
-                }
-                else if (gObj is GeometryInstance inst)
-                {
-                    GeometryElement instGeom = inst.GetInstanceGeometry();
-                    if (instGeom != null)
-                    {
-                        _log.AppendLine($"    (GeometryInstance - nested)");
-                        DumpEdgeStyles(doc, $"{label}/Inst", instGeom);
-                    }
-                }
-            }
-
-            if (edgeIndex == 0)
-            {
-                _log.AppendLine($"    (no edges found)");
-            }
+            _log.AppendLine("Fallback: 3D views are not supported by IExportContext2D.");
+            _log.AppendLine("Linework detection for 3D views is not currently possible.");
         }
 
-        /// <summary>
-        /// ラインワーク変更を一切持たないクリーンなビューを新規作成する
-        /// </summary>
+        #region View Creation
+
         private View CreateCleanView(Document doc, View view)
         {
             try
             {
                 if (view is ViewPlan viewPlan)
-                {
                     return CreateCleanPlanView(doc, viewPlan);
-                }
                 else if (view is ViewSection viewSection)
-                {
                     return CreateCleanSectionView(doc, viewSection);
-                }
-                else if (view is View3D view3D)
-                {
-                    return CreateClean3DView(doc, view3D);
-                }
 
-                _log.AppendLine($"Unsupported view type: {view.ViewType}");
+                _log.AppendLine($"Unsupported view type for clean view: {view.ViewType}");
                 return null;
             }
             catch (Exception ex)
@@ -515,36 +409,6 @@ namespace Tools28.Commands.LineStyleCheck
             return freshView;
         }
 
-        private View CreateClean3DView(Document doc, View3D view3D)
-        {
-            ViewFamilyType vft = new FilteredElementCollector(doc)
-                .OfClass(typeof(ViewFamilyType))
-                .Cast<ViewFamilyType>()
-                .FirstOrDefault(x => x.ViewFamily == ViewFamily.ThreeDimensional);
-
-            if (vft == null)
-            {
-                _log.AppendLine("ERROR: 3D ViewFamilyType not found");
-                return null;
-            }
-
-            View3D freshView = View3D.CreateIsometric(doc, vft.Id);
-            CopyViewSettings(view3D, freshView);
-
-            if (view3D.IsSectionBoxActive)
-            {
-                try
-                {
-                    freshView.IsSectionBoxActive = true;
-                    freshView.SetSectionBox(view3D.GetSectionBox());
-                }
-                catch { }
-            }
-
-            _log.AppendLine($"Clean 3DView created: {freshView.Name} [{freshView.Id}]");
-            return freshView;
-        }
-
         private void CopyViewSettings(View source, View target)
         {
             try { target.Scale = source.Scale; } catch { }
@@ -568,6 +432,8 @@ namespace Tools28.Commands.LineStyleCheck
             catch { }
         }
 
+        #endregion
+
         private void WriteDebugLog()
         {
             try
@@ -580,9 +446,215 @@ namespace Tools28.Commands.LineStyleCheck
                     System.IO.Path.Combine(dir, "Tools28_LineStyleCheck_debug.txt"),
                     _log.ToString());
             }
-            catch
+            catch { }
+        }
+    }
+
+    /// <summary>
+    /// 要素ごとの2Dエクスポートデータ
+    /// </summary>
+    public class ElementExportData
+    {
+        public int CurveCount;
+        public int FaceEdgeCount;
+        public int SilhouetteCount;
+        public int LineSegmentCount;
+        public int PolylineSegmentCount;
+        public List<int> EdgeStyleIds = new List<int>();
+    }
+
+    /// <summary>
+    /// IExportContext2D 実装：2Dビューのジオメトリデータを要素別に収集する
+    ///
+    /// Revit の CustomExporter + IExportContext2D は、ビューの表示内容を
+    /// レンダリングパイプラインを通じて出力する。これにより、通常のジオメトリAPI
+    /// では取得できないラインワークオーバーライドの影響が反映される可能性がある。
+    /// </summary>
+    class LineworkExportContext : IExportContext2D
+    {
+        private readonly Document _doc;
+        private readonly System.Text.StringBuilder _log;
+        private ElementId _currentElementId = ElementId.InvalidElementId;
+        private int _elementCount = 0;
+
+        public Dictionary<int, ElementExportData> Elements { get; }
+            = new Dictionary<int, ElementExportData>();
+
+        public LineworkExportContext(Document doc, System.Text.StringBuilder log)
+        {
+            _doc = doc;
+            _log = log;
+        }
+
+        #region IExportContextBase
+
+        public bool Start()
+        {
+            return true;
+        }
+
+        public void Finish()
+        {
+            _log.AppendLine($"  Export finished: {_elementCount} elements processed");
+        }
+
+        public bool IsCanceled()
+        {
+            return false;
+        }
+
+        #endregion
+
+        #region View/Element lifecycle
+
+        public RenderNodeAction OnViewBegin(ViewNode node)
+        {
+            return RenderNodeAction.Proceed;
+        }
+
+        public void OnViewEnd(ElementId elementId)
+        {
+        }
+
+        public RenderNodeAction OnElementBegin2D(ElementNode node)
+        {
+            _currentElementId = node.ElementId;
+            _elementCount++;
+
+            int id = node.ElementId.IntegerValue;
+            if (!Elements.ContainsKey(id))
+                Elements[id] = new ElementExportData();
+
+            return RenderNodeAction.Proceed;
+        }
+
+        public void OnElementEnd2D(ElementNode node)
+        {
+            _currentElementId = ElementId.InvalidElementId;
+        }
+
+        // 3D element callbacks (required by interface but not used for 2D)
+        public RenderNodeAction OnElementBegin(ElementId elementId)
+        {
+            return RenderNodeAction.Skip;
+        }
+
+        public void OnElementEnd(ElementId elementId)
+        {
+        }
+
+        #endregion
+
+        #region Instance/Link
+
+        public RenderNodeAction OnInstanceBegin(InstanceNode node)
+        {
+            return RenderNodeAction.Proceed;
+        }
+
+        public void OnInstanceEnd(InstanceNode node)
+        {
+        }
+
+        public RenderNodeAction OnLinkBegin(LinkNode node)
+        {
+            return RenderNodeAction.Proceed;
+        }
+
+        public void OnLinkEnd(LinkNode node)
+        {
+        }
+
+        #endregion
+
+        #region Face
+
+        public RenderNodeAction OnFaceBegin(FaceNode node)
+        {
+            return RenderNodeAction.Proceed;
+        }
+
+        public void OnFaceEnd(FaceNode node)
+        {
+        }
+
+        #endregion
+
+        #region 2D Geometry callbacks
+
+        public RenderNodeAction OnCurve(CurveNode node)
+        {
+            RecordForCurrentElement(d => d.CurveCount++);
+            return RenderNodeAction.Proceed;
+        }
+
+        public RenderNodeAction OnPolyline(PolylineNode node)
+        {
+            return RenderNodeAction.Proceed;
+        }
+
+        public RenderNodeAction OnFaceEdge2D(FaceEdgeNode node)
+        {
+            RecordForCurrentElement(d =>
             {
-                // ログ出力失敗は無視
+                d.FaceEdgeCount++;
+
+                // FaceEdge の GraphicsStyleId を取得してみる
+                try
+                {
+                    Edge edge = node.GetFaceEdge();
+                    if (edge != null)
+                    {
+                        ElementId styleId = edge.GraphicsStyleId;
+                        if (styleId != null)
+                            d.EdgeStyleIds.Add(styleId.IntegerValue);
+                    }
+                }
+                catch { }
+            });
+
+            return RenderNodeAction.Proceed;
+        }
+
+        public RenderNodeAction OnFaceSilhouette2D(FaceSilhouetteNode node)
+        {
+            RecordForCurrentElement(d => d.SilhouetteCount++);
+            return RenderNodeAction.Proceed;
+        }
+
+        public void OnLineSegment(LineSegment segment)
+        {
+            RecordForCurrentElement(d => d.LineSegmentCount++);
+        }
+
+        public void OnPolylineSegments(PolylineSegments segments)
+        {
+            RecordForCurrentElement(d => d.PolylineSegmentCount++);
+        }
+
+        public void OnText(TextNode node)
+        {
+            // テキストは無視
+        }
+
+        #endregion
+
+        #region 3D callbacks (required by interface, not used)
+
+        public void OnLight(LightNode node) { }
+        public void OnRPC(RPCNode node) { }
+        public void OnMaterial(MaterialNode node) { }
+        public void OnPolymesh(PolymeshTopology node) { }
+
+        #endregion
+
+        private void RecordForCurrentElement(Action<ElementExportData> action)
+        {
+            if (_currentElementId != ElementId.InvalidElementId)
+            {
+                int id = _currentElementId.IntegerValue;
+                if (Elements.ContainsKey(id))
+                    action(Elements[id]);
             }
         }
     }
