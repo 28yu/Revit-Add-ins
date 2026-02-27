@@ -21,9 +21,9 @@ namespace Tools28.Commands.LineStyleCheck
     /// <summary>
     /// ビュー内の要素のラインワーク変更を検出する
     ///
-    /// 検出方式: ビュー複製比較
-    ///   1. ViewDuplicateOption.Duplicate で一時ビューを作成
-    ///      （ラインワーク変更・注釈・詳細項目を含まないクリーンなビュー）
+    /// 検出方式: 新規ビュー比較
+    ///   1. ViewPlan.Create() でラインワーク変更が一切ないクリーンなビューを新規作成
+    ///      （View.Duplicate はラインワーク変更を保持するため使用不可）
     ///   2. 同一要素のジオメトリを両ビューから取得
     ///   3. 同一位置のエッジのスタイルを1対1で比較
     ///   4. スタイルが異なるエッジ = ラインワークによる変更
@@ -50,21 +50,11 @@ namespace Tools28.Commands.LineStyleCheck
             {
                 tg.Start();
 
-                // ラインワーク変更を含まないクリーンなビューを作成
                 View cleanView = null;
                 using (Transaction trans = new Transaction(doc, "一時ビュー作成"))
                 {
                     trans.Start();
-                    try
-                    {
-                        ElementId dupId = view.Duplicate(ViewDuplicateOption.Duplicate);
-                        cleanView = doc.GetElement(dupId) as View;
-                        _log.AppendLine($"Clean view created: {cleanView?.Name} [{dupId}]");
-                    }
-                    catch (Exception ex)
-                    {
-                        _log.AppendLine($"View.Duplicate failed: {ex.Message}");
-                    }
+                    cleanView = CreateCleanView(doc, view);
                     trans.Commit();
                 }
 
@@ -74,7 +64,7 @@ namespace Tools28.Commands.LineStyleCheck
                 }
                 else
                 {
-                    _log.AppendLine("FALLBACK: Clean view creation failed. No detection possible.");
+                    _log.AppendLine("ERROR: Could not create clean view. Detection aborted.");
                 }
 
                 // RollBack で一時ビューを自動削除（ドキュメントに変更を残さない）
@@ -87,6 +77,188 @@ namespace Tools28.Commands.LineStyleCheck
             WriteDebugLog();
 
             return result;
+        }
+
+        /// <summary>
+        /// ラインワーク変更を一切持たないクリーンなビューを新規作成する
+        ///
+        /// View.Duplicate(Duplicate) はラインワーク変更を保持するため使用不可。
+        /// ViewPlan.Create() で完全に新規のビューを作成し、
+        /// オリジナルビューの設定（ビュー範囲、スケール、詳細レベル等）をコピーする。
+        /// </summary>
+        private View CreateCleanView(Document doc, View view)
+        {
+            try
+            {
+                if (view is ViewPlan viewPlan)
+                {
+                    return CreateCleanPlanView(doc, viewPlan);
+                }
+                else if (view is ViewSection viewSection)
+                {
+                    return CreateCleanSectionView(doc, viewSection);
+                }
+                else if (view is View3D view3D)
+                {
+                    return CreateClean3DView(doc, view3D);
+                }
+
+                _log.AppendLine($"Unsupported view type: {view.ViewType}");
+                return null;
+            }
+            catch (Exception ex)
+            {
+                _log.AppendLine($"CreateCleanView failed: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// クリーンな平面図ビューを作成する（FloorPlan / CeilingPlan / AreaPlan 対応）
+        /// </summary>
+        private View CreateCleanPlanView(Document doc, ViewPlan viewPlan)
+        {
+            Level level = viewPlan.GenLevel;
+            if (level == null)
+            {
+                _log.AppendLine("ERROR: ViewPlan has no GenLevel");
+                return null;
+            }
+
+            // ビュータイプに合った ViewFamilyType を取得
+            ViewFamily family;
+            switch (viewPlan.ViewType)
+            {
+                case ViewType.CeilingPlan:
+                    family = ViewFamily.CeilingPlan;
+                    break;
+                case ViewType.AreaPlan:
+                    family = ViewFamily.AreaPlan;
+                    break;
+                default:
+                    family = ViewFamily.FloorPlan;
+                    break;
+            }
+
+            ViewFamilyType vft = new FilteredElementCollector(doc)
+                .OfClass(typeof(ViewFamilyType))
+                .Cast<ViewFamilyType>()
+                .FirstOrDefault(x => x.ViewFamily == family);
+
+            if (vft == null)
+            {
+                _log.AppendLine($"ERROR: ViewFamilyType not found for {family}");
+                return null;
+            }
+
+            ViewPlan freshView = ViewPlan.Create(doc, vft.Id, level.Id);
+
+            // オリジナルの設定をコピー
+            CopyViewSettings(viewPlan, freshView);
+
+            // ビュー範囲をコピー（平面図固有）
+            try
+            {
+                PlanViewRange origRange = viewPlan.GetViewRange();
+                freshView.SetViewRange(origRange);
+                _log.AppendLine("View range copied");
+            }
+            catch (Exception ex)
+            {
+                _log.AppendLine($"View range copy failed: {ex.Message}");
+            }
+
+            _log.AppendLine($"Clean PlanView created: {freshView.Name} [{freshView.Id}]");
+            return freshView;
+        }
+
+        /// <summary>
+        /// クリーンな断面図ビューを作成する（Section / Elevation 対応）
+        /// </summary>
+        private View CreateCleanSectionView(Document doc, ViewSection viewSection)
+        {
+            ViewFamilyType vft = new FilteredElementCollector(doc)
+                .OfClass(typeof(ViewFamilyType))
+                .Cast<ViewFamilyType>()
+                .FirstOrDefault(x => x.ViewFamily == ViewFamily.Section);
+
+            if (vft == null)
+            {
+                _log.AppendLine("ERROR: Section ViewFamilyType not found");
+                return null;
+            }
+
+            // オリジナルの断面ボックスを使用して断面図を作成
+            BoundingBoxXYZ sectionBox = viewSection.GetSectionBox();
+            ViewSection freshView = ViewSection.CreateSection(doc, vft.Id, sectionBox);
+
+            CopyViewSettings(viewSection, freshView);
+
+            _log.AppendLine($"Clean SectionView created: {freshView.Name} [{freshView.Id}]");
+            return freshView;
+        }
+
+        /// <summary>
+        /// クリーンな3Dビューを作成する
+        /// </summary>
+        private View CreateClean3DView(Document doc, View3D view3D)
+        {
+            ViewFamilyType vft = new FilteredElementCollector(doc)
+                .OfClass(typeof(ViewFamilyType))
+                .Cast<ViewFamilyType>()
+                .FirstOrDefault(x => x.ViewFamily == ViewFamily.ThreeDimensional);
+
+            if (vft == null)
+            {
+                _log.AppendLine("ERROR: 3D ViewFamilyType not found");
+                return null;
+            }
+
+            View3D freshView = View3D.CreateIsometric(doc, vft.Id);
+
+            CopyViewSettings(view3D, freshView);
+
+            // セクションボックスをコピー
+            if (view3D.IsSectionBoxActive)
+            {
+                try
+                {
+                    freshView.IsSectionBoxActive = true;
+                    freshView.SetSectionBox(view3D.GetSectionBox());
+                }
+                catch { }
+            }
+
+            _log.AppendLine($"Clean 3DView created: {freshView.Name} [{freshView.Id}]");
+            return freshView;
+        }
+
+        /// <summary>
+        /// ビューの共通設定をコピーする
+        /// </summary>
+        private void CopyViewSettings(View source, View target)
+        {
+            try { target.Scale = source.Scale; } catch { }
+            try { target.DetailLevel = source.DetailLevel; } catch { }
+
+            // トリミング領域をコピー
+            try
+            {
+                target.CropBoxActive = source.CropBoxActive;
+                if (source.CropBoxActive)
+                    target.CropBox = source.CropBox;
+            }
+            catch { }
+
+            // フェーズをコピー
+            try
+            {
+                Parameter srcPhase = source.get_Parameter(BuiltInParameter.VIEW_PHASE);
+                Parameter tgtPhase = target.get_Parameter(BuiltInParameter.VIEW_PHASE);
+                if (srcPhase != null && tgtPhase != null && !tgtPhase.IsReadOnly)
+                    tgtPhase.Set(srcPhase.AsElementId());
+            }
+            catch { }
         }
 
         /// <summary>
@@ -106,11 +278,7 @@ namespace Tools28.Commands.LineStyleCheck
             {
                 totalCount++;
                 if (elem.Category == null) continue;
-
-                // モデル要素のみ対象（注釈要素は Lines のスタイルを自然に持つため除外）
                 if (elem.Category.CategoryType != CategoryType.Model) continue;
-
-                // Lines カテゴリ自体の要素はスキップ
                 if (elem.Category.Id.IntegerValue == (int)BuiltInCategory.OST_Lines) continue;
                 if (elem.Category.Id.IntegerValue == (int)BuiltInCategory.OST_SketchLines) continue;
 
@@ -165,10 +333,6 @@ namespace Tools28.Commands.LineStyleCheck
 
         /// <summary>
         /// 2つのジオメトリのエッジスタイルを1対1で比較する
-        ///
-        /// 同一ビュー設定（crop/scale/detail level 等）から取得したジオメトリは
-        /// 同一の構造（Solid数、Edge数、Edge順序）を持つため、
-        /// インデックスベースの1対1比較が可能。
         /// </summary>
         private void CompareGeometry(
             Document doc,
