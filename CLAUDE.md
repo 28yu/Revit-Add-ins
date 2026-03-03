@@ -283,9 +283,8 @@ git push -u origin claude/<branch-name>
 
 | 色 | コード | 用途 |
 |---|---|---|
-| Blue-green | `#5F968E` | フェーズヘッダー、AI アクセント、矢印 |
-| Mint | `#BFDCCF` | AI ノード背景、結果ノード |
-| Lavender | `#8B7EAB` | 自動（Auto）ノード |
+| Blue-green | `#5F968E` | フェーズヘッダー、AI・自動アクセント、矢印 |
+| Mint | `#BFDCCF` | AI・自動（Auto）ノード背景、結果ノード |
 | Oatmeal | `#D5C9B1` | あなた（You）ノード、ブラウザフレーム |
 
 派生色（背景色・ボーダー等）はメインカラーから明度を調整して生成。
