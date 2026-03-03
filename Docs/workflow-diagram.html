@@ -431,7 +431,7 @@ body{
   <!-- Title -->
   <div class="title">
     <h1>Revitアドイン開発ワークフロー</h1>
-    <span class="title-sub">あなたが考えて指示 → AI が全て書く → 自動でビルド → あなたが確認</span>
+    <span class="title-sub">あなたは「指示」と「確認」だけ → 開発からデプロイまで全自動</span>
   </div>
 
   <!-- Legend -->
@@ -443,10 +443,10 @@ body{
   </div>
 
   <!-- ============================== -->
-  <!-- Phase 1: 開発フェーズ          -->
+  <!-- Phase 1: 指示フェーズ          -->
   <!-- ============================== -->
   <div class="phase">
-    <div class="phase-header">開発フェーズ</div>
+    <div class="phase-header">指示フェーズ</div>
     <div class="flow">
 
       <!-- あなた -->
@@ -461,7 +461,7 @@ body{
       <div class="arrow">
         <div class="arrow-line"></div>
         <div class="arrow-head"></div>
-        <span class="arrow-label">指示を出す</span>
+        <span class="arrow-label">ブラウザで指示を出す</span>
       </div>
 
       <!-- Claude Code (ブラウザ操作) -->
@@ -473,9 +473,9 @@ body{
         <div class="node node-ai">
           <div class="node-icon"><img src="icons/workflow/claude.png" alt="Claude Code"></div>
           <div class="node-text">
-            <div class="node-role">Claude Code ─ AI 脚本家</div>
-            <div class="node-name">コードを全て書く</div>
-            <div class="node-desc">コマンドクラス (.cs) / WPF (XAML) / Application.cs / csproj</div>
+            <div class="node-role">Claude Code ─ AI 開発者</div>
+            <div class="node-name">コードを書いて push まで完了</div>
+            <div class="node-desc">実装 → テスト → git push（claude/* ブランチ）</div>
           </div>
         </div>
       </div>
@@ -483,77 +483,90 @@ body{
       <div class="arrow">
         <div class="arrow-line"></div>
         <div class="arrow-head"></div>
-      </div>
-
-      <!-- Code -->
-      <div class="node-result">
-        <div class="node-icon">📄</div>
-        コード（設計図）が完成
-      </div>
-
-      <div class="arrow">
-        <div class="arrow-line"></div>
-        <div class="arrow-head"></div>
-        <span class="arrow-label">git push で保管</span>
+        <span class="arrow-label">ここから全自動 ↓</span>
       </div>
 
     </div>
   </div>
 
   <!-- ============================== -->
-  <!-- Phase 2: ビルド＆テスト         -->
+  <!-- Phase 2: 自動ビルド＆デプロイ   -->
   <!-- ============================== -->
   <div class="phase">
-    <div class="phase-header">ビルド＆テストフェーズ</div>
+    <div class="phase-header">自動ビルド＆デプロイフェーズ ── 通知が届くまで待つだけ！</div>
     <div class="flow">
 
-      <!-- PowerShell 実行 -->
-      <div class="node node-you">
-        <div class="node-icon"><img src="icons/workflow/powershell.png" alt="PowerShell"></div>
-        <div class="node-text">
-          <div class="node-role">あなたが実行</div>
-          <div class="node-name">QuickBuild.ps1 を起動</div>
-        </div>
-      </div>
+      <!-- GitHub Actions: auto-merge -->
+      <div class="hrow">
 
-      <div class="arrow">
-        <div class="arrow-line"></div>
-        <div class="arrow-head"></div>
-      </div>
-
-      <!-- Branch: Build + Deploy -->
-      <div class="branch">
-        <div class="branch-col">
+        <div class="browser-frame-sm">
+          <div class="browser-bar">
+            <div class="browser-dots"><span></span><span></span><span></span></div>
+            <span class="browser-bar-label">🌐 GitHub</span>
+          </div>
           <div class="node node-auto node-sm">
-            <div class="node-icon"><img src="icons/workflow/nuget.png" alt="NuGet"></div>
+            <div class="node-icon"><img src="icons/workflow/action.png" alt="GitHub Actions"></div>
             <div class="node-text">
-              <div class="node-name">ビルド（変換）</div>
+              <div class="node-name">自動マージ</div>
+              <div class="node-desc">claude/* → main</div>
             </div>
           </div>
-          <div class="nuget-note">← NuGet が部品を自動調達</div>
         </div>
 
-        <div class="branch-col" style="justify-content:center;align-self:center">
+        <div class="harrow-up">
+          <div class="harrow-label">main 更新を検知</div>
           <div class="harrow">
             <div class="harrow-line"></div>
             <div class="harrow-head"></div>
           </div>
         </div>
 
-        <div class="branch-col">
-          <div class="node node-auto node-sm">
-            <div class="node-icon"><img src="icons/workflow/revit.png" alt="Revit"></div>
-            <div class="node-text">
-              <div class="node-name">デプロイ（配置）</div>
-            </div>
+        <div class="node node-auto node-sm">
+          <div class="node-icon"><img src="icons/workflow/powershell.png" alt="AutoBuild"></div>
+          <div class="node-text">
+            <div class="node-name">自動ビルド</div>
+            <div class="node-desc">AutoBuild.ps1</div>
           </div>
         </div>
+
+        <div class="harrow-up">
+          <div class="harrow-label">Revit へ配置</div>
+          <div class="harrow">
+            <div class="harrow-line"></div>
+            <div class="harrow-head"></div>
+          </div>
+        </div>
+
+        <div class="node node-auto node-sm">
+          <div class="node-icon"><img src="icons/workflow/revit.png" alt="Deploy"></div>
+          <div class="node-text">
+            <div class="node-name">自動デプロイ</div>
+            <div class="node-desc">Addins フォルダへ</div>
+          </div>
+        </div>
+
       </div>
 
       <div class="arrow">
         <div class="arrow-line"></div>
         <div class="arrow-head"></div>
       </div>
+
+      <!-- Windows notification -->
+      <div class="node-result">
+        <div class="node-icon">🔔</div>
+        Windows 通知「ビルド完了！」
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ============================== -->
+  <!-- Phase 3: テストフェーズ         -->
+  <!-- ============================== -->
+  <div class="phase">
+    <div class="phase-header">テストフェーズ</div>
+    <div class="flow">
 
       <!-- Revit 動作確認 -->
       <div class="node node-you">
@@ -569,11 +582,11 @@ body{
       <div style="display:flex;gap:5mm;margin-top:2mm;align-items:center;justify-content:center">
         <div>
           <span class="badge badge-ok">✓ OK</span>
-          <span style="font-size:6.5pt;font-weight:700;color:#8a8580;margin-left:1px">→ 次のフェーズへ</span>
+          <span style="font-size:6.5pt;font-weight:700;color:#8a8580;margin-left:1px">→ リリースへ</span>
         </div>
         <div>
           <span class="badge badge-ng">✗ NG</span>
-          <span style="font-size:6.5pt;font-weight:700;color:#8a8580;margin-left:1px">→ Claude Code に修正指示 → 最初に戻る</span>
+          <span style="font-size:6.5pt;font-weight:700;color:#8a8580;margin-left:1px">→ Claude Code に修正指示 → 指示フェーズへ戻る</span>
         </div>
       </div>
 
@@ -581,7 +594,7 @@ body{
   </div>
 
   <!-- ============================== -->
-  <!-- Phase 3: リリースフェーズ       -->
+  <!-- Phase 4: リリースフェーズ       -->
   <!-- ============================== -->
   <div class="phase">
     <div class="phase-header">リリースフェーズ</div>
@@ -614,7 +627,7 @@ body{
             <div class="node-icon"><img src="icons/workflow/github.png" alt="GitHub"></div>
             <div class="node-text">
               <div class="node-name">GitHub</div>
-              <div class="node-desc">台本倉庫</div>
+              <div class="node-desc">コード倉庫</div>
             </div>
           </div>
         </div>
@@ -674,9 +687,9 @@ body{
 
   <!-- Callout -->
   <div class="callout">
-    <strong>💡 ポイント：</strong>あなたはコードを一行も書く必要はありません。
-    Claude Code に「こういう機能がほしい」と伝えるだけで、実装からテスト準備まで AI が担当します。
-    あなたの役割は<strong>「指示」と「確認」</strong>の2つだけ！
+    <strong>💡 ポイント：</strong>あなたが行うのは<strong>「指示」と「確認」</strong>の2つだけ！
+    Claude Code にブラウザで指示を出せば、コード作成 → push → 自動マージ → ビルド → デプロイまで全て自動で進みます。
+    Windows 通知が届いたら Revit を起動してテストするだけ。コードは一行も書く必要がありません。
   </div>
 
   <!-- Footer -->
