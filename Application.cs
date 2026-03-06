@@ -23,6 +23,7 @@ namespace Tools28
                 CreateThreeDViewPanel(application, tabName, assemblyPath);
                 CreateViewPanel(application, tabName, assemblyPath);
                 CreateDetailPanel(application, tabName, assemblyPath);
+                CreateStructuralPanel(application, tabName, assemblyPath);
 
                 return Result.Succeeded;
             }
@@ -212,6 +213,24 @@ namespace Tools28
             filledRegionButtonData.ToolTip = "配置されている塗潰領域を分割/統合します";
             filledRegionButtonData.LargeImage = LoadImage("filled_region_32.png");
             panel.AddItem(filledRegionButtonData);
+        }
+
+        /// <summary>
+        /// 構造パネルを作成
+        /// </summary>
+        private void CreateStructuralPanel(UIControlledApplication application, string tabName, string assemblyPath)
+        {
+            RibbonPanel panel = application.CreateRibbonPanel(tabName, "構造");
+
+            // 梁下端色分けボタン
+            PushButtonData beamUnderLevelButtonData = new PushButtonData(
+                "BeamUnderLevel",
+                "梁下端\n色分け",
+                assemblyPath,
+                "Tools28.Commands.BeamUnderLevel.BeamUnderLevelCommand");
+            beamUnderLevelButtonData.ToolTip = "天井伏図の梁下端レベルを自動算出し、レベル別に色分け表示します";
+            beamUnderLevelButtonData.LargeImage = LoadImage("beam_under_level_32.png");
+            panel.AddItem(beamUnderLevelButtonData);
         }
 
         /// <summary>
