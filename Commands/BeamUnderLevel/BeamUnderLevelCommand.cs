@@ -80,15 +80,15 @@ namespace Tools28.Commands.BeamUnderLevel
                     return Result.Cancelled;
                 }
 
-                // 下位レベル候補（参照レベルより低い）
-                var lowerLevels = allLevels
-                    .Where(l => l.Elevation < refLevel.Elevation)
+                // 基準レベル候補（参照レベル以下のレベル）
+                var baseLevels = allLevels
+                    .Where(l => l.Elevation <= refLevel.Elevation)
                     .OrderByDescending(l => l.Elevation)
                     .ToList();
 
-                if (lowerLevels.Count == 0)
+                if (baseLevels.Count == 0)
                 {
-                    TaskDialog.Show("エラー", "参照レベルより下のレベルが見つかりません。");
+                    TaskDialog.Show("エラー", "基準レベルの候補が見つかりません。");
                     return Result.Cancelled;
                 }
 
@@ -106,8 +106,8 @@ namespace Tools28.Commands.BeamUnderLevel
                     ViewName = activeView.Name,
                     BeamCount = beams.Count,
                     RefLevel = refLevel,
-                    LowerLevels = lowerLevels,
-                    DefaultLowerLevel = lowerLevels.First(),
+                    LowerLevels = baseLevels,
+                    DefaultLowerLevel = baseLevels.First(),
                     BeamsByFamily = beamsByFamily,
                     ParamCandidates = paramCandidates
                 };
