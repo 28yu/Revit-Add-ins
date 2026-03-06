@@ -58,6 +58,7 @@ namespace Tools28.Commands.BeamUnderLevel
                 BindingMap bindingMap = doc.ParameterBindings;
 
                 // 各パラメータを作成・バインド
+                // SpecTypeId / GroupTypeId は Revit 2021+ で使用可能
                 CreateAndBindTextParameter(defGroup, bindingMap, binding, ParamRefLevel);
                 CreateAndBindLengthParameter(defGroup, bindingMap, binding, ParamLevelDiff);
                 CreateAndBindTextParameter(defGroup, bindingMap, binding, ParamDisplay);
@@ -147,11 +148,8 @@ namespace Tools28.Commands.BeamUnderLevel
             Definition definition = defGroup.Definitions.get_Item(paramName);
             if (definition == null)
             {
-#if REVIT2024 || REVIT2025 || REVIT2026
+                // SpecTypeId.String.Text は Revit 2021+ で使用可能
                 var options = new ExternalDefinitionCreationOptions(paramName, SpecTypeId.String.Text);
-#else
-                var options = new ExternalDefinitionCreationOptions(paramName, ParameterType.Text);
-#endif
                 options.Visible = true;
                 definition = defGroup.Definitions.Create(options);
             }
@@ -168,11 +166,8 @@ namespace Tools28.Commands.BeamUnderLevel
             Definition definition = defGroup.Definitions.get_Item(paramName);
             if (definition == null)
             {
-#if REVIT2024 || REVIT2025 || REVIT2026
+                // SpecTypeId.Length は Revit 2021+ で使用可能
                 var options = new ExternalDefinitionCreationOptions(paramName, SpecTypeId.Length);
-#else
-                var options = new ExternalDefinitionCreationOptions(paramName, ParameterType.Length);
-#endif
                 options.Visible = true;
                 definition = defGroup.Definitions.Create(options);
             }
@@ -187,11 +182,9 @@ namespace Tools28.Commands.BeamUnderLevel
         {
             if (!bindingMap.Contains(definition))
             {
-#if REVIT2024 || REVIT2025 || REVIT2026
-                bindingMap.Insert(definition, binding, GroupTypeId.StructuralAnalysis);
-#else
-                bindingMap.Insert(definition, binding, BuiltInParameterGroup.PG_STRUCTURAL);
-#endif
+                // GroupTypeId は Revit 2024+ で使用可能
+                // BindingMap.Insert(Definition, Binding) の2引数版は全バージョンで使用可能
+                bindingMap.Insert(definition, binding);
             }
         }
 

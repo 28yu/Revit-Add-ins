@@ -222,11 +222,8 @@ namespace Tools28.Commands.BeamUnderLevel
         /// </summary>
         public static double FeetToMm(double feet)
         {
-#if REVIT2022 || REVIT2023
-            return UnitUtils.ConvertFromInternalUnits(feet, DisplayUnitType.DUT_MILLIMETERS);
-#else
+            // UnitTypeId.Millimeters は Revit 2021+ で使用可能
             return UnitUtils.ConvertFromInternalUnits(feet, UnitTypeId.Millimeters);
-#endif
         }
 
         /// <summary>
@@ -234,11 +231,7 @@ namespace Tools28.Commands.BeamUnderLevel
         /// </summary>
         public static double MmToFeet(double mm)
         {
-#if REVIT2022 || REVIT2023
-            return UnitUtils.ConvertToInternalUnits(mm, DisplayUnitType.DUT_MILLIMETERS);
-#else
             return UnitUtils.ConvertToInternalUnits(mm, UnitTypeId.Millimeters);
-#endif
         }
     }
 }
