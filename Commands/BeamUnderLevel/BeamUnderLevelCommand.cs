@@ -4,6 +4,7 @@ using System.Linq;
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using RevitApp = Autodesk.Revit.ApplicationServices.Application;
 
 namespace Tools28.Commands.BeamUnderLevel
 {
@@ -172,7 +173,8 @@ namespace Tools28.Commands.BeamUnderLevel
                     trans.Start();
 
                     // 共有パラメータの作成・バインド
-                    ParameterManager.EnsureSharedParameters(doc, uiapp.Application);
+                    RevitApp revitApp = uiapp.Application;
+                    ParameterManager.EnsureSharedParameters(doc, revitApp);
 
                     // 梁への値書き込み
                     foreach (var beam in beams)

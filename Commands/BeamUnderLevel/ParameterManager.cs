@@ -2,7 +2,7 @@ using System;
 using System.IO;
 using System.Text;
 using Autodesk.Revit.DB;
-using Autodesk.Revit.ApplicationServices;
+using RevitApp = Autodesk.Revit.ApplicationServices.Application;
 
 namespace Tools28.Commands.BeamUnderLevel
 {
@@ -23,7 +23,7 @@ namespace Tools28.Commands.BeamUnderLevel
         /// <summary>
         /// 共有パラメータが存在することを確認し、なければ作成・バインドする
         /// </summary>
-        public static void EnsureSharedParameters(Document doc, Application app)
+        public static void EnsureSharedParameters(Document doc, RevitApp app)
         {
             // 既にバインド済みか確認
             if (IsParameterBound(doc, ParamDisplay))
@@ -147,7 +147,7 @@ namespace Tools28.Commands.BeamUnderLevel
             Definition definition = defGroup.Definitions.get_Item(paramName);
             if (definition == null)
             {
-#if REVIT2025 || REVIT2026
+#if REVIT2024 || REVIT2025 || REVIT2026
                 var options = new ExternalDefinitionCreationOptions(paramName, SpecTypeId.String.Text);
 #else
                 var options = new ExternalDefinitionCreationOptions(paramName, ParameterType.Text);
@@ -168,7 +168,7 @@ namespace Tools28.Commands.BeamUnderLevel
             Definition definition = defGroup.Definitions.get_Item(paramName);
             if (definition == null)
             {
-#if REVIT2025 || REVIT2026
+#if REVIT2024 || REVIT2025 || REVIT2026
                 var options = new ExternalDefinitionCreationOptions(paramName, SpecTypeId.Length);
 #else
                 var options = new ExternalDefinitionCreationOptions(paramName, ParameterType.Length);
@@ -187,7 +187,7 @@ namespace Tools28.Commands.BeamUnderLevel
         {
             if (!bindingMap.Contains(definition))
             {
-#if REVIT2025 || REVIT2026
+#if REVIT2024 || REVIT2025 || REVIT2026
                 bindingMap.Insert(definition, binding, GroupTypeId.StructuralAnalysis);
 #else
                 bindingMap.Insert(definition, binding, BuiltInParameterGroup.PG_STRUCTURAL);

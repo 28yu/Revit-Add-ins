@@ -332,9 +332,9 @@ namespace Tools28.Commands.BeamUnderLevel
         {
             _currentStep = step;
 
-            Step1Panel.Visibility = step == 1 ? Visibility.Visible : Visibility.Collapsed;
-            Step2Panel.Visibility = step == 2 ? Visibility.Visible : Visibility.Collapsed;
-            Step3Panel.Visibility = step == 3 ? Visibility.Visible : Visibility.Collapsed;
+            Step1Panel.Visibility = step == 1 ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+            Step2Panel.Visibility = step == 2 ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+            Step3Panel.Visibility = step == 3 ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
 
             BackButton.IsEnabled = step > 1;
             NextButton.Content = step == TotalSteps ? "実行" : "次へ";

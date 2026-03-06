@@ -76,12 +76,12 @@ namespace Tools28.Commands.BeamUnderLevel
                         continue;
 
                     // フィルタルール: 梁下_表示 == displayValue
-#if REVIT2025 || REVIT2026
+#if REVIT2022
                     FilterRule rule = ParameterFilterRuleFactory.CreateEqualsRule(
                         paramId, displayValue, false);
 #else
                     FilterRule rule = ParameterFilterRuleFactory.CreateEqualsRule(
-                        paramId, displayValue, false);
+                        paramId, displayValue);
 #endif
 
                     ElementParameterFilter paramFilter =
@@ -145,12 +145,12 @@ namespace Tools28.Commands.BeamUnderLevel
                     return;
 
                 // ルール: 梁下_エラー != ""
-#if REVIT2025 || REVIT2026
+#if REVIT2022
                 FilterRule errorRule = ParameterFilterRuleFactory.CreateNotEqualsRule(
                     errorParamId, "", false);
 #else
                 FilterRule errorRule = ParameterFilterRuleFactory.CreateNotEqualsRule(
-                    errorParamId, "", false);
+                    errorParamId, "");
 #endif
 
                 ElementParameterFilter errorFilter =

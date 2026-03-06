@@ -222,10 +222,10 @@ namespace Tools28.Commands.BeamUnderLevel
         /// </summary>
         public static double FeetToMm(double feet)
         {
-#if REVIT2025 || REVIT2026
-            return UnitUtils.ConvertFromInternalUnits(feet, UnitTypeId.Millimeters);
-#else
+#if REVIT2022 || REVIT2023
             return UnitUtils.ConvertFromInternalUnits(feet, DisplayUnitType.DUT_MILLIMETERS);
+#else
+            return UnitUtils.ConvertFromInternalUnits(feet, UnitTypeId.Millimeters);
 #endif
         }
 
@@ -234,10 +234,10 @@ namespace Tools28.Commands.BeamUnderLevel
         /// </summary>
         public static double MmToFeet(double mm)
         {
-#if REVIT2025 || REVIT2026
-            return UnitUtils.ConvertToInternalUnits(mm, UnitTypeId.Millimeters);
-#else
+#if REVIT2022 || REVIT2023
             return UnitUtils.ConvertToInternalUnits(mm, DisplayUnitType.DUT_MILLIMETERS);
+#else
+            return UnitUtils.ConvertToInternalUnits(mm, UnitTypeId.Millimeters);
 #endif
         }
     }
