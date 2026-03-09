@@ -1,4 +1,4 @@
-# Tools28 - 自動デプロイ環境セットアップ
+﻿# Tools28 - 自動デプロイ環境セットアップ
 # 使用方法:
 #   .\SetupAutoDeploy.ps1            # AutoBuild監視をタスクスケジューラに登録
 #   .\SetupAutoDeploy.ps1 -Remove    # タスクの登録解除
