@@ -80,15 +80,15 @@ namespace Tools28.Commands.BeamUnderLevel
                     return Result.Cancelled;
                 }
 
-                // 基準レベル候補（参照レベル以下のレベル）
-                var baseLevels = allLevels
-                    .Where(l => l.Elevation <= refLevel.Elevation)
-                    .OrderByDescending(l => l.Elevation)
+                // 上位レベル候補（参照レベルより上のレベル）
+                var upperLevels = allLevels
+                    .Where(l => l.Elevation > refLevel.Elevation)
+                    .OrderBy(l => l.Elevation)
                     .ToList();
 
-                if (baseLevels.Count == 0)
+                if (upperLevels.Count == 0)
                 {
-                    TaskDialog.Show("エラー", "基準レベルの候補が見つかりません。");
+                    TaskDialog.Show("エラー", "参照レベルより上のレベルが見つかりません。");
                     return Result.Cancelled;
                 }
 
@@ -106,8 +106,8 @@ namespace Tools28.Commands.BeamUnderLevel
                     ViewName = activeView.Name,
                     BeamCount = beams.Count,
                     RefLevel = refLevel,
-                    LowerLevels = baseLevels,
-                    DefaultLowerLevel = baseLevels.First(),
+                    LowerLevels = upperLevels,
+                    DefaultLowerLevel = upperLevels.First(),
                     BeamsByFamily = beamsByFamily,
                     ParamCandidates = paramCandidates
                 };
@@ -129,8 +129,8 @@ namespace Tools28.Commands.BeamUnderLevel
                 var failedBeams = new List<string>();
                 var calculationResults = new Dictionary<ElementId, BeamCalculationResult>();
 
-                // 階高計算
-                double floorHeight = refLevel.Elevation - selectedLowerLevel.Elevation;
+                // 階高計算（上位レベル - 参照レベル）
+                double floorHeight = selectedLowerLevel.Elevation - refLevel.Elevation;
 
                 // 各梁の計算
                 foreach (var beam in beams)
@@ -149,7 +149,7 @@ namespace Tools28.Commands.BeamUnderLevel
                     }
 
                     var result = BeamCalculator.Calculate(beam, floorHeight,
-                        selectedLowerLevel.Name, familyParamSelection[familyName]);
+                        refLevel.Name, familyParamSelection[familyName]);
                     calculationResults[beam.Id] = result;
 
                     if (result.Success)

@@ -48,7 +48,7 @@ namespace Tools28.Commands.BeamUnderLevel
             double refElevMm = BeamCalculator.FeetToMm(_data.RefLevel.Elevation);
             RefLevelText.Text = $"{_data.RefLevel.Name} ({refElevMm:+0;-0}mm)";
 
-            // 下位レベルドロップダウン
+            // 上位レベルドロップダウン
             var levelItems = _data.LowerLevels
                 .Select(l => new LevelItem(l))
                 .ToList();
@@ -75,7 +75,7 @@ namespace Tools28.Commands.BeamUnderLevel
             var selectedItem = LowerLevelComboBox.SelectedItem as LevelItem;
             if (selectedItem != null)
             {
-                double floorHeightFeet = _data.RefLevel.Elevation - selectedItem.Level.Elevation;
+                double floorHeightFeet = selectedItem.Level.Elevation - _data.RefLevel.Elevation;
                 double floorHeightMm = BeamCalculator.FeetToMm(floorHeightFeet);
                 FloorHeightText.Text = $"{floorHeightMm:0}mm";
                 SelectedLowerLevel = selectedItem.Level;
@@ -294,9 +294,9 @@ namespace Tools28.Commands.BeamUnderLevel
                 $"ファミリ数: {_data.BeamsByFamily.Count}\n\n";
 
             summary += $"参照レベル: {_data.RefLevel.Name}\n";
-            summary += $"下位レベル: {SelectedLowerLevel.Name}\n";
+            summary += $"上位レベル: {SelectedLowerLevel.Name}\n";
             double floorHeightMm = BeamCalculator.FeetToMm(
-                _data.RefLevel.Elevation - SelectedLowerLevel.Elevation);
+                SelectedLowerLevel.Elevation - _data.RefLevel.Elevation);
             summary += $"階高: {floorHeightMm:0}mm\n\n";
 
             summary += "ファミリ別パラメータ:\n";
@@ -350,7 +350,7 @@ namespace Tools28.Commands.BeamUnderLevel
                 // バリデーション
                 if (SelectedLowerLevel == null)
                 {
-                    MessageBox.Show("下位レベルを選択してください。", "入力エラー",
+                    MessageBox.Show("上位レベルを選択してください。", "入力エラー",
                         MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }

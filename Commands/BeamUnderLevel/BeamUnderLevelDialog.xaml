@@ -209,7 +209,7 @@
                                        x:Name="RefLevelText" VerticalAlignment="Center"/>
 
                             <TextBlock Grid.Row="2" Grid.Column="0" Style="{StaticResource LabelStyle}"
-                                       Text="下位レベル:" VerticalAlignment="Center"/>
+                                       Text="上位レベル:" VerticalAlignment="Center"/>
                             <ComboBox Grid.Row="2" Grid.Column="1"
                                       x:Name="LowerLevelComboBox"
                                       Style="{StaticResource ComboBoxStyle}"
@@ -221,7 +221,7 @@
                                        x:Name="FloorHeightText" VerticalAlignment="Center"/>
                         </Grid>
                         <TextBlock Style="{StaticResource NoteStyle}"
-                                   Text="※ 下位レベルを基準として梁下端レベルを算出します"/>
+                                   Text="※ 参照レベルを基準として梁下端レベルを算出します"/>
                     </StackPanel>
                 </Border>
             </Grid>
