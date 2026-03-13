@@ -135,6 +135,9 @@ namespace Tools28.Commands.BeamUnderLevel
                 var failedBeams = new List<string>();
                 var calculationResults = new Dictionary<ElementId, BeamCalculationResult>();
 
+                // 階高計算（上位レベル - 参照レベル）
+                double floorHeight = selectedLowerLevel.Elevation - refLevel.Elevation;
+
                 // 各梁の計算
                 foreach (var beam in beams)
                 {
@@ -152,7 +155,7 @@ namespace Tools28.Commands.BeamUnderLevel
                         continue;
                     }
 
-                    var result = BeamCalculator.Calculate(beam,
+                    var result = BeamCalculator.Calculate(beam, floorHeight,
                         refLevel.Name, familyParamSelection[familyName],
                         familyTopLevelParamSelection[familyName]);
                     calculationResults[beam.Id] = result;
