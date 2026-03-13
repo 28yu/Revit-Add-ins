@@ -268,22 +268,22 @@ namespace Tools28.Commands.BeamUnderLevel
         }
 
         /// <summary>
-        /// 色パレット生成（落ち着いた色合い）
+        /// 色パレット生成（明るく見やすい色合い、暗い色は使用しない）
         /// </summary>
         private static List<Color> GenerateColors(int colorCount)
         {
             var baseColors = new[]
             {
-                new { R = 144, G = 175, B = 197 },  // mist
-                new { R = 51,  G = 107, B = 135 },  // stone
-                new { R = 118, G = 54,  B = 38  },  // autumn
-                new { R = 42,  G = 49,  B = 50  },  // shadow
-                new { R = 173, G = 145, B = 98  },  // sand
-                new { R = 99,  G = 121, B = 97  },  // sage
-                new { R = 128, G = 101, B = 117 },  // mauve
-                new { R = 139, G = 117, B = 91  },  // taupe
-                new { R = 147, G = 112, B = 99  },  // dust
-                new { R = 119, G = 136, B = 153 },  // slate
+                new { R = 144, G = 175, B = 197 },  // mist blue
+                new { R = 165, G = 196, B = 152 },  // sage green
+                new { R = 210, G = 165, B = 120 },  // warm sand
+                new { R = 180, G = 150, B = 180 },  // soft mauve
+                new { R = 120, G = 180, B = 190 },  // teal
+                new { R = 200, G = 160, B = 150 },  // rose beige
+                new { R = 160, G = 185, B = 130 },  // leaf green
+                new { R = 185, G = 170, B = 140 },  // light taupe
+                new { R = 150, G = 170, B = 200 },  // periwinkle
+                new { R = 200, G = 185, B = 150 },  // wheat
             };
 
             var colors = new List<Color>();
