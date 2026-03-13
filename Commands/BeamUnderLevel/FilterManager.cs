@@ -226,18 +226,10 @@ namespace Tools28.Commands.BeamUnderLevel
 
             if (solidFillPatternId != null)
             {
-                // 投影サーフェス（前景）
+                // 投影サーフェス（前景）のみ
                 overrides.SetSurfaceForegroundPatternId(solidFillPatternId);
                 overrides.SetSurfaceForegroundPatternColor(color);
-
-                // 断面パターン（前景） - 梁が切断面にかかる場合
-                overrides.SetCutForegroundPatternId(solidFillPatternId);
-                overrides.SetCutForegroundPatternColor(color);
             }
-
-            // 投影線・断面線の色
-            overrides.SetProjectionLineColor(color);
-            overrides.SetCutLineColor(color);
 
             return overrides;
         }
