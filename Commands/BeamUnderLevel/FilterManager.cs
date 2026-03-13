@@ -93,15 +93,10 @@ namespace Tools28.Commands.BeamUnderLevel
                     // ビューにフィルタを追加
                     activeView.AddFilter(filterElement.Id);
 
-                    // 色を設定（サーフェスパターン塗り潰し + 投影線）
+                    // 色を設定（全グラフィック上書き）
                     Color color = colors[colorIndex];
-                    OverrideGraphicSettings overrides = new OverrideGraphicSettings();
-                    if (solidFillPatternId != null)
-                    {
-                        overrides.SetSurfaceForegroundPatternId(solidFillPatternId);
-                        overrides.SetSurfaceForegroundPatternColor(color);
-                    }
-                    overrides.SetProjectionLineColor(color);
+                    OverrideGraphicSettings overrides = CreateColorOverrides(
+                        color, solidFillPatternId);
 
                     activeView.SetFilterOverrides(filterElement.Id, overrides);
                 }
@@ -159,16 +154,11 @@ namespace Tools28.Commands.BeamUnderLevel
 
                 activeView.AddFilter(errorFilterElement.Id);
 
-                // エラー梁は赤で表示（サーフェスパターン塗り潰し + 投影線）
+                // エラー梁は赤で表示（全グラフィック上書き）
                 Color errorColor = new Color(255, 100, 100);
-                OverrideGraphicSettings errorOverrides = new OverrideGraphicSettings();
                 ElementId solidFillId = GetSolidFillPatternId(doc);
-                if (solidFillId != null)
-                {
-                    errorOverrides.SetSurfaceForegroundPatternId(solidFillId);
-                    errorOverrides.SetSurfaceForegroundPatternColor(errorColor);
-                }
-                errorOverrides.SetProjectionLineColor(errorColor);
+                OverrideGraphicSettings errorOverrides = CreateColorOverrides(
+                    errorColor, solidFillId);
 
                 activeView.SetFilterOverrides(errorFilterElement.Id, errorOverrides);
             }
@@ -223,6 +213,33 @@ namespace Tools28.Commands.BeamUnderLevel
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// 色によるグラフィック上書き設定を生成
+        /// 投影サーフェス、断面パターン、投影線すべてに色を適用
+        /// </summary>
+        private static OverrideGraphicSettings CreateColorOverrides(
+            Color color, ElementId solidFillPatternId)
+        {
+            var overrides = new OverrideGraphicSettings();
+
+            if (solidFillPatternId != null)
+            {
+                // 投影サーフェス（前景）
+                overrides.SetSurfaceForegroundPatternId(solidFillPatternId);
+                overrides.SetSurfaceForegroundPatternColor(color);
+
+                // 断面パターン（前景） - 梁が切断面にかかる場合
+                overrides.SetCutForegroundPatternId(solidFillPatternId);
+                overrides.SetCutForegroundPatternColor(color);
+            }
+
+            // 投影線・断面線の色
+            overrides.SetProjectionLineColor(color);
+            overrides.SetCutLineColor(color);
+
+            return overrides;
         }
 
         /// <summary>
