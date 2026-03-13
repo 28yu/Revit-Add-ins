@@ -38,6 +38,16 @@ namespace Tools28.Commands.BeamUnderLevel
             "b", "厚さ", "width", "幅", "Height"
         };
 
+        // 梁天端レベルパラメータの検索候補（優先度順）
+        private static readonly string[] TopLevelParamNames = new[]
+        {
+            "始端レベル オフセット", "終端レベル オフセット",
+            "始端レベルオフセット", "終端レベルオフセット",
+            "Start Level Offset", "End Level Offset",
+            "天端レベル", "Top Level", "Top Offset",
+            "レベルからのオフセット値", "Offset from Level"
+        };
+
         /// <summary>
         /// ファミリ毎に梁高さパラメータ候補を検索
         /// </summary>
@@ -107,19 +117,94 @@ namespace Tools28.Commands.BeamUnderLevel
         }
 
         /// <summary>
+        /// ファミリ毎に梁天端レベルパラメータ候補を検索
+        /// </summary>
+        public static Dictionary<string, List<ParamCandidate>> FindTopLevelParameterCandidates(
+            Dictionary<string, List<FamilyInstance>> beamsByFamily)
+        {
+            var result = new Dictionary<string, List<ParamCandidate>>();
+
+            foreach (var entry in beamsByFamily)
+            {
+                string familyName = entry.Key;
+                var beamList = entry.Value;
+                var candidates = new List<ParamCandidate>();
+
+                // BuiltInParameter で検索（始端/終端レベルオフセット）
+                var builtInParams = new[]
+                {
+                    new { Param = BuiltInParameter.STRUCTURAL_BEAM_END0_ELEVATION, Name = "始端レベル オフセット" },
+                    new { Param = BuiltInParameter.STRUCTURAL_BEAM_END1_ELEVATION, Name = "終端レベル オフセット" }
+                };
+
+                foreach (var bip in builtInParams)
+                {
+                    int detectedCount = 0;
+                    foreach (var beam in beamList)
+                    {
+                        Parameter param = beam.get_Parameter(bip.Param);
+                        if (param != null && param.HasValue)
+                            detectedCount++;
+                    }
+
+                    if (detectedCount > 0)
+                    {
+                        candidates.Add(new ParamCandidate
+                        {
+                            ParamName = bip.Name,
+                            DetectedCount = detectedCount
+                        });
+                    }
+                }
+
+                // 名前で検索
+                foreach (string paramName in TopLevelParamNames)
+                {
+                    if (candidates.Any(c => c.ParamName == paramName))
+                        continue;
+
+                    int detectedCount = 0;
+                    foreach (var beam in beamList)
+                    {
+                        Parameter param = beam.LookupParameter(paramName);
+                        if (param != null && param.HasValue &&
+                            param.StorageType == StorageType.Double)
+                        {
+                            detectedCount++;
+                        }
+                    }
+
+                    if (detectedCount > 0)
+                    {
+                        candidates.Add(new ParamCandidate
+                        {
+                            ParamName = paramName,
+                            DetectedCount = detectedCount
+                        });
+                    }
+                }
+
+                result[familyName] = candidates;
+            }
+
+            return result;
+        }
+
+        /// <summary>
         /// 梁下端レベルを計算
-        /// 計算式: 梁下端レベル = 階高 - 始端レベルオフセット - 梁高さ
+        /// 計算式: 梁下端レベル = 階高 - 梁天端レベル - 梁高さ
         /// </summary>
         public static BeamCalculationResult Calculate(
             FamilyInstance beam,
             double floorHeight,
-            string lowerLevelName,
-            string heightParamName)
+            string refLevelName,
+            string heightParamName,
+            string topLevelParamName)
         {
             try
             {
-                // 1. 始端レベルオフセットを取得
-                double offset = GetStartLevelOffset(beam);
+                // 1. 梁天端レベル（オフセット）を取得
+                double topLevel = GetBeamTopLevel(beam, topLevelParamName);
 
                 // 2. 梁高さを取得
                 double beamHeight = GetBeamHeight(beam, heightParamName);
@@ -133,18 +218,18 @@ namespace Tools28.Commands.BeamUnderLevel
                 }
 
                 // 3. 梁下端レベルを計算（フィート単位）
-                double bottomLevel = floorHeight - offset - beamHeight;
+                double bottomLevel = floorHeight - topLevel - beamHeight;
 
                 // 4. mm単位に変換して表示形式を生成
                 double bottomLevelMm = Math.Round(FeetToMm(bottomLevel));
 
                 string sign = bottomLevelMm >= 0 ? "+" : "";
-                string displayValue = $"{lowerLevelName}{sign}{bottomLevelMm:0}";
+                string displayValue = $"{refLevelName}{sign}{bottomLevelMm:0}";
 
                 return new BeamCalculationResult
                 {
                     Success = true,
-                    RefLevelName = lowerLevelName,
+                    RefLevelName = refLevelName,
                     LevelDifference = bottomLevel,
                     DisplayValue = displayValue
                 };
@@ -160,30 +245,32 @@ namespace Tools28.Commands.BeamUnderLevel
         }
 
         /// <summary>
-        /// 始端レベルオフセットを取得
+        /// 梁天端レベル（オフセット）を取得
         /// </summary>
-        private static double GetStartLevelOffset(FamilyInstance beam)
+        private static double GetBeamTopLevel(FamilyInstance beam, string paramName)
         {
-            // BuiltInParameter で取得を試行
-            Parameter offsetParam = beam.get_Parameter(
-                BuiltInParameter.STRUCTURAL_BEAM_END0_ELEVATION);
-            if (offsetParam != null && offsetParam.HasValue)
-                return offsetParam.AsDouble();
-
-            // 名前で検索（日本語/英語）
-            string[] offsetParamNames = new[]
+            // BuiltInParameter で取得を試行（始端/終端レベルオフセット）
+            if (paramName == "始端レベル オフセット" || paramName == "始端レベルオフセット" ||
+                paramName == "Start Level Offset")
             {
-                "始端レベル オフセット",
-                "Start Level Offset",
-                "始端レベルオフセット"
-            };
-
-            foreach (string name in offsetParamNames)
-            {
-                Parameter param = beam.LookupParameter(name);
-                if (param != null && param.HasValue)
-                    return param.AsDouble();
+                Parameter bipParam = beam.get_Parameter(
+                    BuiltInParameter.STRUCTURAL_BEAM_END0_ELEVATION);
+                if (bipParam != null && bipParam.HasValue)
+                    return bipParam.AsDouble();
             }
+            else if (paramName == "終端レベル オフセット" || paramName == "終端レベルオフセット" ||
+                     paramName == "End Level Offset")
+            {
+                Parameter bipParam = beam.get_Parameter(
+                    BuiltInParameter.STRUCTURAL_BEAM_END1_ELEVATION);
+                if (bipParam != null && bipParam.HasValue)
+                    return bipParam.AsDouble();
+            }
+
+            // 名前で検索
+            Parameter param = beam.LookupParameter(paramName);
+            if (param != null && param.HasValue && param.StorageType == StorageType.Double)
+                return param.AsDouble();
 
             return 0;
         }

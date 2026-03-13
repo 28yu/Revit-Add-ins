@@ -99,6 +99,7 @@ namespace Tools28.Commands.BeamUnderLevel
 
                 // ファミリ毎のパラメータ候補を検索
                 var paramCandidates = BeamCalculator.FindHeightParameterCandidates(beamsByFamily);
+                var topLevelParamCandidates = BeamCalculator.FindTopLevelParameterCandidates(beamsByFamily);
 
                 // ダイアログ表示
                 var dialogData = new BeamUnderLevelDialogData
@@ -109,7 +110,8 @@ namespace Tools28.Commands.BeamUnderLevel
                     LowerLevels = upperLevels,
                     DefaultLowerLevel = upperLevels.First(),
                     BeamsByFamily = beamsByFamily,
-                    ParamCandidates = paramCandidates
+                    ParamCandidates = paramCandidates,
+                    TopLevelParamCandidates = topLevelParamCandidates
                 };
 
                 var dialog = new BeamUnderLevelDialog(dialogData);
@@ -121,6 +123,7 @@ namespace Tools28.Commands.BeamUnderLevel
                 // ダイアログから設定を取得
                 Level selectedLowerLevel = dialog.SelectedLowerLevel;
                 Dictionary<string, string> familyParamSelection = dialog.FamilyParamSelection;
+                Dictionary<string, string> familyTopLevelParamSelection = dialog.FamilyTopLevelParamSelection;
                 bool overwriteExisting = dialog.OverwriteExistingFilters;
 
                 // 処理実行
@@ -136,12 +139,13 @@ namespace Tools28.Commands.BeamUnderLevel
                 foreach (var beam in beams)
                 {
                     string familyName = beam.Symbol.Family.Name;
-                    if (!familyParamSelection.ContainsKey(familyName))
+                    if (!familyParamSelection.ContainsKey(familyName) ||
+                        !familyTopLevelParamSelection.ContainsKey(familyName))
                     {
                         calculationResults[beam.Id] = new BeamCalculationResult
                         {
                             Success = false,
-                            Error = "梁高さパラメータが未選択"
+                            Error = "パラメータが未選択"
                         };
                         failureCount++;
                         failedBeams.Add($"ID:{beam.Id} ({familyName}) - パラメータ未選択");
@@ -149,7 +153,8 @@ namespace Tools28.Commands.BeamUnderLevel
                     }
 
                     var result = BeamCalculator.Calculate(beam, floorHeight,
-                        refLevel.Name, familyParamSelection[familyName]);
+                        refLevel.Name, familyParamSelection[familyName],
+                        familyTopLevelParamSelection[familyName]);
                     calculationResults[beam.Id] = result;
 
                     if (result.Success)

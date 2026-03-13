@@ -244,8 +244,26 @@
                 </ScrollViewer>
             </Grid>
 
-            <!-- ステップ3: 確認・実行 -->
+            <!-- ステップ3: 梁天端レベルパラメータ選択 -->
             <Grid x:Name="Step3Panel" Visibility="Collapsed">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <StackPanel Grid.Row="0" Margin="0,0,0,10">
+                    <TextBlock Style="{StaticResource SectionHeader}" Text="梁天端レベルパラメータ選択"/>
+                    <TextBlock Style="{StaticResource NoteStyle}"
+                               Text="※ ファミリ毎に梁天端レベル（参照レベルからのオフセット）として使用するパラメータを選択してください"/>
+                </StackPanel>
+
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                    <StackPanel x:Name="FamilyTopLevelParamPanel"/>
+                </ScrollViewer>
+            </Grid>
+
+            <!-- ステップ4: 確認・実行 -->
+            <Grid x:Name="Step4Panel" Visibility="Collapsed">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
