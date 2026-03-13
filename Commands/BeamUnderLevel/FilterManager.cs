@@ -93,7 +93,7 @@ namespace Tools28.Commands.BeamUnderLevel
                     // ビューにフィルタを追加
                     activeView.AddFilter(filterElement.Id);
 
-                    // 色を設定（サーフェスパターン塗り潰し）
+                    // 色を設定（サーフェスパターン塗り潰し + 投影線）
                     Color color = colors[colorIndex];
                     OverrideGraphicSettings overrides = new OverrideGraphicSettings();
                     if (solidFillPatternId != null)
@@ -101,6 +101,7 @@ namespace Tools28.Commands.BeamUnderLevel
                         overrides.SetSurfaceForegroundPatternId(solidFillPatternId);
                         overrides.SetSurfaceForegroundPatternColor(color);
                     }
+                    overrides.SetProjectionLineColor(color);
 
                     activeView.SetFilterOverrides(filterElement.Id, overrides);
                 }
@@ -158,14 +159,16 @@ namespace Tools28.Commands.BeamUnderLevel
 
                 activeView.AddFilter(errorFilterElement.Id);
 
-                // エラー梁は赤で表示（サーフェスパターン塗り潰し）
+                // エラー梁は赤で表示（サーフェスパターン塗り潰し + 投影線）
+                Color errorColor = new Color(255, 100, 100);
                 OverrideGraphicSettings errorOverrides = new OverrideGraphicSettings();
                 ElementId solidFillId = GetSolidFillPatternId(doc);
                 if (solidFillId != null)
                 {
                     errorOverrides.SetSurfaceForegroundPatternId(solidFillId);
-                    errorOverrides.SetSurfaceForegroundPatternColor(new Color(255, 100, 100));
+                    errorOverrides.SetSurfaceForegroundPatternColor(errorColor);
                 }
+                errorOverrides.SetProjectionLineColor(errorColor);
 
                 activeView.SetFilterOverrides(errorFilterElement.Id, errorOverrides);
             }
