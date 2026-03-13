@@ -76,8 +76,9 @@ namespace Tools28.Commands.BeamUnderLevel
                         continue;
 
                     // フィルタルール: 梁下_表示 == displayValue
+                    // 3引数版はRevit 2021+全バージョンで使用可能
                     FilterRule rule = ParameterFilterRuleFactory.CreateEqualsRule(
-                        paramId, displayValue);
+                        paramId, displayValue, false);
 
                     ElementParameterFilter paramFilter =
                         new ElementParameterFilter(rule);
@@ -141,7 +142,7 @@ namespace Tools28.Commands.BeamUnderLevel
 
                 // ルール: 梁下_エラー != ""
                 FilterRule errorRule = ParameterFilterRuleFactory.CreateNotEqualsRule(
-                    errorParamId, "");
+                    errorParamId, "", false);
 
                 ElementParameterFilter errorFilter =
                     new ElementParameterFilter(errorRule);
