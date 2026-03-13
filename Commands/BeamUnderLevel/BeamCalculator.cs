@@ -268,19 +268,18 @@ namespace Tools28.Commands.BeamUnderLevel
 
         /// <summary>
         /// 梁下端レベルを計算
-        /// 計算式: 梁下端レベル = 階高 - 梁天端レベル - 梁高さ
+        /// 計算式: 梁下端レベル = 梁天端オフセット（参照レベル基準） - 梁高さ
         /// </summary>
         public static BeamCalculationResult Calculate(
             FamilyInstance beam,
-            double floorHeight,
             string refLevelName,
             string heightParamName,
             string topLevelParamName)
         {
             try
             {
-                // 1. 梁天端レベル（オフセット）を取得
-                double topLevel = GetBeamTopLevel(beam, topLevelParamName);
+                // 1. 梁天端レベル（参照レベルからのオフセット）を取得
+                double topLevelOffset = GetBeamTopLevel(beam, topLevelParamName);
 
                 // 2. 梁高さを取得
                 double beamHeight = GetBeamHeight(beam, heightParamName);
@@ -293,8 +292,8 @@ namespace Tools28.Commands.BeamUnderLevel
                     };
                 }
 
-                // 3. 梁下端レベルを計算（フィート単位）
-                double bottomLevel = floorHeight - topLevel - beamHeight;
+                // 3. 梁下端レベルを計算（フィート単位、参照レベル基準）
+                double bottomLevel = topLevelOffset - beamHeight;
 
                 // 4. mm単位に変換して表示形式を生成
                 double bottomLevelMm = Math.Round(FeetToMm(bottomLevel));
