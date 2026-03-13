@@ -100,6 +100,8 @@ namespace Tools28.Commands.BeamUnderLevel
                 // ファミリ毎のパラメータ候補を検索
                 var paramCandidates = BeamCalculator.FindHeightParameterCandidates(beamsByFamily);
                 var topLevelParamCandidates = BeamCalculator.FindTopLevelParameterCandidates(beamsByFamily);
+                var additionalLevelParams = BeamCalculator.FindAdditionalLevelParameters(
+                    beamsByFamily, topLevelParamCandidates);
 
                 // ダイアログ表示
                 var dialogData = new BeamUnderLevelDialogData
@@ -111,7 +113,8 @@ namespace Tools28.Commands.BeamUnderLevel
                     DefaultLowerLevel = upperLevels.First(),
                     BeamsByFamily = beamsByFamily,
                     ParamCandidates = paramCandidates,
-                    TopLevelParamCandidates = topLevelParamCandidates
+                    TopLevelParamCandidates = topLevelParamCandidates,
+                    AdditionalLevelParams = additionalLevelParams
                 };
 
                 var dialog = new BeamUnderLevelDialog(dialogData);

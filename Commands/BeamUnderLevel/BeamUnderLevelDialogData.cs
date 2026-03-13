@@ -16,6 +16,7 @@ namespace Tools28.Commands.BeamUnderLevel
         public Dictionary<string, List<FamilyInstance>> BeamsByFamily { get; set; }
         public Dictionary<string, List<ParamCandidate>> ParamCandidates { get; set; }
         public Dictionary<string, List<ParamCandidate>> TopLevelParamCandidates { get; set; }
+        public Dictionary<string, List<string>> AdditionalLevelParams { get; set; }
     }
 
     /// <summary>

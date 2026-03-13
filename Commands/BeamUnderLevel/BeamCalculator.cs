@@ -191,6 +191,82 @@ namespace Tools28.Commands.BeamUnderLevel
         }
 
         /// <summary>
+        /// ファミリ毎に梁のDouble型パラメータを収集（レベル・オフセット関連に絞る）
+        /// 主要候補以外の追加パラメータ用
+        /// </summary>
+        public static Dictionary<string, List<string>> FindAdditionalLevelParameters(
+            Dictionary<string, List<FamilyInstance>> beamsByFamily,
+            Dictionary<string, List<ParamCandidate>> alreadyFound)
+        {
+            // レベル・オフセット関連のキーワード
+            string[] levelKeywords = new[]
+            {
+                "レベル", "オフセット", "天端", "上端", "下端",
+                "level", "offset", "elevation", "top", "bottom"
+            };
+
+            var result = new Dictionary<string, List<string>>();
+
+            foreach (var entry in beamsByFamily)
+            {
+                string familyName = entry.Key;
+                var beamList = entry.Value;
+                var existingNames = alreadyFound.ContainsKey(familyName)
+                    ? alreadyFound[familyName].Select(c => c.ParamName).ToHashSet()
+                    : new HashSet<string>();
+
+                var additionalParams = new HashSet<string>();
+
+                if (beamList.Count > 0)
+                {
+                    var sampleBeam = beamList[0];
+
+                    // インスタンスパラメータをスキャン
+                    foreach (Parameter param in sampleBeam.Parameters)
+                    {
+                        if (param.StorageType != StorageType.Double || !param.HasValue)
+                            continue;
+
+                        string name = param.Definition.Name;
+                        if (existingNames.Contains(name))
+                            continue;
+
+                        string nameLower = name.ToLower();
+                        if (levelKeywords.Any(kw => nameLower.Contains(kw.ToLower())))
+                        {
+                            additionalParams.Add(name);
+                        }
+                    }
+
+                    // タイプパラメータもスキャン
+                    FamilySymbol symbol = sampleBeam.Symbol;
+                    if (symbol != null)
+                    {
+                        foreach (Parameter param in symbol.Parameters)
+                        {
+                            if (param.StorageType != StorageType.Double || !param.HasValue)
+                                continue;
+
+                            string name = param.Definition.Name;
+                            if (existingNames.Contains(name) || additionalParams.Contains(name))
+                                continue;
+
+                            string nameLower = name.ToLower();
+                            if (levelKeywords.Any(kw => nameLower.Contains(kw.ToLower())))
+                            {
+                                additionalParams.Add(name);
+                            }
+                        }
+                    }
+                }
+
+                result[familyName] = additionalParams.OrderBy(n => n).ToList();
+            }
+
+            return result;
+        }
+
+        /// <summary>
         /// 梁下端レベルを計算
         /// 計算式: 梁下端レベル = 階高 - 梁天端レベル - 梁高さ
         /// </summary>

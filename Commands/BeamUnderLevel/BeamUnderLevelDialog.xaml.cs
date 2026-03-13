@@ -29,8 +29,8 @@ namespace Tools28.Commands.BeamUnderLevel
         // ファミリ毎の天端レベルパラメータ選択用
         private readonly Dictionary<string, RadioButton> _familyTopLevelCustomRadios =
             new Dictionary<string, RadioButton>();
-        private readonly Dictionary<string, TextBox> _familyTopLevelCustomTextBoxes =
-            new Dictionary<string, TextBox>();
+        private readonly Dictionary<string, ComboBox> _familyTopLevelCustomComboBoxes =
+            new Dictionary<string, ComboBox>();
 
         // 結果プロパティ
         public Level SelectedLowerLevel { get; private set; }
@@ -296,7 +296,7 @@ namespace Tools28.Commands.BeamUnderLevel
         {
             FamilyTopLevelParamPanel.Children.Clear();
             _familyTopLevelCustomRadios.Clear();
-            _familyTopLevelCustomTextBoxes.Clear();
+            _familyTopLevelCustomComboBoxes.Clear();
 
             foreach (var entry in _data.BeamsByFamily)
             {
@@ -305,6 +305,10 @@ namespace Tools28.Commands.BeamUnderLevel
                 var candidates = _data.TopLevelParamCandidates.ContainsKey(familyName)
                     ? _data.TopLevelParamCandidates[familyName]
                     : new List<ParamCandidate>();
+                var additionalParams = _data.AdditionalLevelParams != null &&
+                    _data.AdditionalLevelParams.ContainsKey(familyName)
+                    ? _data.AdditionalLevelParams[familyName]
+                    : new List<string>();
 
                 var groupBox = new Border
                 {
@@ -330,30 +334,31 @@ namespace Tools28.Commands.BeamUnderLevel
                 };
                 stackPanel.Children.Add(header);
 
-                if (candidates.Count > 0)
+                string groupName = $"toplevel_{familyName.GetHashCode()}";
+                bool firstSelected = false;
+
+                // 主要候補をラジオボタンで表示
+                foreach (var candidate in candidates.OrderByDescending(c => c.DetectedCount))
                 {
-                    string groupName = $"toplevel_{familyName.GetHashCode()}";
-                    bool firstSelected = false;
-
-                    foreach (var candidate in candidates.OrderByDescending(c => c.DetectedCount))
+                    var radio = new RadioButton
                     {
-                        var radio = new RadioButton
-                        {
-                            Content = $"{candidate.ParamName}  ({candidate.DetectedCount}梁で検出)",
-                            GroupName = groupName,
-                            Tag = candidate.ParamName,
-                            FontSize = 11,
-                            Margin = new Thickness(10, 3, 0, 3),
-                            IsChecked = !firstSelected
-                        };
+                        Content = $"{candidate.ParamName}  ({candidate.DetectedCount}梁で検出)",
+                        GroupName = groupName,
+                        Tag = candidate.ParamName,
+                        FontSize = 11,
+                        Margin = new Thickness(10, 3, 0, 3),
+                        IsChecked = !firstSelected
+                    };
 
-                        if (!firstSelected)
-                            firstSelected = true;
+                    if (!firstSelected)
+                        firstSelected = true;
 
-                        stackPanel.Children.Add(radio);
-                    }
+                    stackPanel.Children.Add(radio);
+                }
 
-                    // カスタム入力オプション
+                // その他のパラメータ（ComboBox）
+                if (additionalParams.Count > 0)
+                {
                     var customPanel = new StackPanel
                     {
                         Orientation = Orientation.Horizontal,
@@ -362,56 +367,53 @@ namespace Tools28.Commands.BeamUnderLevel
 
                     var customRadio = new RadioButton
                     {
-                        Content = "カスタム: ",
+                        Content = "その他: ",
                         GroupName = groupName,
                         FontSize = 11,
-                        VerticalAlignment = VerticalAlignment.Center
+                        VerticalAlignment = VerticalAlignment.Center,
+                        IsChecked = !firstSelected
                     };
 
-                    var customTextBox = new TextBox
+                    if (!firstSelected)
+                        firstSelected = true;
+
+                    var customComboBox = new ComboBox
                     {
-                        Width = 150,
-                        Height = 22,
+                        Width = 250,
+                        Height = 24,
                         FontSize = 11,
-                        IsEnabled = false,
-                        VerticalContentAlignment = VerticalAlignment.Center,
-                        Padding = new Thickness(4, 0, 4, 0)
+                        IsEnabled = customRadio.IsChecked == true,
+                        VerticalContentAlignment = VerticalAlignment.Center
                     };
 
-                    customRadio.Checked += (s, e) => { customTextBox.IsEnabled = true; };
-                    customRadio.Unchecked += (s, e) => { customTextBox.IsEnabled = false; };
+                    foreach (string paramName in additionalParams)
+                    {
+                        customComboBox.Items.Add(paramName);
+                    }
+                    if (customComboBox.Items.Count > 0)
+                        customComboBox.SelectedIndex = 0;
+
+                    customRadio.Checked += (s, e) => { customComboBox.IsEnabled = true; };
+                    customRadio.Unchecked += (s, e) => { customComboBox.IsEnabled = false; };
 
                     _familyTopLevelCustomRadios[familyName] = customRadio;
-                    _familyTopLevelCustomTextBoxes[familyName] = customTextBox;
+                    _familyTopLevelCustomComboBoxes[familyName] = customComboBox;
 
                     customPanel.Children.Add(customRadio);
-                    customPanel.Children.Add(customTextBox);
+                    customPanel.Children.Add(customComboBox);
                     stackPanel.Children.Add(customPanel);
                 }
-                else
+                else if (candidates.Count == 0)
                 {
                     var noParamText = new TextBlock
                     {
-                        Text = "天端レベルパラメータが見つかりませんでした。カスタム入力してください:",
+                        Text = "天端レベル関連のパラメータが見つかりませんでした。",
                         FontSize = 11,
                         Foreground = new System.Windows.Media.SolidColorBrush(
                             System.Windows.Media.Color.FromRgb(0xCC, 0x00, 0x00)),
                         Margin = new Thickness(10, 0, 0, 5)
                     };
                     stackPanel.Children.Add(noParamText);
-
-                    var customTextBox = new TextBox
-                    {
-                        Width = 200,
-                        Height = 22,
-                        FontSize = 11,
-                        Margin = new Thickness(10, 0, 0, 0),
-                        HorizontalAlignment = HorizontalAlignment.Left,
-                        VerticalContentAlignment = VerticalAlignment.Center,
-                        Padding = new Thickness(4, 0, 4, 0)
-                    };
-                    _familyTopLevelCustomTextBoxes[familyName] = customTextBox;
-                    stackPanel.Children.Add(customTextBox);
                 }
 
                 groupBox.Child = stackPanel;
@@ -430,23 +432,16 @@ namespace Tools28.Commands.BeamUnderLevel
             {
                 string familyName = entry.Key;
 
-                // カスタム入力がアクティブか確認
+                // 「その他」ComboBoxがアクティブか確認
                 if (_familyTopLevelCustomRadios.ContainsKey(familyName) &&
                     _familyTopLevelCustomRadios[familyName].IsChecked == true)
                 {
-                    string customValue = _familyTopLevelCustomTextBoxes[familyName].Text?.Trim();
-                    if (!string.IsNullOrEmpty(customValue))
-                        result[familyName] = customValue;
-                    continue;
-                }
-
-                // カスタムテキストボックスのみ（候補なしの場合）
-                if (!_familyTopLevelCustomRadios.ContainsKey(familyName) &&
-                    _familyTopLevelCustomTextBoxes.ContainsKey(familyName))
-                {
-                    string customValue = _familyTopLevelCustomTextBoxes[familyName].Text?.Trim();
-                    if (!string.IsNullOrEmpty(customValue))
-                        result[familyName] = customValue;
+                    if (_familyTopLevelCustomComboBoxes.ContainsKey(familyName))
+                    {
+                        string selected = _familyTopLevelCustomComboBoxes[familyName].SelectedItem as string;
+                        if (!string.IsNullOrEmpty(selected))
+                            result[familyName] = selected;
+                    }
                     continue;
                 }
 
