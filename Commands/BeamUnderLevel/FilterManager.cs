@@ -28,6 +28,9 @@ namespace Tools28.Commands.BeamUnderLevel
                 new ElementId(BuiltInCategory.OST_StructuralFraming)
             };
 
+            // ベタ塗りパターンを取得
+            ElementId solidFillPatternId = GetSolidFillPatternId(doc);
+
             // レベル値でソート（数値部分で）
             var sortedLevels = levelGroups
                 .OrderBy(kv => ExtractNumericValue(kv.Key))
@@ -90,11 +93,14 @@ namespace Tools28.Commands.BeamUnderLevel
                     // ビューにフィルタを追加
                     activeView.AddFilter(filterElement.Id);
 
-                    // 色を設定
+                    // 色を設定（サーフェスパターン塗り潰し）
                     Color color = colors[colorIndex];
                     OverrideGraphicSettings overrides = new OverrideGraphicSettings();
-                    overrides.SetProjectionLineColor(color);
-                    overrides.SetProjectionLineWeight(2);
+                    if (solidFillPatternId != null)
+                    {
+                        overrides.SetSurfaceForegroundPatternId(solidFillPatternId);
+                        overrides.SetSurfaceForegroundPatternColor(color);
+                    }
 
                     activeView.SetFilterOverrides(filterElement.Id, overrides);
                 }
@@ -152,10 +158,14 @@ namespace Tools28.Commands.BeamUnderLevel
 
                 activeView.AddFilter(errorFilterElement.Id);
 
-                // エラー梁は赤で表示
+                // エラー梁は赤で表示（サーフェスパターン塗り潰し）
                 OverrideGraphicSettings errorOverrides = new OverrideGraphicSettings();
-                errorOverrides.SetProjectionLineColor(new Color(255, 100, 100));
-                errorOverrides.SetProjectionLineWeight(3);
+                ElementId solidFillId = GetSolidFillPatternId(doc);
+                if (solidFillId != null)
+                {
+                    errorOverrides.SetSurfaceForegroundPatternId(solidFillId);
+                    errorOverrides.SetSurfaceForegroundPatternColor(new Color(255, 100, 100));
+                }
 
                 activeView.SetFilterOverrides(errorFilterElement.Id, errorOverrides);
             }
@@ -210,6 +220,19 @@ namespace Tools28.Commands.BeamUnderLevel
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// ベタ塗り（Solid Fill）パターンのElementIdを取得
+        /// </summary>
+        private static ElementId GetSolidFillPatternId(Document doc)
+        {
+            var fillPattern = new FilteredElementCollector(doc)
+                .OfClass(typeof(FillPatternElement))
+                .Cast<FillPatternElement>()
+                .FirstOrDefault(fp => fp.GetFillPattern().IsSolidFill);
+
+            return fillPattern?.Id;
         }
 
         /// <summary>
