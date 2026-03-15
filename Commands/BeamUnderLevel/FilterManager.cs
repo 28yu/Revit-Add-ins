@@ -251,7 +251,7 @@ namespace Tools28.Commands.BeamUnderLevel
         /// 表示値から数値部分を抽出（ソート用）
         /// 例: "2FL+2800" → 2800, "1FL-600" → -600
         /// </summary>
-        private static double ExtractNumericValue(string displayValue)
+        internal static double ExtractNumericValue(string displayValue)
         {
             int plusIndex = displayValue.LastIndexOf('+');
             int minusIndex = displayValue.LastIndexOf('-');
@@ -270,7 +270,7 @@ namespace Tools28.Commands.BeamUnderLevel
         /// <summary>
         /// 色パレット生成（明るく見やすい色合い、暗い色は使用しない）
         /// </summary>
-        private static List<Color> GenerateColors(int colorCount)
+        internal static List<Color> GenerateColors(int colorCount)
         {
             var baseColors = new[]
             {

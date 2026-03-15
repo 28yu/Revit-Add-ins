@@ -176,6 +176,7 @@ namespace Tools28.Commands.BeamUnderLevel
                     .ToDictionary(g => g.Key, g => g.Count());
 
                 // パラメータ作成・値の書き込み・フィルタ作成をトランザクションで実行
+                ElementId legendViewId = null;
                 using (Transaction trans = new Transaction(doc, "梁下端色分け"))
                 {
                     trans.Start();
@@ -195,15 +196,24 @@ namespace Tools28.Commands.BeamUnderLevel
                     FilterManager.CreateFiltersAndColorize(doc, activeView,
                         levelGroups, overwriteExisting);
 
+                    // 凡例の製図ビューを作成
+                    legendViewId = LegendManager.CreateLegendDraftingView(
+                        doc, levelGroups, overwriteExisting);
+
                     trans.Commit();
                 }
 
                 // 完了ダイアログ
+                string legendInfo = legendViewId != null
+                    ? "凡例ビュー: 「梁下端色分け凡例」を作成しました"
+                    : "凡例ビュー: 作成をスキップしました（既存あり）";
+
                 string resultMessage = $"処理が完了しました。\n\n" +
                     $"対象梁数: {beams.Count}\n" +
                     $"成功: {successCount}\n" +
                     $"失敗: {failureCount}\n" +
-                    $"作成フィルタ数: {levelGroups.Count}";
+                    $"作成フィルタ数: {levelGroups.Count}\n" +
+                    $"{legendInfo}";
 
                 if (failureCount > 0)
                 {
