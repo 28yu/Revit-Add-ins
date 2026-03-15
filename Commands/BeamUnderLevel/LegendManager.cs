@@ -83,11 +83,11 @@ namespace Tools28.Commands.BeamUnderLevel
                 double textHeight = GetTextHeight(doc, textNoteTypeId);
 
                 // テキストサイズ基準のレイアウト定数
-                double rectHeight = textHeight * 0.8;
-                double rectWidth = textHeight * 2.0;
-                double textOffsetX = rectWidth + textHeight * 0.5;
-                double rowSpacing = textHeight * 0.5;
-                double titleGap = textHeight * 1.5;
+                double rectHeight = textHeight * 1.8;
+                double rectWidth = textHeight * 4.0;
+                double textOffsetX = rectWidth + textHeight * 0.8;
+                double rowSpacing = textHeight * 0.8;
+                double titleGap = textHeight * 2.0;
 
                 // 凡例の各行を描画
                 double currentY = 0;
