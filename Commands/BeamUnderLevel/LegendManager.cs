@@ -11,24 +11,13 @@ namespace Tools28.Commands.BeamUnderLevel
     public static class LegendManager
     {
         private const string LegendViewName = "梁下端色分け凡例";
-        private const string LegendTypePrefix = "梁下_凡例_";
-
-        // レイアウト定数（mm → 内部単位はfeetだがMmToFeetで変換）
-        private const double RectWidthMm = 15.0;
-        private const double RectHeightMm = 8.0;
-        private const double TextOffsetXMm = 20.0;
-        private const double RowSpacingMm = 12.0;
-        private const double TitleOffsetYMm = 5.0;
-        private const double StartXMm = 0.0;
-        private const double StartYMm = 0.0;
+        // フィルタ名と同じプレフィックス
+        private const string FilterPrefix = "梁下_";
+        private const string ErrorFilterName = "梁下_エラー";
 
         /// <summary>
         /// 凡例用の製図ビューを作成
         /// </summary>
-        /// <param name="doc">Revitドキュメント</param>
-        /// <param name="levelGroups">レベル別グループ（表示値→梁数）</param>
-        /// <param name="overwriteExisting">既存の凡例ビューを上書きするか</param>
-        /// <returns>作成された製図ビューのId（失敗時はnull）</returns>
         public static ElementId CreateLegendDraftingView(
             Document doc,
             Dictionary<string, int> levelGroups,
@@ -50,6 +39,12 @@ namespace Tools28.Commands.BeamUnderLevel
                     }
                 }
 
+                // 既存の凡例用FilledRegionTypeをクリーンアップ
+                if (overwriteExisting)
+                {
+                    CleanupLegendRegionTypes(doc);
+                }
+
                 // 製図ビュー用の ViewFamilyType を取得
                 ElementId viewFamilyTypeId = GetDraftingViewFamilyTypeId(doc);
                 if (viewFamilyTypeId == null)
@@ -57,7 +52,6 @@ namespace Tools28.Commands.BeamUnderLevel
 
                 // 製図ビューを作成
                 ViewDrafting draftingView = ViewDrafting.Create(doc, viewFamilyTypeId);
-                // 名前の重複を避ける
                 try
                 {
                     draftingView.Name = LegendViewName;
@@ -81,19 +75,28 @@ namespace Tools28.Commands.BeamUnderLevel
                 // FilterManagerと同じ色を生成
                 List<Color> colors = FilterManager.GenerateColors(sortedLevels.Count);
 
-                // TextNoteTypeを取得
+                // TextNoteTypeを取得し、テキストサイズを基準にレイアウト計算
                 ElementId textNoteTypeId = GetDefaultTextNoteTypeId(doc);
                 if (textNoteTypeId == null)
                     return draftingView.Id;
 
+                double textHeight = GetTextHeight(doc, textNoteTypeId);
+
+                // テキストサイズ基準のレイアウト定数
+                double rectHeight = textHeight * 0.8;
+                double rectWidth = textHeight * 2.0;
+                double textOffsetX = rectWidth + textHeight * 0.5;
+                double rowSpacing = textHeight * 0.5;
+                double titleGap = textHeight * 1.5;
+
                 // 凡例の各行を描画
-                double currentY = MmToFeet(StartYMm);
+                double currentY = 0;
 
                 // タイトル
-                XYZ titlePos = new XYZ(MmToFeet(StartXMm), currentY, 0);
+                XYZ titlePos = new XYZ(0, currentY, 0);
                 TextNote.Create(doc, draftingView.Id, titlePos,
                     "梁下端色分け凡例", textNoteTypeId);
-                currentY -= MmToFeet(TitleOffsetYMm + RowSpacingMm);
+                currentY -= (textHeight + titleGap);
 
                 // 各レベル行
                 for (int i = 0; i < sortedLevels.Count; i++)
@@ -101,32 +104,34 @@ namespace Tools28.Commands.BeamUnderLevel
                     string displayValue = sortedLevels[i].Key;
                     int beamCount = sortedLevels[i].Value;
                     Color color = colors[i];
+                    string typeName = FilterPrefix + displayValue;
 
                     // 色付き矩形を作成
                     CreateColoredRectangle(doc, draftingView.Id,
-                        solidFillPatternId, color,
-                        MmToFeet(StartXMm), currentY, i);
+                        solidFillPatternId, color, typeName,
+                        0, currentY, rectWidth, rectHeight);
 
-                    // テキストラベル
+                    // テキストラベル（矩形の右横、垂直中央揃え）
                     XYZ textPos = new XYZ(
-                        MmToFeet(StartXMm + TextOffsetXMm),
-                        currentY + MmToFeet(RectHeightMm / 2),
+                        textOffsetX,
+                        currentY + (rectHeight - textHeight) / 2,
                         0);
-                    string label = $"{displayValue}  ({beamCount}本)";
+                    string label = $"{displayValue}（{beamCount}本）";
                     TextNote.Create(doc, draftingView.Id, textPos,
                         label, textNoteTypeId);
 
-                    currentY -= MmToFeet(RowSpacingMm + RectHeightMm);
+                    currentY -= (rectHeight + rowSpacing);
                 }
 
                 // エラー行
                 CreateColoredRectangle(doc, draftingView.Id,
                     solidFillPatternId, new Color(255, 100, 100),
-                    MmToFeet(StartXMm), currentY, sortedLevels.Count);
+                    ErrorFilterName,
+                    0, currentY, rectWidth, rectHeight);
 
                 XYZ errorTextPos = new XYZ(
-                    MmToFeet(StartXMm + TextOffsetXMm),
-                    currentY + MmToFeet(RectHeightMm / 2),
+                    textOffsetX,
+                    currentY + (rectHeight - textHeight) / 2,
                     0);
                 TextNote.Create(doc, draftingView.Id, errorTextPos,
                     "エラー", textNoteTypeId);
@@ -145,14 +150,12 @@ namespace Tools28.Commands.BeamUnderLevel
         private static void CreateColoredRectangle(
             Document doc, ElementId viewId,
             ElementId solidFillPatternId, Color color,
-            double x, double y, int colorIndex)
+            string typeName,
+            double x, double y, double width, double height)
         {
-            double width = MmToFeet(RectWidthMm);
-            double height = MmToFeet(RectHeightMm);
-
-            // FilledRegionTypeを作成（色ごと）
+            // FilledRegionTypeを作成（フィルタ名と同じ名前）
             ElementId regionTypeId = GetOrCreateFilledRegionType(
-                doc, solidFillPatternId, color, colorIndex);
+                doc, solidFillPatternId, color, typeName);
             if (regionTypeId == null)
                 return;
 
@@ -174,13 +177,12 @@ namespace Tools28.Commands.BeamUnderLevel
 
         /// <summary>
         /// 指定色のFilledRegionTypeを取得または作成
+        /// タイプ名はフィルタ名と同じ（例: 梁下_2FL+2800）
         /// </summary>
         private static ElementId GetOrCreateFilledRegionType(
             Document doc, ElementId solidFillPatternId,
-            Color color, int index)
+            Color color, string typeName)
         {
-            string typeName = LegendTypePrefix + index;
-
             // 既存タイプを検索
             var existing = new FilteredElementCollector(doc)
                 .OfClass(typeof(FilledRegionType))
@@ -208,12 +210,27 @@ namespace Tools28.Commands.BeamUnderLevel
 
             newType.ForegroundPatternColor = color;
             newType.ForegroundPatternId = solidFillPatternId;
-            // 背景パターンをクリア（ベタ塗りのみ）
             newType.BackgroundPatternId = ElementId.InvalidElementId;
-            // 境界線を非表示
             newType.IsMasking = false;
 
             return newType.Id;
+        }
+
+        /// <summary>
+        /// TextNoteTypeからテキスト高さを取得（内部単位 feet）
+        /// </summary>
+        private static double GetTextHeight(Document doc, ElementId textNoteTypeId)
+        {
+            var textNoteType = doc.GetElement(textNoteTypeId) as TextNoteType;
+            if (textNoteType != null)
+            {
+                Parameter sizeParam = textNoteType.get_Parameter(
+                    BuiltInParameter.TEXT_SIZE);
+                if (sizeParam != null)
+                    return sizeParam.AsDouble();
+            }
+            // フォールバック: 2.5mm
+            return 2.5 / 304.8;
         }
 
         /// <summary>
@@ -268,22 +285,14 @@ namespace Tools28.Commands.BeamUnderLevel
         }
 
         /// <summary>
-        /// mm → feet 変換
+        /// 凡例用のFilledRegionTypeをクリーンアップ
         /// </summary>
-        private static double MmToFeet(double mm)
-        {
-            return mm / 304.8;
-        }
-
-        /// <summary>
-        /// 凡例作成時に生成したFilledRegionTypeをクリーンアップ
-        /// </summary>
-        public static void CleanupLegendTypes(Document doc)
+        private static void CleanupLegendRegionTypes(Document doc)
         {
             var legendTypes = new FilteredElementCollector(doc)
                 .OfClass(typeof(FilledRegionType))
                 .Cast<FilledRegionType>()
-                .Where(t => t.Name.StartsWith(LegendTypePrefix))
+                .Where(t => t.Name.StartsWith(FilterPrefix))
                 .ToList();
 
             foreach (var type in legendTypes)
