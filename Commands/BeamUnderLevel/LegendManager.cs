@@ -118,9 +118,9 @@ namespace Tools28.Commands.BeamUnderLevel
                     // TextNoteの基準点は左上、矩形中央にテキスト中央を合わせる
                     XYZ textPos = new XYZ(
                         textOffsetX,
-                        currentY + rectHeight / 2 + textHeight * 0.4,
+                        currentY + rectHeight / 2 + textHeight * 0.55,
                         0);
-                    string label = $"{displayValue}（{beamCount}本）";
+                    string label = $"- {displayValue}（{beamCount}本）";
                     TextNote.Create(doc, draftingView.Id, textPos,
                         label, textNoteTypeId);
 
@@ -138,7 +138,7 @@ namespace Tools28.Commands.BeamUnderLevel
                     currentY + rectHeight / 2 + textHeight * 0.4,
                     0);
                 TextNote.Create(doc, draftingView.Id, errorTextPos,
-                    "エラー", textNoteTypeId);
+                    "- エラー", textNoteTypeId);
 
                 return draftingView.Id;
             }
