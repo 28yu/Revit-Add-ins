@@ -62,6 +62,9 @@ namespace Tools28.Commands.BeamUnderLevel
                         DateTime.Now.ToString("yyyyMMdd_HHmmss");
                 }
 
+                // 尺度を1:1に設定
+                draftingView.Scale = 1;
+
                 // ベタ塗りパターンを取得
                 ElementId solidFillPatternId = GetSolidFillPatternId(doc);
                 if (solidFillPatternId == null)
