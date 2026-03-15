@@ -90,7 +90,7 @@ namespace Tools28.Commands.BeamUnderLevel
                 double rectWidth = textHeight * 4.0;
                 double textOffsetX = rectWidth + textHeight * 0.8;
                 double rowSpacing = textHeight * 0.8;
-                double titleGap = textHeight * 2.0;
+                double titleGap = textHeight * 3.0;
 
                 // 凡例の各行を描画
                 double currentY = 0;
@@ -115,10 +115,10 @@ namespace Tools28.Commands.BeamUnderLevel
                         0, currentY, rectWidth, rectHeight);
 
                     // テキストラベル（矩形の右横、垂直中央揃え）
-                    // TextNoteの基準点は左上なので、矩形中央にテキスト中央を合わせる
+                    // TextNoteの基準点は左上、矩形中央にテキスト中央を合わせる
                     XYZ textPos = new XYZ(
                         textOffsetX,
-                        currentY + (rectHeight + textHeight) / 2,
+                        currentY + rectHeight / 2 + textHeight * 0.4,
                         0);
                     string label = $"{displayValue}（{beamCount}本）";
                     TextNote.Create(doc, draftingView.Id, textPos,
@@ -135,7 +135,7 @@ namespace Tools28.Commands.BeamUnderLevel
 
                 XYZ errorTextPos = new XYZ(
                     textOffsetX,
-                    currentY + (rectHeight + textHeight) / 2,
+                    currentY + rectHeight / 2 + textHeight * 0.4,
                     0);
                 TextNote.Create(doc, draftingView.Id, errorTextPos,
                     "エラー", textNoteTypeId);
