@@ -143,7 +143,7 @@
                 BorderThickness="0,0,0,1" Padding="20,12">
             <TextBlock x:Name="StepIndicator" FontSize="14" FontWeight="Bold"
                        Foreground="{StaticResource RevitDarkGray}"
-                       Text="ステップ 1 / 3  レベル設定"/>
+                       Text="ステップ 1 / 4  レベル設定、凡例設定"/>
         </Border>
 
         <!-- ステップ内容 -->
