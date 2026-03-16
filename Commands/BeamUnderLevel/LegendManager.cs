@@ -21,7 +21,8 @@ namespace Tools28.Commands.BeamUnderLevel
         public static ElementId CreateLegendDraftingView(
             Document doc,
             Dictionary<string, int> levelGroups,
-            bool overwriteExisting)
+            bool overwriteExisting,
+            int errorCount = 0)
         {
             try
             {
@@ -92,8 +93,8 @@ namespace Tools28.Commands.BeamUnderLevel
                 double rowSpacing = textHeight * 0.8;
                 double titleGap = textHeight * 3.0;
 
-                // テキストY位置の補正値（矩形中央に合わせる）
-                double textYOffset = rectHeight / 2 + textHeight * 1.7;
+                // テキストY位置の補正値（矩形中央にテキスト中央を合わせる）
+                double textYOffset = (rectHeight + textHeight) / 2;
                 // 行ピッチ（矩形とテキストで共通）
                 double rowPitch = rectHeight + rowSpacing;
 
@@ -105,9 +106,6 @@ namespace Tools28.Commands.BeamUnderLevel
                 TextNote.Create(doc, draftingView.Id, titlePos,
                     "梁下端色分け凡例", textNoteTypeId);
                 startY -= (textHeight + titleGap);
-
-                // 全行数（レベル行 + エラー行）
-                int totalRows = sortedLevels.Count + 1;
 
                 // 各レベル行
                 for (int i = 0; i < sortedLevels.Count; i++)
@@ -131,17 +129,20 @@ namespace Tools28.Commands.BeamUnderLevel
                         label, textNoteTypeId);
                 }
 
-                // エラー行
-                double errorRowY = startY - rowPitch * sortedLevels.Count;
+                // エラー行（エラーがある場合のみ）
+                if (errorCount > 0)
+                {
+                    double errorRowY = startY - rowPitch * sortedLevels.Count;
 
-                CreateColoredRectangle(doc, draftingView.Id,
-                    solidFillPatternId, new Color(255, 100, 100),
-                    ErrorFilterName,
-                    0, errorRowY, rectWidth, rectHeight);
+                    CreateColoredRectangle(doc, draftingView.Id,
+                        solidFillPatternId, new Color(255, 100, 100),
+                        ErrorFilterName,
+                        0, errorRowY, rectWidth, rectHeight);
 
-                XYZ errorTextPos = new XYZ(textOffsetX, errorRowY + textYOffset, 0);
-                TextNote.Create(doc, draftingView.Id, errorTextPos,
-                    "- エラー", textNoteTypeId);
+                    XYZ errorTextPos = new XYZ(textOffsetX, errorRowY + textYOffset, 0);
+                    TextNote.Create(doc, draftingView.Id, errorTextPos,
+                        "- エラー", textNoteTypeId);
+                }
 
                 return draftingView.Id;
             }

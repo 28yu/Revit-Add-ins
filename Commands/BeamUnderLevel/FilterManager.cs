@@ -21,7 +21,8 @@ namespace Tools28.Commands.BeamUnderLevel
             Document doc,
             View activeView,
             Dictionary<string, int> levelGroups,
-            bool overwriteExisting)
+            bool overwriteExisting,
+            int errorCount = 0)
         {
             List<ElementId> categories = new List<ElementId>
             {
@@ -108,8 +109,11 @@ namespace Tools28.Commands.BeamUnderLevel
                 colorIndex++;
             }
 
-            // エラー梁用フィルタ
-            CreateErrorFilter(doc, activeView, categories, overwriteExisting);
+            // エラー梁用フィルタ（エラーがある場合のみ）
+            if (errorCount > 0)
+            {
+                CreateErrorFilter(doc, activeView, categories, overwriteExisting);
+            }
         }
 
         /// <summary>

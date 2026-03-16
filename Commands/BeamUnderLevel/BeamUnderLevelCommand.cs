@@ -194,11 +194,11 @@ namespace Tools28.Commands.BeamUnderLevel
 
                     // フィルタ作成・色分け
                     FilterManager.CreateFiltersAndColorize(doc, activeView,
-                        levelGroups, overwriteExisting);
+                        levelGroups, overwriteExisting, failureCount);
 
                     // 凡例の製図ビューを作成
                     legendViewId = LegendManager.CreateLegendDraftingView(
-                        doc, levelGroups, overwriteExisting);
+                        doc, levelGroups, overwriteExisting, failureCount);
 
                     trans.Commit();
                 }
