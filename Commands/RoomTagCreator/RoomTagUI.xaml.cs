@@ -6,6 +6,8 @@ using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Shapes;
 using Autodesk.Revit.DB;
 using Tools28.Commands.RoomTagCreator.Model;
 
@@ -34,6 +36,7 @@ namespace Tools28.Commands.RoomTagCreator
 
             // 部屋リストをObservableCollectionに変換
             _rooms = new ObservableCollection<RoomInfo>(rooms);
+            _rooms.CollectionChanged += (s, e) => UpdatePreview();
             RoomListBox.ItemsSource = _rooms;
 
             // ビュー名の自動生成
@@ -45,6 +48,7 @@ namespace Tools28.Commands.RoomTagCreator
 
             // 初期状態のラベル設定
             UpdateCountLabel();
+            UpdatePreview();
         }
 
         private void LoadTagTypes()
@@ -78,11 +82,111 @@ namespace Tools28.Commands.RoomTagCreator
             }
         }
 
+        private void UpdatePreview()
+        {
+            if (PreviewCanvas == null || _rooms == null) return;
+
+            PreviewCanvas.Children.Clear();
+
+            int roomCount = _rooms.Count;
+            if (roomCount == 0) return;
+
+            bool isHorizontal = HorizontalRadio?.IsChecked == true;
+            int count = 5;
+            if (int.TryParse(CountTextBox?.Text, out int parsed) && parsed >= 1)
+                count = parsed;
+
+            double canvasW = PreviewCanvas.ActualWidth > 0 ? PreviewCanvas.ActualWidth : 660;
+            double canvasH = PreviewCanvas.ActualHeight > 0 ? PreviewCanvas.ActualHeight : 120;
+
+            // グリッド配置の計算
+            int cols, rows;
+            if (isHorizontal)
+            {
+                cols = count;
+                rows = (int)Math.Ceiling((double)roomCount / count);
+            }
+            else
+            {
+                rows = count;
+                cols = (int)Math.Ceiling((double)roomCount / count);
+            }
+
+            // タグサイズとマージンの計算
+            double margin = 4;
+            double cellW = (canvasW - margin) / cols - margin;
+            double cellH = (canvasH - margin) / rows - margin;
+
+            // セルの最大・最小サイズ制限
+            cellW = Math.Max(20, Math.Min(cellW, 120));
+            cellH = Math.Max(14, Math.Min(cellH, 24));
+
+            var tagBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xCC, 0xE5, 0xFF));
+            var tagBorder = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x00, 0x66, 0xCC));
+            var textBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x33, 0x33, 0x33));
+
+            int index = 0;
+            for (int i = 0; i < roomCount; i++)
+            {
+                int col, row;
+                if (isHorizontal)
+                {
+                    col = i % count;
+                    row = i / count;
+                }
+                else
+                {
+                    row = i % count;
+                    col = i / count;
+                }
+
+                double x = margin + col * (cellW + margin);
+                double y = margin + row * (cellH + margin);
+
+                var rect = new System.Windows.Shapes.Rectangle
+                {
+                    Width = cellW,
+                    Height = cellH,
+                    Fill = tagBrush,
+                    Stroke = tagBorder,
+                    StrokeThickness = 1,
+                    RadiusX = 2,
+                    RadiusY = 2
+                };
+                Canvas.SetLeft(rect, x);
+                Canvas.SetTop(rect, y);
+                PreviewCanvas.Children.Add(rect);
+
+                // 部屋名テキスト
+                string name = _rooms[i].Name;
+                if (name.Length > 6) name = name.Substring(0, 5) + "..";
+                var text = new TextBlock
+                {
+                    Text = name,
+                    FontSize = 9,
+                    Foreground = textBrush,
+                    TextTrimming = TextTrimming.CharacterEllipsis,
+                    MaxWidth = cellW - 4
+                };
+                Canvas.SetLeft(text, x + 3);
+                Canvas.SetTop(text, y + (cellH - 14) / 2);
+                PreviewCanvas.Children.Add(text);
+
+                index++;
+            }
+        }
+
         // --- イベントハンドラ ---
 
-        private void LayoutDirection_Changed(object sender, RoutedEventArgs e)
+        private void LayoutChanged(object sender, RoutedEventArgs e)
         {
             UpdateCountLabel();
+            UpdatePreview();
+        }
+
+        private void LayoutChanged_Text(object sender, TextChangedEventArgs e)
+        {
+            UpdatePreview();
         }
 
         private void MoveUpButton_Click(object sender, RoutedEventArgs e)

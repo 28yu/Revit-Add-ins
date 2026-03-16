@@ -24,7 +24,7 @@ namespace Tools28.Commands.RoomTagCreator
                 .OfCategory(BuiltInCategory.OST_Rooms)
                 .WhereElementIsNotElementType()
                 .Cast<Room>()
-                .Where(r => r.Area > 0)
+                .Where(r => r.Location != null)
                 .OrderBy(r => r.LookupParameter("名前")?.AsString() ?? r.Name ?? "")
                 .Select(r => new RoomInfo(r))
                 .ToList();
@@ -197,11 +197,11 @@ namespace Tools28.Commands.RoomTagCreator
                 {
                     // タグタイプを設定
                     newTag.ChangeTypeId(tagTypeId);
-                    // 引き出し線を有効化
-                    newTag.HasLeader = true;
+                    // 引き出し線は後で一括設定（BoundingBox取得時に影響するため）
+                    newTag.HasLeader = false;
                     createdTags.Add(newTag);
 
-                    // 最初のタグからサイズを取得
+                    // 最初のタグからサイズを取得（引き出し線なしの状態で測定）
                     if (!sizeCalculated)
                     {
                         doc.Regenerate();
@@ -254,6 +254,12 @@ namespace Tools28.Commands.RoomTagCreator
                         }
                     }
                 }
+            }
+
+            // 全タグの引き出し線を一括で有効化
+            foreach (var tag in createdTags)
+            {
+                tag.HasLeader = true;
             }
 
             return createdTags;
