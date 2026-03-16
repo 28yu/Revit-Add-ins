@@ -71,8 +71,7 @@ namespace Tools28.Commands.RoomTagCreator
                 .OfClass(typeof(ViewFamilyType))
                 .Cast<ViewFamilyType>()
                 .Where(vft => vft.ViewFamily == ViewFamily.FloorPlan
-                           || vft.ViewFamily == ViewFamily.CeilingPlan
-                           || vft.ViewFamily == ViewFamily.AreaPlan)
+                           || vft.ViewFamily == ViewFamily.CeilingPlan)
                 .OrderBy(vft => vft.Name)
                 .ToList();
         }
@@ -93,6 +92,11 @@ namespace Tools28.Commands.RoomTagCreator
             if (level == null)
             {
                 throw new InvalidOperationException("ソースビューのレベルが取得できません。");
+            }
+
+            if (viewFamilyTypeId == null || viewFamilyTypeId == ElementId.InvalidElementId)
+            {
+                throw new InvalidOperationException("ビューファミリタイプが選択されていません。");
             }
 
             // ビュー名の重複チェック
@@ -140,6 +144,9 @@ namespace Tools28.Commands.RoomTagCreator
             var createdTags = new List<RoomTag>();
 
             if (rooms == null || rooms.Count == 0)
+                return createdTags;
+
+            if (tagTypeId == null || tagTypeId == ElementId.InvalidElementId)
                 return createdTags;
 
             // タグタイプを取得してBoundingBoxからサイズを推定

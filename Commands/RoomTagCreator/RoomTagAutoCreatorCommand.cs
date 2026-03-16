@@ -77,6 +77,27 @@ namespace Tools28.Commands.RoomTagCreator
                 if (dialogResult != true)
                     return Result.Cancelled;
 
+                // ダイアログ結果の検証
+                if (dialog.SelectedViewFamilyTypeId == null ||
+                    dialog.SelectedViewFamilyTypeId == ElementId.InvalidElementId)
+                {
+                    TaskDialog.Show("エラー", "ビューファミリタイプが選択されていません。");
+                    return Result.Failed;
+                }
+
+                if (dialog.SelectedTagTypeId == null ||
+                    dialog.SelectedTagTypeId == ElementId.InvalidElementId)
+                {
+                    TaskDialog.Show("エラー", "タグファミリタイプが選択されていません。");
+                    return Result.Failed;
+                }
+
+                if (dialog.Layout == null)
+                {
+                    TaskDialog.Show("エラー", "配置設定が取得できませんでした。");
+                    return Result.Failed;
+                }
+
                 // トランザクショングループで処理を実行
                 using (TransactionGroup tg = new TransactionGroup(doc, "部屋タグ自動配置"))
                 {
@@ -150,6 +171,7 @@ namespace Tools28.Commands.RoomTagCreator
             catch (Exception ex)
             {
                 message = $"部屋タグ自動配置中にエラーが発生しました。\n\n{ex.Message}" +
+                    $"\n\n--- スタックトレース ---\n{ex.StackTrace}" +
                     "\n\nマニュアル: https://28yu.github.io/28tools-manual/" +
                     "\n配布サイト: https://28yu.github.io/28tools-download/";
                 return Result.Failed;

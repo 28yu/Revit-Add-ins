@@ -21,11 +21,11 @@ namespace Tools28.Commands.RoomTagCreator
 
         // 結果プロパティ
         public string NewViewName { get; private set; }
-        public ElementId SelectedViewFamilyTypeId { get; private set; }
+        public ElementId SelectedViewFamilyTypeId { get; private set; } = ElementId.InvalidElementId;
         public List<RoomInfo> SelectedRooms { get; private set; }
-        public ElementId SelectedTagTypeId { get; private set; }
+        public ElementId SelectedTagTypeId { get; private set; } = ElementId.InvalidElementId;
         public LayoutSettings Layout { get; private set; }
-        public ElementId SelectedViewTemplateId { get; private set; }
+        public ElementId SelectedViewTemplateId { get; private set; } = ElementId.InvalidElementId;
 
         public RoomTagUI(Document doc, List<RoomInfo> rooms, string sourceViewName)
         {
@@ -153,7 +153,14 @@ namespace Tools28.Commands.RoomTagCreator
                 return;
             }
 
-            if (TagTypeComboBox.SelectedIndex < 0)
+            if (ViewFamilyTypeComboBox.SelectedIndex < 0 || _viewFamilyTypes.Count == 0)
+            {
+                MessageBox.Show("ビューファミリタイプを選択してください。", "警告",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            if (TagTypeComboBox.SelectedIndex < 0 || _tagTypes.Count == 0)
             {
                 MessageBox.Show("タグファミリタイプを選択してください。", "警告",
                     MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -178,9 +185,7 @@ namespace Tools28.Commands.RoomTagCreator
             NewViewName = ViewNameTextBox.Text.Trim();
             SelectedRooms = _rooms.ToList();
 
-            if (ViewFamilyTypeComboBox.SelectedIndex >= 0)
-                SelectedViewFamilyTypeId = _viewFamilyTypes[ViewFamilyTypeComboBox.SelectedIndex].Id;
-
+            SelectedViewFamilyTypeId = _viewFamilyTypes[ViewFamilyTypeComboBox.SelectedIndex].Id;
             SelectedTagTypeId = _tagTypes[TagTypeComboBox.SelectedIndex].Id;
 
             Layout = new LayoutSettings
