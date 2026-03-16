@@ -337,3 +337,42 @@ git push -u origin claude/<branch-name>
 - **配色**: 明るいパステル〜中間色トーンのみ使用。黒っぽい色・暗い茶色は使わない
 - **フィルタ名**: `梁下_{レベル名}{±値}` 形式
 - サーフェスを持たない梁ファミリはファミリ側でサーフェス表示を有効にする（アドイン側では対応不要）
+
+### コード構成
+```
+Commands/BeamUnderLevel/
+├── BeamUnderLevelCommand.cs    # メインコマンド (IExternalCommand)
+├── BeamUnderLevelDialog.xaml    # WPF 4ステップダイアログ
+├── BeamUnderLevelDialog.xaml.cs # ダイアログのコードビハインド
+├── BeamUnderLevelDialogData.cs  # ダイアログのデータモデル
+├── BeamCalculator.cs            # 梁下端レベル計算ロジック
+├── FilterManager.cs             # ParameterFilterElement の作成・色分け適用
+├── ParameterManager.cs          # 共有パラメータ (梁下端レベル) の作成・値設定
+├── LegendManager.cs             # 凡例ビュー作成（色分け対応表）
+└── BeamLabelManager.cs          # 梁上に下端レベル値の TextNote を配置
+```
+
+### 開発で得た知見
+
+#### アイコン作成
+- アイコンは `Resources/Icons/{name}_32.png` の命名規則
+- `Tools28.csproj` の `<Resource>` に登録が必要
+- `Application.cs` の `LoadImage()` でリソースまたはファイルから読み込み（ハイブリッド方式）
+
+#### 梁ラベル (TextNote) の配置
+- ビュー上の梁の位置取得には `beam.get_BoundingBox(view)` を使用（モデル座標の BoundingBox ではなくビュー固有のものを使うこと）
+- 梁の幅はタイプパラメータから取得（インスタンスパラメータではない）
+- ラベルのオフセット量はビュースケール (`view.Scale`) を考慮して調整する
+- テキスト配置は `Center` + `Bottom` で梁との重なりを防止
+- 梁の方向に合わせてラベルを回転させる
+
+#### 自動マージ (claude/* ブランチ)
+- push 前に必ず `git fetch origin main && git rebase origin/main` を実行
+- 自動マージ成功後はリモートブランチが自動削除される
+- 削除後に再 push する場合は `--force-with-lease` ではなく通常の push を使用
+- マージ失敗時は rebase して再 push すれば自動リトライされる
+
+### 現在のステータス
+- **機能実装**: 完了（ダイアログ、計算、フィルタ、ラベル、凡例）
+- **アイコン**: 案A採用済み（I型梁 + カラーバー、`beam_under_level_32.png`）
+- **未テスト**: 実際の Revit 環境での動作確認が必要
