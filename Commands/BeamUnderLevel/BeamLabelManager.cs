@@ -34,8 +34,12 @@ namespace Tools28.Commands.BeamUnderLevel
 
             // テキストサイズを取得（梁の上にオフセットするため）
             double textHeight = GetTextHeight(doc, textNoteTypeId);
-            // 梁の上にオフセットする量（テキスト高さ + 余白）
-            double offsetDistance = textHeight * 2.0;
+            // ビューのスケールを考慮してモデル空間でのテキスト高さを計算
+            // TEXT_SIZE はペーパー空間の高さなので、モデル空間では viewScale 倍
+            int viewScale = activeView.Scale;
+            double modelTextHeight = textHeight * viewScale;
+            // オフセット量: テキストのモデル空間高さ + 余白
+            double offsetDistance = modelTextHeight + modelTextHeight * 0.3;
 
             // 各梁にテキストを配置
             foreach (var beam in beams)
@@ -120,38 +124,83 @@ namespace Tools28.Commands.BeamUnderLevel
             XYZ direction = (endPoint - startPoint);
             direction = new XYZ(direction.X, direction.Y, 0).Normalize();
 
-            // 梁幅をビュー固有のBoundingBoxから取得
-            double beamWidth = 0;
-            BoundingBoxXYZ bb = beam.get_BoundingBox(activeView);
-            if (bb != null)
+            // 梁幅を取得（タイプ/インスタンスパラメータから直接取得を優先）
+            double beamWidth = GetBeamWidthFromParameters(beam);
+
+            // パラメータから取得できない場合はBoundingBoxからフォールバック
+            if (beamWidth <= 0)
             {
-                // ビューBBのXY範囲から梁方向に直交する幅を計算
-                XYZ normal = new XYZ(-direction.Y, direction.X, 0);
-
-                XYZ[] corners = new[]
+                BoundingBoxXYZ bb = beam.get_BoundingBox(activeView);
+                if (bb != null)
                 {
-                    new XYZ(bb.Min.X, bb.Min.Y, 0),
-                    new XYZ(bb.Max.X, bb.Min.Y, 0),
-                    new XYZ(bb.Min.X, bb.Max.Y, 0),
-                    new XYZ(bb.Max.X, bb.Max.Y, 0)
-                };
+                    XYZ normal = new XYZ(-direction.Y, direction.X, 0);
 
-                double minProj = double.MaxValue;
-                double maxProj = double.MinValue;
-                foreach (var corner in corners)
-                {
-                    double proj = corner.X * normal.X + corner.Y * normal.Y;
-                    minProj = Math.Min(minProj, proj);
-                    maxProj = Math.Max(maxProj, proj);
+                    XYZ[] corners = new[]
+                    {
+                        new XYZ(bb.Min.X, bb.Min.Y, 0),
+                        new XYZ(bb.Max.X, bb.Min.Y, 0),
+                        new XYZ(bb.Min.X, bb.Max.Y, 0),
+                        new XYZ(bb.Max.X, bb.Max.Y, 0)
+                    };
+
+                    double minProj = double.MaxValue;
+                    double maxProj = double.MinValue;
+                    foreach (var corner in corners)
+                    {
+                        double proj = corner.X * normal.X + corner.Y * normal.Y;
+                        minProj = Math.Min(minProj, proj);
+                        maxProj = Math.Max(maxProj, proj);
+                    }
+
+                    beamWidth = maxProj - minProj;
                 }
-
-                beamWidth = maxProj - minProj;
             }
+
+            // 最小幅を保証（200mm = 約0.656ft）
+            if (beamWidth < 200.0 / 304.8)
+                beamWidth = 200.0 / 304.8;
 
             // Z=0 にする（天井伏図はXY平面）
             midPoint = new XYZ(midPoint.X, midPoint.Y, 0);
 
             return Tuple.Create(midPoint, direction, beamWidth);
+        }
+
+        /// <summary>
+        /// 梁のタイプ/インスタンスパラメータから梁幅を取得
+        /// </summary>
+        private static double GetBeamWidthFromParameters(FamilyInstance beam)
+        {
+            // よく使われる梁幅パラメータ名
+            string[] widthParamNames = { "b", "B", "幅", "梁幅", "W", "w", "Width", "width" };
+
+            // インスタンスパラメータを検索
+            foreach (string name in widthParamNames)
+            {
+                Parameter param = beam.LookupParameter(name);
+                if (param != null && param.StorageType == StorageType.Double)
+                {
+                    double val = param.AsDouble();
+                    if (val > 0) return val;
+                }
+            }
+
+            // タイプパラメータを検索
+            ElementType beamType = beam.Symbol;
+            if (beamType != null)
+            {
+                foreach (string name in widthParamNames)
+                {
+                    Parameter param = beamType.LookupParameter(name);
+                    if (param != null && param.StorageType == StorageType.Double)
+                    {
+                        double val = param.AsDouble();
+                        if (val > 0) return val;
+                    }
+                }
+            }
+
+            return 0;
         }
 
         /// <summary>
