@@ -76,6 +76,8 @@ namespace Tools28.Commands.RoomTagCreator
 
         private void UpdateCountLabel()
         {
+            if (CountLabel == null) return;
+
             if (HorizontalRadio != null && HorizontalRadio.IsChecked == true)
             {
                 CountLabel.Text = "列数:";
