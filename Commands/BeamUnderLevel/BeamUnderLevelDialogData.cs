@@ -17,6 +17,27 @@ namespace Tools28.Commands.BeamUnderLevel
         public Dictionary<string, List<ParamCandidate>> ParamCandidates { get; set; }
         public Dictionary<string, List<ParamCandidate>> TopLevelParamCandidates { get; set; }
         public Dictionary<string, List<string>> AdditionalLevelParams { get; set; }
+        public List<TextNoteTypeItem> TextNoteTypes { get; set; }
+    }
+
+    /// <summary>
+    /// TextNoteType表示用ラッパー
+    /// </summary>
+    public class TextNoteTypeItem
+    {
+        public ElementId Id { get; set; }
+        public string Name { get; set; }
+
+        public TextNoteTypeItem(TextNoteType type)
+        {
+            Id = type.Id;
+            Name = type.Name;
+        }
+
+        public override string ToString()
+        {
+            return Name;
+        }
     }
 
     /// <summary>

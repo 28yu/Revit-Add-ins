@@ -37,6 +37,7 @@ namespace Tools28.Commands.BeamUnderLevel
         public Dictionary<string, string> FamilyParamSelection { get; private set; }
         public Dictionary<string, string> FamilyTopLevelParamSelection { get; private set; }
         public bool OverwriteExistingFilters { get; private set; }
+        public ElementId SelectedTextNoteTypeId { get; private set; }
 
         public BeamUnderLevelDialog(BeamUnderLevelDialogData data)
         {
@@ -68,6 +69,13 @@ namespace Tools28.Commands.BeamUnderLevel
                 LowerLevelComboBox.SelectedItem = defaultItem;
             else if (levelItems.Count > 0)
                 LowerLevelComboBox.SelectedIndex = 0;
+
+            // 凡例文字タイプドロップダウン
+            if (_data.TextNoteTypes != null && _data.TextNoteTypes.Count > 0)
+            {
+                TextNoteTypeComboBox.ItemsSource = _data.TextNoteTypes;
+                TextNoteTypeComboBox.SelectedIndex = 0;
+            }
 
             UpdateFloorHeight();
         }
@@ -169,7 +177,7 @@ namespace Tools28.Commands.BeamUnderLevel
 
                     var customRadio = new RadioButton
                     {
-                        Content = "カスタム: ",
+                        Content = "その他: ",
                         GroupName = groupName,
                         FontSize = 11,
                         VerticalAlignment = VerticalAlignment.Center
@@ -382,7 +390,7 @@ namespace Tools28.Commands.BeamUnderLevel
                         Width = 250,
                         Height = 24,
                         FontSize = 11,
-                        IsEnabled = customRadio.IsChecked == true,
+                        IsEnabled = true,
                         VerticalContentAlignment = VerticalAlignment.Center
                     };
 
@@ -393,8 +401,13 @@ namespace Tools28.Commands.BeamUnderLevel
                     if (customComboBox.Items.Count > 0)
                         customComboBox.SelectedIndex = 0;
 
-                    customRadio.Checked += (s, e) => { customComboBox.IsEnabled = true; };
-                    customRadio.Unchecked += (s, e) => { customComboBox.IsEnabled = false; };
+                    // ComboBox選択時にラジオボタンを自動チェック
+                    customComboBox.DropDownOpened += (s, e) => { customRadio.IsChecked = true; };
+                    customComboBox.SelectionChanged += (s, e) =>
+                    {
+                        if (customComboBox.IsDropDownOpen || customComboBox.IsFocused)
+                            customRadio.IsChecked = true;
+                    };
 
                     _familyTopLevelCustomRadios[familyName] = customRadio;
                     _familyTopLevelCustomComboBoxes[familyName] = customComboBox;
@@ -593,6 +606,8 @@ namespace Tools28.Commands.BeamUnderLevel
                 FamilyParamSelection = CollectParamSelections();
                 FamilyTopLevelParamSelection = CollectTopLevelParamSelections();
                 OverwriteExistingFilters = OverwriteCheckBox.IsChecked == true;
+                var selectedTextType = TextNoteTypeComboBox.SelectedItem as TextNoteTypeItem;
+                SelectedTextNoteTypeId = selectedTextType?.Id;
                 DialogResult = true;
                 Close();
             }

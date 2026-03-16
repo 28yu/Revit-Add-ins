@@ -154,6 +154,7 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
 
@@ -185,8 +186,29 @@
                     </StackPanel>
                 </Border>
 
-                <!-- レベル設定 -->
+                <!-- 凡例文字タイプ設定 -->
                 <Border Grid.Row="1" Background="White" BorderBrush="#D3D3D3"
+                        BorderThickness="1" CornerRadius="3" Padding="15,12" Margin="0,0,0,15">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionHeader}" Text="凡例設定"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="120"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Style="{StaticResource LabelStyle}"
+                                       Text="文字タイプ:" VerticalAlignment="Center"/>
+                            <ComboBox Grid.Column="1"
+                                      x:Name="TextNoteTypeComboBox"
+                                      Style="{StaticResource ComboBoxStyle}"/>
+                        </Grid>
+                        <TextBlock Style="{StaticResource NoteStyle}"
+                                   Text="※ 凡例の製図ビューに使用する文字タイプを選択してください"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- レベル設定 -->
+                <Border Grid.Row="2" Background="White" BorderBrush="#D3D3D3"
                         BorderThickness="1" CornerRadius="3" Padding="15,12" Margin="0,0,0,15">
                     <StackPanel>
                         <TextBlock Style="{StaticResource SectionHeader}" Text="レベル設定"/>

@@ -22,7 +22,8 @@ namespace Tools28.Commands.BeamUnderLevel
             Document doc,
             Dictionary<string, int> levelGroups,
             bool overwriteExisting,
-            int errorCount = 0)
+            int errorCount = 0,
+            ElementId textNoteTypeId = null)
         {
             try
             {
@@ -80,7 +81,8 @@ namespace Tools28.Commands.BeamUnderLevel
                 List<Color> colors = FilterManager.GenerateColors(sortedLevels.Count);
 
                 // TextNoteTypeを取得し、テキストサイズを基準にレイアウト計算
-                ElementId textNoteTypeId = GetDefaultTextNoteTypeId(doc);
+                if (textNoteTypeId == null)
+                    textNoteTypeId = GetDefaultTextNoteTypeId(doc);
                 if (textNoteTypeId == null)
                     return draftingView.Id;
 

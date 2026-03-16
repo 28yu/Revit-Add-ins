@@ -103,6 +103,14 @@ namespace Tools28.Commands.BeamUnderLevel
                 var additionalLevelParams = BeamCalculator.FindAdditionalLevelParameters(
                     beamsByFamily, topLevelParamCandidates);
 
+                // TextNoteType一覧を収集
+                var textNoteTypes = new FilteredElementCollector(doc)
+                    .OfClass(typeof(TextNoteType))
+                    .Cast<TextNoteType>()
+                    .OrderBy(t => t.Name)
+                    .Select(t => new TextNoteTypeItem(t))
+                    .ToList();
+
                 // ダイアログ表示
                 var dialogData = new BeamUnderLevelDialogData
                 {
@@ -114,7 +122,8 @@ namespace Tools28.Commands.BeamUnderLevel
                     BeamsByFamily = beamsByFamily,
                     ParamCandidates = paramCandidates,
                     TopLevelParamCandidates = topLevelParamCandidates,
-                    AdditionalLevelParams = additionalLevelParams
+                    AdditionalLevelParams = additionalLevelParams,
+                    TextNoteTypes = textNoteTypes
                 };
 
                 var dialog = new BeamUnderLevelDialog(dialogData);
@@ -128,6 +137,7 @@ namespace Tools28.Commands.BeamUnderLevel
                 Dictionary<string, string> familyParamSelection = dialog.FamilyParamSelection;
                 Dictionary<string, string> familyTopLevelParamSelection = dialog.FamilyTopLevelParamSelection;
                 bool overwriteExisting = dialog.OverwriteExistingFilters;
+                ElementId selectedTextNoteTypeId = dialog.SelectedTextNoteTypeId;
 
                 // 処理実行
                 int successCount = 0;
@@ -198,7 +208,8 @@ namespace Tools28.Commands.BeamUnderLevel
 
                     // 凡例の製図ビューを作成
                     legendViewId = LegendManager.CreateLegendDraftingView(
-                        doc, levelGroups, overwriteExisting, failureCount);
+                        doc, levelGroups, overwriteExisting, failureCount,
+                        selectedTextNoteTypeId);
 
                     trans.Commit();
                 }
