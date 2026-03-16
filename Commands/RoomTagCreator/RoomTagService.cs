@@ -126,14 +126,17 @@ namespace Tools28.Commands.RoomTagCreator
             // クロップボックス表示を非表示
             newView.CropBoxVisible = false;
 
-            // 部屋タグ以外の全カテゴリを非表示にする
-            HideAllCategoriesExceptRoomTags(doc, newView);
-
-            // ビューテンプレートを適用
+            // ユーザー指定のビューテンプレートを適用
             if (viewTemplateId != null && viewTemplateId != ElementId.InvalidElementId)
             {
                 newView.ViewTemplateId = viewTemplateId;
             }
+
+            // ビューテンプレートを解除（自動適用含む）して手動設定を可能にする
+            newView.ViewTemplateId = ElementId.InvalidElementId;
+
+            // 部屋タグ以外の全カテゴリを非表示にする
+            HideAllCategoriesExceptRoomTags(doc, newView);
 
             return newView;
         }
@@ -278,6 +281,7 @@ namespace Tools28.Commands.RoomTagCreator
                 if (cat.Id.IntegerValue == (int)BuiltInCategory.OST_RoomTags)
                     continue;
 
+                // 親カテゴリを非表示
                 try
                 {
                     if (view.CanCategoryBeHidden(cat.Id))
@@ -285,9 +289,19 @@ namespace Tools28.Commands.RoomTagCreator
                         view.SetCategoryHidden(cat.Id, true);
                     }
                 }
-                catch
+                catch { }
+
+                // サブカテゴリも非表示
+                foreach (Category subCat in cat.SubCategories)
                 {
-                    // 一部のカテゴリは非表示にできない場合がある
+                    try
+                    {
+                        if (view.CanCategoryBeHidden(subCat.Id))
+                        {
+                            view.SetCategoryHidden(subCat.Id, true);
+                        }
+                    }
+                    catch { }
                 }
             }
         }
