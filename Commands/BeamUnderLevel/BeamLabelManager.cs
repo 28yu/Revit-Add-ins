@@ -35,7 +35,7 @@ namespace Tools28.Commands.BeamUnderLevel
             // テキストサイズを取得（梁の上にオフセットするため）
             double textHeight = GetTextHeight(doc, textNoteTypeId);
             // 梁の上にオフセットする量（テキスト高さ + 余白）
-            double offsetDistance = textHeight * 1.5;
+            double offsetDistance = textHeight * 2.0;
 
             // 各梁にテキストを配置
             foreach (var beam in beams)
@@ -48,7 +48,7 @@ namespace Tools28.Commands.BeamUnderLevel
                     continue;
 
                 // 梁の方向と中央点を取得
-                var beamInfo = GetBeamDirectionAndMidPoint(beam);
+                var beamInfo = GetBeamDirectionAndMidPoint(beam, activeView);
                 if (beamInfo == null)
                     continue;
 
@@ -105,7 +105,7 @@ namespace Tools28.Commands.BeamUnderLevel
         /// Returns: (midPoint, direction, beamWidth)
         /// </summary>
         private static Tuple<XYZ, XYZ, double> GetBeamDirectionAndMidPoint(
-            FamilyInstance beam)
+            FamilyInstance beam, View activeView)
         {
             var location = beam.Location as LocationCurve;
             if (location == null)
@@ -120,24 +120,24 @@ namespace Tools28.Commands.BeamUnderLevel
             XYZ direction = (endPoint - startPoint);
             direction = new XYZ(direction.X, direction.Y, 0).Normalize();
 
-            // 梁幅をBoundingBoxから推定
+            // 梁幅をビュー固有のBoundingBoxから取得
             double beamWidth = 0;
-            BoundingBoxXYZ bb = beam.get_BoundingBox(null);
+            BoundingBoxXYZ bb = beam.get_BoundingBox(activeView);
             if (bb != null)
             {
-                // 梁方向に直交する方向の幅を計算
+                // ビューBBのXY範囲から梁方向に直交する幅を計算
                 XYZ normal = new XYZ(-direction.Y, direction.X, 0);
-                double minProj = double.MaxValue;
-                double maxProj = double.MinValue;
 
                 XYZ[] corners = new[]
                 {
-                    bb.Min,
-                    new XYZ(bb.Max.X, bb.Min.Y, bb.Min.Z),
-                    new XYZ(bb.Min.X, bb.Max.Y, bb.Min.Z),
-                    bb.Max
+                    new XYZ(bb.Min.X, bb.Min.Y, 0),
+                    new XYZ(bb.Max.X, bb.Min.Y, 0),
+                    new XYZ(bb.Min.X, bb.Max.Y, 0),
+                    new XYZ(bb.Max.X, bb.Max.Y, 0)
                 };
 
+                double minProj = double.MaxValue;
+                double maxProj = double.MinValue;
                 foreach (var corner in corners)
                 {
                     double proj = corner.X * normal.X + corner.Y * normal.Y;
