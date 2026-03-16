@@ -3,9 +3,9 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="梁下端色分け"
         Width="700"
-        Height="700"
+        Height="850"
         MinWidth="600"
-        MinHeight="550"
+        MinHeight="700"
         WindowStartupLocation="CenterScreen"
         Background="#F5F5F5"
         KeyDown="Window_KeyDown">
@@ -285,53 +285,52 @@
             </Grid>
 
             <!-- ステップ4: 確認・実行 -->
-            <Grid x:Name="Step4Panel" Visibility="Collapsed">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
-
-                <!-- 処理概要 -->
-                <Border Grid.Row="0" Background="White" BorderBrush="#D3D3D3"
-                        BorderThickness="1" CornerRadius="3" Padding="15,12" Margin="0,0,0,15">
-                    <StackPanel>
-                        <TextBlock Style="{StaticResource SectionHeader}" Text="処理概要"/>
-                        <TextBlock x:Name="SummaryText" Style="{StaticResource LabelStyle}"
-                                   TextWrapping="Wrap"/>
-                    </StackPanel>
-                </Border>
-
-                <!-- プレビュー -->
-                <Border Grid.Row="1" Background="White" BorderBrush="#D3D3D3"
-                        BorderThickness="1" CornerRadius="3" Padding="15,12" Margin="0,0,0,15">
-                    <StackPanel>
-                        <TextBlock Style="{StaticResource SectionHeader}" Text="処理内容"/>
+            <ScrollViewer x:Name="Step4Panel" Visibility="Collapsed"
+                          VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <!-- 処理概要 -->
+                    <Border Background="White" BorderBrush="#D3D3D3"
+                            BorderThickness="1" CornerRadius="3" Padding="15,12" Margin="0,0,0,15">
                         <StackPanel>
-                            <CheckBox Content="共有パラメータ作成・バインド"
-                                      IsChecked="True" IsEnabled="False" Margin="0,3"/>
-                            <CheckBox Content="梁下レベル値の計算・書き込み"
-                                      IsChecked="True" IsEnabled="False" Margin="0,3"/>
-                            <CheckBox Content="フィルタ自動作成・色分け"
-                                      IsChecked="True" IsEnabled="False" Margin="0,3"/>
+                            <TextBlock Style="{StaticResource SectionHeader}" Text="処理概要"/>
+                            <TextBlock x:Name="SummaryText" Style="{StaticResource LabelStyle}"
+                                       TextWrapping="Wrap"/>
                         </StackPanel>
-                    </StackPanel>
-                </Border>
+                    </Border>
 
-                <!-- 既存フィルタ上書き確認 -->
-                <Border Grid.Row="2" Background="#FFF8E1" BorderBrush="#FFD54F"
-                        BorderThickness="1" CornerRadius="3" Padding="15,12">
-                    <StackPanel>
-                        <TextBlock FontSize="12" FontWeight="Bold" Foreground="#F57F17"
-                                   Text="既存フィルタについて" Margin="0,0,0,5"/>
-                        <CheckBox x:Name="OverwriteCheckBox" IsChecked="True"
-                                  Content="既存の「梁下_」フィルタを上書きする"
-                                  FontSize="11" Margin="0,3"/>
-                        <TextBlock Style="{StaticResource NoteStyle}"
-                                   Text="※ チェックを外すと既存フィルタはそのまま残ります"/>
-                    </StackPanel>
-                </Border>
-            </Grid>
+                    <!-- 処理内容 -->
+                    <Border Background="White" BorderBrush="#D3D3D3"
+                            BorderThickness="1" CornerRadius="3" Padding="15,12" Margin="0,0,0,15">
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource SectionHeader}" Text="処理内容"/>
+                            <StackPanel>
+                                <CheckBox Content="共有パラメータ作成・バインド"
+                                          IsChecked="True" IsEnabled="False" Margin="0,3"/>
+                                <CheckBox Content="梁下レベル値の計算・書き込み"
+                                          IsChecked="True" IsEnabled="False" Margin="0,3"/>
+                                <CheckBox Content="フィルタ自動作成・色分け"
+                                          IsChecked="True" IsEnabled="False" Margin="0,3"/>
+                                <CheckBox Content="凡例の製図ビュー作成"
+                                          IsChecked="True" IsEnabled="False" Margin="0,3"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- 既存フィルタ上書き確認 -->
+                    <Border Background="#FFF8E1" BorderBrush="#FFD54F"
+                            BorderThickness="1" CornerRadius="3" Padding="15,12">
+                        <StackPanel>
+                            <TextBlock FontSize="12" FontWeight="Bold" Foreground="#F57F17"
+                                       Text="既存フィルタについて" Margin="0,0,0,5"/>
+                            <CheckBox x:Name="OverwriteCheckBox" IsChecked="True"
+                                      Content="既存の「梁下_」フィルタを上書きする"
+                                      FontSize="11" Margin="0,3"/>
+                            <TextBlock Style="{StaticResource NoteStyle}"
+                                       Text="※ チェックを外すと既存フィルタはそのまま残ります"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
         </Grid>
 
         <!-- ボタンエリア -->

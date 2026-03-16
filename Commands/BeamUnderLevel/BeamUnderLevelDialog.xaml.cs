@@ -14,17 +14,12 @@ namespace Tools28.Commands.BeamUnderLevel
         private int _currentStep = 1;
         private const int TotalSteps = 4;
 
-        // ファミリ毎の梁高さパラメータ選択コンボボックス
-        private readonly Dictionary<string, ComboBox> _familyParamComboBoxes =
-            new Dictionary<string, ComboBox>();
-
-        // ファミリ毎のカスタム入力テキストボックス（梁高さ）
-        private readonly Dictionary<string, TextBox> _familyCustomTextBoxes =
-            new Dictionary<string, TextBox>();
-
-        // ファミリ毎の「カスタム入力」ラジオボタン（梁高さ）
+            // ファミリ毎の「その他」ラジオボタン（梁高さ）
         private readonly Dictionary<string, RadioButton> _familyCustomRadios =
             new Dictionary<string, RadioButton>();
+        // ファミリ毎の「その他」ComboBox（梁高さ）
+        private readonly Dictionary<string, ComboBox> _familyCustomComboBoxes =
+            new Dictionary<string, ComboBox>();
 
         // ファミリ毎の天端レベルパラメータ選択用
         private readonly Dictionary<string, RadioButton> _familyTopLevelCustomRadios =
@@ -104,8 +99,7 @@ namespace Tools28.Commands.BeamUnderLevel
         private void InitializeStep2()
         {
             FamilyParamPanel.Children.Clear();
-            _familyParamComboBoxes.Clear();
-            _familyCustomTextBoxes.Clear();
+            _familyCustomComboBoxes.Clear();
             _familyCustomRadios.Clear();
 
             foreach (var entry in _data.BeamsByFamily)
@@ -168,66 +162,72 @@ namespace Tools28.Commands.BeamUnderLevel
                         stackPanel.Children.Add(radio);
                     }
 
-                    // カスタム入力オプション
-                    var customPanel = new StackPanel
+                    // その他パラメータ（ComboBox）
+                    var additionalParams = _data.AdditionalHeightParams != null &&
+                        _data.AdditionalHeightParams.ContainsKey(familyName)
+                        ? _data.AdditionalHeightParams[familyName]
+                        : new List<string>();
+
+                    if (additionalParams.Count > 0)
                     {
-                        Orientation = Orientation.Horizontal,
-                        Margin = new Thickness(10, 3, 0, 3)
-                    };
+                        var customPanel = new StackPanel
+                        {
+                            Orientation = Orientation.Horizontal,
+                            Margin = new Thickness(10, 3, 0, 3)
+                        };
 
-                    var customRadio = new RadioButton
-                    {
-                        Content = "その他: ",
-                        GroupName = groupName,
-                        FontSize = 11,
-                        VerticalAlignment = VerticalAlignment.Center
-                    };
+                        var customRadio = new RadioButton
+                        {
+                            Content = "その他: ",
+                            GroupName = groupName,
+                            FontSize = 11,
+                            VerticalAlignment = VerticalAlignment.Center
+                        };
 
-                    var customTextBox = new TextBox
-                    {
-                        Width = 150,
-                        Height = 22,
-                        FontSize = 11,
-                        IsEnabled = false,
-                        VerticalContentAlignment = VerticalAlignment.Center,
-                        Padding = new Thickness(4, 0, 4, 0)
-                    };
+                        var customComboBox = new ComboBox
+                        {
+                            Width = 250,
+                            Height = 24,
+                            FontSize = 11,
+                            IsEnabled = true,
+                            VerticalContentAlignment = VerticalAlignment.Center
+                        };
 
-                    customRadio.Checked += (s, e) => { customTextBox.IsEnabled = true; };
-                    customRadio.Unchecked += (s, e) => { customTextBox.IsEnabled = false; };
+                        foreach (string paramName in additionalParams)
+                        {
+                            customComboBox.Items.Add(paramName);
+                        }
+                        if (customComboBox.Items.Count > 0)
+                            customComboBox.SelectedIndex = 0;
 
-                    _familyCustomRadios[familyName] = customRadio;
-                    _familyCustomTextBoxes[familyName] = customTextBox;
+                        // ComboBox選択時にラジオボタンを自動チェック
+                        customComboBox.DropDownOpened += (s, e) => { customRadio.IsChecked = true; };
+                        customComboBox.SelectionChanged += (s, e) =>
+                        {
+                            if (customComboBox.IsDropDownOpen || customComboBox.IsFocused)
+                                customRadio.IsChecked = true;
+                        };
 
-                    customPanel.Children.Add(customRadio);
-                    customPanel.Children.Add(customTextBox);
-                    stackPanel.Children.Add(customPanel);
+                        _familyCustomRadios[familyName] = customRadio;
+                        _familyCustomComboBoxes[familyName] = customComboBox;
+
+                        customPanel.Children.Add(customRadio);
+                        customPanel.Children.Add(customComboBox);
+                        stackPanel.Children.Add(customPanel);
+                    }
                 }
                 else
                 {
                     // 候補なし
                     var noParamText = new TextBlock
                     {
-                        Text = "梁高さパラメータが見つかりませんでした。カスタム入力してください:",
+                        Text = "梁高さパラメータが見つかりませんでした。",
                         FontSize = 11,
                         Foreground = new System.Windows.Media.SolidColorBrush(
                             System.Windows.Media.Color.FromRgb(0xCC, 0x00, 0x00)),
                         Margin = new Thickness(10, 0, 0, 5)
                     };
                     stackPanel.Children.Add(noParamText);
-
-                    var customTextBox = new TextBox
-                    {
-                        Width = 200,
-                        Height = 22,
-                        FontSize = 11,
-                        Margin = new Thickness(10, 0, 0, 0),
-                        HorizontalAlignment = HorizontalAlignment.Left,
-                        VerticalContentAlignment = VerticalAlignment.Center,
-                        Padding = new Thickness(4, 0, 4, 0)
-                    };
-                    _familyCustomTextBoxes[familyName] = customTextBox;
-                    stackPanel.Children.Add(customTextBox);
                 }
 
                 groupBox.Child = stackPanel;
@@ -246,23 +246,16 @@ namespace Tools28.Commands.BeamUnderLevel
             {
                 string familyName = entry.Key;
 
-                // カスタム入力がアクティブか確認
+                // 「その他」ComboBoxがアクティブか確認
                 if (_familyCustomRadios.ContainsKey(familyName) &&
                     _familyCustomRadios[familyName].IsChecked == true)
                 {
-                    string customValue = _familyCustomTextBoxes[familyName].Text?.Trim();
-                    if (!string.IsNullOrEmpty(customValue))
-                        result[familyName] = customValue;
-                    continue;
-                }
-
-                // カスタムテキストボックスのみ（候補なしの場合）
-                if (!_familyCustomRadios.ContainsKey(familyName) &&
-                    _familyCustomTextBoxes.ContainsKey(familyName))
-                {
-                    string customValue = _familyCustomTextBoxes[familyName].Text?.Trim();
-                    if (!string.IsNullOrEmpty(customValue))
-                        result[familyName] = customValue;
+                    if (_familyCustomComboBoxes.ContainsKey(familyName))
+                    {
+                        string selected = _familyCustomComboBoxes[familyName].SelectedItem as string;
+                        if (!string.IsNullOrEmpty(selected))
+                            result[familyName] = selected;
+                    }
                     continue;
                 }
 
@@ -274,12 +267,10 @@ namespace Tools28.Commands.BeamUnderLevel
                     var panel = border.Child as StackPanel;
                     if (panel == null) continue;
 
-                    // このファミリのパネルか確認
                     var headerText = panel.Children.OfType<TextBlock>().FirstOrDefault();
                     if (headerText == null || !headerText.Text.StartsWith(familyName))
                         continue;
 
-                    // 選択されたラジオボタンを探す
                     foreach (var panelChild in panel.Children)
                     {
                         var radio = panelChild as RadioButton;
@@ -551,7 +542,7 @@ namespace Tools28.Commands.BeamUnderLevel
             BackButton.IsEnabled = step > 1;
             NextButton.Content = step == TotalSteps ? "実行" : "次へ";
 
-            string[] stepNames = { "", "レベル設定", "梁高さパラメータ選択", "梁天端レベルパラメータ選択", "処理確認" };
+            string[] stepNames = { "", "レベル設定、凡例設定", "梁高さパラメータ選択", "梁天端レベルパラメータ選択", "処理確認" };
             StepIndicator.Text = $"ステップ {step} / {TotalSteps}  {stepNames[step]}";
         }
 
