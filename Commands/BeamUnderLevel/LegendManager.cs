@@ -94,7 +94,8 @@ namespace Tools28.Commands.BeamUnderLevel
                 double titleGap = textHeight * 3.0;
 
                 // テキストY位置の補正値（矩形中央にテキスト中央を合わせる）
-                double textYOffset = (rectHeight + textHeight) / 2;
+                // TextNoteの基準点は左上だが、描画はベースライン基準のため追加補正
+                double textYOffset = (rectHeight + textHeight) / 2 + textHeight * 0.3;
                 // 行ピッチ（矩形とテキストで共通）
                 double rowPitch = rectHeight + rowSpacing;
 
