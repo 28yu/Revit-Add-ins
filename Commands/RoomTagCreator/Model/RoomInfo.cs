@@ -8,17 +8,19 @@ namespace Tools28.Commands.RoomTagCreator.Model
         public ElementId Id { get; set; }
         public string Name { get; set; }
         public Room Element { get; set; }
+        public bool IsEnclosed { get; set; }
 
         public RoomInfo(Room room)
         {
             Element = room;
             Id = room.Id;
             Name = room.LookupParameter("名前")?.AsString() ?? room.Name ?? "(名称なし)";
+            IsEnclosed = room.Area > 0;
         }
 
         public override string ToString()
         {
-            return Name;
+            return IsEnclosed ? Name : Name + "*";
         }
     }
 }
