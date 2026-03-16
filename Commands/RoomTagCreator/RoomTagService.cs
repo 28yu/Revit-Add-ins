@@ -276,14 +276,23 @@ namespace Tools28.Commands.RoomTagCreator
         {
             Categories categories = doc.Settings.Categories;
 
+            // 表示を維持するカテゴリ
+            var keepVisible = new HashSet<int>
+            {
+                (int)BuiltInCategory.OST_RoomTags,
+                (int)BuiltInCategory.OST_RevisionClouds,       // 改定雲マーク
+                (int)BuiltInCategory.OST_RevisionCloudTags,    // 改定雲マークタグ
+                (int)BuiltInCategory.OST_TextNotes,            // 文字注記
+            };
+
             foreach (Category cat in categories)
             {
                 if (cat.CategoryType != CategoryType.Model &&
                     cat.CategoryType != CategoryType.Annotation)
                     continue;
 
-                // 部屋タグ (OST_RoomTags) は表示を維持
-                if (cat.Id.IntegerValue == (int)BuiltInCategory.OST_RoomTags)
+                // 表示を維持するカテゴリはスキップ
+                if (keepVisible.Contains(cat.Id.IntegerValue))
                     continue;
 
                 // 部屋 (OST_Rooms) は表示を維持し、色塗り潰し以外のサブカテゴリを非表示
@@ -331,6 +340,59 @@ namespace Tools28.Commands.RoomTagCreator
                     catch { }
                 }
             }
+
+            // 部屋タグの引き出し線を白色・間隔が広いドットに設定
+            SetRoomTagLeaderOverride(doc, view);
+        }
+
+        /// <summary>
+        /// 部屋タグの引き出し線を白色・間隔が広いドットにオーバーライド
+        /// </summary>
+        private static void SetRoomTagLeaderOverride(Document doc, View view)
+        {
+            // 間隔が広いドットのラインパターンを取得または作成
+            ElementId linePatternId = GetOrCreateWideDotPattern(doc);
+
+            var overrides = new OverrideGraphicSettings();
+            overrides.SetProjectionLineColor(new Color(255, 255, 255));
+            if (linePatternId != null && linePatternId != ElementId.InvalidElementId)
+            {
+                overrides.SetProjectionLinePatternId(linePatternId);
+            }
+
+            var roomTagCatId = new ElementId(BuiltInCategory.OST_RoomTags);
+            view.SetCategoryOverrides(roomTagCatId, overrides);
+        }
+
+        /// <summary>
+        /// 間隔が広いドットのラインパターンを取得または作成
+        /// </summary>
+        private static ElementId GetOrCreateWideDotPattern(Document doc)
+        {
+            string patternName = "間隔が広いドット";
+
+            // 既存のパターンを検索（日本語名・英語名）
+            var existing = new FilteredElementCollector(doc)
+                .OfClass(typeof(LinePatternElement))
+                .Cast<LinePatternElement>()
+                .FirstOrDefault(lp => lp.Name == patternName
+                    || lp.Name == "Wide Dot"
+                    || lp.Name == "Dot (wide)");
+
+            if (existing != null)
+                return existing.Id;
+
+            // 見つからない場合は作成（ドット + 広い間隔）
+            var segments = new List<LinePatternSegment>
+            {
+                new LinePatternSegment(LinePatternSegmentType.Dot, 0),
+                new LinePatternSegment(LinePatternSegmentType.Space, 3.0 / 304.8)  // 3mm間隔
+            };
+
+            var pattern = new LinePattern(patternName);
+            pattern.SetSegments(segments);
+
+            return LinePatternElement.Create(doc, pattern).Id;
         }
     }
 }
