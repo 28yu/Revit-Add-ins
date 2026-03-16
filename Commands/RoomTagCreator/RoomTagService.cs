@@ -155,9 +155,12 @@ namespace Tools28.Commands.RoomTagCreator
             if (tagTypeId == null || tagTypeId == ElementId.InvalidElementId)
                 return createdTags;
 
-            // タグタイプを取得してBoundingBoxからサイズを推定
-            // まず最初のタグを作成してサイズを取得
             int viewScale = view.Scale;
+
+            // クロップボックスの左上を起点にする
+            BoundingBoxXYZ cropBox = view.CropBox;
+            double startU = cropBox.Min.X;
+            double startV = cropBox.Max.Y;
 
             // 配置位置の計算用変数
             double width = 0;
@@ -166,8 +169,8 @@ namespace Tools28.Commands.RoomTagCreator
 
             int columnCount = 0;
             int rowCount = 0;
-            double currentU = 0;
-            double currentV = 0;
+            double currentU = startU;
+            double currentV = startV;
 
             for (int i = 0; i < rooms.Count; i++)
             {
@@ -193,14 +196,16 @@ namespace Tools28.Commands.RoomTagCreator
                         BoundingBoxXYZ tagBB = newTag.get_BoundingBox(view);
                         if (tagBB != null)
                         {
-                            double step = settings.SpacingFeet;
-                            width = (tagBB.Max.X - tagBB.Min.X + step) * viewScale;
-                            height = (tagBB.Max.Y - tagBB.Min.Y + step) * viewScale;
+                            // BoundingBoxはモデル座標（スケール反映済み）
+                            // 間隔は紙面mm指定なのでスケール変換
+                            double stepModel = settings.SpacingFeet * viewScale;
+                            width = (tagBB.Max.X - tagBB.Min.X) + stepModel;
+                            height = (tagBB.Max.Y - tagBB.Min.Y) + stepModel;
                             sizeCalculated = true;
                         }
                         else
                         {
-                            // BoundingBox取得失敗時のデフォルト値
+                            // BoundingBox取得失敗時のデフォルト値（紙面10mm×5mm）
                             width = 10.0 / 304.8 * viewScale;
                             height = 5.0 / 304.8 * viewScale;
                             sizeCalculated = true;
@@ -214,7 +219,7 @@ namespace Tools28.Commands.RoomTagCreator
                         columnCount++;
                         if (columnCount % settings.Count == 0)
                         {
-                            currentU = 0;
+                            currentU = startU;
                             currentV -= height;
                         }
                         else
@@ -229,7 +234,7 @@ namespace Tools28.Commands.RoomTagCreator
                         if (rowCount % settings.Count == 0)
                         {
                             currentU += width;
-                            currentV = 0;
+                            currentV = startV;
                         }
                         else
                         {
