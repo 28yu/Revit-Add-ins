@@ -19,10 +19,9 @@ namespace Tools28
 
                 // パネル作成
                 CreateGridBubblePanel(application, tabName, assemblyPath);
-                CreateSheetPanel(application, tabName, assemblyPath);
+                CreateSheetViewPanel(application, tabName, assemblyPath);
                 CreateThreeDViewPanel(application, tabName, assemblyPath);
-                CreateViewPanel(application, tabName, assemblyPath);
-                CreateDetailPanel(application, tabName, assemblyPath);
+                CreateAnnotationPanel(application, tabName, assemblyPath);
                 CreateStructuralPanel(application, tabName, assemblyPath);
 
                 return Result.Succeeded;
@@ -78,11 +77,11 @@ namespace Tools28
         }
 
         /// <summary>
-        /// シートパネルを作成
+        /// シート・ビューパネルを作成
         /// </summary>
-        private void CreateSheetPanel(UIControlledApplication application, string tabName, string assemblyPath)
+        private void CreateSheetViewPanel(UIControlledApplication application, string tabName, string assemblyPath)
         {
-            RibbonPanel panel = application.CreateRibbonPanel(tabName, "シート");
+            RibbonPanel panel = application.CreateRibbonPanel(tabName, "シート・ビュー");
 
             // シート一括作成ボタン
             PushButtonData sheetButtonData = new PushButtonData(
@@ -120,15 +119,25 @@ namespace Tools28
             // セパレータ
             panel.AddSeparator();
 
-            // 部屋タグ自動配置ボタン
-            PushButtonData roomTagButtonData = new PushButtonData(
-                "RoomTagAutoCreator",
-                "部屋タグ\n自動配置",
+            // トリミング領域コピーボタン
+            PushButtonData cropBoxCopyButtonData = new PushButtonData(
+                "CropBoxCopy",
+                "トリミング\n領域コピー",
                 assemblyPath,
-                "Tools28.Commands.RoomTagCreator.RoomTagAutoCreatorCommand");
-            roomTagButtonData.ToolTip = "ビューポート内の部屋タグを指定方向・間隔で自動配置します";
-            roomTagButtonData.LargeImage = LoadImage("room_tag_32.png");
-            panel.AddItem(roomTagButtonData);
+                "Tools28.Commands.CropBoxCopy.ExecuteCropBoxCopyCommand");
+            cropBoxCopyButtonData.ToolTip = "ビューのトリミング領域をコピーします";
+            cropBoxCopyButtonData.LargeImage = LoadImage("cropbox_copy_32.png");
+            panel.AddItem(cropBoxCopyButtonData);
+
+            // トリミング領域ペーストボタン
+            PushButtonData cropBoxPasteButtonData = new PushButtonData(
+                "CropBoxPaste",
+                "トリミング\n領域ペースト",
+                assemblyPath,
+                "Tools28.Commands.CropBoxCopy.ExecuteCropBoxPasteCommand");
+            cropBoxPasteButtonData.ToolTip = "コピーしたトリミング領域を他のビューに適用します";
+            cropBoxPasteButtonData.LargeImage = LoadImage("cropbox_paste_32.png");
+            panel.AddItem(cropBoxPasteButtonData);
         }
 
         /// <summary>
@@ -183,39 +192,24 @@ namespace Tools28
         }
 
         /// <summary>
-        /// ビューパネルを作成
+        /// 注釈・詳細パネルを作成
         /// </summary>
-        private void CreateViewPanel(UIControlledApplication application, string tabName, string assemblyPath)
+        private void CreateAnnotationPanel(UIControlledApplication application, string tabName, string assemblyPath)
         {
-            RibbonPanel panel = application.CreateRibbonPanel(tabName, "ビュー");
+            RibbonPanel panel = application.CreateRibbonPanel(tabName, "注釈・詳細");
 
-            // トリミング領域コピーボタン
-            PushButtonData cropBoxCopyButtonData = new PushButtonData(
-                "CropBoxCopy",
-                "トリミング\n領域コピー",
+            // 部屋タグ自動配置ボタン
+            PushButtonData roomTagButtonData = new PushButtonData(
+                "RoomTagAutoCreator",
+                "部屋タグ\n自動配置",
                 assemblyPath,
-                "Tools28.Commands.CropBoxCopy.ExecuteCropBoxCopyCommand");
-            cropBoxCopyButtonData.ToolTip = "ビューのトリミング領域をコピーします";
-            cropBoxCopyButtonData.LargeImage = LoadImage("cropbox_copy_32.png");
-            panel.AddItem(cropBoxCopyButtonData);
+                "Tools28.Commands.RoomTagCreator.RoomTagAutoCreatorCommand");
+            roomTagButtonData.ToolTip = "ビューポート内の部屋タグを指定方向・間隔で自動配置します";
+            roomTagButtonData.LargeImage = LoadImage("room_tag_32.png");
+            panel.AddItem(roomTagButtonData);
 
-            // トリミング領域ペーストボタン
-            PushButtonData cropBoxPasteButtonData = new PushButtonData(
-                "CropBoxPaste",
-                "トリミング\n領域ペースト",
-                assemblyPath,
-                "Tools28.Commands.CropBoxCopy.ExecuteCropBoxPasteCommand");
-            cropBoxPasteButtonData.ToolTip = "コピーしたトリミング領域を他のビューに適用します";
-            cropBoxPasteButtonData.LargeImage = LoadImage("cropbox_paste_32.png");
-            panel.AddItem(cropBoxPasteButtonData);
-        }
-
-        /// <summary>
-        /// 詳細パネルを作成
-        /// </summary>
-        private void CreateDetailPanel(UIControlledApplication application, string tabName, string assemblyPath)
-        {
-            RibbonPanel panel = application.CreateRibbonPanel(tabName, "詳細");
+            // セパレータ
+            panel.AddSeparator();
 
             // 塗潰し領域 分割/統合ボタン
             PushButtonData filledRegionButtonData = new PushButtonData(
