@@ -38,8 +38,8 @@ namespace Tools28.Commands.BeamUnderLevel
             // TEXT_SIZE はペーパー空間の高さなので、モデル空間では viewScale 倍
             int viewScale = activeView.Scale;
             double modelTextHeight = textHeight * viewScale;
-            // オフセット量: テキストのモデル空間高さ + 余白
-            double offsetDistance = modelTextHeight + modelTextHeight * 0.3;
+            // オフセット量: 梁端からの余白（テキストは下端基準なので上に伸びる）
+            double offsetDistance = modelTextHeight * 0.3;
 
             // 各梁にテキストを配置
             foreach (var beam in beams)
@@ -86,6 +86,10 @@ namespace Tools28.Commands.BeamUnderLevel
                 {
                     TextNote textNote = TextNote.Create(doc, activeView.Id,
                         textPosition, labelText, textNoteTypeId);
+
+                    // 位置合わせ: 中心・下（アンカーがテキスト下端中央になり、梁から離れる方向にテキストが伸びる）
+                    textNote.HorizontalAlignment = HorizontalTextAlignment.Center;
+                    textNote.VerticalAlignment = VerticalTextAlignment.Bottom;
 
                     // 梁方向に回転
                     if (Math.Abs(angle) > 0.001)
