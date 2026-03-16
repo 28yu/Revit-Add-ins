@@ -22,11 +22,12 @@ namespace Tools28.Commands.BeamTopLevel
             {
                 View activeView = doc.ActiveView;
 
-                // チェック1: ビュータイプ（平面ビュー = FloorPlan）
-                if (activeView.ViewType != ViewType.FloorPlan)
+                // チェック1: ビュータイプ（平面ビュー = FloorPlan / 構造伏図 = EngineeringPlan）
+                if (activeView.ViewType != ViewType.FloorPlan &&
+                    activeView.ViewType != ViewType.EngineeringPlan)
                 {
                     TaskDialog.Show("エラー",
-                        "アクティブビューが平面ビューではありません。\n平面ビューを開いた状態で実行してください。");
+                        "アクティブビューが平面ビューまたは構造伏図ではありません。\n平面ビューまたは構造伏図を開いた状態で実行してください。");
                     return Result.Cancelled;
                 }
 
