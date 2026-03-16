@@ -19,6 +19,7 @@ namespace Tools28.Commands.RoomTagCreator
         private ObservableCollection<RoomInfo> _rooms;
         private List<RoomTagTypeInfo> _tagTypes;
         private List<View> _viewTemplates;
+        private int _rowCount = 2;
 
         // 結果プロパティ
         public string NewViewName { get; private set; }
@@ -46,8 +47,8 @@ namespace Tools28.Commands.RoomTagCreator
             LoadTagTypes();
             LoadViewTemplates();
 
-            // 初期状態のラベル設定
-            UpdateCountLabel();
+            // 初期表示
+            RowCountText.Text = _rowCount.ToString();
             UpdatePreview();
         }
 
@@ -68,20 +69,6 @@ namespace Tools28.Commands.RoomTagCreator
             ViewTemplateComboBox.SelectedIndex = 0;
         }
 
-        private void UpdateCountLabel()
-        {
-            if (CountLabel == null) return;
-
-            if (HorizontalRadio != null && HorizontalRadio.IsChecked == true)
-            {
-                CountLabel.Text = "列数:";
-            }
-            else
-            {
-                CountLabel.Text = "行数:";
-            }
-        }
-
         private void UpdatePreview()
         {
             if (PreviewCanvas == null || _rooms == null) return;
@@ -91,26 +78,11 @@ namespace Tools28.Commands.RoomTagCreator
             int roomCount = _rooms.Count;
             if (roomCount == 0) return;
 
-            bool isHorizontal = HorizontalRadio?.IsChecked == true;
-            int count = 5;
-            if (int.TryParse(CountTextBox?.Text, out int parsed) && parsed >= 1)
-                count = parsed;
+            int rows = _rowCount;
+            int cols = (int)Math.Ceiling((double)roomCount / rows);
 
-            double canvasW = PreviewCanvas.ActualWidth > 0 ? PreviewCanvas.ActualWidth : 660;
+            double canvasW = PreviewCanvas.ActualWidth > 0 ? PreviewCanvas.ActualWidth : 620;
             double canvasH = PreviewCanvas.ActualHeight > 0 ? PreviewCanvas.ActualHeight : 120;
-
-            // グリッド配置の計算
-            int cols, rows;
-            if (isHorizontal)
-            {
-                cols = count;
-                rows = (int)Math.Ceiling((double)roomCount / count);
-            }
-            else
-            {
-                rows = count;
-                cols = (int)Math.Ceiling((double)roomCount / count);
-            }
 
             // タグサイズとマージンの計算
             double margin = 4;
@@ -125,20 +97,11 @@ namespace Tools28.Commands.RoomTagCreator
             var tagBorder = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x00, 0x66, 0xCC));
             var textBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x33, 0x33, 0x33));
 
-            int index = 0;
             for (int i = 0; i < roomCount; i++)
             {
-                int col, row;
-                if (isHorizontal)
-                {
-                    col = i % count;
-                    row = i / count;
-                }
-                else
-                {
-                    row = i % count;
-                    col = i / count;
-                }
+                // 横並び: 左→右、指定行数で折り返し
+                int col = i / rows;
+                int row = i % rows;
 
                 double x = margin + col * (cellW + margin);
                 double y = margin + row * (cellH + margin);
@@ -171,22 +134,29 @@ namespace Tools28.Commands.RoomTagCreator
                 Canvas.SetLeft(text, x + 3);
                 Canvas.SetTop(text, y + (cellH - 14) / 2);
                 PreviewCanvas.Children.Add(text);
-
-                index++;
             }
         }
 
         // --- イベントハンドラ ---
 
-        private void LayoutChanged(object sender, RoutedEventArgs e)
+        private void RowCountUp_Click(object sender, RoutedEventArgs e)
         {
-            UpdateCountLabel();
-            UpdatePreview();
+            if (_rowCount < _rooms.Count)
+            {
+                _rowCount++;
+                RowCountText.Text = _rowCount.ToString();
+                UpdatePreview();
+            }
         }
 
-        private void LayoutChanged_Text(object sender, TextChangedEventArgs e)
+        private void RowCountDown_Click(object sender, RoutedEventArgs e)
         {
-            UpdatePreview();
+            if (_rowCount > 1)
+            {
+                _rowCount--;
+                RowCountText.Text = _rowCount.ToString();
+                UpdatePreview();
+            }
         }
 
         private void MoveUpButton_Click(object sender, RoutedEventArgs e)
@@ -222,11 +192,6 @@ namespace Tools28.Commands.RoomTagCreator
             }
         }
 
-        private void CountTextBox_PreviewTextInput(object sender, TextCompositionEventArgs e)
-        {
-            e.Handled = !Regex.IsMatch(e.Text, "^[0-9]+$");
-        }
-
         private void SpacingTextBox_PreviewTextInput(object sender, TextCompositionEventArgs e)
         {
             e.Handled = !Regex.IsMatch(e.Text, "^[0-9.]+$");
@@ -256,13 +221,6 @@ namespace Tools28.Commands.RoomTagCreator
                 return;
             }
 
-            if (!int.TryParse(CountTextBox.Text, out int count) || count < 1)
-            {
-                MessageBox.Show("行数/列数には1以上の整数を入力してください。", "入力エラー",
-                    MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-
             if (!double.TryParse(SpacingTextBox.Text, out double spacing) || spacing < 0)
             {
                 MessageBox.Show("タグ間隔には0以上の数値を入力してください。", "入力エラー",
@@ -279,8 +237,7 @@ namespace Tools28.Commands.RoomTagCreator
 
             Layout = new LayoutSettings
             {
-                IsHorizontal = HorizontalRadio.IsChecked == true,
-                Count = count,
+                Count = _rowCount,
                 SpacingMm = spacing
             };
 

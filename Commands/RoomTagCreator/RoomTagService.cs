@@ -179,7 +179,6 @@ namespace Tools28.Commands.RoomTagCreator
             double height = 0;
             bool sizeCalculated = false;
 
-            int columnCount = 0;
             int rowCount = 0;
             double currentU = startU;
             double currentV = startV;
@@ -225,33 +224,16 @@ namespace Tools28.Commands.RoomTagCreator
                     }
 
                     // 次のタグの位置を計算
-                    if (settings.IsHorizontal)
+                    // Count = 行数。縦にCount個並べたら右にシフト
+                    rowCount++;
+                    if (rowCount % settings.Count == 0)
                     {
-                        // 横並び: X軸右方向、指定列数で改行
-                        columnCount++;
-                        if (columnCount % settings.Count == 0)
-                        {
-                            currentU = startU;
-                            currentV -= height;
-                        }
-                        else
-                        {
-                            currentU += width;
-                        }
+                        currentU += width;
+                        currentV = startV;
                     }
                     else
                     {
-                        // 縦並び: Y軸下方向、指定行数で右へシフト
-                        rowCount++;
-                        if (rowCount % settings.Count == 0)
-                        {
-                            currentU += width;
-                            currentV = startV;
-                        }
-                        else
-                        {
-                            currentV -= height;
-                        }
+                        currentV -= height;
                     }
                 }
             }

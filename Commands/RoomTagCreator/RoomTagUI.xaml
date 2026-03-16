@@ -287,24 +287,6 @@
 
             <!-- 右パネル -->
             <StackPanel Grid.Column="2">
-                <!-- 配置方向 -->
-                <TextBlock Text="配置方向:" Style="{StaticResource LabelStyle}"/>
-                <Border Background="White" BorderBrush="{StaticResource RevitLightGray}"
-                        BorderThickness="1" CornerRadius="2" Padding="10,8" Margin="0,0,0,12">
-                    <StackPanel>
-                        <RadioButton x:Name="HorizontalRadio" Content="横並び" FontSize="12" Margin="0,0,0,5"
-                                     Checked="LayoutChanged"/>
-                        <RadioButton x:Name="VerticalRadio" Content="縦並び" FontSize="12" IsChecked="True"
-                                     Checked="LayoutChanged"/>
-                    </StackPanel>
-                </Border>
-
-                <!-- 行数/列数 -->
-                <TextBlock x:Name="CountLabel" Text="行数:" Style="{StaticResource LabelStyle}"/>
-                <TextBox x:Name="CountTextBox" Style="{StaticResource TextBoxStyle}" Text="5"
-                         PreviewTextInput="CountTextBox_PreviewTextInput" TextChanged="LayoutChanged_Text"
-                         Margin="0,0,0,12"/>
-
                 <!-- タグファミリタイプ -->
                 <TextBlock Text="タグファミリタイプ:" Style="{StaticResource LabelStyle}"/>
                 <ComboBox x:Name="TagTypeComboBox" Style="{StaticResource ComboBoxStyle}" Margin="0,0,0,12"/>
@@ -312,8 +294,7 @@
                 <!-- タグ間隔 -->
                 <TextBlock Text="タグ間隔 (mm):" Style="{StaticResource LabelStyle}"/>
                 <TextBox x:Name="SpacingTextBox" Style="{StaticResource TextBoxStyle}" Text="2"
-                         PreviewTextInput="SpacingTextBox_PreviewTextInput" TextChanged="LayoutChanged_Text"
-                         Margin="0,0,0,12"/>
+                         PreviewTextInput="SpacingTextBox_PreviewTextInput" Margin="0,0,0,12"/>
 
                 <!-- ビューテンプレート -->
                 <TextBlock Text="ビューテンプレート:" Style="{StaticResource LabelStyle}"/>
@@ -324,10 +305,29 @@
         <!-- 配置プレビュー -->
         <StackPanel Grid.Row="1" Margin="0,10,0,0">
             <TextBlock Text="配置プレビュー:" Style="{StaticResource LabelStyle}"/>
-            <Border Background="White" BorderBrush="{StaticResource RevitLightGray}"
-                    BorderThickness="1" CornerRadius="2">
-                <Canvas x:Name="PreviewCanvas" Height="120" ClipToBounds="True"/>
-            </Border>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- 行数コントロール -->
+                <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,8,0">
+                    <Button Content="&#x25B2;" Style="{StaticResource SmallButtonStyle}"
+                            Click="RowCountUp_Click" ToolTip="行数を増やす"/>
+                    <TextBlock x:Name="RowCountText" Text="2" FontSize="16" FontWeight="Bold"
+                               HorizontalAlignment="Center" Margin="0,4"
+                               Foreground="{StaticResource RevitDarkGray}"/>
+                    <Button Content="&#x25BC;" Style="{StaticResource SmallButtonStyle}"
+                            Click="RowCountDown_Click" ToolTip="行数を減らす"/>
+                </StackPanel>
+
+                <!-- プレビューキャンバス -->
+                <Border Grid.Column="1" Background="White" BorderBrush="{StaticResource RevitLightGray}"
+                        BorderThickness="1" CornerRadius="2">
+                    <Canvas x:Name="PreviewCanvas" Height="120" ClipToBounds="True"/>
+                </Border>
+            </Grid>
         </StackPanel>
 
         <!-- ボタンエリア -->
