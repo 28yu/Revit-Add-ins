@@ -375,8 +375,8 @@ Commands/BeamUnderLevel/
 
 ### 現在のステータス
 - **機能実装**: 完了（ダイアログ、計算、フィルタ、ラベル、凡例）
-- **アイコン**: 案A採用済み（I型梁 + カラーバー、`beam_under_level_32.png`）
-- **未テスト**: 実際の Revit 環境での動作確認が必要
+- **動作確認**: Revit 環境で動作確認済み
+- **アイコン**: I型梁 + 上向き矢印 + ∇FL線 + 3色ブロック（`beam_under_level_32.png`）
 
 ## BeamTopLevel（梁天端色分け）設計メモ
 
@@ -387,13 +387,13 @@ Commands/BeamUnderLevel/
 計算式は不要。梁の天端レベルパラメータの値（参照レベル基準）をそのまま使用する。
 
 ### 対象ビュー
-- **平面ビュー（FloorPlan）のみ**
+- **平面ビュー（FloorPlan）および構造伏図（EngineeringPlan）**
 - 参照レベルはビューの GenLevel から自動取得
 
 ### BeamUnderLevel との違い
 | 項目 | BeamUnderLevel | BeamTopLevel |
 |------|---------------|-------------|
-| 対象ビュー | 天井伏図 (CeilingPlan) | 平面ビュー (FloorPlan) |
+| 対象ビュー | 天井伏図 (CeilingPlan) | 平面ビュー (FloorPlan) / 構造伏図 (EngineeringPlan) |
 | 計算式 | 階高 + オフセット - 梁高さ | パラメータ値をそのまま使用 |
 | ダイアログ | 4ステップ | 3ステップ |
 | レベル設定 | 上位レベル選択あり | 不要（参照レベル自動取得） |
@@ -425,7 +425,17 @@ Commands/BeamTopLevel/
 └── BeamLabelManager.cs          # 梁上に天端レベル値の TextNote を配置
 ```
 
+### ダイアログの設計知見
+- `SizeToContent="Height"` + `MaxHeight="800"` でコンテンツに応じた自動サイズ調整（固定Heightだと隙間が生じる）
+- Step1のGrid行定義で `Height="*"` を使うと不要な空間ができるため `Height="Auto"` のみにする
+
+### アイコンのデザイン規則
+- 梁下端: I型梁(上) + 上向き矢印 + ∇FL線(下) + ピンク/黄/青3色ブロック(右)
+- 梁天端: ∇FL線(上) + 下向き矢印 + I型梁(下) + ピンク/黄/青3色ブロック(右)
+- 色: ピンク `(255,128,148)`, 黄 `(218,185,47)`, 青 `(30,144,255)`
+- Python Pillow (`ImageDraw`) で32x32 PNGを生成
+
 ### 現在のステータス
 - **機能実装**: 完了（ダイアログ、パラメータ取得、フィルタ、ラベル、凡例）
-- **アイコン**: I型梁 + 上向き矢印 + カラーバー（`beam_top_level_32.png`）
-- **未テスト**: 実際の Revit 環境での動作確認が必要
+- **動作確認**: Revit 環境で動作確認済み
+- **アイコン**: ∇FL線 + 矢印 + I型梁 + 3色ブロック（`beam_top_level_32.png`）
