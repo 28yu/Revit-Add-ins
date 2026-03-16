@@ -231,6 +231,16 @@ namespace Tools28
             beamUnderLevelButtonData.ToolTip = "天井伏図の梁下端レベルを自動算出し、レベル別に色分け表示します";
             beamUnderLevelButtonData.LargeImage = LoadImage("beam_under_level_32.png");
             panel.AddItem(beamUnderLevelButtonData);
+
+            // 梁天端色分けボタン
+            PushButtonData beamTopLevelButtonData = new PushButtonData(
+                "BeamTopLevel",
+                "梁天端\n色分け",
+                assemblyPath,
+                "Tools28.Commands.BeamTopLevel.BeamTopLevelCommand");
+            beamTopLevelButtonData.ToolTip = "平面ビューの梁天端レベルをパラメータから取得し、レベル別に色分け表示します";
+            beamTopLevelButtonData.LargeImage = LoadImage("beam_top_level_32.png");
+            panel.AddItem(beamTopLevelButtonData);
         }
 
         /// <summary>

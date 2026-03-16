@@ -21,7 +21,8 @@ Revit-Add-ins/
 │   ├── ViewCopy/               # 3Dビュー視点コピー
 │   ├── SectionBoxCopy/         # セクションボックスコピー
 │   ├── ViewportPosition/       # ビューポート位置コピー (自動マッチング)
-│   └── CropBoxCopy/            # トリミング領域コピー
+│   ├── CropBoxCopy/            # トリミング領域コピー
+│   └── BeamTopLevel/           # 梁天端レベル色分け (平面ビュー)
 ├── Resources/Icons/            # 32x32アイコン (12個)
 ├── Properties/                 # AssemblyInfo.cs
 ├── Packages/                   # 配布パッケージテンプレート (バージョン別)
@@ -375,4 +376,56 @@ Commands/BeamUnderLevel/
 ### 現在のステータス
 - **機能実装**: 完了（ダイアログ、計算、フィルタ、ラベル、凡例）
 - **アイコン**: 案A採用済み（I型梁 + カラーバー、`beam_under_level_32.png`）
+- **未テスト**: 実際の Revit 環境での動作確認が必要
+
+## BeamTopLevel（梁天端色分け）設計メモ
+
+### 概要
+平面ビュー上の梁を天端レベル値で色分けするコマンド。BeamUnderLevel をベースに簡略化。
+
+### 計算式
+計算式は不要。梁の天端レベルパラメータの値（参照レベル基準）をそのまま使用する。
+
+### 対象ビュー
+- **平面ビュー（FloorPlan）のみ**
+- 参照レベルはビューの GenLevel から自動取得
+
+### BeamUnderLevel との違い
+| 項目 | BeamUnderLevel | BeamTopLevel |
+|------|---------------|-------------|
+| 対象ビュー | 天井伏図 (CeilingPlan) | 平面ビュー (FloorPlan) |
+| 計算式 | 階高 + オフセット - 梁高さ | パラメータ値をそのまま使用 |
+| ダイアログ | 4ステップ | 3ステップ |
+| レベル設定 | 上位レベル選択あり | 不要（参照レベル自動取得） |
+| 梁高さパラメータ | 選択必要 | 不要 |
+| プレフィックス | 梁下_ | 梁天端_ |
+| ラベルサフィックス | 下端 | 天端 |
+
+### ダイアログ構成（3ステップ）
+1. 基本設定（ビュー情報表示 + 文字タイプ選択）
+2. 梁天端レベルパラメータ選択（ファミリ毎）
+3. 処理確認・実行
+
+### フィルタ・色分けの設計
+- BeamUnderLevel と同じ設計（投影サーフェス前景の塗り潰しのみ）
+- フィルタ名: `梁天端_{レベル名}{±値}` 形式
+- 共有パラメータ: `梁天端_基準レベル`, `梁天端_レベル差`, `梁天端_表示`, `梁天端_エラー`
+
+### コード構成
+```
+Commands/BeamTopLevel/
+├── BeamTopLevelCommand.cs      # メインコマンド (IExternalCommand)
+├── BeamTopLevelDialog.xaml      # WPF 3ステップダイアログ
+├── BeamTopLevelDialog.xaml.cs   # ダイアログのコードビハインド
+├── BeamTopLevelDialogData.cs    # ダイアログのデータモデル
+├── BeamCalculator.cs            # 天端レベル取得ロジック（パラメータ値直接取得）
+├── FilterManager.cs             # ParameterFilterElement の作成・色分け適用
+├── ParameterManager.cs          # 共有パラメータ (梁天端レベル) の作成・値設定
+├── LegendManager.cs             # 凡例ビュー作成（色分け対応表）
+└── BeamLabelManager.cs          # 梁上に天端レベル値の TextNote を配置
+```
+
+### 現在のステータス
+- **機能実装**: 完了（ダイアログ、パラメータ取得、フィルタ、ラベル、凡例）
+- **アイコン**: I型梁 + 上向き矢印 + カラーバー（`beam_top_level_32.png`）
 - **未テスト**: 実際の Revit 環境での動作確認が必要
