@@ -92,14 +92,22 @@ namespace Tools28.Commands.BeamUnderLevel
                 double rowSpacing = textHeight * 0.8;
                 double titleGap = textHeight * 3.0;
 
+                // テキストY位置の補正値（矩形中央に合わせる）
+                double textYOffset = rectHeight / 2 + textHeight * 1.7;
+                // 行ピッチ（矩形とテキストで共通）
+                double rowPitch = rectHeight + rowSpacing;
+
                 // 凡例の各行を描画
-                double currentY = 0;
+                double startY = 0;
 
                 // タイトル
-                XYZ titlePos = new XYZ(0, currentY, 0);
+                XYZ titlePos = new XYZ(0, startY, 0);
                 TextNote.Create(doc, draftingView.Id, titlePos,
                     "梁下端色分け凡例", textNoteTypeId);
-                currentY -= (textHeight + titleGap);
+                startY -= (textHeight + titleGap);
+
+                // 全行数（レベル行 + エラー行）
+                int totalRows = sortedLevels.Count + 1;
 
                 // 各レベル行
                 for (int i = 0; i < sortedLevels.Count; i++)
@@ -109,34 +117,29 @@ namespace Tools28.Commands.BeamUnderLevel
                     Color color = colors[i];
                     string typeName = FilterPrefix + displayValue;
 
+                    double rowY = startY - rowPitch * i;
+
                     // 色付き矩形を作成
                     CreateColoredRectangle(doc, draftingView.Id,
                         solidFillPatternId, color, typeName,
-                        0, currentY, rectWidth, rectHeight);
+                        0, rowY, rectWidth, rectHeight);
 
-                    // テキストラベル（矩形の右横、垂直中央揃え）
-                    // TextNoteの基準点は左上、矩形中央にテキスト中央を合わせる
-                    XYZ textPos = new XYZ(
-                        textOffsetX,
-                        currentY + rectHeight / 2 + textHeight * 1.5,
-                        0);
+                    // テキストラベル
+                    XYZ textPos = new XYZ(textOffsetX, rowY + textYOffset, 0);
                     string label = $"- {displayValue}（{beamCount}本）";
                     TextNote.Create(doc, draftingView.Id, textPos,
                         label, textNoteTypeId);
-
-                    currentY -= (rectHeight + rowSpacing);
                 }
 
                 // エラー行
+                double errorRowY = startY - rowPitch * sortedLevels.Count;
+
                 CreateColoredRectangle(doc, draftingView.Id,
                     solidFillPatternId, new Color(255, 100, 100),
                     ErrorFilterName,
-                    0, currentY, rectWidth, rectHeight);
+                    0, errorRowY, rectWidth, rectHeight);
 
-                XYZ errorTextPos = new XYZ(
-                    textOffsetX,
-                    currentY + rectHeight / 2 + textHeight * 0.4,
-                    0);
+                XYZ errorTextPos = new XYZ(textOffsetX, errorRowY + textYOffset, 0);
                 TextNote.Create(doc, draftingView.Id, errorTextPos,
                     "- エラー", textNoteTypeId);
 
