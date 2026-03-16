@@ -141,6 +141,7 @@ namespace Tools28.Commands.BeamUnderLevel
                 Dictionary<string, string> familyTopLevelParamSelection = dialog.FamilyTopLevelParamSelection;
                 bool overwriteExisting = dialog.OverwriteExistingFilters;
                 ElementId selectedTextNoteTypeId = dialog.SelectedTextNoteTypeId;
+                ElementId selectedBeamLabelTypeId = dialog.SelectedBeamLabelTypeId;
 
                 // 処理実行
                 int successCount = 0;
@@ -203,6 +204,14 @@ namespace Tools28.Commands.BeamUnderLevel
                     {
                         var result = calculationResults[beam.Id];
                         ParameterManager.WriteValues(beam, result);
+                    }
+
+                    // 梁ラベル（TextNote）の作成
+                    if (selectedBeamLabelTypeId != null)
+                    {
+                        BeamLabelManager.CreateBeamLabels(doc, activeView,
+                            beams, calculationResults, selectedBeamLabelTypeId,
+                            overwriteExisting);
                     }
 
                     // フィルタ作成・色分け

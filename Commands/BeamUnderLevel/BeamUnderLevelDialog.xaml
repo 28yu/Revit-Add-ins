@@ -186,24 +186,36 @@
                     </StackPanel>
                 </Border>
 
-                <!-- 凡例文字タイプ設定 -->
+                <!-- 文字タイプ設定 -->
                 <Border Grid.Row="1" Background="White" BorderBrush="#D3D3D3"
                         BorderThickness="1" CornerRadius="3" Padding="15,12" Margin="0,0,0,15">
                     <StackPanel>
-                        <TextBlock Style="{StaticResource SectionHeader}" Text="凡例設定"/>
+                        <TextBlock Style="{StaticResource SectionHeader}" Text="文字タイプ設定"/>
                         <Grid>
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="120"/>
+                                <ColumnDefinition Width="150"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Style="{StaticResource LabelStyle}"
-                                       Text="文字タイプ:" VerticalAlignment="Center"/>
-                            <ComboBox Grid.Column="1"
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="8"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Grid.Column="0" Style="{StaticResource LabelStyle}"
+                                       Text="凡例の文字タイプ:" VerticalAlignment="Center"/>
+                            <ComboBox Grid.Row="0" Grid.Column="1"
                                       x:Name="TextNoteTypeComboBox"
+                                      Style="{StaticResource ComboBoxStyle}"/>
+
+                            <TextBlock Grid.Row="2" Grid.Column="0" Style="{StaticResource LabelStyle}"
+                                       Text="梁ラベルの文字タイプ:" VerticalAlignment="Center"/>
+                            <ComboBox Grid.Row="2" Grid.Column="1"
+                                      x:Name="BeamLabelTypeComboBox"
                                       Style="{StaticResource ComboBoxStyle}"/>
                         </Grid>
                         <TextBlock Style="{StaticResource NoteStyle}"
-                                   Text="※ 凡例の製図ビューに使用する文字タイプを選択してください"/>
+                                   Text="※ 凡例は製図ビューの文字、梁ラベルは天井伏図上の梁に表示する文字です"/>
                     </StackPanel>
                 </Border>
 

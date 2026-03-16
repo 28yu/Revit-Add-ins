@@ -33,6 +33,7 @@ namespace Tools28.Commands.BeamUnderLevel
         public Dictionary<string, string> FamilyTopLevelParamSelection { get; private set; }
         public bool OverwriteExistingFilters { get; private set; }
         public ElementId SelectedTextNoteTypeId { get; private set; }
+        public ElementId SelectedBeamLabelTypeId { get; private set; }
 
         public BeamUnderLevelDialog(BeamUnderLevelDialogData data)
         {
@@ -65,11 +66,14 @@ namespace Tools28.Commands.BeamUnderLevel
             else if (levelItems.Count > 0)
                 LowerLevelComboBox.SelectedIndex = 0;
 
-            // 凡例文字タイプドロップダウン
+            // 文字タイプドロップダウン
             if (_data.TextNoteTypes != null && _data.TextNoteTypes.Count > 0)
             {
                 TextNoteTypeComboBox.ItemsSource = _data.TextNoteTypes;
                 TextNoteTypeComboBox.SelectedIndex = 0;
+
+                BeamLabelTypeComboBox.ItemsSource = _data.TextNoteTypes;
+                BeamLabelTypeComboBox.SelectedIndex = 0;
             }
 
             UpdateFloorHeight();
@@ -599,6 +603,8 @@ namespace Tools28.Commands.BeamUnderLevel
                 OverwriteExistingFilters = OverwriteCheckBox.IsChecked == true;
                 var selectedTextType = TextNoteTypeComboBox.SelectedItem as TextNoteTypeItem;
                 SelectedTextNoteTypeId = selectedTextType?.Id;
+                var selectedBeamLabelType = BeamLabelTypeComboBox.SelectedItem as TextNoteTypeItem;
+                SelectedBeamLabelTypeId = selectedBeamLabelType?.Id;
                 DialogResult = true;
                 Close();
             }
