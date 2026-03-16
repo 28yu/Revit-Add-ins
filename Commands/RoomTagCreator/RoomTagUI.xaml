@@ -248,7 +248,13 @@
 
                 <!-- ビューファミリタイプ -->
                 <TextBlock Text="ビューファミリタイプ:" Style="{StaticResource LabelStyle}"/>
-                <ComboBox x:Name="ViewFamilyTypeComboBox" Style="{StaticResource ComboBoxStyle}" Margin="0,0,0,12"/>
+                <Border Background="White" BorderBrush="{StaticResource RevitLightGray}"
+                        BorderThickness="1" CornerRadius="2" Padding="10,8" Margin="0,0,0,12">
+                    <StackPanel>
+                        <RadioButton x:Name="FloorPlanRadio" Content="仕上表_平面図" FontSize="12" Margin="0,0,0,5" IsChecked="True"/>
+                        <RadioButton x:Name="CeilingPlanRadio" Content="仕上表_天井伏図" FontSize="12"/>
+                    </StackPanel>
+                </Border>
 
                 <!-- 部屋リスト -->
                 <TextBlock Text="部屋リスト:" Style="{StaticResource LabelStyle}"/>

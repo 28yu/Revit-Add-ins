@@ -63,24 +63,38 @@ namespace Tools28.Commands.RoomTagCreator
         }
 
         /// <summary>
-        /// ViewFamilyType一覧を取得（平面図用）
+        /// 指定名のViewFamilyTypeを取得、なければ複製して作成
         /// </summary>
-        public static List<ViewFamilyType> GetViewFamilyTypes(Document doc)
+        private static ElementId GetOrCreateViewFamilyType(Document doc, string typeName)
         {
-            return new FilteredElementCollector(doc)
+            // 天井伏図かどうかを判定
+            bool isCeilingPlan = typeName.Contains("天井伏図");
+            ViewFamily targetFamily = isCeilingPlan ? ViewFamily.CeilingPlan : ViewFamily.FloorPlan;
+
+            var allTypes = new FilteredElementCollector(doc)
                 .OfClass(typeof(ViewFamilyType))
                 .Cast<ViewFamilyType>()
-                .Where(vft => vft.ViewFamily == ViewFamily.FloorPlan
-                           || vft.ViewFamily == ViewFamily.CeilingPlan)
-                .OrderBy(vft => vft.Name)
+                .Where(vft => vft.ViewFamily == targetFamily)
                 .ToList();
+
+            // 同名が既にあればそれを使用
+            var existing = allTypes.FirstOrDefault(vft => vft.Name == typeName);
+            if (existing != null)
+                return existing.Id;
+
+            // なければ最初のタイプを複製
+            if (allTypes.Count == 0)
+                throw new InvalidOperationException($"{targetFamily} のビューファミリタイプが見つかりません。");
+
+            var duplicated = allTypes.First().Duplicate(typeName);
+            return duplicated.Id;
         }
 
         /// <summary>
         /// 新規ビューを作成
         /// </summary>
         public static ViewPlan CreateNewView(Document doc, View sourceView, string viewName,
-            ElementId viewFamilyTypeId, ElementId viewTemplateId)
+            string viewFamilyTypeName, ElementId viewTemplateId)
         {
             // ソースビューのレベルを取得
             Level level = null;
@@ -92,11 +106,6 @@ namespace Tools28.Commands.RoomTagCreator
             if (level == null)
             {
                 throw new InvalidOperationException("ソースビューのレベルが取得できません。");
-            }
-
-            if (viewFamilyTypeId == null || viewFamilyTypeId == ElementId.InvalidElementId)
-            {
-                throw new InvalidOperationException("ビューファミリタイプが選択されていません。");
             }
 
             // ビュー名の重複チェック
@@ -111,6 +120,9 @@ namespace Tools28.Commands.RoomTagCreator
             {
                 throw new InvalidOperationException($"ビュー名「{viewName}」は既に存在します。別の名前を指定してください。");
             }
+
+            // ビューファミリタイプを取得または作成
+            ElementId viewFamilyTypeId = GetOrCreateViewFamilyType(doc, viewFamilyTypeName);
 
             // 新規平面図を作成
             ViewPlan newView = ViewPlan.Create(doc, viewFamilyTypeId, level.Id);
@@ -386,7 +398,7 @@ namespace Tools28.Commands.RoomTagCreator
             var segments = new List<LinePatternSegment>
             {
                 new LinePatternSegment(LinePatternSegmentType.Dot, 0),
-                new LinePatternSegment(LinePatternSegmentType.Space, 3.0 / 304.8)  // 3mm間隔
+                new LinePatternSegment(LinePatternSegmentType.Space, 30.0 / 304.8)  // 30mm間隔
             };
 
             var pattern = new LinePattern(patternName);

@@ -78,8 +78,7 @@ namespace Tools28.Commands.RoomTagCreator
                     return Result.Cancelled;
 
                 // ダイアログ結果の検証
-                if (dialog.SelectedViewFamilyTypeId == null ||
-                    dialog.SelectedViewFamilyTypeId == ElementId.InvalidElementId)
+                if (string.IsNullOrEmpty(dialog.SelectedViewFamilyTypeName))
                 {
                     TaskDialog.Show("エラー", "ビューファミリタイプが選択されていません。");
                     return Result.Failed;
@@ -113,7 +112,7 @@ namespace Tools28.Commands.RoomTagCreator
                         {
                             newView = RoomTagService.CreateNewView(
                                 doc, sourceView, dialog.NewViewName,
-                                dialog.SelectedViewFamilyTypeId,
+                                dialog.SelectedViewFamilyTypeName,
                                 dialog.SelectedViewTemplateId);
                         }
                         catch (InvalidOperationException ex)

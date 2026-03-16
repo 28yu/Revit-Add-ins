@@ -16,12 +16,11 @@ namespace Tools28.Commands.RoomTagCreator
         private readonly Document _doc;
         private ObservableCollection<RoomInfo> _rooms;
         private List<RoomTagTypeInfo> _tagTypes;
-        private List<ViewFamilyType> _viewFamilyTypes;
         private List<View> _viewTemplates;
 
         // 結果プロパティ
         public string NewViewName { get; private set; }
-        public ElementId SelectedViewFamilyTypeId { get; private set; } = ElementId.InvalidElementId;
+        public string SelectedViewFamilyTypeName { get; private set; }
         public List<RoomInfo> SelectedRooms { get; private set; }
         public ElementId SelectedTagTypeId { get; private set; } = ElementId.InvalidElementId;
         public LayoutSettings Layout { get; private set; }
@@ -41,20 +40,11 @@ namespace Tools28.Commands.RoomTagCreator
             ViewNameTextBox.Text = RoomTagService.GenerateViewName(sourceViewName);
 
             // ドロップダウンを初期化
-            LoadViewFamilyTypes();
             LoadTagTypes();
             LoadViewTemplates();
 
             // 初期状態のラベル設定
             UpdateCountLabel();
-        }
-
-        private void LoadViewFamilyTypes()
-        {
-            _viewFamilyTypes = RoomTagService.GetViewFamilyTypes(_doc);
-            ViewFamilyTypeComboBox.ItemsSource = _viewFamilyTypes.Select(vft => vft.Name).ToList();
-            if (_viewFamilyTypes.Count > 0)
-                ViewFamilyTypeComboBox.SelectedIndex = 0;
         }
 
         private void LoadTagTypes()
@@ -155,13 +145,6 @@ namespace Tools28.Commands.RoomTagCreator
                 return;
             }
 
-            if (ViewFamilyTypeComboBox.SelectedIndex < 0 || _viewFamilyTypes.Count == 0)
-            {
-                MessageBox.Show("ビューファミリタイプを選択してください。", "警告",
-                    MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-
             if (TagTypeComboBox.SelectedIndex < 0 || _tagTypes.Count == 0)
             {
                 MessageBox.Show("タグファミリタイプを選択してください。", "警告",
@@ -187,7 +170,7 @@ namespace Tools28.Commands.RoomTagCreator
             NewViewName = ViewNameTextBox.Text.Trim();
             SelectedRooms = _rooms.ToList();
 
-            SelectedViewFamilyTypeId = _viewFamilyTypes[ViewFamilyTypeComboBox.SelectedIndex].Id;
+            SelectedViewFamilyTypeName = FloorPlanRadio.IsChecked == true ? "仕上表_平面図" : "仕上表_天井伏図";
             SelectedTagTypeId = _tagTypes[TagTypeComboBox.SelectedIndex].Id;
 
             Layout = new LayoutSettings
