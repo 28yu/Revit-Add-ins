@@ -270,7 +270,7 @@ namespace Tools28.Commands.RoomTagCreator
         }
 
         /// <summary>
-        /// 部屋タグ以外の全カテゴリを非表示にする
+        /// 部屋タグ・部屋（色塗り潰しのみ）以外の全カテゴリを非表示にする
         /// </summary>
         private static void HideAllCategoriesExceptRoomTags(Document doc, View view)
         {
@@ -286,7 +286,29 @@ namespace Tools28.Commands.RoomTagCreator
                 if (cat.Id.IntegerValue == (int)BuiltInCategory.OST_RoomTags)
                     continue;
 
-                // 親カテゴリを非表示
+                // 部屋 (OST_Rooms) は表示を維持し、色塗り潰し以外のサブカテゴリを非表示
+                if (cat.Id.IntegerValue == (int)BuiltInCategory.OST_Rooms)
+                {
+                    foreach (Category subCat in cat.SubCategories)
+                    {
+                        // 色塗り潰し (Color Fill) は表示を維持
+                        string subName = subCat.Name;
+                        if (subName == "色塗り潰し" || subName == "Color Fill")
+                            continue;
+
+                        try
+                        {
+                            if (view.CanCategoryBeHidden(subCat.Id))
+                            {
+                                view.SetCategoryHidden(subCat.Id, true);
+                            }
+                        }
+                        catch { }
+                    }
+                    continue;
+                }
+
+                // その他のカテゴリを非表示
                 try
                 {
                     if (view.CanCategoryBeHidden(cat.Id))
