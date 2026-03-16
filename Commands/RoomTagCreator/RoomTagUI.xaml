@@ -1,0 +1,323 @@
+<Window x:Class="Tools28.Commands.RoomTagCreator.RoomTagUI"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="部屋タグ自動配置"
+        Width="700"
+        SizeToContent="Height"
+        MaxHeight="700"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="NoResize"
+        Background="#F5F5F5"
+        KeyDown="Window_KeyDown">
+
+    <Window.Resources>
+        <SolidColorBrush x:Key="RevitBlue" Color="#0066CC"/>
+        <SolidColorBrush x:Key="RevitLightBlue" Color="#3399FF"/>
+        <SolidColorBrush x:Key="RevitDarkGray" Color="#333333"/>
+        <SolidColorBrush x:Key="RevitLightGray" Color="#E6E6E6"/>
+        <SolidColorBrush x:Key="RevitHoverBlue" Color="#0052A3"/>
+
+        <Style x:Key="LabelStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="{StaticResource RevitDarkGray}"/>
+            <Setter Property="Margin" Value="0,0,0,5"/>
+        </Style>
+
+        <Style x:Key="TextBoxStyle" TargetType="TextBox">
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Padding" Value="8,5"/>
+            <Setter Property="BorderBrush" Value="{StaticResource RevitLightGray}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border Background="White"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="2">
+                            <ScrollViewer x:Name="PART_ContentHost"
+                                        Margin="8,0"
+                                        VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ComboBoxStyle" TargetType="ComboBox">
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Padding" Value="8,5"/>
+            <Setter Property="BorderBrush" Value="{StaticResource RevitLightGray}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <ToggleButton x:Name="ToggleButton"
+                                        Background="White"
+                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                        BorderThickness="{TemplateBinding BorderThickness}"
+                                        Focusable="False"
+                                        IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                                        ClickMode="Press">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border x:Name="Border"
+                                                Background="{TemplateBinding Background}"
+                                                BorderBrush="{TemplateBinding BorderBrush}"
+                                                BorderThickness="{TemplateBinding BorderThickness}"
+                                                CornerRadius="2">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition />
+                                                    <ColumnDefinition Width="24" />
+                                                </Grid.ColumnDefinitions>
+                                                <Path Grid.Column="1"
+                                                      HorizontalAlignment="Center"
+                                                      VerticalAlignment="Center"
+                                                      Data="M 0 0 L 4 4 L 8 0 Z"
+                                                      Fill="{StaticResource RevitDarkGray}" />
+                                            </Grid>
+                                        </Border>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                            </ToggleButton>
+                            <ContentPresenter x:Name="ContentSite"
+                                            Content="{TemplateBinding SelectionBoxItem}"
+                                            ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                            ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
+                                            HorizontalAlignment="Left"
+                                            VerticalAlignment="Center"
+                                            Margin="8,0,28,0"
+                                            IsHitTestVisible="False" />
+                            <Popup x:Name="Popup"
+                                   Placement="Bottom"
+                                   IsOpen="{TemplateBinding IsDropDownOpen}"
+                                   AllowsTransparency="True"
+                                   Focusable="False"
+                                   PopupAnimation="Slide">
+                                <Grid x:Name="DropDown"
+                                      SnapsToDevicePixels="True"
+                                      MinWidth="{TemplateBinding ActualWidth}"
+                                      MaxHeight="{TemplateBinding MaxDropDownHeight}">
+                                    <Border x:Name="DropDownBorder"
+                                            Background="White"
+                                            BorderThickness="1"
+                                            BorderBrush="{StaticResource RevitLightGray}"
+                                            CornerRadius="2">
+                                        <ScrollViewer Margin="4,6,4,6" SnapsToDevicePixels="True">
+                                            <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained" />
+                                        </ScrollViewer>
+                                    </Border>
+                                </Grid>
+                            </Popup>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="PrimaryButtonStyle" TargetType="Button">
+            <Setter Property="MinWidth" Value="75"/>
+            <Setter Property="Height" Value="23"/>
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="Margin" Value="5,0,0,0"/>
+            <Setter Property="Background" Value="{StaticResource RevitBlue}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="{StaticResource RevitBlue}"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="Normal"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="2"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                            VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{StaticResource RevitHoverBlue}"/>
+                    <Setter Property="BorderBrush" Value="{StaticResource RevitHoverBlue}"/>
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Background" Value="{StaticResource RevitLightGray}"/>
+                    <Setter Property="BorderBrush" Value="{StaticResource RevitLightGray}"/>
+                    <Setter Property="Foreground" Value="#999999"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="SecondaryButtonStyle" TargetType="Button">
+            <Setter Property="MinWidth" Value="75"/>
+            <Setter Property="Height" Value="23"/>
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="Margin" Value="5,0,0,0"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="Foreground" Value="{StaticResource RevitDarkGray}"/>
+            <Setter Property="BorderBrush" Value="#ADADAD"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="2"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                            VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#E5F3FF"/>
+                    <Setter Property="BorderBrush" Value="#0078D7"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="SmallButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="30"/>
+            <Setter Property="Height" Value="26"/>
+            <Setter Property="Margin" Value="0,2"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="Foreground" Value="{StaticResource RevitDarkGray}"/>
+            <Setter Property="BorderBrush" Value="#ADADAD"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="2">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                            VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#E5F3FF"/>
+                    <Setter Property="BorderBrush" Value="#0078D7"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- メインコンテンツ: 左右パネル -->
+        <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="15"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- 左パネル -->
+            <StackPanel Grid.Column="0">
+                <!-- ビュー名 -->
+                <TextBlock Text="ビュー名:" Style="{StaticResource LabelStyle}"/>
+                <TextBox x:Name="ViewNameTextBox" Style="{StaticResource TextBoxStyle}" Margin="0,0,0,12"/>
+
+                <!-- ビューファミリタイプ -->
+                <TextBlock Text="ビューファミリタイプ:" Style="{StaticResource LabelStyle}"/>
+                <ComboBox x:Name="ViewFamilyTypeComboBox" Style="{StaticResource ComboBoxStyle}" Margin="0,0,0,12"/>
+
+                <!-- 部屋リスト -->
+                <TextBlock Text="部屋リスト:" Style="{StaticResource LabelStyle}"/>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <ListBox x:Name="RoomListBox"
+                             Grid.Column="0"
+                             Height="250"
+                             FontSize="12"
+                             SelectionMode="Extended"
+                             BorderBrush="{StaticResource RevitLightGray}"
+                             BorderThickness="1"/>
+
+                    <StackPanel Grid.Column="1" Margin="5,0,0,0" VerticalAlignment="Center">
+                        <Button Content="&#x25B2;" Style="{StaticResource SmallButtonStyle}"
+                                Click="MoveUpButton_Click" ToolTip="上へ移動"/>
+                        <Button Content="&#x25BC;" Style="{StaticResource SmallButtonStyle}"
+                                Click="MoveDownButton_Click" ToolTip="下へ移動"/>
+                        <Button Content="&#x2715;" Style="{StaticResource SmallButtonStyle}"
+                                Click="RemoveButton_Click" ToolTip="項目を削除"
+                                Margin="0,10,0,0"/>
+                    </StackPanel>
+                </Grid>
+            </StackPanel>
+
+            <!-- 右パネル -->
+            <StackPanel Grid.Column="2">
+                <!-- 配置方向 -->
+                <TextBlock Text="配置方向:" Style="{StaticResource LabelStyle}"/>
+                <Border Background="White" BorderBrush="{StaticResource RevitLightGray}"
+                        BorderThickness="1" CornerRadius="2" Padding="10,8" Margin="0,0,0,12">
+                    <StackPanel>
+                        <RadioButton x:Name="HorizontalRadio" Content="横並び" FontSize="12" Margin="0,0,0,5"
+                                     Checked="LayoutDirection_Changed"/>
+                        <RadioButton x:Name="VerticalRadio" Content="縦並び" FontSize="12" IsChecked="True"
+                                     Checked="LayoutDirection_Changed"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- 行数/列数 -->
+                <TextBlock x:Name="CountLabel" Text="行数:" Style="{StaticResource LabelStyle}"/>
+                <TextBox x:Name="CountTextBox" Style="{StaticResource TextBoxStyle}" Text="5"
+                         PreviewTextInput="CountTextBox_PreviewTextInput" Margin="0,0,0,12"/>
+
+                <!-- タグファミリタイプ -->
+                <TextBlock Text="タグファミリタイプ:" Style="{StaticResource LabelStyle}"/>
+                <ComboBox x:Name="TagTypeComboBox" Style="{StaticResource ComboBoxStyle}" Margin="0,0,0,12"/>
+
+                <!-- タグ間隔 -->
+                <TextBlock Text="タグ間隔 (mm):" Style="{StaticResource LabelStyle}"/>
+                <TextBox x:Name="SpacingTextBox" Style="{StaticResource TextBoxStyle}" Text="2"
+                         PreviewTextInput="SpacingTextBox_PreviewTextInput" Margin="0,0,0,12"/>
+
+                <!-- ビューテンプレート -->
+                <TextBlock Text="ビューテンプレート:" Style="{StaticResource LabelStyle}"/>
+                <ComboBox x:Name="ViewTemplateComboBox" Style="{StaticResource ComboBoxStyle}" Margin="0,0,0,12"/>
+            </StackPanel>
+        </Grid>
+
+        <!-- ボタンエリア -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0">
+            <Button Content="実行" Style="{StaticResource PrimaryButtonStyle}"
+                    Click="ExecuteButton_Click" x:Name="ExecuteButton"/>
+            <Button Content="キャンセル" Style="{StaticResource SecondaryButtonStyle}"
+                    Click="CancelButton_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>

@@ -49,6 +49,7 @@
     <Resource Include="Resources\Icons\filled_region_32.png" />
     <Resource Include="Resources\Icons\beam_under_level_32.png" />
     <Resource Include="Resources\Icons\beam_top_level_32.png" />
+    <Resource Include="Resources\Icons\room_tag_32.png" />
   </ItemGroup>
 
 

@@ -1,0 +1,252 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Autodesk.Revit.DB;
+using Autodesk.Revit.DB.Architecture;
+using Autodesk.Revit.UI;
+using Tools28.Commands.RoomTagCreator.Model;
+
+namespace Tools28.Commands.RoomTagCreator
+{
+    public static class RoomTagService
+    {
+        /// <summary>
+        /// ビューポート内の部屋を取得
+        /// </summary>
+        public static List<RoomInfo> GetViewportRooms(Document doc, Viewport viewport)
+        {
+            ElementId viewId = viewport.ViewId;
+            View view = doc.GetElement(viewId) as View;
+            if (view == null)
+                return new List<RoomInfo>();
+
+            var rooms = new FilteredElementCollector(doc, viewId)
+                .OfCategory(BuiltInCategory.OST_Rooms)
+                .WhereElementIsNotElementType()
+                .Cast<Room>()
+                .Where(r => r.Area > 0)
+                .OrderBy(r => r.LookupParameter("名前")?.AsString() ?? r.Name ?? "")
+                .Select(r => new RoomInfo(r))
+                .ToList();
+
+            return rooms;
+        }
+
+        /// <summary>
+        /// ドキュメント内の全RoomTagタイプを取得
+        /// </summary>
+        public static List<RoomTagTypeInfo> GetRoomTagTypes(Document doc)
+        {
+            var tagTypes = new FilteredElementCollector(doc)
+                .OfCategory(BuiltInCategory.OST_RoomTags)
+                .OfClass(typeof(FamilySymbol))
+                .Cast<FamilySymbol>()
+                .OrderBy(s => s.FamilyName)
+                .ThenBy(s => s.Name)
+                .Select(s => new RoomTagTypeInfo(s))
+                .ToList();
+
+            return tagTypes;
+        }
+
+        /// <summary>
+        /// ドキュメント内のビューテンプレート一覧を取得
+        /// </summary>
+        public static List<View> GetViewTemplates(Document doc)
+        {
+            return new FilteredElementCollector(doc)
+                .OfClass(typeof(View))
+                .Cast<View>()
+                .Where(v => v.IsTemplate)
+                .OrderBy(v => v.Name)
+                .ToList();
+        }
+
+        /// <summary>
+        /// ViewFamilyType一覧を取得（平面図用）
+        /// </summary>
+        public static List<ViewFamilyType> GetViewFamilyTypes(Document doc)
+        {
+            return new FilteredElementCollector(doc)
+                .OfClass(typeof(ViewFamilyType))
+                .Cast<ViewFamilyType>()
+                .Where(vft => vft.ViewFamily == ViewFamily.FloorPlan
+                           || vft.ViewFamily == ViewFamily.CeilingPlan
+                           || vft.ViewFamily == ViewFamily.AreaPlan)
+                .OrderBy(vft => vft.Name)
+                .ToList();
+        }
+
+        /// <summary>
+        /// 新規ビューを作成
+        /// </summary>
+        public static ViewPlan CreateNewView(Document doc, View sourceView, string viewName,
+            ElementId viewFamilyTypeId, ElementId viewTemplateId)
+        {
+            // ソースビューのレベルを取得
+            Level level = null;
+            if (sourceView is ViewPlan viewPlan)
+            {
+                level = viewPlan.GenLevel;
+            }
+
+            if (level == null)
+            {
+                throw new InvalidOperationException("ソースビューのレベルが取得できません。");
+            }
+
+            // ビュー名の重複チェック
+            var existingViews = new FilteredElementCollector(doc)
+                .OfClass(typeof(View))
+                .Cast<View>()
+                .Where(v => !v.IsTemplate)
+                .Select(v => v.Name)
+                .ToList();
+
+            if (existingViews.Contains(viewName))
+            {
+                throw new InvalidOperationException($"ビュー名「{viewName}」は既に存在します。別の名前を指定してください。");
+            }
+
+            // 新規平面図を作成
+            ViewPlan newView = ViewPlan.Create(doc, viewFamilyTypeId, level.Id);
+            newView.Name = viewName;
+
+            // クロップボックスをソースビューからコピー
+            if (sourceView.CropBoxActive)
+            {
+                newView.CropBoxActive = true;
+                newView.CropBox = sourceView.CropBox;
+            }
+
+            // クロップボックス表示を非表示
+            newView.CropBoxVisible = false;
+
+            // ビューテンプレートを適用
+            if (viewTemplateId != null && viewTemplateId != ElementId.InvalidElementId)
+            {
+                newView.ViewTemplateId = viewTemplateId;
+            }
+
+            return newView;
+        }
+
+        /// <summary>
+        /// 部屋タグを自動配置
+        /// </summary>
+        public static List<RoomTag> CreateRoomTags(Document doc, ViewPlan view,
+            List<RoomInfo> rooms, ElementId tagTypeId, LayoutSettings settings)
+        {
+            var createdTags = new List<RoomTag>();
+
+            if (rooms == null || rooms.Count == 0)
+                return createdTags;
+
+            // タグタイプを取得してBoundingBoxからサイズを推定
+            // まず最初のタグを作成してサイズを取得
+            int viewScale = view.Scale;
+
+            // 配置位置の計算用変数
+            double width = 0;
+            double height = 0;
+            bool sizeCalculated = false;
+
+            int columnCount = 0;
+            int rowCount = 0;
+            double currentU = 0;
+            double currentV = 0;
+
+            for (int i = 0; i < rooms.Count; i++)
+            {
+                var room = rooms[i];
+                UV tagPosition = new UV(currentU, currentV);
+
+                // 部屋タグを作成
+                RoomTag newTag = doc.Create.NewRoomTag(
+                    new LinkElementId(room.Id), tagPosition, view.Id);
+
+                if (newTag != null)
+                {
+                    // タグタイプを設定
+                    newTag.ChangeTypeId(tagTypeId);
+                    createdTags.Add(newTag);
+
+                    // 最初のタグからサイズを取得
+                    if (!sizeCalculated)
+                    {
+                        doc.Regenerate();
+                        BoundingBoxXYZ tagBB = newTag.get_BoundingBox(view);
+                        if (tagBB != null)
+                        {
+                            double step = settings.SpacingFeet;
+                            width = (tagBB.Max.X - tagBB.Min.X + step) * viewScale;
+                            height = (tagBB.Max.Y - tagBB.Min.Y + step) * viewScale;
+                            sizeCalculated = true;
+                        }
+                        else
+                        {
+                            // BoundingBox取得失敗時のデフォルト値
+                            width = 10.0 / 304.8 * viewScale;
+                            height = 5.0 / 304.8 * viewScale;
+                            sizeCalculated = true;
+                        }
+                    }
+
+                    // 次のタグの位置を計算
+                    if (settings.IsHorizontal)
+                    {
+                        // 横並び: X軸右方向、指定列数で改行
+                        columnCount++;
+                        if (columnCount % settings.Count == 0)
+                        {
+                            currentU = 0;
+                            currentV -= height;
+                        }
+                        else
+                        {
+                            currentU += width;
+                        }
+                    }
+                    else
+                    {
+                        // 縦並び: Y軸下方向、指定行数で右へシフト
+                        rowCount++;
+                        if (rowCount % settings.Count == 0)
+                        {
+                            currentU += width;
+                            currentV = 0;
+                        }
+                        else
+                        {
+                            currentV -= height;
+                        }
+                    }
+                }
+            }
+
+            return createdTags;
+        }
+
+        /// <summary>
+        /// ビュー名を自動生成
+        /// パターン: 元ビュー名 "xxx_yyy - zzz" → "仕上表_yyy - zzz"
+        /// </summary>
+        public static string GenerateViewName(string sourceViewName)
+        {
+            if (string.IsNullOrEmpty(sourceViewName))
+                return "仕上表";
+
+            // パターン: xxx_yyy - zzz
+            var match = System.Text.RegularExpressions.Regex.Match(
+                sourceViewName, @"^(.*)_(.*)$");
+
+            if (match.Success)
+            {
+                string remainder = match.Groups[2].Value;
+                return $"仕上表_{remainder}";
+            }
+
+            return $"仕上表_{sourceViewName}";
+        }
+    }
+}

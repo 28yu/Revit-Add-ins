@@ -116,6 +116,19 @@ namespace Tools28
             viewportPasteButtonData.ToolTip = "コピーしたビューポート位置を他のシートに適用します";
             viewportPasteButtonData.LargeImage = LoadImage("viewport_paste_32.png");
             panel.AddItem(viewportPasteButtonData);
+
+            // セパレータ
+            panel.AddSeparator();
+
+            // 部屋タグ自動配置ボタン
+            PushButtonData roomTagButtonData = new PushButtonData(
+                "RoomTagAutoCreator",
+                "部屋タグ\n自動配置",
+                assemblyPath,
+                "Tools28.Commands.RoomTagCreator.RoomTagAutoCreatorCommand");
+            roomTagButtonData.ToolTip = "ビューポート内の部屋タグを指定方向・間隔で自動配置します";
+            roomTagButtonData.LargeImage = LoadImage("room_tag_32.png");
+            panel.AddItem(roomTagButtonData);
         }
 
         /// <summary>
