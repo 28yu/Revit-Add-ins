@@ -112,8 +112,7 @@ namespace Tools28.Commands.RoomTagCreator
                         {
                             newView = RoomTagService.CreateNewView(
                                 doc, sourceView, dialog.NewViewName,
-                                dialog.SelectedViewFamilyTypeName,
-                                dialog.SelectedViewTemplateId);
+                                dialog.SelectedViewFamilyTypeName);
                         }
                         catch (InvalidOperationException ex)
                         {

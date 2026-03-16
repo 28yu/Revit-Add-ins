@@ -18,7 +18,6 @@ namespace Tools28.Commands.RoomTagCreator
         private readonly Document _doc;
         private ObservableCollection<RoomInfo> _rooms;
         private List<RoomTagTypeInfo> _tagTypes;
-        private List<View> _viewTemplates;
         private int _rowCount = 2;
 
         // 結果プロパティ
@@ -27,7 +26,6 @@ namespace Tools28.Commands.RoomTagCreator
         public List<RoomInfo> SelectedRooms { get; private set; }
         public ElementId SelectedTagTypeId { get; private set; } = ElementId.InvalidElementId;
         public LayoutSettings Layout { get; private set; }
-        public ElementId SelectedViewTemplateId { get; private set; } = ElementId.InvalidElementId;
 
         public RoomTagUI(Document doc, List<RoomInfo> rooms, string sourceViewName)
         {
@@ -45,7 +43,6 @@ namespace Tools28.Commands.RoomTagCreator
 
             // ドロップダウンを初期化
             LoadTagTypes();
-            LoadViewTemplates();
 
             // 初期表示
             RowCountText.Text = _rowCount.ToString();
@@ -58,15 +55,6 @@ namespace Tools28.Commands.RoomTagCreator
             TagTypeComboBox.ItemsSource = _tagTypes.Select(t => t.DisplayName).ToList();
             if (_tagTypes.Count > 0)
                 TagTypeComboBox.SelectedIndex = 0;
-        }
-
-        private void LoadViewTemplates()
-        {
-            _viewTemplates = RoomTagService.GetViewTemplates(_doc);
-            var templateNames = new List<string> { "(なし)" };
-            templateNames.AddRange(_viewTemplates.Select(v => v.Name));
-            ViewTemplateComboBox.ItemsSource = templateNames;
-            ViewTemplateComboBox.SelectedIndex = 0;
         }
 
         private void UpdatePreview()
@@ -240,13 +228,6 @@ namespace Tools28.Commands.RoomTagCreator
                 Count = _rowCount,
                 SpacingMm = spacing
             };
-
-            // ビューテンプレート（0=なし、1以降=テンプレート）
-            int templateIndex = ViewTemplateComboBox.SelectedIndex;
-            if (templateIndex > 0)
-                SelectedViewTemplateId = _viewTemplates[templateIndex - 1].Id;
-            else
-                SelectedViewTemplateId = ElementId.InvalidElementId;
 
             DialogResult = true;
             Close();

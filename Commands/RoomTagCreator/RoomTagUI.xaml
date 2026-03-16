@@ -265,10 +265,6 @@
                 <TextBlock Text="タグ間隔 (mm):" Style="{StaticResource LabelStyle}"/>
                 <TextBox x:Name="SpacingTextBox" Style="{StaticResource TextBoxStyle}" Text="2"
                          PreviewTextInput="SpacingTextBox_PreviewTextInput" Margin="0,0,0,12"/>
-
-                <!-- ビューテンプレート -->
-                <TextBlock Text="ビューテンプレート:" Style="{StaticResource LabelStyle}"/>
-                <ComboBox x:Name="ViewTemplateComboBox" Style="{StaticResource ComboBoxStyle}" Margin="0,0,0,12"/>
             </StackPanel>
 
             <!-- 右パネル: 部屋リスト -->

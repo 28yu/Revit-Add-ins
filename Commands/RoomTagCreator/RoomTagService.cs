@@ -50,19 +50,6 @@ namespace Tools28.Commands.RoomTagCreator
         }
 
         /// <summary>
-        /// ドキュメント内のビューテンプレート一覧を取得
-        /// </summary>
-        public static List<View> GetViewTemplates(Document doc)
-        {
-            return new FilteredElementCollector(doc)
-                .OfClass(typeof(View))
-                .Cast<View>()
-                .Where(v => v.IsTemplate)
-                .OrderBy(v => v.Name)
-                .ToList();
-        }
-
-        /// <summary>
         /// 指定名のViewFamilyTypeを取得、なければ複製して作成
         /// </summary>
         private static ElementId GetOrCreateViewFamilyType(Document doc, string typeName)
@@ -94,7 +81,7 @@ namespace Tools28.Commands.RoomTagCreator
         /// 新規ビューを作成
         /// </summary>
         public static ViewPlan CreateNewView(Document doc, View sourceView, string viewName,
-            string viewFamilyTypeName, ElementId viewTemplateId)
+            string viewFamilyTypeName)
         {
             // ソースビューのレベルを取得
             Level level = null;
@@ -137,12 +124,6 @@ namespace Tools28.Commands.RoomTagCreator
 
             // クロップボックス表示を非表示
             newView.CropBoxVisible = false;
-
-            // ユーザー指定のビューテンプレートを適用
-            if (viewTemplateId != null && viewTemplateId != ElementId.InvalidElementId)
-            {
-                newView.ViewTemplateId = viewTemplateId;
-            }
 
             // ビューテンプレートを解除（自動適用含む）して手動設定を可能にする
             newView.ViewTemplateId = ElementId.InvalidElementId;
