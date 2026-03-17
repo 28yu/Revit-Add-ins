@@ -83,12 +83,21 @@ namespace Tools28.Commands.ExcelExportImport.Services
                         row++;
                     }
 
-                    // 列幅の自動調整（各列個別に調整し余白を追加）
+                    // 列幅の自動調整（文字数ベースで手動計算）
                     int lastCol = categoryParams.Count + 2;
+                    int lastRow = row - 1;
                     for (int col = 1; col <= lastCol; col++)
                     {
-                        worksheet.Column(col).AdjustToContents();
-                        worksheet.Column(col).Width = worksheet.Column(col).Width + 3;
+                        double maxWidth = 0;
+                        for (int r = 1; r <= lastRow; r++)
+                        {
+                            string text = worksheet.Cell(r, col).GetString();
+                            if (string.IsNullOrEmpty(text)) continue;
+                            double w = CalculateTextWidth(text);
+                            if (w > maxWidth) maxWidth = w;
+                        }
+                        // オートフィルタの▼アイコン分(ヘッダー行)を加算
+                        worksheet.Column(col).Width = maxWidth + 4;
                     }
 
                     // 要素ID列の最小幅を確保
@@ -108,6 +117,23 @@ namespace Tools28.Commands.ExcelExportImport.Services
             }
 
             return results;
+        }
+
+        /// <summary>
+        /// 文字列の表示幅をExcel列幅単位で計算（全角=2, 半角=1）
+        /// </summary>
+        private static double CalculateTextWidth(string text)
+        {
+            double width = 0;
+            foreach (char c in text)
+            {
+                // 全角文字（日本語、全角英数記号など）は2、半角は1
+                if (c > 0x7F)
+                    width += 2.0;
+                else
+                    width += 1.0;
+            }
+            return width;
         }
 
         /// <summary>
