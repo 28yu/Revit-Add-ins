@@ -154,10 +154,21 @@ namespace Tools28.Commands.ExcelExportImport.Views
 
         private void AddToOutputButton_Click(object sender, RoutedEventArgs e)
         {
-            var currentParams = ParameterListBox.ItemsSource as IEnumerable<ParameterInfo>;
-            if (currentParams == null) return;
+            // ListCollectionView からパラメータを列挙
+            var checkedParams = new List<ParameterInfo>();
+            if (ParameterListBox.ItemsSource is ListCollectionView view)
+            {
+                foreach (var item in view)
+                {
+                    if (item is ParameterInfo p && p.IsChecked)
+                        checkedParams.Add(p);
+                }
+            }
+            else if (ParameterListBox.ItemsSource is IEnumerable<ParameterInfo> list)
+            {
+                checkedParams = list.Where(p => p.IsChecked).ToList();
+            }
 
-            var checkedParams = currentParams.Where(p => p.IsChecked).ToList();
             if (checkedParams.Count == 0) return;
 
             foreach (var param in checkedParams)
