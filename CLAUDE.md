@@ -271,6 +271,14 @@ git push -u origin claude/<branch-name>
 これを怠ると PR が作成されてもマージできず、手動でのコンフリクト解消が必要になる。
 特に同じファイル（例: `Docs/workflow-diagram.html`）を連続して変更する場合は要注意。
 
+#### ⚠️ ローカルでの pull 失敗に注意
+
+Claude Code で push → 自動マージ後、ユーザーがローカルで `git pull origin main` する際：
+- **ローカルに未コミット変更があると `git pull` がエラーで中止される**
+- エラーメッセージを見落とすと、古いコードのままビルドしてしまう
+- 特にバイナリファイル（PNG アイコン等）は Claude Code とローカルの両方で変更されやすい
+- **対策**: pull 後に `git log --oneline -3` で期待するコミットが反映されたか確認する
+
 ## GitHub Pages (Docs/)
 
 ### 概要
@@ -492,29 +500,50 @@ Commands/RoomTagCreator/
 - `Application.cs` の `OnStartup()` で各パネルを個別メソッドで構築
 - `CreateGridLevelPanel()`, `CreateSheetPanel()`, `CreateViewPanel()`, `CreateAnnotationPanel()`, `CreateStructuralPanel()`
 
-## 保留事項: 塗潰し領域ボタンの名称・アイコン変更がRevitに反映されない問題
+## 解決済み: 塗潰し領域ボタンの名称・アイコン変更がRevitに反映されない問題
 
 ### 症状
-- ボタン名を「領域」→「塗潰し領域\n分割･統合」に変更
-- アイコンを `filled_region_32.png`（ハッチング+矢印デザイン）に差替え
-- 内部名を `FilledRegionSplitMerge` → `FilledRegionSplitMerge2` に変更（キャッシュ無効化のため）
-- コード変更・csproj のリソース登録・ビルド・デプロイは全て完了済み
-- **しかし Revit を再起動しても旧名称・旧アイコンのまま反映されない**
+- ボタン名・アイコン・内部名を変更し、ビルド＆デプロイしても Revit に反映されない
+- デバッグログも更新されない
+- リボンの位置変更（パネル再構成）は反映されている
 
-### 実施済みの対策
-1. ボタンの内部名（PushButtonData の第1引数）を変更してキャッシュ無効化を試みた → 効果なし
-2. Revit 終了 → ビルド＆デプロイ → Revit 起動の順序で実行 → 効果なし
+### 原因（解決済み）
+**`git pull` の失敗に気づかず、古いコードでビルドしていた。**
 
-### 未調査の原因候補
-1. **Revit のリボンキャッシュ**: `%AppData%\Autodesk\Revit\Autodesk Revit 20XX\` 内にUIキャッシュが残っている可能性。`UIState.dat` や類似ファイルの削除が必要かもしれない
-2. **DLL が実際に更新されていない**: デプロイ先 (`C:\ProgramData\Autodesk\Revit\Addins\{VERSION}\Tools28.dll`) のタイムスタンプやファイルサイズが更新されているか未確認
-3. **ビルドが正常に完了していない**: ビルド時に古いキャッシュが使われている可能性。`bin\` / `obj\` フォルダを削除してクリーンビルドを試す
-4. **pack URI のアセンブリ名不一致**: `pack://application:,,,/Tools28;component/Resources/Icons/filled_region_32.png` のアセンブリ名が実際のアセンブリと一致しているか確認
-5. **Revit が別の場所のDLLを読み込んでいる**: `.addin` マニフェストで指定されたパスと実際のデプロイ先が異なる可能性
+具体的な経緯：
+1. Claude Code（リモート環境）でコード変更 → コミット → push → 自動マージで main に反映
+2. ユーザーのローカル（Windows）で `git pull origin main` を実行
+3. **ローカルに未コミットの変更（`filled_region_32.png`）があったため `git pull` がエラーで中止された**
+4. エラーメッセージを見落とし、`QuickBuild.ps1` を実行 → 古いコードのままビルド＆デプロイ
+5. Revit を起動しても変更が反映されない → 様々な原因を調査（UIState.dat 削除、DLLタイムスタンプ確認等）
+6. 実際にはコード自体が更新されていなかっただけだった
 
-### 次セッションでの調査手順
-1. `bin\` と `obj\` を削除してクリーンビルド
-2. デプロイ先DLLのタイムスタンプ・ファイルサイズを確認
-3. Revit の UIState.dat 等のキャッシュファイルを削除して再起動
-4. デバッグログ (`C:\temp\Tools28_debug.txt`) で LoadImage の成功/失敗を確認
-5. 必要に応じて LoadImage にログ出力を追加して原因を特定
+### 教訓・再発防止
+
+#### Claude Code セッションでの注意事項
+1. **`git pull` の結果を必ず確認させる** — エラーで中止されていないか、実際にコミットが適用されたかを確認
+2. **ローカルの未コミット変更に注意** — 特にバイナリファイル（PNG等）はマージコンフリクトの原因になりやすい
+3. **変更が反映されない場合、まず `git log --oneline -5` でローカルの HEAD を確認** — 期待するコミットが含まれているかが最重要
+4. **デバッグログや UIState.dat 等の調査は、コードが正しくデプロイされていることを確認した後に行う**
+
+#### 確認手順チェックリスト（変更が反映されない場合）
+```
+1. git status                           # 未コミット変更がないか
+2. git log --oneline -5                 # 期待するコミットがHEADに含まれるか
+3. git pull origin main                 # pull が成功したか（エラーなし？）
+4. .\QuickBuild.ps1                     # ビルド成功を確認
+5. デプロイ先DLLのタイムスタンプ確認      # 更新されているか
+6. Revit 再起動して確認
+```
+
+#### git pull 失敗時の対処法
+```powershell
+# ローカルの未コミット変更を退避して pull
+git stash
+git pull origin main
+git stash pop  # 必要なら退避した変更を戻す
+
+# または、ローカル変更が不要なら破棄
+git checkout -- <ファイル名>
+git pull origin main
+```
