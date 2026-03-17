@@ -284,7 +284,6 @@ namespace Tools28.Commands.ExcelExportImport.Views
                 {
                     var settings = SettingsService.LoadSettings(dialog.FileName);
                     ApplySettings(settings);
-                    MessageBox.Show("設定を読み込みました。", "設定読込", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
                 catch (Exception ex)
                 {

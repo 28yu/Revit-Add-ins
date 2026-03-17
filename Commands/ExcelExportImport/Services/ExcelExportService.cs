@@ -61,6 +61,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
                     headerRange.Style.Fill.BackgroundColor = XLColor.FromArgb(155, 187, 89);
                     headerRange.Style.Font.FontColor = XLColor.White;
                     headerRange.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                    headerRange.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
                     headerRange.Style.Border.BottomBorder = XLBorderStyleValues.Thin;
 
                     // 1行目の高さを25に設定
@@ -101,9 +102,9 @@ namespace Tools28.Commands.ExcelExportImport.Services
                             double w = CalculateTextWidth(text);
                             if (w > maxDataWidth) maxDataWidth = w;
                         }
-                        // ヘッダー行の幅（フィルタ▼ボタン分+6を加算）
+                        // ヘッダー行の幅（フィルタ▼ボタン分+8を加算）
                         string headerText = worksheet.Cell(1, col).GetString();
-                        double headerWidth = CalculateTextWidth(headerText ?? "") + 6;
+                        double headerWidth = CalculateTextWidth(headerText ?? "") + 8;
                         // データ幅には余白+2を加算
                         double dataWidth = maxDataWidth + 2;
                         worksheet.Column(col).Width = Math.Max(headerWidth, dataWidth);
