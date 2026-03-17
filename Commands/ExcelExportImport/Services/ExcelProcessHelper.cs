@@ -1,13 +1,11 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
 using System.Runtime.InteropServices;
 
 namespace Tools28.Commands.ExcelExportImport.Services
 {
     /// <summary>
-    /// 開いているExcelファイルを検出するヘルパー
+    /// 開いているExcelファイルを検出・操作するヘルパー
     /// </summary>
     public static class ExcelProcessHelper
     {
@@ -20,25 +18,12 @@ namespace Tools28.Commands.ExcelExportImport.Services
 
             try
             {
-                // Excel.Application の ROT (Running Object Table) から取得を試行
-                object excelApp = null;
-                try
-                {
-                    excelApp = Marshal.GetActiveObject("Excel.Application");
-                }
-                catch (COMException)
-                {
-                    // Excelが起動していない場合
-                    return result;
-                }
-
-                if (excelApp == null)
+                dynamic app = GetExcelApplication();
+                if (app == null)
                     return result;
 
                 try
                 {
-                    // excelApp.Workbooks をリフレクションで取得
-                    dynamic app = excelApp;
                     dynamic workbooks = app.Workbooks;
                     int count = workbooks.Count;
 
@@ -64,7 +49,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
                 }
                 finally
                 {
-                    Marshal.ReleaseComObject(excelApp);
+                    Marshal.ReleaseComObject(app);
                 }
             }
             catch
@@ -73,6 +58,157 @@ namespace Tools28.Commands.ExcelExportImport.Services
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// 開いているExcelブックの指定セルに背景色を設定する（COM経由）
+        /// </summary>
+        /// <param name="filePath">対象ファイルパス</param>
+        /// <param name="changedSet">色付け対象セルのキー（"ElementId|ParameterName"）</param>
+        /// <returns>色付けに成功した場合true</returns>
+        public static bool MarkCellsViaCom(string filePath, HashSet<string> changedSet)
+        {
+            if (changedSet == null || changedSet.Count == 0)
+                return false;
+
+            dynamic app = null;
+            try
+            {
+                app = GetExcelApplication();
+                if (app == null)
+                    return false;
+
+                // ファイルパスに一致するワークブックを検索
+                dynamic workbooks = app.Workbooks;
+                dynamic targetWb = null;
+                int wbCount = workbooks.Count;
+
+                for (int i = 1; i <= wbCount; i++)
+                {
+                    dynamic wb = workbooks[i];
+                    try
+                    {
+                        string fullName = wb.FullName;
+                        if (string.Equals(fullName, filePath, StringComparison.OrdinalIgnoreCase))
+                        {
+                            targetWb = wb;
+                            break;
+                        }
+                    }
+                    catch
+                    {
+                        // ignore
+                    }
+                    if (targetWb == null || !ReferenceEquals(targetWb, wb))
+                    {
+                        Marshal.ReleaseComObject(wb);
+                    }
+                }
+
+                Marshal.ReleaseComObject(workbooks);
+
+                if (targetWb == null)
+                    return false;
+
+                try
+                {
+                    // RGB → Excel の ColorIndex 形式 (BGR)
+                    // R=252, G=213, B=180 → Excel Color = B + G*256 + R*256*256
+                    int excelColor = 180 + 213 * 256 + 252 * 256 * 256;
+
+                    int sheetCount = targetWb.Sheets.Count;
+                    for (int s = 1; s <= sheetCount; s++)
+                    {
+                        dynamic sheet = targetWb.Sheets[s];
+                        try
+                        {
+                            // 使用範囲を取得
+                            dynamic usedRange = sheet.UsedRange;
+                            int rowCount = usedRange.Rows.Count;
+                            int colCount = usedRange.Columns.Count;
+                            Marshal.ReleaseComObject(usedRange);
+
+                            if (rowCount < 2 || colCount < 3)
+                                continue;
+
+                            // ヘッダー行からパラメータ名を取得
+                            var paramHeaders = new List<string>();
+                            for (int col = 3; col <= colCount; col++)
+                            {
+                                dynamic cell = sheet.Cells[1, col];
+                                string headerText = Convert.ToString(cell.Value ?? "");
+                                paramHeaders.Add(headerText);
+                                Marshal.ReleaseComObject(cell);
+                            }
+
+                            // データ行を走査して該当セルに色を付ける
+                            for (int row = 2; row <= rowCount; row++)
+                            {
+                                dynamic idCell = sheet.Cells[row, 1];
+                                object idValue = idCell.Value;
+                                Marshal.ReleaseComObject(idCell);
+
+                                if (idValue == null)
+                                    continue;
+
+                                // ElementIdを整数文字列に正規化
+                                string elementIdStr;
+                                if (idValue is double dVal)
+                                    elementIdStr = ((int)dVal).ToString();
+                                else
+                                    elementIdStr = Convert.ToString(idValue).Trim();
+
+                                for (int i = 0; i < paramHeaders.Count; i++)
+                                {
+                                    string key = elementIdStr + "|" + paramHeaders[i];
+                                    if (changedSet.Contains(key))
+                                    {
+                                        dynamic cell = sheet.Cells[row, i + 3];
+                                        cell.Interior.Color = excelColor;
+                                        Marshal.ReleaseComObject(cell);
+                                    }
+                                }
+                            }
+                        }
+                        finally
+                        {
+                            Marshal.ReleaseComObject(sheet);
+                        }
+                    }
+
+                    return true;
+                }
+                finally
+                {
+                    Marshal.ReleaseComObject(targetWb);
+                }
+            }
+            catch
+            {
+                return false;
+            }
+            finally
+            {
+                if (app != null)
+                {
+                    try { Marshal.ReleaseComObject(app); } catch { }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Excel.Application の COM オブジェクトを取得
+        /// </summary>
+        private static dynamic GetExcelApplication()
+        {
+            try
+            {
+                return Marshal.GetActiveObject("Excel.Application");
+            }
+            catch (COMException)
+            {
+                return null;
+            }
         }
     }
 }

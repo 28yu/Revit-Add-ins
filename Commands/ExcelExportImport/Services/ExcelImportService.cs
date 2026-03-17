@@ -247,12 +247,12 @@ namespace Tools28.Commands.ExcelExportImport.Services
 
         /// <summary>
         /// インポートで変更されたセルにExcelファイル上で色を付ける
+        /// Excelが開いている場合はCOM経由で直接色付け、閉じている場合はClosedXMLで上書き
         /// </summary>
-        /// <returns>色付けファイルの保存先パス（元ファイルまたは別名ファイル）。色付け不要の場合はnull</returns>
+        /// <returns>色付けファイルの保存先パス。COM経由成功時は元ファイルパス。色付け不要/失敗の場合はnull</returns>
         public static string MarkImportedCells(string filePath, List<ImportPreviewRow> previewRows)
         {
             // 変更のあったセルを (ElementId, ParameterName) で検索用セットに
-            // ElementIdはintなのでToString()で統一
             var changedSet = new HashSet<string>(
                 previewRows
                     .Where(r => r.HasChange)
@@ -261,7 +261,19 @@ namespace Tools28.Commands.ExcelExportImport.Services
             if (changedSet.Count == 0)
                 return null;
 
-            // ファイルをMemoryStreamに読み込み、FileStreamを即座に解放
+            // まずCOM経由（開いているExcelに直接色付け）を試行
+            if (ExcelProcessHelper.MarkCellsViaCom(filePath, changedSet))
+                return filePath;
+
+            // Excelが開いていない場合、ClosedXMLでファイルを直接編集
+            return MarkCellsViaClosedXml(filePath, changedSet);
+        }
+
+        /// <summary>
+        /// ClosedXMLを使用してExcelファイルのセルに色を付ける（Excelが閉じている場合のフォールバック）
+        /// </summary>
+        private static string MarkCellsViaClosedXml(string filePath, HashSet<string> changedSet)
+        {
             byte[] fileBytes;
             try
             {
@@ -274,7 +286,6 @@ namespace Tools28.Commands.ExcelExportImport.Services
             }
             catch (IOException)
             {
-                // ファイルが読み取れない場合は色付け不可
                 return null;
             }
 
@@ -296,17 +307,14 @@ namespace Tools28.Commands.ExcelExportImport.Services
                     if (rowCount < 2 || colCount < 3)
                         continue;
 
-                    // ヘッダーからパラメータ名を取得
                     var paramHeaders = new List<string>();
                     for (int col = 3; col <= colCount; col++)
                     {
                         paramHeaders.Add(worksheet.Cell(1, col).GetString());
                     }
 
-                    // データ行を走査して該当セルに色を付ける
                     for (int row = 2; row <= rowCount; row++)
                     {
-                        // ElementIdを数値として正規化（"12345.0" → "12345" 等の差異を吸収）
                         string elementIdStr = worksheet.Cell(row, 1).GetString().Trim();
                         if (double.TryParse(elementIdStr, out double idDouble))
                         {
@@ -329,14 +337,11 @@ namespace Tools28.Commands.ExcelExportImport.Services
                 if (!anyMarked)
                     return null;
 
-                // 保存用MemoryStreamに書き出し
                 using (var saveStream = new MemoryStream())
                 {
                     workbook.SaveAs(saveStream);
-                    saveStream.Position = 0;
                     byte[] savedBytes = saveStream.ToArray();
 
-                    // 元ファイルに直接上書きを試行
                     try
                     {
                         File.WriteAllBytes(filePath, savedBytes);
@@ -344,7 +349,6 @@ namespace Tools28.Commands.ExcelExportImport.Services
                     }
                     catch (IOException)
                     {
-                        // ファイルがロックされている場合、別名で保存
                         string dir = Path.GetDirectoryName(filePath);
                         string name = Path.GetFileNameWithoutExtension(filePath);
                         string ext = Path.GetExtension(filePath);
