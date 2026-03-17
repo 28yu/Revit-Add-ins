@@ -244,5 +244,62 @@ namespace Tools28.Commands.ExcelExportImport.Services
 
             return result;
         }
+
+        /// <summary>
+        /// インポートで変更されたセルにExcelファイル上で色を付ける
+        /// </summary>
+        public static void MarkImportedCells(string filePath, List<ImportPreviewRow> previewRows)
+        {
+            // 変更のあったセルを (ElementId, ParameterName) で検索用セットに
+            var changedSet = new HashSet<string>(
+                previewRows
+                    .Where(r => r.HasChange)
+                    .Select(r => r.ElementId + "|" + r.ParameterName));
+
+            if (changedSet.Count == 0)
+                return;
+
+            using (var workbook = new XLWorkbook(filePath))
+            {
+                foreach (var worksheet in workbook.Worksheets)
+                {
+                    var lastRow = worksheet.LastRowUsed();
+                    var lastCol = worksheet.LastColumnUsed();
+                    if (lastRow == null || lastCol == null)
+                        continue;
+
+                    int rowCount = lastRow.RowNumber();
+                    int colCount = lastCol.ColumnNumber();
+
+                    if (rowCount < 2 || colCount < 3)
+                        continue;
+
+                    // ヘッダーからパラメータ名を取得
+                    var paramHeaders = new List<string>();
+                    for (int col = 3; col <= colCount; col++)
+                    {
+                        paramHeaders.Add(worksheet.Cell(1, col).GetString());
+                    }
+
+                    // データ行を走査して該当セルに色を付ける
+                    for (int row = 2; row <= rowCount; row++)
+                    {
+                        string elementIdStr = worksheet.Cell(row, 1).GetString();
+
+                        for (int i = 0; i < paramHeaders.Count; i++)
+                        {
+                            string key = elementIdStr + "|" + paramHeaders[i];
+                            if (changedSet.Contains(key))
+                            {
+                                worksheet.Cell(row, i + 3).Style.Fill.BackgroundColor =
+                                    XLColor.FromArgb(252, 213, 180);
+                            }
+                        }
+                    }
+                }
+
+                workbook.Save();
+            }
+        }
     }
 }

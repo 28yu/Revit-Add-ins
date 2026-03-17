@@ -27,6 +27,9 @@ namespace Tools28.Commands.ExcelExportImport
                 if (result != true || !dialog.ImportExecuted)
                     return Result.Cancelled;
 
+                // プレビューデータを取得（色付け用）
+                var previewRows = ExcelImportService.GeneratePreview(doc, dialog.SelectedFilePath);
+
                 // トランザクション内でインポート実行
                 ImportResult importResult;
                 using (var trans = new Transaction(doc, "Excelインポート"))
@@ -42,6 +45,19 @@ namespace Tools28.Commands.ExcelExportImport
                     else
                     {
                         trans.RollBack();
+                    }
+                }
+
+                // インポート成功時、Excelの変更セルに色を付ける
+                if (importResult.SuccessCount > 0)
+                {
+                    try
+                    {
+                        ExcelImportService.MarkImportedCells(dialog.SelectedFilePath, previewRows);
+                    }
+                    catch
+                    {
+                        // Excel色付けの失敗はインポート結果に影響させない
                     }
                 }
 
