@@ -89,7 +89,7 @@ namespace Tools28.Commands.ExcelExportImport.Views
                 Background = System.Windows.Media.Brushes.WhiteSmoke
             };
 
-            var grid = new Grid { Margin = new Thickness(10) };
+            var grid = new System.Windows.Controls.Grid { Margin = new Thickness(10) };
             grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Auto) });
             grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
             grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Auto) });
@@ -100,7 +100,7 @@ namespace Tools28.Commands.ExcelExportImport.Views
                 FontSize = 12,
                 Margin = new Thickness(0, 0, 0, 8)
             };
-            Grid.SetRow(label, 0);
+            System.Windows.Controls.Grid.SetRow(label, 0);
             grid.Children.Add(label);
 
             var listBox = new ListBox { FontSize = 11 };
@@ -115,7 +115,7 @@ namespace Tools28.Commands.ExcelExportImport.Views
             }
             if (listBox.Items.Count > 0)
                 listBox.SelectedIndex = 0;
-            Grid.SetRow(listBox, 1);
+            System.Windows.Controls.Grid.SetRow(listBox, 1);
             grid.Children.Add(listBox);
 
             var btnPanel = new StackPanel
@@ -155,7 +155,7 @@ namespace Tools28.Commands.ExcelExportImport.Views
 
             btnPanel.Children.Add(okBtn);
             btnPanel.Children.Add(cancelBtn);
-            Grid.SetRow(btnPanel, 2);
+            System.Windows.Controls.Grid.SetRow(btnPanel, 2);
             grid.Children.Add(btnPanel);
 
             selectWindow.Content = grid;
