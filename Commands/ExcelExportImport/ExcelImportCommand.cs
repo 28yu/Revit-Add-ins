@@ -49,11 +49,12 @@ namespace Tools28.Commands.ExcelExportImport
                 }
 
                 // インポート成功時、Excelの変更セルに色を付ける
+                string markedFilePath = null;
                 if (importResult.SuccessCount > 0)
                 {
                     try
                     {
-                        ExcelImportService.MarkImportedCells(dialog.SelectedFilePath, previewRows);
+                        markedFilePath = ExcelImportService.MarkImportedCells(dialog.SelectedFilePath, previewRows);
                     }
                     catch
                     {
@@ -67,6 +68,13 @@ namespace Tools28.Commands.ExcelExportImport
                 sb.AppendLine($"成功: {importResult.SuccessCount}件");
                 sb.AppendLine($"失敗: {importResult.FailCount}件");
                 sb.AppendLine($"スキップ: {importResult.SkipCount}件");
+
+                // 色付けファイルの保存先を表示
+                if (markedFilePath != null && markedFilePath != dialog.SelectedFilePath)
+                {
+                    sb.AppendLine($"\n※ Excelが開いているため、色付けファイルを別名で保存しました:");
+                    sb.AppendLine(markedFilePath);
+                }
 
                 if (importResult.Errors.Count > 0)
                 {
