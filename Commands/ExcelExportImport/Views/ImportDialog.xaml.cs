@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Windows;
+using System.Windows.Controls;
 using Autodesk.Revit.DB;
 using Microsoft.Win32;
 using Tools28.Commands.ExcelExportImport.Services;
@@ -27,6 +29,154 @@ namespace Tools28.Commands.ExcelExportImport.Views
         {
             InitializeComponent();
             _doc = doc;
+
+            // 起動時に開いているExcelファイルを自動検出
+            AutoDetectOpenFiles();
+        }
+
+        private void AutoDetectOpenFiles()
+        {
+            try
+            {
+                var openFiles = ExcelProcessHelper.GetOpenExcelFiles();
+                if (openFiles.Count == 1)
+                {
+                    _selectedFilePath = openFiles[0];
+                    FilePathTextBox.Text = _selectedFilePath;
+                    LoadPreview();
+                }
+                else if (openFiles.Count > 1)
+                {
+                    ShowOpenFileSelection(openFiles);
+                }
+            }
+            catch
+            {
+                // 自動検出の失敗は無視
+            }
+        }
+
+        private void OpenFilesButton_Click(object sender, RoutedEventArgs e)
+        {
+            var openFiles = ExcelProcessHelper.GetOpenExcelFiles();
+            if (openFiles.Count == 0)
+            {
+                MessageBox.Show("開いているExcelファイルが見つかりません。",
+                    "確認", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+            else if (openFiles.Count == 1)
+            {
+                _selectedFilePath = openFiles[0];
+                FilePathTextBox.Text = _selectedFilePath;
+                LoadPreview();
+            }
+            else
+            {
+                ShowOpenFileSelection(openFiles);
+            }
+        }
+
+        private void ShowOpenFileSelection(List<string> openFiles)
+        {
+            var selectWindow = new Window
+            {
+                Title = "Excelファイルを選択",
+                Width = 500,
+                Height = 300,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Owner = this,
+                Background = System.Windows.Media.Brushes.WhiteSmoke
+            };
+
+            var grid = new Grid { Margin = new Thickness(10) };
+            grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Auto) });
+            grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Auto) });
+
+            var label = new TextBlock
+            {
+                Text = "インポートするExcelファイルを選択してください:",
+                FontSize = 12,
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+            Grid.SetRow(label, 0);
+            grid.Children.Add(label);
+
+            var listBox = new ListBox { FontSize = 11 };
+            foreach (var file in openFiles)
+            {
+                listBox.Items.Add(new ListBoxItem
+                {
+                    Content = Path.GetFileName(file),
+                    Tag = file,
+                    ToolTip = file
+                });
+            }
+            if (listBox.Items.Count > 0)
+                listBox.SelectedIndex = 0;
+            Grid.SetRow(listBox, 1);
+            grid.Children.Add(listBox);
+
+            var btnPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                Margin = new Thickness(0, 8, 0, 0)
+            };
+
+            string selectedPath = null;
+            var okBtn = new Button
+            {
+                Content = "OK",
+                Width = 80,
+                Height = 28,
+                Margin = new Thickness(4, 0, 0, 0),
+                IsDefault = true
+            };
+            okBtn.Click += (s, args) =>
+            {
+                var selected = listBox.SelectedItem as ListBoxItem;
+                if (selected != null)
+                {
+                    selectedPath = selected.Tag as string;
+                    selectWindow.DialogResult = true;
+                }
+            };
+
+            var cancelBtn = new Button
+            {
+                Content = "キャンセル",
+                Width = 80,
+                Height = 28,
+                Margin = new Thickness(4, 0, 0, 0),
+                IsCancel = true
+            };
+
+            btnPanel.Children.Add(okBtn);
+            btnPanel.Children.Add(cancelBtn);
+            Grid.SetRow(btnPanel, 2);
+            grid.Children.Add(btnPanel);
+
+            selectWindow.Content = grid;
+
+            // ダブルクリックで選択
+            listBox.MouseDoubleClick += (s, args) =>
+            {
+                var selected = listBox.SelectedItem as ListBoxItem;
+                if (selected != null)
+                {
+                    selectedPath = selected.Tag as string;
+                    selectWindow.DialogResult = true;
+                }
+            };
+
+            if (selectWindow.ShowDialog() == true && selectedPath != null)
+            {
+                _selectedFilePath = selectedPath;
+                FilePathTextBox.Text = _selectedFilePath;
+                LoadPreview();
+            }
         }
 
         private void BrowseButton_Click(object sender, RoutedEventArgs e)

@@ -260,9 +260,15 @@ namespace Tools28.Commands.ExcelExportImport.Services
             if (changedSet.Count == 0)
                 return null;
 
-            // 共有モードで読み込み
+            // ファイルをMemoryStreamに読み込み、FileStreamを即座に解放
+            var memStream = new MemoryStream();
             using (var readStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
-            using (var workbook = new XLWorkbook(readStream))
+            {
+                readStream.CopyTo(memStream);
+            }
+            memStream.Position = 0;
+
+            using (var workbook = new XLWorkbook(memStream))
             {
                 foreach (var worksheet in workbook.Worksheets)
                 {

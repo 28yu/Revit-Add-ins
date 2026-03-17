@@ -99,11 +99,16 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <TextBox x:Name="FilePathTextBox" Grid.Column="0"
                          IsReadOnly="True" FontSize="11" Padding="4,2"
                          BorderBrush="#CCCCCC"/>
-                <Button Grid.Column="1" Content="参照..."
+                <Button Grid.Column="1" Content="開いているファイル"
+                        Style="{StaticResource SecondaryButtonStyle}"
+                        Margin="4,0,0,0"
+                        Click="OpenFilesButton_Click"/>
+                <Button Grid.Column="2" Content="参照..."
                         Style="{StaticResource SecondaryButtonStyle}"
                         Margin="4,0,0,0"
                         Click="BrowseButton_Click"/>
