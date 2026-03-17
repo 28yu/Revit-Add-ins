@@ -141,7 +141,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
                                 Marshal.ReleaseComObject(cell);
                             }
 
-                            // データ行を走査して該当セルに色を付ける
+                            // データ行を走査して変更がある行全体に色を付ける
                             for (int row = 2; row <= rowCount; row++)
                             {
                                 dynamic idCell = sheet.Cells[row, 1];
@@ -158,15 +158,24 @@ namespace Tools28.Commands.ExcelExportImport.Services
                                 else
                                     elementIdStr = Convert.ToString(idValue).Trim();
 
+                                // この行に変更があるかチェック
+                                bool rowHasChange = false;
                                 for (int i = 0; i < paramHeaders.Count; i++)
                                 {
                                     string key = elementIdStr + "|" + paramHeaders[i];
                                     if (changedSet.Contains(key))
                                     {
-                                        dynamic cell = sheet.Cells[row, i + 3];
-                                        cell.Interior.Color = excelColor;
-                                        Marshal.ReleaseComObject(cell);
+                                        rowHasChange = true;
+                                        break;
                                     }
+                                }
+
+                                // 変更がある行は全列に色を付ける
+                                if (rowHasChange)
+                                {
+                                    dynamic rowRange = sheet.Range[sheet.Cells[row, 1], sheet.Cells[row, colCount]];
+                                    rowRange.Interior.Color = excelColor;
+                                    Marshal.ReleaseComObject(rowRange);
                                 }
                             }
                         }

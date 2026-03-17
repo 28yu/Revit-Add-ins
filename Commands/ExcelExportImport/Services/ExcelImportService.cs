@@ -321,15 +321,27 @@ namespace Tools28.Commands.ExcelExportImport.Services
                             elementIdStr = ((int)idDouble).ToString();
                         }
 
+                        // この行に変更があるかチェック
+                        bool rowHasChange = false;
                         for (int i = 0; i < paramHeaders.Count; i++)
                         {
                             string key = elementIdStr + "|" + paramHeaders[i];
                             if (changedSet.Contains(key))
                             {
-                                worksheet.Cell(row, i + 3).Style.Fill.BackgroundColor =
-                                    XLColor.FromArgb(252, 213, 180);
-                                anyMarked = true;
+                                rowHasChange = true;
+                                break;
                             }
+                        }
+
+                        // 変更がある行は全列に色を付ける
+                        if (rowHasChange)
+                        {
+                            for (int col = 1; col <= colCount; col++)
+                            {
+                                worksheet.Cell(row, col).Style.Fill.BackgroundColor =
+                                    XLColor.FromArgb(252, 213, 180);
+                            }
+                            anyMarked = true;
                         }
                     }
                 }
