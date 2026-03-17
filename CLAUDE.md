@@ -475,3 +475,46 @@ Commands/RoomTagCreator/
 - **コード実装**: 完了（コマンド、サービス、ダイアログ、モデル）
 - **アイコン**: 表形式アイコン（`room_tag_32.png`）- 上部通し行 + 下部グリッド
 - **リボン登録**: 未確認（Application.cs への登録が必要）
+
+## リボンメニュー整理
+
+### 概要
+リボンメニューを5パネル構成に整理。
+
+### パネル構成（左から順）
+1. **通り芯・レベル** — 通り芯/レベルの符号表示切替（両方/左のみ/右のみ）
+2. **シート** — シート一括作成
+3. **ビュー** — ビューポート位置コピー/ペースト、トリミング領域コピー/ペースト、3Dビューコピー/ペースト、セクションボックスコピー/ペースト
+4. **注釈・詳細** — 部屋タグ自動配置、塗潰し領域 分割・統合
+5. **構造** — 梁下端色分け、梁天端色分け
+
+### 実装
+- `Application.cs` の `OnStartup()` で各パネルを個別メソッドで構築
+- `CreateGridLevelPanel()`, `CreateSheetPanel()`, `CreateViewPanel()`, `CreateAnnotationPanel()`, `CreateStructuralPanel()`
+
+## 保留事項: 塗潰し領域ボタンの名称・アイコン変更がRevitに反映されない問題
+
+### 症状
+- ボタン名を「領域」→「塗潰し領域\n分割･統合」に変更
+- アイコンを `filled_region_32.png`（ハッチング+矢印デザイン）に差替え
+- 内部名を `FilledRegionSplitMerge` → `FilledRegionSplitMerge2` に変更（キャッシュ無効化のため）
+- コード変更・csproj のリソース登録・ビルド・デプロイは全て完了済み
+- **しかし Revit を再起動しても旧名称・旧アイコンのまま反映されない**
+
+### 実施済みの対策
+1. ボタンの内部名（PushButtonData の第1引数）を変更してキャッシュ無効化を試みた → 効果なし
+2. Revit 終了 → ビルド＆デプロイ → Revit 起動の順序で実行 → 効果なし
+
+### 未調査の原因候補
+1. **Revit のリボンキャッシュ**: `%AppData%\Autodesk\Revit\Autodesk Revit 20XX\` 内にUIキャッシュが残っている可能性。`UIState.dat` や類似ファイルの削除が必要かもしれない
+2. **DLL が実際に更新されていない**: デプロイ先 (`C:\ProgramData\Autodesk\Revit\Addins\{VERSION}\Tools28.dll`) のタイムスタンプやファイルサイズが更新されているか未確認
+3. **ビルドが正常に完了していない**: ビルド時に古いキャッシュが使われている可能性。`bin\` / `obj\` フォルダを削除してクリーンビルドを試す
+4. **pack URI のアセンブリ名不一致**: `pack://application:,,,/Tools28;component/Resources/Icons/filled_region_32.png` のアセンブリ名が実際のアセンブリと一致しているか確認
+5. **Revit が別の場所のDLLを読み込んでいる**: `.addin` マニフェストで指定されたパスと実際のデプロイ先が異なる可能性
+
+### 次セッションでの調査手順
+1. `bin\` と `obj\` を削除してクリーンビルド
+2. デプロイ先DLLのタイムスタンプ・ファイルサイズを確認
+3. Revit の UIState.dat 等のキャッシュファイルを削除して再起動
+4. デバッグログ (`C:\temp\Tools28_debug.txt`) で LoadImage の成功/失敗を確認
+5. 必要に応じて LoadImage にログ出力を追加して原因を特定
