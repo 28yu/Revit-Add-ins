@@ -1,0 +1,291 @@
+<Window x:Class="Tools28.Commands.ExcelExportImport.Views.ExportDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="EXCELエクスポート"
+        Width="750"
+        Height="520"
+        MinWidth="650"
+        MinHeight="420"
+        WindowStartupLocation="CenterScreen"
+        Background="#F5F5F5">
+
+    <Window.Resources>
+        <!-- カラー定義 -->
+        <SolidColorBrush x:Key="RevitBlue" Color="#0066CC"/>
+        <SolidColorBrush x:Key="RevitHoverBlue" Color="#0052A3"/>
+        <SolidColorBrush x:Key="RevitDarkGray" Color="#333333"/>
+        <SolidColorBrush x:Key="RevitLightGray" Color="#E6E6E6"/>
+
+        <!-- ボタンスタイル -->
+        <Style x:Key="PrimaryButtonStyle" TargetType="Button">
+            <Setter Property="MinWidth" Value="80"/>
+            <Setter Property="Height" Value="28"/>
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="Margin" Value="4,0,0,0"/>
+            <Setter Property="Background" Value="{StaticResource RevitBlue}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="{StaticResource RevitBlue}"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="2"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                            VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{StaticResource RevitHoverBlue}"/>
+                    <Setter Property="BorderBrush" Value="{StaticResource RevitHoverBlue}"/>
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Background" Value="#CCCCCC"/>
+                    <Setter Property="BorderBrush" Value="#CCCCCC"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="SecondaryButtonStyle" TargetType="Button">
+            <Setter Property="MinWidth" Value="70"/>
+            <Setter Property="Height" Value="28"/>
+            <Setter Property="Padding" Value="8,0"/>
+            <Setter Property="Margin" Value="4,0,0,0"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="Foreground" Value="{StaticResource RevitDarkGray}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="#CCCCCC"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="2"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                            VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#F0F0F0"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- 移動ボタンスタイル -->
+        <Style x:Key="MoveButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="32"/>
+            <Setter Property="Height" Value="28"/>
+            <Setter Property="Margin" Value="2,0"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="Foreground" Value="{StaticResource RevitDarkGray}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="#CCCCCC"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="2">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                            VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#F0F0F0"/>
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Foreground" Value="#CCCCCC"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- 検索ボックススタイル -->
+        <Style x:Key="SearchBoxStyle" TargetType="TextBox">
+            <Setter Property="Height" Value="24"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Padding" Value="4,2"/>
+            <Setter Property="BorderBrush" Value="#CCCCCC"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- 3カラムメインエリア -->
+        <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- 左カラム: カテゴリを選択 -->
+            <GroupBox Grid.Column="0" Header="カテゴリを選択" Margin="0,0,4,0" FontSize="12">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <Grid Grid.Row="0" Margin="0,4,0,4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="CategorySearchBox" Grid.Column="0"
+                                 Style="{StaticResource SearchBoxStyle}"
+                                 TextChanged="CategorySearchBox_TextChanged"/>
+                        <Button Grid.Column="1" Content="検索" Width="40" Height="24" Margin="4,0,0,0"
+                                Style="{StaticResource SecondaryButtonStyle}"
+                                Click="CategorySearchButton_Click"/>
+                    </Grid>
+                    <ListBox x:Name="CategoryListBox" Grid.Row="1"
+                             BorderThickness="1" BorderBrush="#CCCCCC"
+                             SelectionChanged="CategoryListBox_SelectionChanged">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <CheckBox Content="{Binding}"
+                                          IsChecked="{Binding IsChecked}"
+                                          Checked="CategoryCheckBox_Changed"
+                                          Unchecked="CategoryCheckBox_Changed"
+                                          FontSize="11" Margin="2,1"/>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
+            </GroupBox>
+
+            <!-- 中央カラム: パラメーター -->
+            <GroupBox Grid.Column="1" Header="パラメーター" Margin="4,0,4,0" FontSize="12">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <Grid Grid.Row="0" Margin="0,4,0,4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="ParameterSearchBox" Grid.Column="0"
+                                 Style="{StaticResource SearchBoxStyle}"
+                                 TextChanged="ParameterSearchBox_TextChanged"/>
+                        <Button Grid.Column="1" Content="検索" Width="40" Height="24" Margin="4,0,0,0"
+                                Style="{StaticResource SecondaryButtonStyle}"
+                                Click="ParameterSearchButton_Click"/>
+                    </Grid>
+                    <ListBox x:Name="ParameterListBox" Grid.Row="1"
+                             BorderThickness="1" BorderBrush="#CCCCCC"
+                             SelectionMode="Extended">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <CheckBox Content="{Binding DisplayName}"
+                                          IsChecked="{Binding IsChecked}"
+                                          FontSize="11" Margin="2,1"/>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
+            </GroupBox>
+
+            <!-- 右カラム: 出力 -->
+            <GroupBox Grid.Column="2" Header="出力" Margin="4,0,0,0" FontSize="12">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <Grid Grid.Row="0" Margin="0,4,0,4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="OutputSearchBox" Grid.Column="0"
+                                 Style="{StaticResource SearchBoxStyle}"
+                                 TextChanged="OutputSearchBox_TextChanged"/>
+                        <Button Grid.Column="1" Content="検索" Width="40" Height="24" Margin="4,0,0,0"
+                                Style="{StaticResource SecondaryButtonStyle}"
+                                Click="OutputSearchButton_Click"/>
+                    </Grid>
+                    <ListBox x:Name="OutputListBox" Grid.Row="1"
+                             BorderThickness="1" BorderBrush="#CCCCCC"
+                             SelectionMode="Single">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding DisplayName}" FontSize="11" Margin="2,1"/>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
+            </GroupBox>
+        </Grid>
+
+        <!-- 中央ボタンエリア: 追加/削除/上下移動 -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,8,0,4">
+            <Button Content="＞" ToolTip="出力に追加"
+                    Style="{StaticResource MoveButtonStyle}"
+                    Click="AddToOutputButton_Click"/>
+            <Button Content="＜" ToolTip="出力から削除"
+                    Style="{StaticResource MoveButtonStyle}"
+                    Click="RemoveFromOutputButton_Click"/>
+            <Button Content="▲" ToolTip="上へ移動"
+                    Style="{StaticResource MoveButtonStyle}"
+                    Click="MoveUpButton_Click"/>
+            <Button Content="▼" ToolTip="下へ移動"
+                    Style="{StaticResource MoveButtonStyle}"
+                    Click="MoveDownButton_Click"/>
+        </StackPanel>
+
+        <!-- 下部ボタンエリア -->
+        <Grid Grid.Row="2" Margin="0,8,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- 設定ボタン群 -->
+            <StackPanel Grid.Column="0" Orientation="Horizontal">
+                <Button Content="設定復元" Style="{StaticResource SecondaryButtonStyle}"
+                        Click="ResetSettingsButton_Click"/>
+                <Button Content="設定読込" Style="{StaticResource SecondaryButtonStyle}"
+                        Click="LoadSettingsButton_Click"/>
+                <Button Content="設定保存" Style="{StaticResource SecondaryButtonStyle}"
+                        Click="SaveSettingsButton_Click"/>
+            </StackPanel>
+
+            <!-- OK/キャンセルボタン -->
+            <StackPanel Grid.Column="2" Orientation="Horizontal">
+                <Button Content="OK" Style="{StaticResource PrimaryButtonStyle}"
+                        Click="OkButton_Click"/>
+                <Button Content="キャンセル" Style="{StaticResource SecondaryButtonStyle}"
+                        Click="CancelButton_Click"/>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>

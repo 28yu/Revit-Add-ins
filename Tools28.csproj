@@ -30,6 +30,7 @@
     <PackageReference Include="Nice3point.Revit.Api.RevitAPIUI" Version="$(RevitVersion).*">
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
+    <PackageReference Include="ClosedXML" Version="0.102.*" />
   </ItemGroup>
 
   <!-- リソースファイル -->
@@ -50,6 +51,8 @@
     <Resource Include="Resources\Icons\beam_under_level_32.png" />
     <Resource Include="Resources\Icons\beam_top_level_32.png" />
     <Resource Include="Resources\Icons\room_tag_32.png" />
+    <Resource Include="Resources\Icons\excel_export_32.png" />
+    <Resource Include="Resources\Icons\excel_import_32.png" />
   </ItemGroup>
 
 

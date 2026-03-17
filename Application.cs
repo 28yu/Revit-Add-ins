@@ -38,6 +38,7 @@ namespace Tools28
                 CreateThreeDViewPanel(application, tabName, assemblyPath);
                 CreateAnnotationPanel(application, tabName, assemblyPath);
                 CreateStructuralPanel(application, tabName, assemblyPath);
+                CreateExcelPanel(application, tabName, assemblyPath);
 
                 return Result.Succeeded;
             }
@@ -263,6 +264,34 @@ namespace Tools28
             beamTopLevelButtonData.ToolTip = "平面ビューの梁天端レベルをパラメータから取得し、レベル別に色分け表示します";
             beamTopLevelButtonData.LargeImage = LoadImage("beam_top_level_32.png");
             panel.AddItem(beamTopLevelButtonData);
+        }
+
+        /// <summary>
+        /// Excel連携パネルを作成
+        /// </summary>
+        private void CreateExcelPanel(UIControlledApplication application, string tabName, string assemblyPath)
+        {
+            RibbonPanel panel = application.CreateRibbonPanel(tabName, "Excel連携");
+
+            // Excelエクスポートボタン
+            PushButtonData exportButtonData = new PushButtonData(
+                "ExcelExport",
+                "Excel\nエクスポート",
+                assemblyPath,
+                "Tools28.Commands.ExcelExportImport.ExcelExportCommand");
+            exportButtonData.ToolTip = "パラメータをExcelに書き出します";
+            exportButtonData.LargeImage = LoadImage("excel_export_32.png");
+            panel.AddItem(exportButtonData);
+
+            // Excelインポートボタン
+            PushButtonData importButtonData = new PushButtonData(
+                "ExcelImport",
+                "Excel\nインポート",
+                assemblyPath,
+                "Tools28.Commands.ExcelExportImport.ExcelImportCommand");
+            importButtonData.ToolTip = "Excelからパラメータを読み込みます";
+            importButtonData.LargeImage = LoadImage("excel_import_32.png");
+            panel.AddItem(importButtonData);
         }
 
         /// <summary>
