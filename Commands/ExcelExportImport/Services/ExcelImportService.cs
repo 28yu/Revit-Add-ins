@@ -252,24 +252,37 @@ namespace Tools28.Commands.ExcelExportImport.Services
         public static string MarkImportedCells(string filePath, List<ImportPreviewRow> previewRows)
         {
             // 変更のあったセルを (ElementId, ParameterName) で検索用セットに
+            // ElementIdはintなのでToString()で統一
             var changedSet = new HashSet<string>(
                 previewRows
                     .Where(r => r.HasChange)
-                    .Select(r => r.ElementId + "|" + r.ParameterName));
+                    .Select(r => r.ElementId.ToString() + "|" + r.ParameterName));
 
             if (changedSet.Count == 0)
                 return null;
 
             // ファイルをMemoryStreamに読み込み、FileStreamを即座に解放
-            var memStream = new MemoryStream();
-            using (var readStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            byte[] fileBytes;
+            try
             {
-                readStream.CopyTo(memStream);
+                using (var readStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                {
+                    var memRead = new MemoryStream();
+                    readStream.CopyTo(memRead);
+                    fileBytes = memRead.ToArray();
+                }
             }
-            memStream.Position = 0;
+            catch (IOException)
+            {
+                // ファイルが読み取れない場合は色付け不可
+                return null;
+            }
 
+            using (var memStream = new MemoryStream(fileBytes))
             using (var workbook = new XLWorkbook(memStream))
             {
+                bool anyMarked = false;
+
                 foreach (var worksheet in workbook.Worksheets)
                 {
                     var lastRow = worksheet.LastRowUsed();
@@ -293,7 +306,12 @@ namespace Tools28.Commands.ExcelExportImport.Services
                     // データ行を走査して該当セルに色を付ける
                     for (int row = 2; row <= rowCount; row++)
                     {
-                        string elementIdStr = worksheet.Cell(row, 1).GetString();
+                        // ElementIdを数値として正規化（"12345.0" → "12345" 等の差異を吸収）
+                        string elementIdStr = worksheet.Cell(row, 1).GetString().Trim();
+                        if (double.TryParse(elementIdStr, out double idDouble))
+                        {
+                            elementIdStr = ((int)idDouble).ToString();
+                        }
 
                         for (int i = 0; i < paramHeaders.Count; i++)
                         {
@@ -302,26 +320,38 @@ namespace Tools28.Commands.ExcelExportImport.Services
                             {
                                 worksheet.Cell(row, i + 3).Style.Fill.BackgroundColor =
                                     XLColor.FromArgb(252, 213, 180);
+                                anyMarked = true;
                             }
                         }
                     }
                 }
 
-                // 元ファイルに直接上書きを試行
-                try
+                if (!anyMarked)
+                    return null;
+
+                // 保存用MemoryStreamに書き出し
+                using (var saveStream = new MemoryStream())
                 {
-                    workbook.SaveAs(filePath);
-                    return filePath;
-                }
-                catch (IOException)
-                {
-                    // ファイルがロックされている場合、別名で保存
-                    string dir = Path.GetDirectoryName(filePath);
-                    string name = Path.GetFileNameWithoutExtension(filePath);
-                    string ext = Path.GetExtension(filePath);
-                    string altPath = Path.Combine(dir, name + "_imported" + ext);
-                    workbook.SaveAs(altPath);
-                    return altPath;
+                    workbook.SaveAs(saveStream);
+                    saveStream.Position = 0;
+                    byte[] savedBytes = saveStream.ToArray();
+
+                    // 元ファイルに直接上書きを試行
+                    try
+                    {
+                        File.WriteAllBytes(filePath, savedBytes);
+                        return filePath;
+                    }
+                    catch (IOException)
+                    {
+                        // ファイルがロックされている場合、別名で保存
+                        string dir = Path.GetDirectoryName(filePath);
+                        string name = Path.GetFileNameWithoutExtension(filePath);
+                        string ext = Path.GetExtension(filePath);
+                        string altPath = Path.Combine(dir, name + "_imported" + ext);
+                        File.WriteAllBytes(altPath, savedBytes);
+                        return altPath;
+                    }
                 }
             }
         }

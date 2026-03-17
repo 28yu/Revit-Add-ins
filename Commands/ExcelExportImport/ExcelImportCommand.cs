@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Text;
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
@@ -27,8 +28,8 @@ namespace Tools28.Commands.ExcelExportImport
                 if (result != true || !dialog.ImportExecuted)
                     return Result.Cancelled;
 
-                // プレビューデータを取得（色付け用）
-                var previewRows = ExcelImportService.GeneratePreview(doc, dialog.SelectedFilePath);
+                // ダイアログで生成済みのプレビューデータを再利用（色付け用）
+                var previewRows = dialog.PreviewRows;
 
                 // トランザクション内でインポート実行
                 ImportResult importResult;
@@ -50,11 +51,17 @@ namespace Tools28.Commands.ExcelExportImport
 
                 // インポート成功時、Excelの変更セルに色を付ける
                 string markedFilePath = null;
-                if (importResult.SuccessCount > 0)
+                if (importResult.SuccessCount > 0 && previewRows != null)
                 {
                     try
                     {
                         markedFilePath = ExcelImportService.MarkImportedCells(dialog.SelectedFilePath, previewRows);
+
+                        // 別名保存された場合、色付きファイルを自動で開く
+                        if (markedFilePath != null && markedFilePath != dialog.SelectedFilePath)
+                        {
+                            Process.Start(new ProcessStartInfo(markedFilePath) { UseShellExecute = true });
+                        }
                     }
                     catch
                     {

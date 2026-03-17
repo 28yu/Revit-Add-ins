@@ -256,5 +256,8 @@ namespace Tools28.Commands.ExcelExportImport.Views
 
         /// <summary>選択されたファイルパスを取得</summary>
         public string SelectedFilePath => _selectedFilePath;
+
+        /// <summary>プレビュー行を取得（色付け用）</summary>
+        public List<ImportPreviewRow> PreviewRows => _previewRows;
     }
 }

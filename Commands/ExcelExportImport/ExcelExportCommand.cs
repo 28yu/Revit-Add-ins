@@ -1,7 +1,5 @@
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
@@ -42,24 +40,11 @@ namespace Tools28.Commands.ExcelExportImport
                     return Result.Cancelled;
 
                 // エクスポート実行
-                var exportResults = ExcelExportService.Export(
+                ExcelExportService.Export(
                     doc,
                     saveDialog.FileName,
                     dialog.SelectedCategories,
                     dialog.OutputParameters);
-
-                // 結果表示
-                int totalElements = exportResults.Values.Sum();
-                int totalCategories = exportResults.Count;
-                string details = string.Join("\n",
-                    exportResults.Select(kv => $"  {kv.Key}: {kv.Value}件"));
-
-                TaskDialog.Show("エクスポート完了",
-                    $"Excelファイルを出力しました。\n\n"
-                    + $"カテゴリ数: {totalCategories}\n"
-                    + $"総要素数: {totalElements}\n\n"
-                    + details
-                    + $"\n\n保存先: {saveDialog.FileName}");
 
                 // エクスポートしたExcelファイルを自動で開く
                 Process.Start(new ProcessStartInfo(saveDialog.FileName) { UseShellExecute = true });
