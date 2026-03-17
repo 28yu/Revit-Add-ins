@@ -12,6 +12,21 @@ namespace Tools28
         {
             try
             {
+                // デバッグログ: DLLの読み込み元とビルド時刻を記録
+                string debugLogPath = @"C:\temp\Tools28_debug.txt";
+                try
+                {
+                    Directory.CreateDirectory(@"C:\temp");
+                    var asm = Assembly.GetExecutingAssembly();
+                    string logContent = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] OnStartup 開始\n"
+                        + $"  DLL場所: {asm.Location}\n"
+                        + $"  DLLバージョン: {asm.GetName().Version}\n"
+                        + $"  DLL更新日時: {File.GetLastWriteTime(asm.Location):yyyy-MM-dd HH:mm:ss}\n"
+                        + $"  ボタン名テスト: 塗潰し領域分割統合\n";
+                    File.AppendAllText(debugLogPath, logContent);
+                }
+                catch { }
+
                 string tabName = "28 Tools";
                 application.CreateRibbonTab(tabName);
 
