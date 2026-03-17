@@ -45,6 +45,9 @@ namespace Tools28.Commands.ExcelExportImport.Services
 
                     var worksheet = workbook.Worksheets.Add(sheetName);
 
+                    // シート全体のフォントをＭＳ 明朝に設定
+                    worksheet.Style.Font.FontName = "ＭＳ 明朝";
+
                     // ヘッダー行を作成
                     worksheet.Cell(1, 1).Value = "要素ID";
                     worksheet.Cell(1, 2).Value = "カテゴリ";
@@ -55,8 +58,8 @@ namespace Tools28.Commands.ExcelExportImport.Services
 
                     // ヘッダー行のスタイル設定
                     var headerRange = worksheet.Range(1, 1, 1, categoryParams.Count + 2);
-                    headerRange.Style.Font.Bold = true;
-                    headerRange.Style.Fill.BackgroundColor = XLColor.FromArgb(198, 239, 206);
+                    headerRange.Style.Fill.BackgroundColor = XLColor.FromArgb(155, 187, 89);
+                    headerRange.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
                     headerRange.Style.Border.BottomBorder = XLBorderStyleValues.Thin;
 
                     // データ行を作成
@@ -80,8 +83,13 @@ namespace Tools28.Commands.ExcelExportImport.Services
                         row++;
                     }
 
-                    // 列幅の自動調整（余白を加えて文字が見切れないように）
-                    worksheet.Columns().AdjustToContents(1, row, 2.0);
+                    // 列幅の自動調整（各列個別に調整し余白を追加）
+                    int lastCol = categoryParams.Count + 2;
+                    for (int col = 1; col <= lastCol; col++)
+                    {
+                        worksheet.Column(col).AdjustToContents();
+                        worksheet.Column(col).Width = worksheet.Column(col).Width + 3;
+                    }
 
                     // 要素ID列の最小幅を確保
                     if (worksheet.Column(1).Width < 12)
