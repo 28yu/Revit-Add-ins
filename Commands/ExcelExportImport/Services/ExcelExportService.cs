@@ -59,8 +59,12 @@ namespace Tools28.Commands.ExcelExportImport.Services
                     // ヘッダー行のスタイル設定
                     var headerRange = worksheet.Range(1, 1, 1, categoryParams.Count + 2);
                     headerRange.Style.Fill.BackgroundColor = XLColor.FromArgb(155, 187, 89);
+                    headerRange.Style.Font.FontColor = XLColor.White;
                     headerRange.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
                     headerRange.Style.Border.BottomBorder = XLBorderStyleValues.Thin;
+
+                    // 1行目の高さを25に設定
+                    worksheet.Row(1).Height = 25;
 
                     // データ行を作成
                     var elements = RevitCategoryHelper.GetElementsByCategory(doc, category.BuiltInCategory);
@@ -88,16 +92,21 @@ namespace Tools28.Commands.ExcelExportImport.Services
                     int lastRow = row - 1;
                     for (int col = 1; col <= lastCol; col++)
                     {
-                        double maxWidth = 0;
-                        for (int r = 1; r <= lastRow; r++)
+                        double maxDataWidth = 0;
+                        // データ行の最大幅
+                        for (int r = 2; r <= lastRow; r++)
                         {
                             string text = worksheet.Cell(r, col).GetString();
                             if (string.IsNullOrEmpty(text)) continue;
                             double w = CalculateTextWidth(text);
-                            if (w > maxWidth) maxWidth = w;
+                            if (w > maxDataWidth) maxDataWidth = w;
                         }
-                        // オートフィルタの▼アイコン分(ヘッダー行)を加算
-                        worksheet.Column(col).Width = maxWidth + 4;
+                        // ヘッダー行の幅（フィルタ▼ボタン分+6を加算）
+                        string headerText = worksheet.Cell(1, col).GetString();
+                        double headerWidth = CalculateTextWidth(headerText ?? "") + 6;
+                        // データ幅には余白+2を加算
+                        double dataWidth = maxDataWidth + 2;
+                        worksheet.Column(col).Width = Math.Max(headerWidth, dataWidth);
                     }
 
                     // 要素ID列の最小幅を確保
