@@ -70,7 +70,8 @@ try {
         /p:RevitVersion=$RevitVersion `
         /p:Platform=AnyCPU `
         /v:minimal `
-        /nologo
+        /nologo `
+        /restore
 
     if ($LASTEXITCODE -ne 0) {
         Write-Host ""
@@ -144,6 +145,14 @@ try {
     # DLLをコピー
     Copy-Item $sourceDll $targetDir -Force
     Write-Host "✓ Tools28.dll をコピーしました" -ForegroundColor Green
+
+    # 依存DLLをコピー（ClosedXML等）
+    $buildOutputDir = ".\bin\Release\Revit$RevitVersion\"
+    $dependencyDlls = Get-ChildItem -Path $buildOutputDir -Filter "*.dll" | Where-Object { $_.Name -ne "Tools28.dll" }
+    foreach ($dll in $dependencyDlls) {
+        Copy-Item $dll.FullName $targetDir -Force
+        Write-Host "✓ $($dll.Name) をコピーしました" -ForegroundColor Green
+    }
 
     # PDBをコピー（デバッグ用）
     if (Test-Path $sourcePdb) {

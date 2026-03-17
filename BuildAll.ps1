@@ -41,7 +41,8 @@ foreach ($version in $revitVersions) {
             /p:RevitVersion=$version `
             /p:Platform=AnyCPU `
             /v:minimal `
-            /nologo
+            /nologo `
+            /restore
         
         if ($LASTEXITCODE -eq 0) {
             Write-Host "✓ Revit $version のビルドに成功しました" -ForegroundColor Green

@@ -20,6 +20,9 @@
 
     <!-- 条件付きコンパイルシンボル -->
     <DefineConstants>$(DefineConstants);REVIT$(RevitVersion)</DefineConstants>
+
+    <!-- 依存DLL（ClosedXML等）を出力フォルダにコピー -->
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
   </PropertyGroup>
 
   <!-- Revit API (NuGet パッケージ経由 - ローカル Revit 不要) -->
