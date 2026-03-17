@@ -32,8 +32,12 @@ namespace Tools28.Commands.ExcelExportImport.Services
             {
                 foreach (var category in selectedCategories)
                 {
-                    // 全出力パラメータを書き出す（カテゴリに関係なく）
-                    if (outputParameters.Count == 0)
+                    // このカテゴリに属するパラメータのみ抽出
+                    var categoryParams = outputParameters
+                        .Where(p => p.CategoryName == category.Name)
+                        .ToList();
+
+                    if (categoryParams.Count == 0)
                         continue;
 
                     // シート名を安全な文字列に変換（Excelの制限: 31文字以内）
@@ -42,17 +46,17 @@ namespace Tools28.Commands.ExcelExportImport.Services
                     var worksheet = workbook.Worksheets.Add(sheetName);
 
                     // ヘッダー行を作成
-                    worksheet.Cell(1, 1).Value = "ElementId";
+                    worksheet.Cell(1, 1).Value = "要素ID";
                     worksheet.Cell(1, 2).Value = "カテゴリ";
-                    for (int i = 0; i < outputParameters.Count; i++)
+                    for (int i = 0; i < categoryParams.Count; i++)
                     {
-                        worksheet.Cell(1, i + 3).Value = outputParameters[i].DisplayName;
+                        worksheet.Cell(1, i + 3).Value = categoryParams[i].DisplayName;
                     }
 
                     // ヘッダー行のスタイル設定
-                    var headerRange = worksheet.Range(1, 1, 1, outputParameters.Count + 2);
+                    var headerRange = worksheet.Range(1, 1, 1, categoryParams.Count + 2);
                     headerRange.Style.Font.Bold = true;
-                    headerRange.Style.Fill.BackgroundColor = XLColor.LightGray;
+                    headerRange.Style.Fill.BackgroundColor = XLColor.FromArgb(198, 239, 206);
                     headerRange.Style.Border.BottomBorder = XLBorderStyleValues.Thin;
 
                     // データ行を作成
@@ -64,9 +68,9 @@ namespace Tools28.Commands.ExcelExportImport.Services
                         worksheet.Cell(row, 1).Value = elem.Id.IntegerValue;
                         worksheet.Cell(row, 2).Value = category.Name;
 
-                        for (int i = 0; i < outputParameters.Count; i++)
+                        for (int i = 0; i < categoryParams.Count; i++)
                         {
-                            var paramInfo = outputParameters[i];
+                            var paramInfo = categoryParams[i];
                             var param = ParameterService.FindParameter(
                                 elem, paramInfo.RawName, paramInfo.IsTypeParameter, doc);
                             string value = ParameterService.GetParameterValueAsString(param);
@@ -76,10 +80,10 @@ namespace Tools28.Commands.ExcelExportImport.Services
                         row++;
                     }
 
-                    // 列幅の自動調整（ヘッダー・データ全て含む）
-                    worksheet.Columns().AdjustToContents();
+                    // 列幅の自動調整（余白を加えて文字が見切れないように）
+                    worksheet.Columns().AdjustToContents(1, row, 2.0);
 
-                    // ElementId列の最小幅を確保
+                    // 要素ID列の最小幅を確保
                     if (worksheet.Column(1).Width < 12)
                         worksheet.Column(1).Width = 12;
 

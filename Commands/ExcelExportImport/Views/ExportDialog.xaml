@@ -267,15 +267,23 @@
             </GroupBox>
         </Grid>
 
-        <!-- ▲▼ 順序変更ボタン（出力セクションとOKボタンの間） -->
-        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,6,0,0">
-            <Button Content="▲" ToolTip="上へ移動"
-                    Style="{StaticResource MoveButtonStyle}"
-                    Click="MoveUpButton_Click"/>
-            <Button Content="▼" ToolTip="下へ移動"
-                    Style="{StaticResource MoveButtonStyle}"
-                    Click="MoveDownButton_Click"/>
-        </StackPanel>
+        <!-- ▲▼ 順序変更ボタン（出力セクションの中心） -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="3" Orientation="Horizontal" HorizontalAlignment="Center" Margin="4,6,0,0">
+                <Button Content="▲" ToolTip="上へ移動"
+                        Style="{StaticResource MoveButtonStyle}"
+                        Click="MoveUpButton_Click"/>
+                <Button Content="▼" ToolTip="下へ移動"
+                        Style="{StaticResource MoveButtonStyle}"
+                        Click="MoveDownButton_Click"/>
+            </StackPanel>
+        </Grid>
 
         <!-- 下部ボタンエリア -->
         <Grid Grid.Row="2" Margin="0,6,0,0">
