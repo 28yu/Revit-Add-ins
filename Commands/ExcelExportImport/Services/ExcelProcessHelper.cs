@@ -113,8 +113,8 @@ namespace Tools28.Commands.ExcelExportImport.Services
                 try
                 {
                     // RGB → Excel の ColorIndex 形式 (BGR)
-                    // R=252, G=213, B=180 → Excel Color = B + G*256 + R*256*256
-                    int excelColor = 180 + 213 * 256 + 252 * 256 * 256;
+                    // R=255, G=255, B=153 → Excel Color = B + G*256 + R*256*256
+                    int excelColor = 153 + 255 * 256 + 255 * 256 * 256;
 
                     int sheetCount = targetWb.Sheets.Count;
                     for (int s = 1; s <= sheetCount; s++)

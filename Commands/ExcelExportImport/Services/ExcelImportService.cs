@@ -339,7 +339,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
                             for (int col = 1; col <= colCount; col++)
                             {
                                 worksheet.Cell(row, col).Style.Fill.BackgroundColor =
-                                    XLColor.FromArgb(252, 213, 180);
+                                    XLColor.FromArgb(255, 255, 153);
                             }
                             anyMarked = true;
                         }
