@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
@@ -59,6 +60,9 @@ namespace Tools28.Commands.ExcelExportImport
                     + $"総要素数: {totalElements}\n\n"
                     + details
                     + $"\n\n保存先: {saveDialog.FileName}");
+
+                // エクスポートしたExcelファイルを自動で開く
+                Process.Start(new ProcessStartInfo(saveDialog.FileName) { UseShellExecute = true });
 
                 return Result.Succeeded;
             }

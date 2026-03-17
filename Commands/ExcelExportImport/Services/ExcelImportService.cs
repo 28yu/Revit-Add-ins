@@ -259,46 +259,63 @@ namespace Tools28.Commands.ExcelExportImport.Services
             if (changedSet.Count == 0)
                 return;
 
-            using (var workbook = new XLWorkbook(filePath))
+            // Excelが開いている場合でも動作するよう、一時ファイル経由で処理
+            string tempPath = filePath + ".tmp";
+            try
             {
-                foreach (var worksheet in workbook.Worksheets)
+                // 共有モードで読み込み
+                using (var readStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                using (var workbook = new XLWorkbook(readStream))
                 {
-                    var lastRow = worksheet.LastRowUsed();
-                    var lastCol = worksheet.LastColumnUsed();
-                    if (lastRow == null || lastCol == null)
-                        continue;
-
-                    int rowCount = lastRow.RowNumber();
-                    int colCount = lastCol.ColumnNumber();
-
-                    if (rowCount < 2 || colCount < 3)
-                        continue;
-
-                    // ヘッダーからパラメータ名を取得
-                    var paramHeaders = new List<string>();
-                    for (int col = 3; col <= colCount; col++)
+                    foreach (var worksheet in workbook.Worksheets)
                     {
-                        paramHeaders.Add(worksheet.Cell(1, col).GetString());
-                    }
+                        var lastRow = worksheet.LastRowUsed();
+                        var lastCol = worksheet.LastColumnUsed();
+                        if (lastRow == null || lastCol == null)
+                            continue;
 
-                    // データ行を走査して該当セルに色を付ける
-                    for (int row = 2; row <= rowCount; row++)
-                    {
-                        string elementIdStr = worksheet.Cell(row, 1).GetString();
+                        int rowCount = lastRow.RowNumber();
+                        int colCount = lastCol.ColumnNumber();
 
-                        for (int i = 0; i < paramHeaders.Count; i++)
+                        if (rowCount < 2 || colCount < 3)
+                            continue;
+
+                        // ヘッダーからパラメータ名を取得
+                        var paramHeaders = new List<string>();
+                        for (int col = 3; col <= colCount; col++)
                         {
-                            string key = elementIdStr + "|" + paramHeaders[i];
-                            if (changedSet.Contains(key))
+                            paramHeaders.Add(worksheet.Cell(1, col).GetString());
+                        }
+
+                        // データ行を走査して該当セルに色を付ける
+                        for (int row = 2; row <= rowCount; row++)
+                        {
+                            string elementIdStr = worksheet.Cell(row, 1).GetString();
+
+                            for (int i = 0; i < paramHeaders.Count; i++)
                             {
-                                worksheet.Cell(row, i + 3).Style.Fill.BackgroundColor =
-                                    XLColor.FromArgb(252, 213, 180);
+                                string key = elementIdStr + "|" + paramHeaders[i];
+                                if (changedSet.Contains(key))
+                                {
+                                    worksheet.Cell(row, i + 3).Style.Fill.BackgroundColor =
+                                        XLColor.FromArgb(252, 213, 180);
+                                }
                             }
                         }
                     }
+
+                    // 一時ファイルに保存
+                    workbook.SaveAs(tempPath);
                 }
 
-                workbook.Save();
+                // 一時ファイルを元のファイルに上書き
+                File.Copy(tempPath, filePath, true);
+            }
+            finally
+            {
+                // 一時ファイルを削除
+                if (File.Exists(tempPath))
+                    File.Delete(tempPath);
             }
         }
     }
