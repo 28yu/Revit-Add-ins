@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using Autodesk.Revit.DB;
 using Microsoft.Win32;
 using Tools28.Commands.ExcelExportImport.Models;
@@ -129,16 +130,22 @@ namespace Tools28.Commands.ExcelExportImport.Views
             }
 
             string filter = ParameterSearchBox.Text.Trim();
+            List<ParameterInfo> filtered;
             if (string.IsNullOrEmpty(filter))
             {
-                ParameterListBox.ItemsSource = source;
+                filtered = source;
             }
             else
             {
-                ParameterListBox.ItemsSource = source
+                filtered = source
                     .Where(p => p.DisplayName.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0)
                     .ToList();
             }
+
+            // カテゴリ別にグループ化して表示
+            var view = new ListCollectionView(filtered);
+            view.GroupDescriptions.Add(new PropertyGroupDescription("CategoryName"));
+            ParameterListBox.ItemsSource = view;
         }
 
         #endregion
