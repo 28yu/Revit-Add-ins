@@ -130,11 +130,11 @@
                       HeadersVisibility="Column"
                       AlternatingRowBackground="#F9F9F9">
                 <DataGrid.Columns>
-                    <DataGridTextColumn Header="ElementId" Binding="{Binding ElementId}" Width="80"/>
-                    <DataGridTextColumn Header="カテゴリ" Binding="{Binding CategoryName}" Width="100"/>
-                    <DataGridTextColumn Header="パラメータ" Binding="{Binding ParameterName}" Width="120"/>
-                    <DataGridTextColumn Header="現在値" Binding="{Binding CurrentValue}" Width="*"/>
-                    <DataGridTextColumn Header="新しい値" Binding="{Binding NewValue}" Width="*"/>
+                    <DataGridTextColumn Header="要素ID" Binding="{Binding ElementId}" Width="80" SortMemberPath="ElementId"/>
+                    <DataGridTextColumn Header="カテゴリ" Binding="{Binding CategoryName}" Width="100" SortMemberPath="CategoryName"/>
+                    <DataGridTextColumn Header="パラメータ" Binding="{Binding ParameterName}" Width="120" SortMemberPath="ParameterName"/>
+                    <DataGridTextColumn Header="現在値" Binding="{Binding CurrentValue}" Width="*" SortMemberPath="CurrentValue"/>
+                    <DataGridTextColumn Header="新しい値" Binding="{Binding NewValue}" Width="*" SortMemberPath="NewValue"/>
                 </DataGrid.Columns>
                 <DataGrid.RowStyle>
                     <Style TargetType="DataGridRow">

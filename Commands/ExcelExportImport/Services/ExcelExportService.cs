@@ -62,7 +62,6 @@ namespace Tools28.Commands.ExcelExportImport.Services
                     headerRange.Style.Font.FontColor = XLColor.White;
                     headerRange.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
                     headerRange.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
-                    headerRange.Style.Border.BottomBorder = XLBorderStyleValues.Thin;
 
                     // 1行目の高さを25に設定
                     worksheet.Row(1).Height = 25;

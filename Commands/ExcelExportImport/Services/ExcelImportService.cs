@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using Autodesk.Revit.DB;
 using ClosedXML.Excel;
@@ -43,7 +44,8 @@ namespace Tools28.Commands.ExcelExportImport.Services
         /// </summary>
         public static List<string> GetSheetNames(string filePath)
         {
-            using (var workbook = new XLWorkbook(filePath))
+            using (var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            using (var workbook = new XLWorkbook(stream))
             {
                 return workbook.Worksheets.Select(ws => ws.Name).ToList();
             }
@@ -56,7 +58,8 @@ namespace Tools28.Commands.ExcelExportImport.Services
         {
             var preview = new List<ImportPreviewRow>();
 
-            using (var workbook = new XLWorkbook(filePath))
+            using (var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            using (var workbook = new XLWorkbook(stream))
             {
                 foreach (var worksheet in workbook.Worksheets)
                 {
@@ -148,7 +151,8 @@ namespace Tools28.Commands.ExcelExportImport.Services
         {
             var result = new ImportResult();
 
-            using (var workbook = new XLWorkbook(filePath))
+            using (var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            using (var workbook = new XLWorkbook(stream))
             {
                 foreach (var worksheet in workbook.Worksheets)
                 {
