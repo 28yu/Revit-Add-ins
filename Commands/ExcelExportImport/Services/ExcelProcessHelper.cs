@@ -100,6 +100,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
                 int wbCount = workbooks.Count;
                 string normalizedFilePath = NormalizePath(filePath);
 
+                // まずフルパス完全一致で検索
                 for (int i = 1; i <= wbCount; i++)
                 {
                     dynamic wb = workbooks[i];
@@ -122,11 +123,40 @@ namespace Tools28.Commands.ExcelExportImport.Services
                     }
                 }
 
+                // フルパスで見つからない場合、ファイル名のみで再検索
+                // （OneDriveパス仮想化等でパスが異なる場合への対応）
+                if (targetWb == null)
+                {
+                    string targetFileName = System.IO.Path.GetFileName(filePath);
+                    for (int i = 1; i <= wbCount; i++)
+                    {
+                        dynamic wb = workbooks[i];
+                        try
+                        {
+                            string wbName = wb.Name;
+                            if (string.Equals(wbName, targetFileName, StringComparison.OrdinalIgnoreCase))
+                            {
+                                targetWb = wb;
+                                break;
+                            }
+                        }
+                        catch
+                        {
+                            // ignore
+                        }
+                        if (targetWb == null || !ReferenceEquals(targetWb, wb))
+                        {
+                            Marshal.ReleaseComObject(wb);
+                        }
+                    }
+                }
+
                 Marshal.ReleaseComObject(workbooks);
 
                 if (targetWb == null)
                     return false;
 
+                bool anyMarked = false;
                 try
                 {
                     // 画面更新を一時停止（パフォーマンス向上＋最後に一括更新）
@@ -142,10 +172,12 @@ namespace Tools28.Commands.ExcelExportImport.Services
                         dynamic sheet = targetWb.Sheets[s];
                         try
                         {
-                            // 使用範囲を取得
+                            // 使用範囲を取得（開始行・列も考慮）
                             dynamic usedRange = sheet.UsedRange;
-                            int rowCount = usedRange.Rows.Count;
-                            int colCount = usedRange.Columns.Count;
+                            int startRow = (int)usedRange.Row;
+                            int startCol = (int)usedRange.Column;
+                            int rowCount = startRow + (int)usedRange.Rows.Count - 1;
+                            int colCount = startCol + (int)usedRange.Columns.Count - 1;
                             Marshal.ReleaseComObject(usedRange);
 
                             if (rowCount < 2 || colCount < 3)
@@ -164,38 +196,49 @@ namespace Tools28.Commands.ExcelExportImport.Services
                             // データ行を走査して変更がある行全体に色を付ける
                             for (int row = 2; row <= rowCount; row++)
                             {
-                                dynamic idCell = sheet.Cells[row, 1];
-                                object idValue = idCell.Value;
-                                Marshal.ReleaseComObject(idCell);
-
-                                if (idValue == null)
-                                    continue;
-
-                                // ElementIdを整数文字列に正規化
-                                string elementIdStr;
-                                if (idValue is double dVal)
-                                    elementIdStr = ((int)dVal).ToString();
-                                else
-                                    elementIdStr = Convert.ToString(idValue).Trim();
-
-                                // この行に変更があるかチェック
-                                bool rowHasChange = false;
-                                for (int i = 0; i < paramHeaders.Count; i++)
+                                try
                                 {
-                                    string key = elementIdStr + "|" + paramHeaders[i];
-                                    if (changedSet.Contains(key))
+                                    dynamic idCell = sheet.Cells[row, 1];
+                                    object idValue = idCell.Value;
+                                    Marshal.ReleaseComObject(idCell);
+
+                                    if (idValue == null)
+                                        continue;
+
+                                    // ElementIdを整数文字列に正規化
+                                    string elementIdStr;
+                                    if (idValue is double dVal)
+                                        elementIdStr = ((int)dVal).ToString();
+                                    else
+                                        elementIdStr = Convert.ToString(idValue).Trim();
+
+                                    // この行に変更があるかチェック
+                                    bool rowHasChange = false;
+                                    for (int i = 0; i < paramHeaders.Count; i++)
                                     {
-                                        rowHasChange = true;
-                                        break;
+                                        string key = elementIdStr + "|" + paramHeaders[i];
+                                        if (changedSet.Contains(key))
+                                        {
+                                            rowHasChange = true;
+                                            break;
+                                        }
+                                    }
+
+                                    // 変更がある行はセルごとに色を付ける
+                                    if (rowHasChange)
+                                    {
+                                        for (int col = 1; col <= colCount; col++)
+                                        {
+                                            dynamic cell = sheet.Cells[row, col];
+                                            cell.Interior.Color = excelColor;
+                                            Marshal.ReleaseComObject(cell);
+                                        }
+                                        anyMarked = true;
                                     }
                                 }
-
-                                // 変更がある行は全列に色を付ける
-                                if (rowHasChange)
+                                catch
                                 {
-                                    dynamic rowRange = sheet.Range[sheet.Cells[row, 1], sheet.Cells[row, colCount]];
-                                    rowRange.Interior.Color = excelColor;
-                                    Marshal.ReleaseComObject(rowRange);
+                                    // 個別行の色付け失敗は無視して次の行へ
                                 }
                             }
                         }
@@ -205,7 +248,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
                         }
                     }
 
-                    return true;
+                    return anyMarked;
                 }
                 finally
                 {
