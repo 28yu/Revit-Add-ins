@@ -139,7 +139,11 @@ namespace Tools28.Commands.BeamTopLevel
             Definition definition = defGroup.Definitions.get_Item(paramName);
             if (definition == null)
             {
+#if REVIT2021
+                var options = new ExternalDefinitionCreationOptions(paramName, ParameterType.Text);
+#else
                 var options = new ExternalDefinitionCreationOptions(paramName, SpecTypeId.String.Text);
+#endif
                 options.Visible = true;
                 definition = defGroup.Definitions.Create(options);
             }
@@ -156,7 +160,11 @@ namespace Tools28.Commands.BeamTopLevel
             Definition definition = defGroup.Definitions.get_Item(paramName);
             if (definition == null)
             {
+#if REVIT2021
+                var options = new ExternalDefinitionCreationOptions(paramName, ParameterType.Length);
+#else
                 var options = new ExternalDefinitionCreationOptions(paramName, SpecTypeId.Length);
+#endif
                 options.Visible = true;
                 definition = defGroup.Definitions.Create(options);
             }

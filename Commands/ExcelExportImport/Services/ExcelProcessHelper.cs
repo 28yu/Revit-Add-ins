@@ -6,6 +6,8 @@ namespace Tools28.Commands.ExcelExportImport.Services
 {
     /// <summary>
     /// 開いているExcelファイルを検出・操作するヘルパー
+    /// .NET 8 (Revit 2025/2026) では Marshal.GetActiveObject が利用不可のため、
+    /// COM操作は .NET Framework (Revit 2021-2024) のみで使用する
     /// </summary>
     public static class ExcelProcessHelper
     {
@@ -16,6 +18,10 @@ namespace Tools28.Commands.ExcelExportImport.Services
         {
             var result = new List<string>();
 
+#if REVIT2025 || REVIT2026
+            // .NET 8 では Marshal.GetActiveObject が利用不可
+            return result;
+#else
             try
             {
                 dynamic app = GetExcelApplication();
@@ -58,6 +64,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
             }
 
             return result;
+#endif
         }
 
         /// <summary>
@@ -71,6 +78,10 @@ namespace Tools28.Commands.ExcelExportImport.Services
             if (changedSet == null || changedSet.Count == 0)
                 return false;
 
+#if REVIT2025 || REVIT2026
+            // .NET 8 では COM 経由の操作は不可。ClosedXML でのフォールバックを使用する
+            return false;
+#else
             dynamic app = null;
             try
             {
@@ -203,8 +214,10 @@ namespace Tools28.Commands.ExcelExportImport.Services
                     try { Marshal.ReleaseComObject(app); } catch { }
                 }
             }
+#endif
         }
 
+#if !REVIT2025 && !REVIT2026
         /// <summary>
         /// Excel.Application の COM オブジェクトを取得
         /// </summary>
@@ -219,5 +232,6 @@ namespace Tools28.Commands.ExcelExportImport.Services
                 return null;
             }
         }
+#endif
     }
 }

@@ -58,7 +58,6 @@ namespace Tools28.Commands.BeamUnderLevel
                 BindingMap bindingMap = doc.ParameterBindings;
 
                 // 各パラメータを作成・バインド
-                // SpecTypeId / GroupTypeId は Revit 2021+ で使用可能
                 CreateAndBindTextParameter(defGroup, bindingMap, binding, ParamRefLevel);
                 CreateAndBindLengthParameter(defGroup, bindingMap, binding, ParamLevelDiff);
                 CreateAndBindTextParameter(defGroup, bindingMap, binding, ParamDisplay);
@@ -148,8 +147,11 @@ namespace Tools28.Commands.BeamUnderLevel
             Definition definition = defGroup.Definitions.get_Item(paramName);
             if (definition == null)
             {
-                // SpecTypeId.String.Text は Revit 2021+ で使用可能
+#if REVIT2021
+                var options = new ExternalDefinitionCreationOptions(paramName, ParameterType.Text);
+#else
                 var options = new ExternalDefinitionCreationOptions(paramName, SpecTypeId.String.Text);
+#endif
                 options.Visible = true;
                 definition = defGroup.Definitions.Create(options);
             }
@@ -166,8 +168,11 @@ namespace Tools28.Commands.BeamUnderLevel
             Definition definition = defGroup.Definitions.get_Item(paramName);
             if (definition == null)
             {
-                // SpecTypeId.Length は Revit 2021+ で使用可能
+#if REVIT2021
+                var options = new ExternalDefinitionCreationOptions(paramName, ParameterType.Length);
+#else
                 var options = new ExternalDefinitionCreationOptions(paramName, SpecTypeId.Length);
+#endif
                 options.Visible = true;
                 definition = defGroup.Definitions.Create(options);
             }
