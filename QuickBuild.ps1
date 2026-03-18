@@ -103,6 +103,7 @@ $sourceDll = ".\bin\Release\Revit$RevitVersion\Tools28.dll"
 $sourcePdb = ".\bin\Release\Revit$RevitVersion\Tools28.pdb"
 $sourceAddin = ".\Packages\$RevitVersion\28Tools\Tools28.addin"
 $targetDir = "$env:ProgramData\Autodesk\Revit\Addins\$RevitVersion\"
+$targetToolsDir = "$env:ProgramData\Autodesk\Revit\Addins\$RevitVersion\28Tools\"
 
 # ビルド成果物の確認
 if (-not (Test-Path $sourceDll)) {
@@ -122,19 +123,9 @@ if (-not (Test-Path $targetDir)) {
     New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
 }
 
-# バックアップの作成（既存のファイルがある場合）
-$targetDll = Join-Path $targetDir "Tools28.dll"
-if (Test-Path $targetDll) {
-    $backupDir = Join-Path $targetDir "backup"
-    if (-not (Test-Path $backupDir)) {
-        New-Item -ItemType Directory -Path $backupDir | Out-Null
-    }
-
-    $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
-    $backupDll = Join-Path $backupDir "Tools28_$timestamp.dll"
-
-    Copy-Item $targetDll $backupDll -Force
-    Write-Host "既存のDLLをバックアップ: backup\Tools28_$timestamp.dll" -ForegroundColor Gray
+# 28Toolsサブフォルダの作成
+if (-not (Test-Path $targetToolsDir)) {
+    New-Item -ItemType Directory -Path $targetToolsDir -Force | Out-Null
 }
 
 # デプロイ実行
@@ -142,28 +133,31 @@ Write-Host "デプロイ中..." -ForegroundColor Yellow
 Write-Host ""
 
 try {
-    # DLLをコピー
-    Copy-Item $sourceDll $targetDir -Force
-    Write-Host "✓ Tools28.dll をコピーしました" -ForegroundColor Green
-
-    # 依存DLLをコピー（ClosedXML等）
+    # 全DLLを 28Tools サブフォルダにコピー（Tools28.dll + ClosedXML等の依存ライブラリ）
     $buildOutputDir = ".\bin\Release\Revit$RevitVersion\"
-    $dependencyDlls = Get-ChildItem -Path $buildOutputDir -Filter "*.dll" | Where-Object { $_.Name -ne "Tools28.dll" }
-    foreach ($dll in $dependencyDlls) {
-        Copy-Item $dll.FullName $targetDir -Force
+    $allDlls = Get-ChildItem -Path $buildOutputDir -Filter "*.dll"
+    foreach ($dll in $allDlls) {
+        Copy-Item $dll.FullName $targetToolsDir -Force
         Write-Host "✓ $($dll.Name) をコピーしました" -ForegroundColor Green
     }
 
     # PDBをコピー（デバッグ用）
     if (Test-Path $sourcePdb) {
-        Copy-Item $sourcePdb $targetDir -Force
+        Copy-Item $sourcePdb $targetToolsDir -Force
         Write-Host "✓ Tools28.pdb をコピーしました" -ForegroundColor Green
     }
 
-    # .addinファイルをコピー
+    # .addinファイルをAddinsルートにコピー
     $targetAddin = Join-Path $targetDir "Tools28.addin"
     Copy-Item $sourceAddin $targetAddin -Force
     Write-Host "✓ Tools28.addin をコピーしました" -ForegroundColor Green
+
+    # 旧バージョンのクリーンアップ（ルートに直置きされていた場合）
+    $oldRootDll = Join-Path $targetDir "Tools28.dll"
+    if (Test-Path $oldRootDll) {
+        Remove-Item $oldRootDll -Force
+        Write-Host "✓ 旧 Tools28.dll（ルート直置き）を削除しました" -ForegroundColor Yellow
+    }
 
     Write-Host ""
     Write-Host "========================================" -ForegroundColor Cyan
