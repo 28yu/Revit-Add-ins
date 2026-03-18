@@ -79,7 +79,9 @@ msbuild Tools28.csproj /p:Configuration=Release /p:RevitVersion=2024
 28Tools_Revit{VERSION}_vX.X.zip
 ├── 28Tools/
 │   ├── Tools28.dll              # メインDLL
-│   └── Tools28.addin            # マニフェストファイル
+│   ├── Tools28.addin            # マニフェストファイル
+│   ├── ClosedXML.dll            # Excel読み書きライブラリ
+│   └── (その他依存DLL)          # ClosedXMLの依存ライブラリ群
 ├── install.bat                  # 自動インストール
 ├── uninstall.bat                # アンインストール
 └── README.txt                   # インストール手順
@@ -98,22 +100,35 @@ Packages/{VERSION}/
 
 ### install.bat の内容
 - `chcp 65001` でUTF-8対応
-- `C:\ProgramData\Autodesk\Revit\Addins\{VERSION}\` へ DLL/addin をコピー
-- ディレクトリ不在時は自動作成
-- 28Tools フォルダ、DLL、addin の存在確認とエラーハンドリング
-- コピー結果の表示
+- バージョン番号をヘッダーに表示（例: `28 Tools v2.0 for Revit 2024`）
+- `28Tools\` フォルダ内の全DLLを `Addins\{VERSION}\28Tools\` にコピー
+- `Tools28.addin` を `Addins\{VERSION}\` ルートにコピー
+- 旧バージョン（ルート直置きDLL）の自動クリーンアップ
+- マニュアルURLの表示
 
 ### uninstall.bat の内容
-- `C:\ProgramData\Autodesk\Revit\Addins\{VERSION}\` から Tools28.dll / Tools28.addin を削除
+- `C:\ProgramData\Autodesk\Revit\Addins\{VERSION}\28Tools\` フォルダを削除
+- `Tools28.addin` を削除
+- 旧バージョン（ルート直置き `Tools28.dll`）のクリーンアップ
 
 ### README.txt の内容
+- バージョン番号付きタイトル（例: `28 Tools v2.0 for Revit 2024`）
 - クイックスタート手順 (install.bat を管理者実行 → Revit 再起動)
-- 機能一覧
+- 新機能・変更点セクション
+- 機能一覧（パネル別）
+- マニュアルURL
 - アンインストール手順
 - 対応バージョン
 
 ### インストール先
-`C:\ProgramData\Autodesk\Revit\Addins\{VERSION}\`
+```
+C:\ProgramData\Autodesk\Revit\Addins\{VERSION}\
+├── Tools28.addin                    # マニフェスト（ルートに配置）
+└── 28Tools\                         # DLLサブフォルダ
+    ├── Tools28.dll
+    ├── ClosedXML.dll
+    └── (その他依存DLL)
+```
 
 ### 配布ZIP作成手順
 ```powershell
@@ -121,9 +136,36 @@ Packages/{VERSION}/
 .\BuildAll.ps1
 
 # 2. 配布ZIPを作成 (バージョン番号を指定)
-.\CreatePackages.ps1 -Version "1.0"
+.\CreatePackages.ps1 -Version "2.0"
 
-# 出力先: .\Dist\28Tools_Revit20XX_v1.0.zip
+# 出力先: .\Dist\28Tools_Revit20XX_v2.0.zip
+```
+
+### ⚠️ リリース時の配布パッケージ更新チェックリスト
+
+**新機能の追加やバージョン番号の変更時は、以下のファイルを必ず更新すること：**
+
+1. **`Packages/{VERSION}/README.txt`** (全6バージョン)
+   - タイトルのバージョン番号（例: `28 Tools v2.0 for Revit 2024`）
+   - 「新機能・変更点」セクションに追加機能を記載
+   - 「機能一覧」セクションに新しいコマンドを追加
+
+2. **`Packages/{VERSION}/install.bat`** (全6バージョン)
+   - ヘッダーのバージョン番号（例: `28 Tools v2.0 for Revit 2024`）
+
+3. **`.github/workflows/build-and-release.yml`**
+   - Release body の「機能一覧」セクションに新機能を追加
+
+4. **`Application.cs`**
+   - リボンに新しいボタンを登録
+
+#### 更新コマンド例（全6バージョン一括更新）
+```bash
+# README.txt のバージョン番号を一括置換
+for ver in 2021 2022 2023 2024 2025 2026; do
+  sed -i 's/v2.0/v2.1/g' Packages/$ver/README.txt
+  sed -i 's/v2.0/v2.1/g' Packages/$ver/install.bat
+done
 ```
 
 ## 開発ワークフロー
