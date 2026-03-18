@@ -22,25 +22,13 @@
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
   </PropertyGroup>
 
-  <!-- 条件付きコンパイルシンボル（バージョンごとに明示的に定義） -->
-  <PropertyGroup Condition="'$(RevitVersion)' == '2021'">
-    <DefineConstants>$(DefineConstants);REVIT2021</DefineConstants>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(RevitVersion)' == '2022'">
-    <DefineConstants>$(DefineConstants);REVIT2022</DefineConstants>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(RevitVersion)' == '2023'">
-    <DefineConstants>$(DefineConstants);REVIT2023</DefineConstants>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(RevitVersion)' == '2024'">
-    <DefineConstants>$(DefineConstants);REVIT2024</DefineConstants>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(RevitVersion)' == '2025'">
-    <DefineConstants>$(DefineConstants);REVIT2025</DefineConstants>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(RevitVersion)' == '2026'">
-    <DefineConstants>$(DefineConstants);REVIT2026</DefineConstants>
-  </PropertyGroup>
+  <!-- 条件付きコンパイルシンボル: Target で CoreCompile 直前に追加することで
+       SDK の DefineConstants 上書きを回避 -->
+  <Target Name="AddRevitVersionDefine" BeforeTargets="CoreCompile">
+    <PropertyGroup>
+      <DefineConstants>$(DefineConstants);REVIT$(RevitVersion)</DefineConstants>
+    </PropertyGroup>
+  </Target>
 
   <!-- Revit API (NuGet パッケージ経由 - ローカル Revit 不要) -->
   <ItemGroup>
