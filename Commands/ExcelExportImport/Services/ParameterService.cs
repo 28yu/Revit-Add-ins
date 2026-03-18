@@ -130,6 +130,14 @@ namespace Tools28.Commands.ExcelExportImport.Services
                         return false;
 
                     case StorageType.ElementId:
+                        // まず表示名での設定を試行（タイプ名等の文字列値に対応）
+                        try
+                        {
+                            if (param.SetValueString(value))
+                                return true;
+                        }
+                        catch { }
+                        // 直接ElementId設定
                         if (int.TryParse(value, out int idVal))
                         {
                             param.Set(new ElementId(idVal));
