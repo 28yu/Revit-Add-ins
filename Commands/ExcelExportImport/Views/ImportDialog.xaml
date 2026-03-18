@@ -142,13 +142,7 @@
                     <DataGridTextColumn Header="新しい値" Binding="{Binding NewValue}" Width="*" SortMemberPath="NewValue"/>
                 </DataGrid.Columns>
                 <DataGrid.RowStyle>
-                    <Style TargetType="DataGridRow">
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding IsReadOnly}" Value="True">
-                                <Setter Property="Foreground" Value="#999999"/>
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
+                    <Style TargetType="DataGridRow"/>
                 </DataGrid.RowStyle>
             </DataGrid>
         </GroupBox>

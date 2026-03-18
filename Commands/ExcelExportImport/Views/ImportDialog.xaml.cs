@@ -206,24 +206,23 @@ namespace Tools28.Commands.ExcelExportImport.Views
                 // プレビューを生成
                 _previewRows = ExcelImportService.GeneratePreview(_doc, _selectedFilePath);
 
-                // 変更のあるもののみ表示
+                // 書き込み可能な変更のみ表示（読み取り専用パラメータは除外）
                 var changedRows = _previewRows
-                    .Where(r => r.HasChange)
-                    .OrderByDescending(r => !r.IsReadOnly) // 書き込み可能を先頭に
-                    .ThenBy(r => r.CategoryName)
+                    .Where(r => r.HasChange && !r.IsReadOnly)
+                    .OrderBy(r => r.CategoryName)
                     .ThenBy(r => r.ElementId)
                     .ToList();
 
                 PreviewDataGrid.ItemsSource = changedRows;
 
                 // サマリーを表示
-                int writableChangeCount = _previewRows.Count(r => r.HasChange && !r.IsReadOnly);
+                int writableChangeCount = changedRows.Count;
                 int readOnlyChangeCount = _previewRows.Count(r => r.HasChange && r.IsReadOnly);
                 int totalCount = _previewRows.Count;
 
                 string summary = $"全{totalCount}件中  変更あり: {writableChangeCount}件";
                 if (readOnlyChangeCount > 0)
-                    summary += $"  読み取り専用（変更不可）: {readOnlyChangeCount}件";
+                    summary += $"  読み取り専用で変更不可: {readOnlyChangeCount}件（長さ等の計算値）";
                 SummaryText.Text = summary;
 
                 ImportButton.IsEnabled = writableChangeCount > 0;
