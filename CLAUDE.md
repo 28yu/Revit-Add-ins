@@ -495,10 +495,98 @@ Commands/RoomTagCreator/
 3. **ビュー** — ビューポート位置コピー/ペースト、トリミング領域コピー/ペースト、3Dビューコピー/ペースト、セクションボックスコピー/ペースト
 4. **注釈・詳細** — 部屋タグ自動配置、塗潰し領域 分割・統合
 5. **構造** — 梁下端色分け、梁天端色分け
+6. **データ** — EXCELエクスポート、EXCELインポート
 
 ### 実装
 - `Application.cs` の `OnStartup()` で各パネルを個別メソッドで構築
 - `CreateGridLevelPanel()`, `CreateSheetPanel()`, `CreateViewPanel()`, `CreateAnnotationPanel()`, `CreateStructuralPanel()`
+
+## ExcelExportImport（EXCELエクスポート/インポート）設計メモ
+
+### 概要
+Revit要素のパラメータをExcelファイルにエクスポートし、Excelで編集した値をRevitにインポートする双方向連携機能。
+
+### コード構成
+```
+Commands/ExcelExportImport/
+├── ExcelExportCommand.cs         # エクスポートコマンド (IExternalCommand)
+├── ExcelImportCommand.cs         # インポートコマンド (IExternalCommand)
+├── Models/
+│   ├── CategoryInfo.cs           # カテゴリ情報モデル
+│   ├── ExportSettings.cs         # エクスポート設定モデル
+│   └── ParameterInfo.cs          # パラメータ情報モデル
+├── Services/
+│   ├── ExcelExportService.cs     # Excel書き出し処理
+│   ├── ExcelImportService.cs     # Excel読み込み・比較・色付け処理
+│   ├── ExcelProcessHelper.cs     # 開いているExcel検出・COM経由操作
+│   ├── ParameterService.cs       # パラメータ取得/設定サービス
+│   ├── RevitCategoryHelper.cs    # カテゴリ別要素取得
+│   └── SettingsService.cs        # エクスポート設定の保存/読込
+└── Views/
+    ├── ExportDialog.xaml          # エクスポート設定ダイアログ
+    ├── ExportDialog.xaml.cs       # エクスポートダイアログのコードビハインド
+    ├── ImportDialog.xaml          # インポートプレビューダイアログ
+    └── ImportDialog.xaml.cs       # インポートダイアログのコードビハインド
+```
+
+### 外部ライブラリ
+- **ClosedXML**: Excel (.xlsx) の読み書き（NuGet パッケージ）
+- **Excel COM (動的)**: 開いている Excel への直接操作（`Marshal.GetActiveObject`）
+
+### エクスポート設計
+- カテゴリ別にシートを分割（シート名=カテゴリ名）
+- ヘッダー行: `要素ID | カテゴリ | パラメータ1 | パラメータ2 | ...`
+- パラメータ名のプレフィックス: `I-`（インスタンス）/ `T-`（タイプ）
+- ヘッダー色: 緑 `RGB(155, 187, 89)` + 白文字
+- フォント: ＭＳ 明朝
+- オートフィルタを自動設定
+
+### インポート設計
+- Excelファイル選択: 開いているファイル自動検出 / ファイル参照 / ドラッグ＆ドロップ
+- プレビュー: 書き込み可能な変更のみ表示（読み取り専用パラメータは非表示）
+- 色付け: インポート後、変更された行に背景色 `RGB(255, 255, 153)` を適用
+- 色付けルート: COM経由（Excel開いている場合）→ ClosedXML（閉じている場合）
+
+### 開発で得た知見
+
+#### Excel COM の `Interior.Color` 形式
+- **`R + G*256 + B*65536` 形式**（VBA の `RGB()` 関数と同じ）
+- **BGR ではない!** — 当初 `B + G*256 + R*65536` と誤解してRとBが逆になり、黄色のつもりが水色になった
+- 例: `RGB(255, 255, 153)` = `255 + 255*256 + 153*65536` = `10092543`
+
+#### 数値パラメータの Excel 書き込み
+- `ClosedXML` の `cell.Value = stringValue` はテキスト形式で保存される → Excelで「数値が文字列として保存されています」警告が出る
+- **数値は `double` 型で書き込む**: `double.TryParse` で変換してから `cell.Value = numValue`
+- これによりExcelの警告が解消され、ユーザーが編集しやすくなる
+
+#### テキスト/数値 混在時の値比較
+- エクスポート時にテキストで保存 → ユーザーが編集 → 数値に変わる場合がある
+- `GetString()` だけでは不十分。`cell.DataType == XLDataType.Number` をチェックし、整数なら小数点なしの文字列に変換
+- 値比較は `ValuesAreEqual()` で数値比較にフォールバック（`"4700"` vs `4700.0` を同一と判定）
+
+#### Revit パラメータの読み取り専用制限
+- 構造柱の「長さ」など、Revitが自動計算するパラメータは `param.IsReadOnly = true`
+- API 経由で `Set()` しても例外が発生するため、インポート時にスキップが必要
+- プレビューでは読み取り専用パラメータを非表示にし、サマリーで件数と理由を表示
+
+#### `AsValueString()` の戻り値
+- `StorageType.Double` のパラメータは `AsValueString()` で表示単位での文字列を取得（例: 内部値 feet → 表示 "4700" mm）
+- `SetValueString()` で表示単位の文字列からの設定が可能（内部での単位変換は自動）
+- `AsValueString()` が `null` を返す場合があるため、`?? AsDouble().ToString()` でフォールバック
+
+#### ClosedXML でのファイル読み取り（Excel 開いている場合）
+- `FileShare.ReadWrite` を指定しないと、Excelがファイルをロックしているため読み取りが失敗する
+- `new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite)` を使用
+
+#### エクスポート設定の保存
+- ユーザーが選択したカテゴリ・パラメータの設定を JSON で保存
+- 保存先: `SettingsService` でプロジェクト単位の設定ファイルを管理
+- 次回エクスポート時に前回の設定を自動復元
+
+### 現在のステータス
+- **機能実装**: 完了（エクスポート、インポート、プレビュー、色付け、設定保存）
+- **動作確認**: Revit 環境で動作確認済み
+- **アイコン**: `excel_export_32.png`, `excel_import_32.png`
 
 ## 解決済み: 塗潰し領域ボタンの名称・アイコン変更がRevitに反映されない問題
 
