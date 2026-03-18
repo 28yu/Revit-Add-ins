@@ -10,6 +10,10 @@ namespace Tools28
     {
         public Result OnStartup(UIControlledApplication application)
         {
+            // 依存DLLの解決ハンドラを登録（ClosedXML等の依存先をアドインフォルダから読み込む）
+            // Revit 2021等で System.Runtime.CompilerServices.Unsafe が見つからないエラーを防止
+            AppDomain.CurrentDomain.AssemblyResolve += OnAssemblyResolve;
+
             try
             {
                 // デバッグログ: DLLの読み込み元とビルド時刻を記録
@@ -51,7 +55,30 @@ namespace Tools28
 
         public Result OnShutdown(UIControlledApplication application)
         {
+            AppDomain.CurrentDomain.AssemblyResolve -= OnAssemblyResolve;
             return Result.Succeeded;
+        }
+
+        /// <summary>
+        /// 依存DLLをアドインフォルダから解決するハンドラ
+        /// ClosedXMLの依存先（System.Runtime.CompilerServices.Unsafe等）がGACにない環境で必要
+        /// </summary>
+        private Assembly OnAssemblyResolve(object sender, ResolveEventArgs args)
+        {
+            try
+            {
+                string assemblyName = new AssemblyName(args.Name).Name;
+                string assemblyDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+                string dllPath = Path.Combine(assemblyDir, assemblyName + ".dll");
+
+                if (File.Exists(dllPath))
+                    return Assembly.LoadFrom(dllPath);
+            }
+            catch
+            {
+                // アセンブリ解決の失敗は無視（別のハンドラやデフォルト解決に任せる）
+            }
+            return null;
         }
 
         /// <summary>

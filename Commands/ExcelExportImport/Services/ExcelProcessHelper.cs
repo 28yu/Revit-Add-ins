@@ -1,16 +1,30 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Runtime.InteropServices;
 
 namespace Tools28.Commands.ExcelExportImport.Services
 {
     /// <summary>
     /// 開いているExcelファイルを検出・操作するヘルパー
-    /// .NET 8 (Revit 2025/2026) では Marshal.GetActiveObject が利用不可のため、
-    /// COM操作は .NET Framework (Revit 2021-2024) のみで使用する
+    /// P/Invoke で oleaut32.dll の GetActiveObject を直接呼び出すことで、
+    /// .NET Framework 4.8 (Revit 2021-2024) と .NET 8 (Revit 2025-2026) の両方で動作する
     /// </summary>
     public static class ExcelProcessHelper
     {
+        // P/Invoke: oleaut32.dll の GetActiveObject（Marshal.GetActiveObject の内部実装と同等）
+        // .NET 8 では Marshal.GetActiveObject が削除されたため、直接呼び出す
+        [DllImport("oleaut32.dll", PreserveSig = false)]
+        private static extern void GetActiveObject(
+            ref Guid rclsid,
+            IntPtr pvReserved,
+            [MarshalAs(UnmanagedType.IUnknown)] out object ppunk);
+
+        [DllImport("ole32.dll")]
+        private static extern int CLSIDFromProgID(
+            [MarshalAs(UnmanagedType.LPWStr)] string lpszProgID,
+            out Guid lpclsid);
+
         /// <summary>
         /// 現在Excelで開いているxlsxファイルのパス一覧を取得
         /// </summary>
@@ -18,10 +32,6 @@ namespace Tools28.Commands.ExcelExportImport.Services
         {
             var result = new List<string>();
 
-#if REVIT2025 || REVIT2026
-            // .NET 8 では Marshal.GetActiveObject が利用不可
-            return result;
-#else
             try
             {
                 dynamic app = GetExcelApplication();
@@ -64,7 +74,6 @@ namespace Tools28.Commands.ExcelExportImport.Services
             }
 
             return result;
-#endif
         }
 
         /// <summary>
@@ -78,10 +87,6 @@ namespace Tools28.Commands.ExcelExportImport.Services
             if (changedSet == null || changedSet.Count == 0)
                 return false;
 
-#if REVIT2025 || REVIT2026
-            // .NET 8 では COM 経由の操作は不可。ClosedXML でのフォールバックを使用する
-            return false;
-#else
             dynamic app = null;
             try
             {
@@ -89,10 +94,11 @@ namespace Tools28.Commands.ExcelExportImport.Services
                 if (app == null)
                     return false;
 
-                // ファイルパスに一致するワークブックを検索
+                // ファイルパスに一致するワークブックを検索（パスを正規化して比較）
                 dynamic workbooks = app.Workbooks;
                 dynamic targetWb = null;
                 int wbCount = workbooks.Count;
+                string normalizedFilePath = NormalizePath(filePath);
 
                 for (int i = 1; i <= wbCount; i++)
                 {
@@ -100,7 +106,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
                     try
                     {
                         string fullName = wb.FullName;
-                        if (string.Equals(fullName, filePath, StringComparison.OrdinalIgnoreCase))
+                        if (string.Equals(NormalizePath(fullName), normalizedFilePath, StringComparison.OrdinalIgnoreCase))
                         {
                             targetWb = wb;
                             break;
@@ -123,6 +129,9 @@ namespace Tools28.Commands.ExcelExportImport.Services
 
                 try
                 {
+                    // 画面更新を一時停止（パフォーマンス向上＋最後に一括更新）
+                    try { app.ScreenUpdating = false; } catch { }
+
                     // Excel COM の Interior.Color は R + G*256 + B*65536 形式
                     // R=255, G=255, B=153
                     int excelColor = 255 + 255 * 256 + 153 * 256 * 256;
@@ -200,6 +209,8 @@ namespace Tools28.Commands.ExcelExportImport.Services
                 }
                 finally
                 {
+                    // 画面更新を再開（これにより色付けが画面に反映される）
+                    try { app.ScreenUpdating = true; } catch { }
                     Marshal.ReleaseComObject(targetWb);
                 }
             }
@@ -214,24 +225,45 @@ namespace Tools28.Commands.ExcelExportImport.Services
                     try { Marshal.ReleaseComObject(app); } catch { }
                 }
             }
-#endif
         }
 
-#if !REVIT2025 && !REVIT2026
         /// <summary>
         /// Excel.Application の COM オブジェクトを取得
+        /// oleaut32.dll の GetActiveObject を直接呼び出す
         /// </summary>
         private static dynamic GetExcelApplication()
         {
             try
             {
-                return Marshal.GetActiveObject("Excel.Application");
+                Guid clsid;
+                int hr = CLSIDFromProgID("Excel.Application", out clsid);
+                if (hr != 0)
+                    return null;
+
+                object app;
+                GetActiveObject(ref clsid, IntPtr.Zero, out app);
+                return app;
             }
-            catch (COMException)
+            catch
             {
                 return null;
             }
         }
-#endif
+
+        /// <summary>
+        /// ファイルパスを正規化して比較しやすくする
+        /// </summary>
+        private static string NormalizePath(string path)
+        {
+            try
+            {
+                return Path.GetFullPath(path).TrimEnd(
+                    Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            }
+            catch
+            {
+                return path;
+            }
+        }
     }
 }

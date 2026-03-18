@@ -250,8 +250,10 @@ namespace Tools28.Commands.ExcelExportImport.Services
         /// Excelが開いている場合はCOM経由で直接色付け、閉じている場合はClosedXMLで上書き
         /// </summary>
         /// <returns>色付けファイルの保存先パス。COM経由成功時は元ファイルパス。色付け不要/失敗の場合はnull</returns>
-        public static string MarkImportedCells(string filePath, List<ImportPreviewRow> previewRows)
+        public static string MarkImportedCells(string filePath, List<ImportPreviewRow> previewRows, out string colorMethod)
         {
+            colorMethod = null;
+
             // 実際にインポートされたセル（変更あり＋書き込み可能）を検索用セットに
             var changedSet = new HashSet<string>(
                 previewRows
@@ -263,10 +265,22 @@ namespace Tools28.Commands.ExcelExportImport.Services
 
             // まずCOM経由（開いているExcelに直接色付け）を試行
             if (ExcelProcessHelper.MarkCellsViaCom(filePath, changedSet))
+            {
+                colorMethod = "COM";
                 return filePath;
+            }
 
-            // Excelが開いていない場合、ClosedXMLでファイルを直接編集
+            // Excelが開いていない or COM失敗の場合、ClosedXMLでファイルを直接編集
+            colorMethod = "ClosedXML";
             return MarkCellsViaClosedXml(filePath, changedSet);
+        }
+
+        /// <summary>
+        /// インポートで変更されたセルにExcelファイル上で色を付ける（互換用オーバーロード）
+        /// </summary>
+        public static string MarkImportedCells(string filePath, List<ImportPreviewRow> previewRows)
+        {
+            return MarkImportedCells(filePath, previewRows, out _);
         }
 
         /// <summary>
