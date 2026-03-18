@@ -1,5 +1,5 @@
 @echo off
-chcp 65001 >/dev/null
+chcp 65001 >nul
 echo Revit 2025版 28 Tools をアンインストール中...
 
 set ADDON_DIR=C:\ProgramData\Autodesk\Revit\Addins\2025

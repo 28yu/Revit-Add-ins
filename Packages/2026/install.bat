@@ -1,5 +1,5 @@
 @echo off
-chcp 65001 >/dev/null
+chcp 65001 >nul
 setlocal enabledelayedexpansion
 
 echo ========================================
@@ -36,7 +36,7 @@ if exist "%ADDON_DIR%\Tools28.dll" (
 REM 28Tools フォルダごとコピー（DLL + 依存ライブラリ）
 echo ファイルをコピー中...
 if not exist "%ADDON_DIR%\28Tools" mkdir "%ADDON_DIR%\28Tools"
-xcopy /Y /Q "%SCRIPT_DIR%28Tools\*.dll" "%ADDON_DIR%\28Tools\" >/dev/null
+xcopy /Y /Q "%SCRIPT_DIR%28Tools\*.dll" "%ADDON_DIR%\28Tools\" >nul
 if errorlevel 1 (
     echo [NG] DLLファイルのコピーに失敗しました
     pause
@@ -46,7 +46,7 @@ echo [OK] DLLファイルをコピーしました
 
 REM アドインマニフェストのコピー（Addins ルートに配置）
 if exist "%SCRIPT_DIR%28Tools\Tools28.addin" (
-    copy /Y "%SCRIPT_DIR%28Tools\Tools28.addin" "%ADDON_DIR%\Tools28.addin" >/dev/null
+    copy /Y "%SCRIPT_DIR%28Tools\Tools28.addin" "%ADDON_DIR%\Tools28.addin" >nul
     if errorlevel 1 (
         echo [NG] Tools28.addin のコピーに失敗しました
         pause
