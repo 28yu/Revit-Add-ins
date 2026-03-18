@@ -144,9 +144,6 @@
                 <DataGrid.RowStyle>
                     <Style TargetType="DataGridRow">
                         <Style.Triggers>
-                            <DataTrigger Binding="{Binding HasChange}" Value="True">
-                                <Setter Property="Background" Value="#FFF8DC"/>
-                            </DataTrigger>
                             <DataTrigger Binding="{Binding IsReadOnly}" Value="True">
                                 <Setter Property="Foreground" Value="#999999"/>
                             </DataTrigger>

@@ -124,7 +124,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
                             var param = ParameterService.FindParameter(elem, rawName, isTypeParam, doc);
                             string currentValue = ParameterService.GetParameterValueAsString(param);
                             bool isReadOnly = param == null || param.IsReadOnly;
-                            bool hasChange = !ValuesAreEqual(currentValue, newValue) && !isReadOnly;
+                            bool hasChange = !ValuesAreEqual(currentValue, newValue);
 
                             preview.Add(new ImportPreviewRow
                             {
@@ -252,10 +252,10 @@ namespace Tools28.Commands.ExcelExportImport.Services
         /// <returns>色付けファイルの保存先パス。COM経由成功時は元ファイルパス。色付け不要/失敗の場合はnull</returns>
         public static string MarkImportedCells(string filePath, List<ImportPreviewRow> previewRows)
         {
-            // 変更のあったセルを (ElementId, ParameterName) で検索用セットに
+            // 実際にインポートされたセル（変更あり＋書き込み可能）を検索用セットに
             var changedSet = new HashSet<string>(
                 previewRows
-                    .Where(r => r.HasChange)
+                    .Where(r => r.HasChange && !r.IsReadOnly)
                     .Select(r => r.ElementId.ToString() + "|" + r.ParameterName));
 
             if (changedSet.Count == 0)

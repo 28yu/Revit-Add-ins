@@ -206,22 +206,27 @@ namespace Tools28.Commands.ExcelExportImport.Views
                 // プレビューを生成
                 _previewRows = ExcelImportService.GeneratePreview(_doc, _selectedFilePath);
 
-                // 変更のあるものを先頭に表示
-                var sorted = _previewRows
-                    .OrderByDescending(r => r.HasChange)
+                // 変更のあるもののみ表示
+                var changedRows = _previewRows
+                    .Where(r => r.HasChange)
+                    .OrderByDescending(r => !r.IsReadOnly) // 書き込み可能を先頭に
                     .ThenBy(r => r.CategoryName)
                     .ThenBy(r => r.ElementId)
                     .ToList();
 
-                PreviewDataGrid.ItemsSource = sorted;
+                PreviewDataGrid.ItemsSource = changedRows;
 
                 // サマリーを表示
-                int changeCount = _previewRows.Count(r => r.HasChange);
-                int readOnlyCount = _previewRows.Count(r => r.IsReadOnly);
+                int writableChangeCount = _previewRows.Count(r => r.HasChange && !r.IsReadOnly);
+                int readOnlyChangeCount = _previewRows.Count(r => r.HasChange && r.IsReadOnly);
                 int totalCount = _previewRows.Count;
-                SummaryText.Text = $"合計: {totalCount}件  変更あり: {changeCount}件  読み取り専用: {readOnlyCount}件";
 
-                ImportButton.IsEnabled = changeCount > 0;
+                string summary = $"全{totalCount}件中  変更あり: {writableChangeCount}件";
+                if (readOnlyChangeCount > 0)
+                    summary += $"  読み取り専用（変更不可）: {readOnlyChangeCount}件";
+                SummaryText.Text = summary;
+
+                ImportButton.IsEnabled = writableChangeCount > 0;
             }
             catch (Exception ex)
             {
@@ -233,7 +238,7 @@ namespace Tools28.Commands.ExcelExportImport.Views
 
         private void ImportButton_Click(object sender, RoutedEventArgs e)
         {
-            int changeCount = _previewRows?.Count(r => r.HasChange) ?? 0;
+            int changeCount = _previewRows?.Count(r => r.HasChange && !r.IsReadOnly) ?? 0;
             var confirmResult = MessageBox.Show(
                 $"{changeCount}件の値を更新します。よろしいですか？",
                 "インポート確認",
