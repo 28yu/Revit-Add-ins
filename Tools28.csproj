@@ -18,11 +18,28 @@
     <!-- 出力先: bin\Release\Revit20XX\ -->
     <OutputPath>bin\$(Configuration)\Revit$(RevitVersion)\</OutputPath>
 
-    <!-- 条件付きコンパイルシンボル -->
-    <DefineConstants>$(DefineConstants);REVIT$(RevitVersion)</DefineConstants>
-
     <!-- 依存DLL（ClosedXML等）を出力フォルダにコピー -->
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+
+  <!-- 条件付きコンパイルシンボル（バージョンごとに明示的に定義） -->
+  <PropertyGroup Condition="'$(RevitVersion)' == '2021'">
+    <DefineConstants>$(DefineConstants);REVIT2021</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(RevitVersion)' == '2022'">
+    <DefineConstants>$(DefineConstants);REVIT2022</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(RevitVersion)' == '2023'">
+    <DefineConstants>$(DefineConstants);REVIT2023</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(RevitVersion)' == '2024'">
+    <DefineConstants>$(DefineConstants);REVIT2024</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(RevitVersion)' == '2025'">
+    <DefineConstants>$(DefineConstants);REVIT2025</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(RevitVersion)' == '2026'">
+    <DefineConstants>$(DefineConstants);REVIT2026</DefineConstants>
   </PropertyGroup>
 
   <!-- Revit API (NuGet パッケージ経由 - ローカル Revit 不要) -->

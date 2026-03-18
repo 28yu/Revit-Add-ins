@@ -258,6 +258,15 @@ namespace Tools28.Commands.RoomTagCreator
             Categories categories = doc.Settings.Categories;
 
             // 表示を維持するカテゴリ
+#if REVIT2026
+            var keepVisible = new HashSet<long>
+            {
+                (long)BuiltInCategory.OST_RoomTags,
+                (long)BuiltInCategory.OST_RevisionClouds,       // 改定雲マーク
+                (long)BuiltInCategory.OST_RevisionCloudTags,    // 改定雲マークタグ
+                (long)BuiltInCategory.OST_TextNotes,            // 文字注記
+            };
+#else
             var keepVisible = new HashSet<int>
             {
                 (int)BuiltInCategory.OST_RoomTags,
@@ -265,6 +274,7 @@ namespace Tools28.Commands.RoomTagCreator
                 (int)BuiltInCategory.OST_RevisionCloudTags,    // 改定雲マークタグ
                 (int)BuiltInCategory.OST_TextNotes,            // 文字注記
             };
+#endif
 
             foreach (Category cat in categories)
             {
@@ -273,11 +283,20 @@ namespace Tools28.Commands.RoomTagCreator
                     continue;
 
                 // 表示を維持するカテゴリはスキップ
+#if REVIT2026
+                if (keepVisible.Contains(cat.Id.Value))
+                    continue;
+#else
                 if (keepVisible.Contains(cat.Id.IntegerValue))
                     continue;
+#endif
 
                 // 部屋 (OST_Rooms) は表示を維持し、色塗り潰し以外のサブカテゴリを非表示
+#if REVIT2026
+                if (cat.Id.Value == (long)BuiltInCategory.OST_Rooms)
+#else
                 if (cat.Id.IntegerValue == (int)BuiltInCategory.OST_Rooms)
+#endif
                 {
                     foreach (Category subCat in cat.SubCategories)
                     {

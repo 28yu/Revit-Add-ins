@@ -83,7 +83,11 @@ namespace Tools28.Commands.ExcelExportImport.Services
                 case StorageType.Double:
                     return param.AsValueString() ?? param.AsDouble().ToString();
                 case StorageType.ElementId:
+#if REVIT2026
+                    return param.AsValueString() ?? param.AsElementId().Value.ToString();
+#else
                     return param.AsValueString() ?? param.AsElementId().IntegerValue.ToString();
+#endif
                 default:
                     return "";
             }

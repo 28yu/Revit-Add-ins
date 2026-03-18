@@ -70,8 +70,13 @@ namespace Tools28.Commands.BeamTopLevel
                     if (paramId == null)
                         continue;
 
+#if REVIT2026
+                    FilterRule rule = ParameterFilterRuleFactory.CreateEqualsRule(
+                        paramId, displayValue);
+#else
                     FilterRule rule = ParameterFilterRuleFactory.CreateEqualsRule(
                         paramId, displayValue, false);
+#endif
 
                     ElementParameterFilter paramFilter =
                         new ElementParameterFilter(rule);
@@ -127,8 +132,13 @@ namespace Tools28.Commands.BeamTopLevel
                 if (errorParamId == null)
                     return;
 
+#if REVIT2026
+                FilterRule errorRule = ParameterFilterRuleFactory.CreateNotEqualsRule(
+                    errorParamId, "");
+#else
                 FilterRule errorRule = ParameterFilterRuleFactory.CreateNotEqualsRule(
                     errorParamId, "", false);
+#endif
 
                 ElementParameterFilter errorFilter =
                     new ElementParameterFilter(errorRule);

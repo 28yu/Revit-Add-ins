@@ -27,7 +27,11 @@ namespace Tools28.Commands.ExcelExportImport.Services
                 if (cat.Parent != null)
                     continue;
 
+#if REVIT2026
+                var builtInCat = (BuiltInCategory)cat.Id.Value;
+#else
                 var builtInCat = (BuiltInCategory)cat.Id.IntegerValue;
+#endif
 
                 // このカテゴリに属する要素数をカウント
                 int count;

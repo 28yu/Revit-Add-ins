@@ -72,7 +72,11 @@ namespace Tools28.Commands.ExcelExportImport.Services
 
                     foreach (var elem in elements)
                     {
+#if REVIT2026
+                        worksheet.Cell(row, 1).Value = elem.Id.Value;
+#else
                         worksheet.Cell(row, 1).Value = elem.Id.IntegerValue;
+#endif
                         worksheet.Cell(row, 2).Value = category.Name;
 
                         for (int i = 0; i < categoryParams.Count; i++)

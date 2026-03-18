@@ -80,9 +80,13 @@ namespace Tools28.Commands.BeamUnderLevel
                         continue;
 
                     // フィルタルール: 梁下_表示 == displayValue
-                    // 3引数版はRevit 2021+全バージョンで使用可能
+#if REVIT2026
+                    FilterRule rule = ParameterFilterRuleFactory.CreateEqualsRule(
+                        paramId, displayValue);
+#else
                     FilterRule rule = ParameterFilterRuleFactory.CreateEqualsRule(
                         paramId, displayValue, false);
+#endif
 
                     ElementParameterFilter paramFilter =
                         new ElementParameterFilter(rule);
@@ -147,8 +151,13 @@ namespace Tools28.Commands.BeamUnderLevel
                     return;
 
                 // ルール: 梁下_エラー != ""
+#if REVIT2026
+                FilterRule errorRule = ParameterFilterRuleFactory.CreateNotEqualsRule(
+                    errorParamId, "");
+#else
                 FilterRule errorRule = ParameterFilterRuleFactory.CreateNotEqualsRule(
                     errorParamId, "", false);
+#endif
 
                 ElementParameterFilter errorFilter =
                     new ElementParameterFilter(errorRule);
