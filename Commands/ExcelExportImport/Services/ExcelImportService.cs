@@ -103,7 +103,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
                                     CategoryName = categoryName,
                                     ParameterName = paramHeaders[i],
                                     CurrentValue = "（要素が見つかりません）",
-                                    NewValue = worksheet.Cell(row, i + 3).GetString(),
+                                    NewValue = GetCellValueAsString(worksheet.Cell(row, i + 3)),
                                     HasChange = false,
                                     IsReadOnly = true
                                 });
@@ -114,7 +114,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
                         for (int i = 0; i < paramHeaders.Count; i++)
                         {
                             string headerName = paramHeaders[i];
-                            string newValue = worksheet.Cell(row, i + 3).GetString();
+                            string newValue = GetCellValueAsString(worksheet.Cell(row, i + 3));
 
                             bool isTypeParam = headerName.StartsWith("T-");
                             string rawName = headerName.StartsWith("T-") || headerName.StartsWith("I-")
@@ -124,7 +124,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
                             var param = ParameterService.FindParameter(elem, rawName, isTypeParam, doc);
                             string currentValue = ParameterService.GetParameterValueAsString(param);
                             bool isReadOnly = param == null || param.IsReadOnly;
-                            bool hasChange = currentValue != newValue && !isReadOnly;
+                            bool hasChange = !ValuesAreEqual(currentValue, newValue) && !isReadOnly;
 
                             preview.Add(new ImportPreviewRow
                             {
@@ -198,7 +198,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
                         for (int i = 0; i < paramHeaders.Count; i++)
                         {
                             string headerName = paramHeaders[i];
-                            string newValue = worksheet.Cell(row, i + 3).GetString();
+                            string newValue = GetCellValueAsString(worksheet.Cell(row, i + 3));
 
                             bool isTypeParam = headerName.StartsWith("T-");
                             string rawName = headerName.StartsWith("T-") || headerName.StartsWith("I-")
@@ -222,7 +222,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
 
                             // 現在値と同じならスキップ
                             string currentValue = ParameterService.GetParameterValueAsString(param);
-                            if (currentValue == newValue)
+                            if (ValuesAreEqual(currentValue, newValue))
                             {
                                 result.SkipCount++;
                                 continue;
@@ -267,6 +267,39 @@ namespace Tools28.Commands.ExcelExportImport.Services
 
             // Excelが開いていない場合、ClosedXMLでファイルを直接編集
             return MarkCellsViaClosedXml(filePath, changedSet);
+        }
+
+        /// <summary>
+        /// Excelセルの値を文字列として取得（数値セルは整数なら小数点なしで返す）
+        /// </summary>
+        private static string GetCellValueAsString(IXLCell cell)
+        {
+            if (cell.DataType == XLDataType.Number)
+            {
+                double numVal = cell.GetDouble();
+                // 整数なら小数点なしの文字列にする（Revit の AsValueString() と一致させる）
+                if (numVal == Math.Floor(numVal))
+                    return ((long)numVal).ToString();
+                return numVal.ToString();
+            }
+            return cell.GetString();
+        }
+
+        /// <summary>
+        /// 2つの値が等しいか比較（数値の場合は数値比較、テキストは文字列比較）
+        /// </summary>
+        private static bool ValuesAreEqual(string val1, string val2)
+        {
+            if (val1 == val2)
+                return true;
+            if (string.IsNullOrEmpty(val1) && string.IsNullOrEmpty(val2))
+                return true;
+
+            // 両方が数値の場合は数値として比較（"4700" vs "4700.0" 等の差異を吸収）
+            if (double.TryParse(val1, out double d1) && double.TryParse(val2, out double d2))
+                return Math.Abs(d1 - d2) < 0.0001;
+
+            return false;
         }
 
         /// <summary>

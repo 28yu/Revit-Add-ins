@@ -81,7 +81,16 @@ namespace Tools28.Commands.ExcelExportImport.Services
                             var param = ParameterService.FindParameter(
                                 elem, paramInfo.RawName, paramInfo.IsTypeParameter, doc);
                             string value = ParameterService.GetParameterValueAsString(param);
-                            worksheet.Cell(row, i + 3).Value = value;
+
+                            // 数値は数値型としてセルに書き込む（Excelの「文字列として保存」警告を回避）
+                            if (double.TryParse(value, out double numValue))
+                            {
+                                worksheet.Cell(row, i + 3).Value = numValue;
+                            }
+                            else
+                            {
+                                worksheet.Cell(row, i + 3).Value = value;
+                            }
                         }
 
                         row++;
