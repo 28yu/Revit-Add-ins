@@ -70,9 +70,11 @@ foreach ($ver in $revitVersions) {
     $tools28Dir = Join-Path $tempDir "28Tools"
     New-Item -ItemType Directory -Path $tools28Dir | Out-Null
 
-    # DLL を 28Tools/ にコピー
-    Copy-Item -Path $buildDll -Destination (Join-Path $tools28Dir "Tools28.dll")
-    Write-Host "  ✓ Tools28.dll をコピーしました" -ForegroundColor Green
+    # 全DLL を 28Tools/ にコピー（Tools28.dll + ClosedXML等の依存ライブラリ）
+    $buildDir = Split-Path $buildDll
+    Copy-Item -Path (Join-Path $buildDir "*.dll") -Destination $tools28Dir
+    $dllCount = (Get-ChildItem -Path $tools28Dir -Filter "*.dll").Count
+    Write-Host "  ✓ DLLファイルをコピーしました ($dllCount 個)" -ForegroundColor Green
 
     # .addin を 28Tools/ にコピー
     $addinSource = Join-Path $templateDir "28Tools\Tools28.addin"

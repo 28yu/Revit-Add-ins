@@ -49,8 +49,8 @@ jobs:
 
           New-Item -ItemType Directory -Path $tools28Dir -Force | Out-Null
 
-          # DLL を 28Tools/ にコピー
-          Copy-Item "bin/Release/Revit$ver/Tools28.dll" "$tools28Dir/Tools28.dll"
+          # 全DLL を 28Tools/ にコピー（Tools28.dll + ClosedXML等の依存ライブラリ）
+          Copy-Item "bin/Release/Revit$ver/*.dll" "$tools28Dir/"
 
           # .addin を 28Tools/ にコピー
           Copy-Item "Packages/$ver/28Tools/Tools28.addin" "$tools28Dir/Tools28.addin"
