@@ -123,7 +123,9 @@ namespace Tools28.Commands.ExcelExportImport.Services
 
                             var param = ParameterService.FindParameter(elem, rawName, isTypeParam, doc);
                             string currentValue = ParameterService.GetParameterValueAsString(param);
-                            bool isReadOnly = param == null || param.IsReadOnly;
+                            // タイプ変更パラメータはIsReadOnlyでもChangeTypeIdで変更可能
+                            bool isReadOnly = param == null
+                                || (param.IsReadOnly && !ParameterService.IsTypeChangeParameter(param));
                             bool hasChange = !ValuesAreEqual(currentValue, newValue);
 
                             preview.Add(new ImportPreviewRow
@@ -214,7 +216,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
                                 continue;
                             }
 
-                            if (param.IsReadOnly)
+                            if (param.IsReadOnly && !ParameterService.IsTypeChangeParameter(param))
                             {
                                 result.SkipCount++;
                                 continue;
@@ -228,7 +230,18 @@ namespace Tools28.Commands.ExcelExportImport.Services
                                 continue;
                             }
 
-                            if (ParameterService.SetParameterValue(param, newValue))
+                            // タイプ変更パラメータ（ELEM_TYPE_PARAM）はChangeTypeIdで処理
+                            bool success;
+                            if (ParameterService.IsTypeChangeParameter(param))
+                            {
+                                success = ParameterService.ChangeElementType(elem, newValue, doc);
+                            }
+                            else
+                            {
+                                success = ParameterService.SetParameterValue(param, newValue);
+                            }
+
+                            if (success)
                             {
                                 result.SuccessCount++;
                             }

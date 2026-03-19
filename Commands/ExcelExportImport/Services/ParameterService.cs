@@ -130,7 +130,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
                         return false;
 
                     case StorageType.ElementId:
-                        // まず表示名での設定を試行（タイプ名等の文字列値に対応）
+                        // SetValueStringを試行
                         try
                         {
                             if (param.SetValueString(value))
@@ -177,6 +177,108 @@ namespace Tools28.Commands.ExcelExportImport.Services
             {
                 return FindParameterByName(elem, paramName);
             }
+        }
+
+        /// <summary>
+        /// 要素のタイプを名前で変更する（「タイプ」パラメータ用）
+        /// </summary>
+        public static bool ChangeElementType(Element elem, string typeName, Document doc)
+        {
+            if (elem == null || doc == null || string.IsNullOrEmpty(typeName))
+                return false;
+
+            try
+            {
+                // 現在のタイプのファミリIDを取得して、同一ファミリ内のタイプを検索
+                var currentTypeId = elem.GetTypeId();
+                if (currentTypeId == null || currentTypeId == ElementId.InvalidElementId)
+                    return false;
+
+                var currentType = doc.GetElement(currentTypeId) as ElementType;
+                if (currentType == null)
+                    return false;
+
+                // 同カテゴリの全ファミリタイプから名前が一致するものを検索
+                var collector = new FilteredElementCollector(doc)
+                    .OfClass(currentType.GetType())
+                    .WhereElementIsElementType();
+
+                // FamilySymbolの場合、同じファミリ内のタイプを優先検索
+                var familySymbol = currentType as FamilySymbol;
+                ElementId targetTypeId = null;
+
+                foreach (var typeElem in collector)
+                {
+                    var et = typeElem as ElementType;
+                    if (et == null) continue;
+
+                    // AsValueStringと同じ形式でタイプ名を比較
+                    string candidateName = et.Name;
+
+                    // FamilySymbolの場合は "ファミリ名: タイプ名" 形式もチェック
+                    if (familySymbol != null && typeElem is FamilySymbol fs)
+                    {
+                        string fullName = fs.FamilyName + ": " + fs.Name;
+                        // 末尾の空白をトリムして比較
+                        if (string.Equals(fullName.Trim(), typeName.Trim(), StringComparison.OrdinalIgnoreCase))
+                        {
+                            targetTypeId = fs.Id;
+                            break;
+                        }
+                    }
+
+                    if (string.Equals(candidateName.Trim(), typeName.Trim(), StringComparison.OrdinalIgnoreCase))
+                    {
+                        // 同じファミリ内のタイプを優先
+                        if (familySymbol != null && typeElem is FamilySymbol fs2
+                            && fs2.FamilyName == familySymbol.FamilyName)
+                        {
+                            targetTypeId = fs2.Id;
+                            break;
+                        }
+                        // ファミリが異なる場合も候補として保持
+                        if (targetTypeId == null)
+                            targetTypeId = et.Id;
+                    }
+                }
+
+                if (targetTypeId != null && targetTypeId != currentTypeId)
+                {
+                    elem.ChangeTypeId(targetTypeId);
+                    return true;
+                }
+
+                return false;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// パラメータがタイプ変更パラメータ（ELEM_TYPE_PARAM）かどうか判定
+        /// </summary>
+        public static bool IsTypeChangeParameter(Parameter param)
+        {
+            if (param == null || param.Definition == null)
+                return false;
+
+            // BuiltInParameterの ELEM_TYPE_PARAM は「タイプ」パラメータ
+#if REVIT2026
+            if (param.Id.Value == (long)BuiltInParameter.ELEM_TYPE_PARAM)
+                return true;
+#else
+            if (param.Id.IntegerValue == (int)BuiltInParameter.ELEM_TYPE_PARAM)
+                return true;
+#endif
+
+            // パラメータ名が「タイプ」でStorageTypeがElementIdの場合も対象
+            if (param.StorageType == StorageType.ElementId
+                && param.Definition.Name == "タイプ")
+                return true;
+
+            return false;
         }
 
         private static Parameter FindParameterByName(Element elem, string paramName)
