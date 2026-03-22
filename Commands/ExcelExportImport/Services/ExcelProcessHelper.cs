@@ -183,12 +183,14 @@ namespace Tools28.Commands.ExcelExportImport.Services
                             if (rowCount < 2 || colCount < 3)
                                 continue;
 
-                            // ヘッダー行からパラメータ名を取得
+                            // ヘッダー行からパラメータ名を取得（(*変更不可)サフィックスは除去）
                             var paramHeaders = new List<string>();
                             for (int col = 3; col <= colCount; col++)
                             {
                                 dynamic cell = sheet.Cells[1, col];
                                 string headerText = Convert.ToString(cell.Value ?? "");
+                                if (headerText.EndsWith("(*変更不可)"))
+                                    headerText = headerText.Substring(0, headerText.Length - "(*変更不可)".Length);
                                 paramHeaders.Add(headerText);
                                 Marshal.ReleaseComObject(cell);
                             }

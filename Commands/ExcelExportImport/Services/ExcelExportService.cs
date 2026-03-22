@@ -53,7 +53,15 @@ namespace Tools28.Commands.ExcelExportImport.Services
                     worksheet.Cell(1, 2).Value = "カテゴリ";
                     for (int i = 0; i < categoryParams.Count; i++)
                     {
-                        worksheet.Cell(1, i + 3).Value = categoryParams[i].DisplayName;
+                        var p = categoryParams[i];
+                        // 読み取り専用パラメータには(*変更不可)を付与
+                        // ただしタイプ変更パラメータ(I-タイプ)はChangeTypeIdで変更可能なので除外
+                        string headerName = p.DisplayName;
+                        if (p.IsReadOnly && p.RawName != "タイプ")
+                        {
+                            headerName += "(*変更不可)";
+                        }
+                        worksheet.Cell(1, i + 3).Value = headerName;
                     }
 
                     // ヘッダー行のスタイル設定

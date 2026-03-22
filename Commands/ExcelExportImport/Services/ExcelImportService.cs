@@ -74,11 +74,12 @@ namespace Tools28.Commands.ExcelExportImport.Services
                     if (rowCount < 2 || colCount < 3)
                         continue;
 
-                    // ヘッダーからパラメータ名を取得
+                    // ヘッダーからパラメータ名を取得（(*変更不可)サフィックスは除去）
                     var paramHeaders = new List<string>();
                     for (int col = 3; col <= colCount; col++)
                     {
-                        paramHeaders.Add(worksheet.Cell(1, col).GetString());
+                        string header = worksheet.Cell(1, col).GetString();
+                        paramHeaders.Add(StripReadOnlySuffix(header));
                     }
 
                     // データ行を処理
@@ -169,11 +170,12 @@ namespace Tools28.Commands.ExcelExportImport.Services
                     if (rowCount < 2 || colCount < 3)
                         continue;
 
-                    // ヘッダーからパラメータ名を取得
+                    // ヘッダーからパラメータ名を取得（(*変更不可)サフィックスは除去）
                     var paramHeaders = new List<string>();
                     for (int col = 3; col <= colCount; col++)
                     {
-                        paramHeaders.Add(worksheet.Cell(1, col).GetString());
+                        string header = worksheet.Cell(1, col).GetString();
+                        paramHeaders.Add(StripReadOnlySuffix(header));
                     }
 
                     // データ行を処理
@@ -297,6 +299,16 @@ namespace Tools28.Commands.ExcelExportImport.Services
         }
 
         /// <summary>
+        /// ヘッダー名から(*変更不可)サフィックスを除去
+        /// </summary>
+        private static string StripReadOnlySuffix(string headerName)
+        {
+            if (headerName != null && headerName.EndsWith("(*変更不可)"))
+                return headerName.Substring(0, headerName.Length - "(*変更不可)".Length);
+            return headerName;
+        }
+
+        /// <summary>
         /// Excelセルの値を文字列として取得（数値セルは整数なら小数点なしで返す）
         /// </summary>
         private static string GetCellValueAsString(IXLCell cell)
@@ -370,7 +382,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
                     var paramHeaders = new List<string>();
                     for (int col = 3; col <= colCount; col++)
                     {
-                        paramHeaders.Add(worksheet.Cell(1, col).GetString());
+                        paramHeaders.Add(StripReadOnlySuffix(worksheet.Cell(1, col).GetString()));
                     }
 
                     for (int row = 2; row <= rowCount; row++)
