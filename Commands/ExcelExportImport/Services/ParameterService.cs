@@ -207,27 +207,36 @@ namespace Tools28.Commands.ExcelExportImport.Services
                 var familySymbol = currentType as FamilySymbol;
                 ElementId targetTypeId = null;
 
+                // 入力値を正規化（コロン前後のスペース差異を吸収）
+                string normalizedInput = NormalizeColonSpacing(typeName.Trim());
+                // 入力値からタイプ名部分を抽出（"ファミリ名: タイプ名" → "タイプ名"）
+                string extractedTypeName = ExtractTypeNamePart(typeName.Trim());
+
                 foreach (var typeElem in collector)
                 {
                     var et = typeElem as ElementType;
                     if (et == null) continue;
 
-                    // AsValueStringと同じ形式でタイプ名を比較
                     string candidateName = et.Name;
 
-                    // FamilySymbolの場合は "ファミリ名: タイプ名" 形式もチェック
+                    // FamilySymbolの場合は "ファミリ名: タイプ名" 形式でチェック
                     if (familySymbol != null && typeElem is FamilySymbol fs)
                     {
+                        // AsValueString() は "ファミリ名 : タイプ名" 形式を返すことがあるため
+                        // コロン前後のスペースを正規化して比較
                         string fullName = fs.FamilyName + ": " + fs.Name;
-                        // 末尾の空白をトリムして比較
-                        if (string.Equals(fullName.Trim(), typeName.Trim(), StringComparison.OrdinalIgnoreCase))
+                        string normalizedFullName = NormalizeColonSpacing(fullName.Trim());
+
+                        if (string.Equals(normalizedFullName, normalizedInput, StringComparison.OrdinalIgnoreCase))
                         {
                             targetTypeId = fs.Id;
                             break;
                         }
                     }
 
-                    if (string.Equals(candidateName.Trim(), typeName.Trim(), StringComparison.OrdinalIgnoreCase))
+                    // タイプ名のみで比較
+                    if (string.Equals(candidateName.Trim(), typeName.Trim(), StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(candidateName.Trim(), extractedTypeName, StringComparison.OrdinalIgnoreCase))
                     {
                         // 同じファミリ内のタイプを優先
                         if (familySymbol != null && typeElem is FamilySymbol fs2
@@ -254,6 +263,32 @@ namespace Tools28.Commands.ExcelExportImport.Services
             {
                 return false;
             }
+        }
+
+        /// <summary>
+        /// コロン前後のスペースを正規化（" : " や ": " や " :" を全て ":" に統一）
+        /// AsValueString() と FamilyName + ": " + Name の形式差異を吸収
+        /// </summary>
+        private static string NormalizeColonSpacing(string name)
+        {
+            if (string.IsNullOrEmpty(name))
+                return name;
+            // " : " → ":", ": " → ":", " :" → ":"
+            return name.Replace(" : ", ":").Replace(": ", ":").Replace(" :", ":");
+        }
+
+        /// <summary>
+        /// "ファミリ名: タイプ名" 形式からタイプ名部分を抽出
+        /// コロンが含まれない場合は入力値をそのまま返す
+        /// </summary>
+        private static string ExtractTypeNamePart(string fullName)
+        {
+            if (string.IsNullOrEmpty(fullName))
+                return fullName;
+            int colonIndex = fullName.LastIndexOf(':');
+            if (colonIndex > 0 && colonIndex < fullName.Length - 1)
+                return fullName.Substring(colonIndex + 1).Trim();
+            return fullName;
         }
 
         /// <summary>

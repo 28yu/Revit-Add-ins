@@ -250,7 +250,10 @@ namespace Tools28.Commands.ExcelExportImport.Services
                             else
                             {
                                 result.FailCount++;
-                                result.Errors.Add($"シート '{worksheet.Name}' 行{row}: パラメータ '{headerName}' の値設定に失敗（値: '{newValue}'）");
+                                string errorDetail = ParameterService.IsTypeChangeParameter(param)
+                                    ? $"シート '{worksheet.Name}' 行{row}: タイプ変更に失敗（値: '{newValue}'）— 一致するタイプが見つかりません"
+                                    : $"シート '{worksheet.Name}' 行{row}: パラメータ '{headerName}' の値設定に失敗（値: '{newValue}'）";
+                                result.Errors.Add(errorDetail);
                             }
                         }
                     }
