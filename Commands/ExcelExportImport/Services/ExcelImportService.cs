@@ -119,6 +119,10 @@ namespace Tools28.Commands.ExcelExportImport.Services
                             string headerName = paramHeaders[i];
                             string newValue = GetCellValueAsString(worksheet.Cell(row, i + 3));
 
+                            // 空セルはスキップ（シート統合モードで該当カテゴリに存在しないパラメータ列）
+                            if (string.IsNullOrEmpty(newValue))
+                                continue;
+
                             bool isTypeParam = headerName.StartsWith("T-");
                             string rawName = headerName.StartsWith("T-") || headerName.StartsWith("I-")
                                 ? headerName.Substring(2)
@@ -205,6 +209,13 @@ namespace Tools28.Commands.ExcelExportImport.Services
                         {
                             string headerName = paramHeaders[i];
                             string newValue = GetCellValueAsString(worksheet.Cell(row, i + 3));
+
+                            // 空セルはスキップ（シート統合モードで該当カテゴリに存在しないパラメータ列）
+                            if (string.IsNullOrEmpty(newValue))
+                            {
+                                result.SkipCount++;
+                                continue;
+                            }
 
                             bool isTypeParam = headerName.StartsWith("T-");
                             string rawName = headerName.StartsWith("T-") || headerName.StartsWith("I-")
