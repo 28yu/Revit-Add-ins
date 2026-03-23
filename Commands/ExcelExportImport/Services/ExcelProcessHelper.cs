@@ -293,8 +293,8 @@ namespace Tools28.Commands.ExcelExportImport.Services
                                 blueChars.Font.Bold = true;
                                 Marshal.ReleaseComObject(blueChars);
 
-                                // "赤字" 部分 (13文字目から2文字) を赤色太字に
-                                dynamic redChars = legendCell.Characters[13, 2];
+                                // "赤字" 部分 (14文字目から2文字) を赤色太字に
+                                dynamic redChars = legendCell.Characters[14, 2];
                                 redChars.Font.Color = redColor;
                                 redChars.Font.Bold = true;
                                 Marshal.ReleaseComObject(redChars);
