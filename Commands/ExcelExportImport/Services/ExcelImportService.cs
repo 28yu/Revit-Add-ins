@@ -446,6 +446,26 @@ namespace Tools28.Commands.ExcelExportImport.Services
                 if (!anyMarked)
                     return null;
 
+                // 各シートの1行目（最終列の次）に凡例を追加
+                foreach (var worksheet in workbook.Worksheets)
+                {
+                    var lastCol = worksheet.LastColumnUsed();
+                    if (lastCol == null) continue;
+                    int legendCol = lastCol.ColumnNumber() + 1;
+
+                    var legendCell = worksheet.Cell(1, legendCol);
+                    var richText = legendCell.CreateRichText();
+                    richText.AddText("(*");
+                    var bluePart = richText.AddText("青字");
+                    bluePart.SetFontColor(blueColor);
+                    bluePart.SetBold(true);
+                    richText.AddText("はインポート成功、");
+                    var redPart = richText.AddText("赤字");
+                    redPart.SetFontColor(XLColor.Red);
+                    redPart.SetBold(true);
+                    richText.AddText("はインポート失敗)");
+                }
+
                 using (var saveStream = new MemoryStream())
                 {
                     workbook.SaveAs(saveStream);

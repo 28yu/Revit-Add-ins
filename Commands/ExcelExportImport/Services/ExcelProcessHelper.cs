@@ -166,6 +166,12 @@ namespace Tools28.Commands.ExcelExportImport.Services
                     // R=255, G=255, B=153
                     int excelColor = 255 + 255 * 256 + 153 * 256 * 256;
 
+                    // Excel COM の Font.Color は R + G*256 + B*65536 形式
+                    // 青色: R=79, G=129, B=189
+                    int blueColor = 79 + 129 * 256 + 189 * 256 * 256;
+                    // 赤色: R=255, G=0, B=0（失敗セル用）
+                    int redColor = 255 + 0 * 256 + 0 * 256 * 256;
+
                     int sheetCount = targetWb.Sheets.Count;
                     for (int s = 1; s <= sheetCount; s++)
                     {
@@ -194,12 +200,6 @@ namespace Tools28.Commands.ExcelExportImport.Services
                                 paramHeaders.Add(headerText);
                                 Marshal.ReleaseComObject(cell);
                             }
-
-                            // Excel COM の Font.Color は R + G*256 + B*65536 形式
-                            // 青色: R=79, G=129, B=189
-                            int blueColor = 79 + 129 * 256 + 189 * 256 * 256;
-                            // 赤色: R=255, G=0, B=0（失敗セル用）
-                            int redColor = 255 + 0 * 256 + 0 * 256 * 256;
 
                             // データ行を走査して変更がある行全体に色を付ける
                             for (int row = 2; row <= rowCount; row++)
@@ -267,6 +267,48 @@ namespace Tools28.Commands.ExcelExportImport.Services
                         finally
                         {
                             Marshal.ReleaseComObject(sheet);
+                        }
+                    }
+
+                    // 各シートの1行目（最終列の次）に凡例を追加
+                    if (anyMarked)
+                    {
+                        for (int s2 = 1; s2 <= sheetCount; s2++)
+                        {
+                            dynamic sheet2 = targetWb.Sheets[s2];
+                            try
+                            {
+                                dynamic usedRange2 = sheet2.UsedRange;
+                                int lastColNum = (int)usedRange2.Column + (int)usedRange2.Columns.Count - 1;
+                                Marshal.ReleaseComObject(usedRange2);
+
+                                int legendCol = lastColNum + 1;
+                                dynamic legendCell = sheet2.Cells[1, legendCol];
+                                string legendText = "(*青字はインポート成功、赤字はインポート失敗)";
+                                legendCell.Value = legendText;
+
+                                // "青字" 部分 (3文字目から2文字) を青色太字に
+                                dynamic blueChars = legendCell.Characters[3, 2];
+                                blueChars.Font.Color = blueColor;
+                                blueChars.Font.Bold = true;
+                                Marshal.ReleaseComObject(blueChars);
+
+                                // "赤字" 部分 (13文字目から2文字) を赤色太字に
+                                dynamic redChars = legendCell.Characters[13, 2];
+                                redChars.Font.Color = redColor;
+                                redChars.Font.Bold = true;
+                                Marshal.ReleaseComObject(redChars);
+
+                                Marshal.ReleaseComObject(legendCell);
+                            }
+                            catch
+                            {
+                                // 凡例追加失敗は無視
+                            }
+                            finally
+                            {
+                                Marshal.ReleaseComObject(sheet2);
+                            }
                         }
                     }
 
