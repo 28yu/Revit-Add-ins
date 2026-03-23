@@ -396,25 +396,29 @@ namespace Tools28.Commands.ExcelExportImport.Services
                             elementIdStr = ((int)idDouble).ToString();
                         }
 
-                        // この行に変更があるかチェック
-                        bool rowHasChange = false;
+                        // この行に変更があるかチェック（セル単位で判定）
+                        var changedCols = new HashSet<int>();
                         for (int i = 0; i < paramHeaders.Count; i++)
                         {
                             string key = elementIdStr + "|" + paramHeaders[i];
                             if (changedSet.Contains(key))
                             {
-                                rowHasChange = true;
-                                break;
+                                changedCols.Add(i + 3); // Excel列番号（1始まり、パラメータは3列目から）
                             }
                         }
 
-                        // 変更がある行は全列に色を付ける
-                        if (rowHasChange)
+                        // 変更がある行は全列に背景色、変更セルは赤字/太字
+                        if (changedCols.Count > 0)
                         {
                             for (int col = 1; col <= colCount; col++)
                             {
                                 worksheet.Cell(row, col).Style.Fill.BackgroundColor =
                                     XLColor.FromArgb(255, 255, 153);
+                            }
+                            foreach (int col in changedCols)
+                            {
+                                worksheet.Cell(row, col).Style.Font.FontColor = XLColor.Red;
+                                worksheet.Cell(row, col).Style.Font.Bold = true;
                             }
                             anyMarked = true;
                         }

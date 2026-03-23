@@ -195,6 +195,10 @@ namespace Tools28.Commands.ExcelExportImport.Services
                                 Marshal.ReleaseComObject(cell);
                             }
 
+                            // Excel COM の Font.Color は R + G*256 + B*65536 形式
+                            // 赤色: R=255, G=0, B=0
+                            int redColor = 255 + 0 * 256 + 0 * 256 * 256;
+
                             // データ行を走査して変更がある行全体に色を付ける
                             for (int row = 2; row <= rowCount; row++)
                             {
@@ -214,25 +218,31 @@ namespace Tools28.Commands.ExcelExportImport.Services
                                     else
                                         elementIdStr = Convert.ToString(idValue).Trim();
 
-                                    // この行に変更があるかチェック
-                                    bool rowHasChange = false;
+                                    // この行に変更があるかチェック（セル単位で判定）
+                                    var changedCols = new HashSet<int>();
                                     for (int i = 0; i < paramHeaders.Count; i++)
                                     {
                                         string key = elementIdStr + "|" + paramHeaders[i];
                                         if (changedSet.Contains(key))
                                         {
-                                            rowHasChange = true;
-                                            break;
+                                            changedCols.Add(i + 3); // Excel列番号（1始まり、パラメータは3列目から）
                                         }
                                     }
 
-                                    // 変更がある行はセルごとに色を付ける
-                                    if (rowHasChange)
+                                    // 変更がある行は全列に背景色、変更セルは赤字/太字
+                                    if (changedCols.Count > 0)
                                     {
                                         for (int col = 1; col <= colCount; col++)
                                         {
                                             dynamic cell = sheet.Cells[row, col];
                                             cell.Interior.Color = excelColor;
+                                            Marshal.ReleaseComObject(cell);
+                                        }
+                                        foreach (int col in changedCols)
+                                        {
+                                            dynamic cell = sheet.Cells[row, col];
+                                            cell.Font.Color = redColor;
+                                            cell.Font.Bold = true;
                                             Marshal.ReleaseComObject(cell);
                                         }
                                         anyMarked = true;
