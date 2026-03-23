@@ -257,6 +257,17 @@
                     <ListBox x:Name="OutputListBox" Grid.Row="1"
                              BorderThickness="1" BorderBrush="#CCCCCC"
                              SelectionMode="Single">
+                        <ListBox.GroupStyle>
+                            <GroupStyle>
+                                <GroupStyle.HeaderTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Name}" FontWeight="Bold"
+                                                   FontSize="11" Margin="4,6,4,2"
+                                                   Foreground="#0066CC"/>
+                                    </DataTemplate>
+                                </GroupStyle.HeaderTemplate>
+                            </GroupStyle>
+                        </ListBox.GroupStyle>
                         <ListBox.ItemTemplate>
                             <DataTemplate>
                                 <TextBlock Text="{Binding DisplayName}" FontSize="11" Margin="2,1"/>

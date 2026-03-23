@@ -218,17 +218,21 @@ namespace Tools28.Commands.ExcelExportImport.Views
         private void RefreshOutputList()
         {
             string filter = OutputSearchBox.Text.Trim();
+            List<ParameterInfo> source;
             if (string.IsNullOrEmpty(filter))
             {
-                OutputListBox.ItemsSource = null;
-                OutputListBox.ItemsSource = _outputParameters;
+                source = _outputParameters;
             }
             else
             {
-                OutputListBox.ItemsSource = _outputParameters
+                source = _outputParameters
                     .Where(p => p.DisplayName.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0)
                     .ToList();
             }
+
+            var view = new ListCollectionView(source);
+            view.GroupDescriptions.Add(new PropertyGroupDescription("CategoryName"));
+            OutputListBox.ItemsSource = view;
         }
 
         private void OutputSearchBox_TextChanged(object sender, TextChangedEventArgs e)

@@ -237,16 +237,6 @@ namespace Tools28.Commands.ExcelExportImport.Views
 
         private void ImportButton_Click(object sender, RoutedEventArgs e)
         {
-            int changeCount = _previewRows?.Count(r => r.HasChange && !r.IsReadOnly) ?? 0;
-            var confirmResult = MessageBox.Show(
-                $"{changeCount}件の値を更新します。よろしいですか？",
-                "インポート確認",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Question);
-
-            if (confirmResult != MessageBoxResult.Yes)
-                return;
-
             ImportExecuted = true;
             DialogResult = true;
             Close();

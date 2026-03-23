@@ -18,6 +18,8 @@ namespace Tools28.Commands.ExcelExportImport.Services
         public int SkipCount { get; set; }
         public List<string> Errors { get; set; } = new List<string>();
         public List<string> Warnings { get; set; } = new List<string>();
+        /// <summary>インポートに失敗したセルのキー（"ElementId|ParameterName"）</summary>
+        public HashSet<string> FailedCells { get; set; } = new HashSet<string>();
     }
 
     /// <summary>
@@ -250,6 +252,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
                             else
                             {
                                 result.FailCount++;
+                                result.FailedCells.Add(elementIdInt.ToString() + "|" + headerName);
                                 string errorDetail = ParameterService.IsTypeChangeParameter(param)
                                     ? $"シート '{worksheet.Name}' 行{row}: タイプ変更に失敗（値: '{newValue}'）— 一致するタイプが見つかりません"
                                     : $"シート '{worksheet.Name}' 行{row}: パラメータ '{headerName}' の値設定に失敗（値: '{newValue}'）";
@@ -268,7 +271,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
         /// Excelが開いている場合はCOM経由で直接色付け、閉じている場合はClosedXMLで上書き
         /// </summary>
         /// <returns>色付けファイルの保存先パス。COM経由成功時は元ファイルパス。色付け不要/失敗の場合はnull</returns>
-        public static string MarkImportedCells(string filePath, List<ImportPreviewRow> previewRows, out string colorMethod)
+        public static string MarkImportedCells(string filePath, List<ImportPreviewRow> previewRows, out string colorMethod, HashSet<string> failedSet = null)
         {
             colorMethod = null;
 
@@ -278,11 +281,17 @@ namespace Tools28.Commands.ExcelExportImport.Services
                     .Where(r => r.HasChange && !r.IsReadOnly)
                     .Select(r => r.ElementId.ToString() + "|" + r.ParameterName));
 
-            if (changedSet.Count == 0)
+            // 成功セットから失敗セルを除外
+            if (failedSet != null && failedSet.Count > 0)
+            {
+                changedSet.ExceptWith(failedSet);
+            }
+
+            if (changedSet.Count == 0 && (failedSet == null || failedSet.Count == 0))
                 return null;
 
             // まずCOM経由（開いているExcelに直接色付け）を試行
-            if (ExcelProcessHelper.MarkCellsViaCom(filePath, changedSet))
+            if (ExcelProcessHelper.MarkCellsViaCom(filePath, changedSet, failedSet))
             {
                 colorMethod = "COM";
                 return filePath;
@@ -290,7 +299,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
 
             // Excelが開いていない or COM失敗の場合、ClosedXMLでファイルを直接編集
             colorMethod = "ClosedXML";
-            return MarkCellsViaClosedXml(filePath, changedSet);
+            return MarkCellsViaClosedXml(filePath, changedSet, failedSet);
         }
 
         /// <summary>
@@ -347,7 +356,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
         /// <summary>
         /// ClosedXMLを使用してExcelファイルのセルに色を付ける（Excelが閉じている場合のフォールバック）
         /// </summary>
-        private static string MarkCellsViaClosedXml(string filePath, HashSet<string> changedSet)
+        private static string MarkCellsViaClosedXml(string filePath, HashSet<string> changedSet, HashSet<string> failedSet = null)
         {
             byte[] fileBytes;
             try
@@ -363,6 +372,9 @@ namespace Tools28.Commands.ExcelExportImport.Services
             {
                 return null;
             }
+
+            // 成功セル: 青(R79,G129,B189)/太字、失敗セル: 赤/太字
+            var blueColor = XLColor.FromArgb(79, 129, 189);
 
             using (var memStream = new MemoryStream(fileBytes))
             using (var workbook = new XLWorkbook(memStream))
@@ -396,26 +408,32 @@ namespace Tools28.Commands.ExcelExportImport.Services
                             elementIdStr = ((int)idDouble).ToString();
                         }
 
-                        // この行に変更があるかチェック（セル単位で判定）
-                        var changedCols = new HashSet<int>();
+                        // セル単位で成功/失敗を判定
+                        var successCols = new HashSet<int>();
+                        var failedCols = new HashSet<int>();
                         for (int i = 0; i < paramHeaders.Count; i++)
                         {
                             string key = elementIdStr + "|" + paramHeaders[i];
                             if (changedSet.Contains(key))
-                            {
-                                changedCols.Add(i + 3); // Excel列番号（1始まり、パラメータは3列目から）
-                            }
+                                successCols.Add(i + 3);
+                            else if (failedSet != null && failedSet.Contains(key))
+                                failedCols.Add(i + 3);
                         }
 
-                        // 変更がある行は全列に背景色、変更セルは赤字/太字
-                        if (changedCols.Count > 0)
+                        // 変更・失敗がある行は全列に背景色、セル単位で色分け
+                        if (successCols.Count > 0 || failedCols.Count > 0)
                         {
                             for (int col = 1; col <= colCount; col++)
                             {
                                 worksheet.Cell(row, col).Style.Fill.BackgroundColor =
                                     XLColor.FromArgb(255, 255, 153);
                             }
-                            foreach (int col in changedCols)
+                            foreach (int col in successCols)
+                            {
+                                worksheet.Cell(row, col).Style.Font.FontColor = blueColor;
+                                worksheet.Cell(row, col).Style.Font.Bold = true;
+                            }
+                            foreach (int col in failedCols)
                             {
                                 worksheet.Cell(row, col).Style.Font.FontColor = XLColor.Red;
                                 worksheet.Cell(row, col).Style.Font.Bold = true;

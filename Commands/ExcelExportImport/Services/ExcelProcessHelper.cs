@@ -82,9 +82,9 @@ namespace Tools28.Commands.ExcelExportImport.Services
         /// <param name="filePath">対象ファイルパス</param>
         /// <param name="changedSet">色付け対象セルのキー（"ElementId|ParameterName"）</param>
         /// <returns>色付けに成功した場合true</returns>
-        public static bool MarkCellsViaCom(string filePath, HashSet<string> changedSet)
+        public static bool MarkCellsViaCom(string filePath, HashSet<string> changedSet, HashSet<string> failedSet = null)
         {
-            if (changedSet == null || changedSet.Count == 0)
+            if ((changedSet == null || changedSet.Count == 0) && (failedSet == null || failedSet.Count == 0))
                 return false;
 
             dynamic app = null;
@@ -196,7 +196,9 @@ namespace Tools28.Commands.ExcelExportImport.Services
                             }
 
                             // Excel COM の Font.Color は R + G*256 + B*65536 形式
-                            // 赤色: R=255, G=0, B=0
+                            // 青色: R=79, G=129, B=189
+                            int blueColor = 79 + 129 * 256 + 189 * 256 * 256;
+                            // 赤色: R=255, G=0, B=0（失敗セル用）
                             int redColor = 255 + 0 * 256 + 0 * 256 * 256;
 
                             // データ行を走査して変更がある行全体に色を付ける
@@ -218,19 +220,20 @@ namespace Tools28.Commands.ExcelExportImport.Services
                                     else
                                         elementIdStr = Convert.ToString(idValue).Trim();
 
-                                    // この行に変更があるかチェック（セル単位で判定）
-                                    var changedCols = new HashSet<int>();
+                                    // セル単位で成功/失敗を判定
+                                    var successCols = new HashSet<int>();
+                                    var failedCols = new HashSet<int>();
                                     for (int i = 0; i < paramHeaders.Count; i++)
                                     {
                                         string key = elementIdStr + "|" + paramHeaders[i];
-                                        if (changedSet.Contains(key))
-                                        {
-                                            changedCols.Add(i + 3); // Excel列番号（1始まり、パラメータは3列目から）
-                                        }
+                                        if (changedSet != null && changedSet.Contains(key))
+                                            successCols.Add(i + 3);
+                                        else if (failedSet != null && failedSet.Contains(key))
+                                            failedCols.Add(i + 3);
                                     }
 
-                                    // 変更がある行は全列に背景色、変更セルは赤字/太字
-                                    if (changedCols.Count > 0)
+                                    // 変更・失敗がある行は全列に背景色、セル単位で色分け
+                                    if (successCols.Count > 0 || failedCols.Count > 0)
                                     {
                                         for (int col = 1; col <= colCount; col++)
                                         {
@@ -238,7 +241,14 @@ namespace Tools28.Commands.ExcelExportImport.Services
                                             cell.Interior.Color = excelColor;
                                             Marshal.ReleaseComObject(cell);
                                         }
-                                        foreach (int col in changedCols)
+                                        foreach (int col in successCols)
+                                        {
+                                            dynamic cell = sheet.Cells[row, col];
+                                            cell.Font.Color = blueColor;
+                                            cell.Font.Bold = true;
+                                            Marshal.ReleaseComObject(cell);
+                                        }
+                                        foreach (int col in failedCols)
                                         {
                                             dynamic cell = sheet.Cells[row, col];
                                             cell.Font.Color = redColor;

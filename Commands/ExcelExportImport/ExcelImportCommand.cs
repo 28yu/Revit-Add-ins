@@ -52,12 +52,12 @@ namespace Tools28.Commands.ExcelExportImport
                 // インポート成功時、Excelの変更セルに色を付ける
                 string markedFilePath = null;
                 string colorMethod = null;
-                if (importResult.SuccessCount > 0 && previewRows != null)
+                if ((importResult.SuccessCount > 0 || importResult.FailedCells.Count > 0) && previewRows != null)
                 {
                     try
                     {
                         markedFilePath = ExcelImportService.MarkImportedCells(
-                            dialog.SelectedFilePath, previewRows, out colorMethod);
+                            dialog.SelectedFilePath, previewRows, out colorMethod, importResult.FailedCells);
 
                         // 別名保存された場合、色付きファイルを自動で開く
                         if (markedFilePath != null && markedFilePath != dialog.SelectedFilePath)
