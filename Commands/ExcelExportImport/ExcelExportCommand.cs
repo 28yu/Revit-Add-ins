@@ -44,7 +44,8 @@ namespace Tools28.Commands.ExcelExportImport
                     doc,
                     saveDialog.FileName,
                     dialog.SelectedCategories,
-                    dialog.OutputParameters);
+                    dialog.OutputParameters,
+                    dialog.SplitByCategory);
 
                 // エクスポートしたExcelファイルを自動で開く
                 Process.Start(new ProcessStartInfo(saveDialog.FileName) { UseShellExecute = true });

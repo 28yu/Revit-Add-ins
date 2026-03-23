@@ -31,6 +31,9 @@ namespace Tools28.Commands.ExcelExportImport.Views
         /// <summary>エクスポート対象パラメータ（順序付き）</summary>
         public List<ParameterInfo> OutputParameters => _outputParameters;
 
+        /// <summary>カテゴリ毎にシートを分けるか</summary>
+        public bool SplitByCategory { get; private set; } = true;
+
         public ExportDialog(Document doc)
         {
             InitializeComponent();
@@ -365,6 +368,7 @@ namespace Tools28.Commands.ExcelExportImport.Views
                 return;
             }
 
+            SplitByCategory = SplitByCategoryCheckBox.IsChecked == true;
             DialogResult = true;
             Close();
         }

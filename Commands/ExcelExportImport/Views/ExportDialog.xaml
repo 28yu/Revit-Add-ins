@@ -135,6 +135,7 @@
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <!-- メインエリア: カテゴリ | パラメータ | ＞＜ | 出力 -->
@@ -296,8 +297,14 @@
             </StackPanel>
         </Grid>
 
+        <!-- オプション -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,6,0,0">
+            <CheckBox x:Name="SplitByCategoryCheckBox" Content="カテゴリ毎にシートを分ける"
+                      IsChecked="True" FontSize="12" VerticalAlignment="Center"/>
+        </StackPanel>
+
         <!-- 下部ボタンエリア -->
-        <Grid Grid.Row="2" Margin="0,6,0,0">
+        <Grid Grid.Row="3" Margin="0,6,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
