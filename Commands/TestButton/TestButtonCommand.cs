@@ -12,7 +12,7 @@ namespace Tools28.Commands.TestButton
             ref string message,
             ElementSet elements)
         {
-            TaskDialog.Show("自動デプロイ確認 v8", "バックグラウンド自動デプロイ成功！\n\nウィンドウなしのバックグラウンド監視から\n自動ビルド＆デプロイが正常に動作しています。");
+            TaskDialog.Show("自動デプロイ確認 v9", "通知ダイアログ変更テスト\n\nビルド完了通知がMessageBoxに変更され、\n手動で閉じるまで表示されるようになりました。");
             return Result.Succeeded;
         }
     }
