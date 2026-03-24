@@ -159,9 +159,12 @@ while ($true) {
             Write-Host ""
 
             # QuickBuild の出力をログにも記録
-            $buildLog = & .\QuickBuild.ps1 2>&1 | Tee-Object -FilePath "$LogFile.build" -Append
-            $buildLog | ForEach-Object { Write-Host $_ }
+            # Note: Tee-Object パイプラインは $LASTEXITCODE を上書きするため、
+            #       出力キャプチャと終了コード取得を分離する
+            $buildLog = & .\QuickBuild.ps1 2>&1
             $buildExitCode = $LASTEXITCODE
+            $buildLog | ForEach-Object { Write-Host $_ }
+            $buildLog | Out-File -FilePath "$LogFile.build" -Append -Encoding UTF8
 
             # ビルド失敗時はエラー詳細をログに記録
             if ($buildExitCode -ne 0) {
