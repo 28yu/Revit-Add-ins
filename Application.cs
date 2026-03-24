@@ -43,6 +43,7 @@ namespace Tools28
                 CreateAnnotationPanel(application, tabName, assemblyPath);
                 CreateStructuralPanel(application, tabName, assemblyPath);
                 CreateExcelPanel(application, tabName, assemblyPath);
+                CreateTestPanel(application, tabName, assemblyPath);
 
                 return Result.Succeeded;
             }
@@ -319,6 +320,22 @@ namespace Tools28
             importButtonData.ToolTip = "Excelからパラメータを読み込みます";
             importButtonData.LargeImage = LoadImage("excel_import_32.png");
             panel.AddItem(importButtonData);
+        }
+
+        /// <summary>
+        /// テストパネルを作成
+        /// </summary>
+        private void CreateTestPanel(UIControlledApplication application, string tabName, string assemblyPath)
+        {
+            RibbonPanel panel = application.CreateRibbonPanel(tabName, "テスト");
+
+            PushButtonData testButtonData = new PushButtonData(
+                "TestButton",
+                "テスト",
+                assemblyPath,
+                "Tools28.Commands.TestButton.TestButtonCommand");
+            testButtonData.ToolTip = "動作確認用のテストボタンです";
+            panel.AddItem(testButtonData);
         }
 
         /// <summary>
