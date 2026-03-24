@@ -1,4 +1,4 @@
-# Tools28 - AutoBuild タスクスケジューラ登録スクリプト
+﻿# Tools28 - AutoBuild タスクスケジューラ登録スクリプト
 # 使用方法: 管理者権限不要。現在のユーザーのログオン時にAutoBuildをバックグラウンド起動します。
 #   .\RegisterAutoBuild.ps1            # タスクを登録
 #   .\RegisterAutoBuild.ps1 -Remove    # タスクを削除
