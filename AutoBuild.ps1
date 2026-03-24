@@ -158,16 +158,17 @@ while ($true) {
             Write-Log "ビルド & デプロイ開始..." "Yellow"
             Write-Host ""
 
-            # QuickBuild の出力をログにも記録
-            # Note: Tee-Object パイプラインは $LASTEXITCODE を上書きするため、
-            #       出力キャプチャと終了コード取得を分離する
+            # QuickBuild の出力をキャプチャ
             $buildLog = & .\QuickBuild.ps1 2>&1
-            $buildExitCode = $LASTEXITCODE
             $buildLog | ForEach-Object { Write-Host $_ }
             $buildLog | Out-File -FilePath "$LogFile.build" -Append -Encoding UTF8
 
+            # ビルド成功判定: $LASTEXITCODE は不安定なため、出力内容で判定する
+            $buildOutput = ($buildLog | ForEach-Object { $_.ToString() }) -join "`n"
+            $buildSuccess = $buildOutput -match "完了しました"
+
             # ビルド失敗時はエラー詳細をログに記録
-            if ($buildExitCode -ne 0) {
+            if (-not $buildSuccess) {
                 Add-Content -Path $LogFile -Value "  --- ビルドエラー詳細 ---" -ErrorAction SilentlyContinue
                 $buildLog | ForEach-Object {
                     $line = $_.ToString()
@@ -178,7 +179,7 @@ while ($true) {
                 Add-Content -Path $LogFile -Value "  --- ビルドエラー詳細 ここまで ---" -ErrorAction SilentlyContinue
             }
 
-            if ($buildExitCode -eq 0) {
+            if ($buildSuccess) {
                 # 通知（成功）
                 Write-Log "自動ビルド & デプロイ完了！ Revit を再起動してテストしてください。" "Green"
 
