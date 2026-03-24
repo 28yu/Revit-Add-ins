@@ -108,18 +108,17 @@ switch ($choice) {
             Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false
         }
 
-        # PowerShell コマンド構築
-        $pwshExe = "powershell.exe"
-        if (Get-Command "pwsh.exe" -ErrorAction SilentlyContinue) {
-            $pwshExe = "pwsh.exe"
+        # VBScriptラッパー経由で完全にウィンドウ非表示で起動
+        $vbsPath = Join-Path $ScriptRoot "StartAutoBuild.vbs"
+        if (-not (Test-Path $vbsPath)) {
+            Write-Host "エラー: StartAutoBuild.vbs が見つかりません: $vbsPath" -ForegroundColor Red
+            exit 1
         }
 
-        $arguments = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Normal -File `"$autoBuildScript`""
-
-        # タスク作成
+        # タスク作成（wscript.exe でVBSを実行 → PowerShellをウィンドウなしで起動）
         $action = New-ScheduledTaskAction `
-            -Execute $pwshExe `
-            -Argument $arguments `
+            -Execute "wscript.exe" `
+            -Argument "`"$vbsPath`"" `
             -WorkingDirectory $ScriptRoot
 
         $trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
@@ -174,12 +173,19 @@ switch ($choice) {
         $startupFolder = [Environment]::GetFolderPath("Startup")
         $shortcutPath = Join-Path $startupFolder "Tools28_AutoBuild.lnk"
 
+        # VBScriptラッパー経由で完全にウィンドウ非表示で起動
+        $vbsPath = Join-Path $ScriptRoot "StartAutoBuild.vbs"
+        if (-not (Test-Path $vbsPath)) {
+            Write-Host "エラー: StartAutoBuild.vbs が見つかりません: $vbsPath" -ForegroundColor Red
+            exit 1
+        }
+
         $shell = New-Object -ComObject WScript.Shell
         $shortcut = $shell.CreateShortcut($shortcutPath)
-        $shortcut.TargetPath = "powershell.exe"
-        $shortcut.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$autoBuildScript`""
+        $shortcut.TargetPath = "wscript.exe"
+        $shortcut.Arguments = "`"$vbsPath`""
         $shortcut.WorkingDirectory = $ScriptRoot
-        $shortcut.Description = "Tools28 自動ビルド&デプロイ監視"
+        $shortcut.Description = "Tools28 自動ビルド&デプロイ監視（ウィンドウ非表示）"
         $shortcut.Save()
 
         Write-Host ""
