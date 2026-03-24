@@ -12,7 +12,7 @@ namespace Tools28.Commands.TestButton
             ref string message,
             ElementSet elements)
         {
-            TaskDialog.Show("自動デプロイ確認 v4", "バックグラウンド常駐テスト成功！\n\nPowerShellウィンドウなしで、タスクスケジューラ経由の\nバックグラウンド監視 → 自動デプロイが動作しています。");
+            TaskDialog.Show("自動デプロイ確認 v5", "AutoBuild改善テスト成功！\n\ngit clean -fd 追加 + ビルドエラーログ記録\nによる自動ビルド安定化を確認。");
             return Result.Succeeded;
         }
     }
