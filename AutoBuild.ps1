@@ -133,19 +133,8 @@ while ($true) {
             if ($localHead -ne $remoteCommit) {
                 Write-Log "エラー: pull 後もコミットが一致しません (local=$($localHead.Substring(0,7)) remote=$($remoteCommit.Substring(0,7)))" "Red"
 
-                # 通知（失敗）
-                try {
-                    Add-Type -AssemblyName System.Windows.Forms
-                    $balloon = New-Object System.Windows.Forms.NotifyIcon
-                    $balloon.Icon = [System.Drawing.SystemIcons]::Error
-                    $balloon.BalloonTipIcon = "Error"
-                    $balloon.BalloonTipTitle = "Tools28 ビルド失敗"
-                    $balloon.BalloonTipText = "git pull に失敗しました。ローカルリポジトリを確認してください。"
-                    $balloon.Visible = $true
-                    $balloon.ShowBalloonTip(10000)
-                    Start-Sleep -Seconds 3
-                    $balloon.Dispose()
-                } catch {}
+                # 通知（失敗）— 別プロセスで表示（監視ループをブロックしない）
+                Start-Process powershell -ArgumentList '-NoProfile', '-WindowStyle', 'Hidden', '-Command', "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.MessageBox]::Show('git pull に失敗しました。`nローカルリポジトリを確認してください。', 'Tools28 ビルド失敗', 'OK', 'Error')" -WindowStyle Hidden
 
                 $lastCommit = $remoteCommit
                 Start-Sleep -Seconds $Interval
@@ -183,34 +172,14 @@ while ($true) {
                 # 通知（成功）
                 Write-Log "自動ビルド & デプロイ完了！ Revit を再起動してテストしてください。" "Green"
 
-                try {
-                    Add-Type -AssemblyName System.Windows.Forms
-                    $balloon = New-Object System.Windows.Forms.NotifyIcon
-                    $balloon.Icon = [System.Drawing.SystemIcons]::Information
-                    $balloon.BalloonTipIcon = "Info"
-                    $balloon.BalloonTipTitle = "Tools28 ビルド完了"
-                    $balloon.BalloonTipText = "ビルド & デプロイが完了しました。Revit を再起動してテストしてください。"
-                    $balloon.Visible = $true
-                    $balloon.ShowBalloonTip(10000)
-                    Start-Sleep -Seconds 3
-                    $balloon.Dispose()
-                } catch {}
+                # 通知（成功）— 別プロセスで表示（監視ループをブロックしない）
+                Start-Process powershell -ArgumentList '-NoProfile', '-WindowStyle', 'Hidden', '-Command', "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.MessageBox]::Show('ビルド & デプロイが完了しました。`nRevit を再起動してテストしてください。', 'Tools28 ビルド完了', 'OK', 'Information')" -WindowStyle Hidden
             } else {
                 # 通知（失敗）
                 Write-Log "ビルドに失敗しました。" "Red"
 
-                try {
-                    Add-Type -AssemblyName System.Windows.Forms
-                    $balloon = New-Object System.Windows.Forms.NotifyIcon
-                    $balloon.Icon = [System.Drawing.SystemIcons]::Error
-                    $balloon.BalloonTipIcon = "Error"
-                    $balloon.BalloonTipTitle = "Tools28 ビルド失敗"
-                    $balloon.BalloonTipText = "ビルドに失敗しました。ログを確認してください。"
-                    $balloon.Visible = $true
-                    $balloon.ShowBalloonTip(10000)
-                    Start-Sleep -Seconds 3
-                    $balloon.Dispose()
-                } catch {}
+                # 通知（失敗）— 別プロセスで表示（監視ループをブロックしない）
+                Start-Process powershell -ArgumentList '-NoProfile', '-WindowStyle', 'Hidden', '-Command', "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.MessageBox]::Show('ビルドに失敗しました。`nログを確認してください。', 'Tools28 ビルド失敗', 'OK', 'Error')" -WindowStyle Hidden
             }
 
             $lastCommit = $remoteCommit
