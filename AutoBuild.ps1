@@ -102,15 +102,18 @@ while ($true) {
             $statusOutput = git status --porcelain 2>$null
             if ($statusOutput) {
                 Write-Log "  未コミット変更を検出 → stash で退避" "Yellow"
-                git stash push -m "AutoBuild: auto-stash before pull" 2>$null
+                git stash push -u -m "AutoBuild: auto-stash before pull" 2>$null
                 $stashed = ($LASTEXITCODE -eq 0)
             }
 
             git pull origin main 2>$null
 
             if ($LASTEXITCODE -ne 0) {
-                Write-Log "  pull 失敗 → reset --hard で強制同期" "Yellow"
+                Write-Log "  pull 失敗 → reset --hard + clean で強制同期" "Yellow"
                 git reset --hard origin/main 2>$null
+                git clean -fd 2>$null
+                # reset --hard 後は stash pop 不要（クリーンな状態を維持）
+                $stashed = $false
             }
 
             # stash を戻す（コンフリクトしても無視）
@@ -118,8 +121,9 @@ while ($true) {
                 Write-Log "  stash を復元中..." "Gray"
                 git stash pop 2>$null
                 if ($LASTEXITCODE -ne 0) {
-                    Write-Log "  stash 復元コンフリクト → stash を破棄" "Yellow"
+                    Write-Log "  stash 復元コンフリクト → stash を破棄 + clean" "Yellow"
                     git checkout -- . 2>$null
+                    git clean -fd 2>$null
                     git stash drop 2>$null
                 }
             }
@@ -154,9 +158,24 @@ while ($true) {
             Write-Log "ビルド & デプロイ開始..." "Yellow"
             Write-Host ""
 
-            & .\QuickBuild.ps1
+            # QuickBuild の出力をログにも記録
+            $buildLog = & .\QuickBuild.ps1 2>&1 | Tee-Object -FilePath "$LogFile.build" -Append
+            $buildLog | ForEach-Object { Write-Host $_ }
+            $buildExitCode = $LASTEXITCODE
 
-            if ($LASTEXITCODE -eq 0) {
+            # ビルド失敗時はエラー詳細をログに記録
+            if ($buildExitCode -ne 0) {
+                Add-Content -Path $LogFile -Value "  --- ビルドエラー詳細 ---" -ErrorAction SilentlyContinue
+                $buildLog | ForEach-Object {
+                    $line = $_.ToString()
+                    if ($line -match "error|エラー|失敗") {
+                        Add-Content -Path $LogFile -Value "  $line" -ErrorAction SilentlyContinue
+                    }
+                }
+                Add-Content -Path $LogFile -Value "  --- ビルドエラー詳細 ここまで ---" -ErrorAction SilentlyContinue
+            }
+
+            if ($buildExitCode -eq 0) {
                 # 通知（成功）
                 Write-Log "自動ビルド & デプロイ完了！ Revit を再起動してテストしてください。" "Green"
 
