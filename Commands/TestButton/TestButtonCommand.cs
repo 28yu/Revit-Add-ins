@@ -12,7 +12,7 @@ namespace Tools28.Commands.TestButton
             ref string message,
             ElementSet elements)
         {
-            TaskDialog.Show("自動デプロイ確認 v7", "AutoBuild完全動作テスト成功！\n\npush → auto-merge → AutoBuild検知 → ビルド → デプロイ\nの全自動パイプラインが正常に動作しています。");
+            TaskDialog.Show("自動デプロイ確認 v8", "バックグラウンド自動デプロイ成功！\n\nウィンドウなしのバックグラウンド監視から\n自動ビルド＆デプロイが正常に動作しています。");
             return Result.Succeeded;
         }
     }
