@@ -12,7 +12,7 @@ namespace Tools28.Commands.TestButton
             ref string message,
             ElementSet elements)
         {
-            TaskDialog.Show("自動デプロイ確認", "自動デプロイが正常に動作しています！\n\nClaude Code → push → auto-merge → AutoBuild検知 → ビルド＆デプロイ\nこの一連の流れが全て自動で完了しました。");
+            TaskDialog.Show("自動デプロイ確認 v2", "自動デプロイパイプライン動作確認OK！\n\n1. Claude Code でコード変更\n2. push → GitHub auto-merge\n3. AutoBuild.ps1 が検知 → pull → ビルド → デプロイ\n\nこのメッセージが見えていれば全自動化成功です！");
             return Result.Succeeded;
         }
     }
