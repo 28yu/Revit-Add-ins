@@ -12,7 +12,7 @@ namespace Tools28.Commands.TestButton
             ref string message,
             ElementSet elements)
         {
-            TaskDialog.Show("自動デプロイ確認 v5", "AutoBuild改善テスト成功！\n\ngit clean -fd 追加 + ビルドエラーログ記録\nによる自動ビルド安定化を確認。");
+            TaskDialog.Show("自動デプロイ確認 v6", "AutoBuild再起動後のテスト成功！\n\ngit clean -fd + ビルドエラーログ記録が有効な状態で\n自動ビルド＆デプロイが正常動作しています。");
             return Result.Succeeded;
         }
     }
