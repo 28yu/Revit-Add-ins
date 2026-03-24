@@ -44,11 +44,8 @@ if ($LASTEXITCODE -eq 0) {
 # タスク登録（ユーザーログオン時に実行）
 Write-Host "タスク '$TaskName' を登録しています..." -ForegroundColor Yellow
 
-schtasks /Create /TN $TaskName `
-    /TR "wscript.exe `"$VbsPath`"" `
-    /SC ONLOGON `
-    /RL LIMITED `
-    /F
+$taskCommand = "wscript.exe ""$VbsPath"""
+schtasks /Create /TN $TaskName /TR $taskCommand /SC ONLOGON /RL LIMITED /F
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host ""
@@ -59,7 +56,7 @@ if ($LASTEXITCODE -eq 0) {
     Write-Host "  実行: $VbsPath" -ForegroundColor Gray
     Write-Host ""
     Write-Host "次回ログオン時から自動的にバックグラウンドで監視が開始されます。" -ForegroundColor Cyan
-    Write-Host "今すぐ開始するには: wscript.exe `"$VbsPath`"" -ForegroundColor Cyan
+    Write-Host "今すぐ開始するには: wscript.exe ""$VbsPath""" -ForegroundColor Cyan
     Write-Host ""
     Write-Host "削除する場合: .\RegisterAutoBuild.ps1 -Remove" -ForegroundColor Gray
 } else {
