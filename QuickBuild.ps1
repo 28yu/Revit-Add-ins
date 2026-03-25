@@ -147,10 +147,14 @@ try {
         }
     }
 
-    # PDBをコピー（デバッグ用）
+    # PDBをコピー（デバッグ用、ロック時はスキップ）
     if (Test-Path $sourcePdb) {
-        Copy-Item $sourcePdb $targetToolsDir -Force
-        Write-Host "✓ Tools28.pdb をコピーしました" -ForegroundColor Green
+        try {
+            Copy-Item $sourcePdb $targetToolsDir -Force -ErrorAction Stop
+            Write-Host "✓ Tools28.pdb をコピーしました" -ForegroundColor Green
+        } catch {
+            Write-Host "⚠ Tools28.pdb はロックされているためスキップしました" -ForegroundColor Yellow
+        }
     }
 
     # .addinファイルをAddinsルートにコピー

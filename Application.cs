@@ -6,7 +6,6 @@ using System.IO;
 
 namespace Tools28
 {
-    // Tools28 Revit Add-in Application
     public class Application : IExternalApplication
     {
         public Result OnStartup(UIControlledApplication application)
