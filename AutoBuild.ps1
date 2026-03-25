@@ -49,8 +49,9 @@ function Run-Build {
 
     # Capture build output to log file for diagnostics
     $buildLog = Join-Path $PSScriptRoot "AutoBuild_detail.log"
-    & .\QuickBuild.ps1 *> $buildLog
+    $output = & .\QuickBuild.ps1 2>&1
     $exitCode = $LASTEXITCODE
+    $output | Out-File -FilePath $buildLog -Encoding UTF8 -Force
 
     $dllExists = Test-Path $dllPath
     $success = ($exitCode -eq 0) -and $dllExists
@@ -58,11 +59,14 @@ function Run-Build {
     Write-Log "Build result: exitCode=$exitCode, dllExists=$dllExists, success=$success" "Gray"
 
     # Log build details on failure
-    if (-not $success -and (Test-Path $buildLog)) {
+    if (-not $success) {
         Write-Log "--- Build output (last 20 lines) ---" "Yellow"
-        Get-Content $buildLog -Tail 20 | ForEach-Object { Write-Log "  $_" "Gray" }
+        if (Test-Path $buildLog) {
+            Get-Content $buildLog -Tail 20 | ForEach-Object { Write-Log "  $_" "Gray" }
+        } else {
+            Write-Log "  (no build log created)" "Red"
+        }
         Write-Log "--- End build output ---" "Yellow"
-        Write-Log "Full build log: $buildLog" "Gray"
     }
 
     return $success
