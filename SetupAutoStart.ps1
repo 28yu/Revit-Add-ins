@@ -40,7 +40,7 @@ $shortcut = $shell.CreateShortcut($shortcutPath)
 $shortcut.TargetPath = "powershell.exe"
 $shortcut.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$autoBuildScript`""
 $shortcut.WorkingDirectory = $repoRoot
-$shortcut.Description = "Tools28 AutoBuild - main ブランチ監視 & 自動ビルド"
+$shortcut.Description = "Tools28 AutoBuild"
 $shortcut.WindowStyle = 1  # 通常ウィンドウ
 $shortcut.Save()
 
