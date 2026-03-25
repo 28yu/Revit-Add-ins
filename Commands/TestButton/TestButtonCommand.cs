@@ -12,7 +12,7 @@ namespace Tools28.Commands.TestButton
             ref string message,
             ElementSet elements)
         {
-            TaskDialog.Show("自動デプロイ確認 v27", "バックグラウンド自動デプロイ成功！\n\n(v27: AutoBuild.ps1内で管理者自動昇格)");
+            TaskDialog.Show("自動デプロイ確認 v28", "バックグラウンド自動デプロイ成功！\n\n(v28: AutoBuild自動昇格の動作確認)");
             return Result.Succeeded;
         }
     }
