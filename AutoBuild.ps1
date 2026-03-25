@@ -60,10 +60,57 @@ if ($currentBranch -ne "main") {
 
 # 初回 fetch
 git fetch origin main 2>$null
-$lastCommit = git rev-parse origin/main 2>$null
+$remoteLatest = git rev-parse origin/main 2>$null
+$localHead = git rev-parse HEAD 2>$null
 
-Write-Log "監視を開始します (コミット: $($lastCommit.Substring(0, 7)))" "Green"
+Write-Log "監視を開始します (ローカル: $($localHead.Substring(0, 7)), リモート: $($remoteLatest.Substring(0, 7)))" "Green"
+
+# ========================================
+# 起動時チェック: ローカルが遅れていれば即座にビルド
+# ========================================
+
+if ($localHead -ne $remoteLatest) {
+    Write-Host ""
+    Write-Log "ローカルがリモートより古いため、即座にビルドを実行します" "Yellow"
+    Write-Host ""
+
+    git reset --hard origin/main 2>$null
+    git clean -fd 2>$null
+
+    $localHead = git rev-parse HEAD 2>$null
+    Write-Log "pull 成功 (HEAD: $($localHead.Substring(0,7)))" "Green"
+
+    Write-Log "ビルド & デプロイ開始..." "Yellow"
+    Write-Host ""
+
+    $buildStartTime = Get-Date
+    & .\QuickBuild.ps1
+
+    $configPath = ".\dev-config.json"
+    $checkVersion = "2022"
+    if (Test-Path $configPath) {
+        try {
+            $cfg = Get-Content $configPath -Raw | ConvertFrom-Json
+            $checkVersion = $cfg.defaultRevitVersion
+        } catch { }
+    }
+    $builtDll = ".\bin\Release\Revit$checkVersion\Tools28.dll"
+    $buildSuccess = (Test-Path $builtDll) -and ((Get-Item $builtDll).LastWriteTime -gt $buildStartTime)
+
+    if ($buildSuccess) {
+        Write-Log "初回ビルド & デプロイ完了！ Revit を再起動してテストしてください。" "Green"
+        Start-Process powershell -ArgumentList '-NoProfile', '-WindowStyle', 'Hidden', '-Command', "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.MessageBox]::Show('ビルド & デプロイが完了しました。`nRevit を再起動してテストしてください。', 'Tools28 ビルド完了', 'OK', 'Information')" -WindowStyle Hidden
+    } else {
+        Write-Log "ビルドに失敗しました。" "Red"
+        Start-Process powershell -ArgumentList '-NoProfile', '-WindowStyle', 'Hidden', '-Command', "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.MessageBox]::Show('ビルドに失敗しました。`nログを確認してください。', 'Tools28 ビルド失敗', 'OK', 'Error')" -WindowStyle Hidden
+    }
+    Write-Host ""
+} else {
+    Write-Log "ローカルは最新です。新しい変更を待機します。" "Green"
+}
+
 Write-Host ""
+$lastCommit = $remoteLatest
 
 # ========================================
 # 監視ループ
