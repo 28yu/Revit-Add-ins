@@ -12,13 +12,9 @@ param(
 )
 
 # ========================================
-# Self-elevate to admin if needed
+# Ensure working directory is repo root
 # ========================================
-$isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-if (-not $isAdmin) {
-    Start-Process powershell -Verb RunAs -ArgumentList "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$PSCommandPath`" -Interval $Interval" -WindowStyle Hidden
-    exit
-}
+Set-Location $PSScriptRoot
 
 # ========================================
 # Setup
