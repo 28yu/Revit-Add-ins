@@ -43,9 +43,15 @@ function Get-RevitVersion {
 }
 
 function Run-Build {
-    # Run QuickBuild and check success by both exit code and DLL existence
+    # Run QuickBuild and check success by DLL timestamp (exit code is unreliable via & .\script.ps1)
     $revitVer = Get-RevitVersion
     $dllPath = ".\bin\Release\Revit$revitVer\Tools28.dll"
+
+    # Record DLL timestamp before build
+    $dllTimeBefore = $null
+    if (Test-Path $dllPath) {
+        $dllTimeBefore = (Get-Item $dllPath).LastWriteTime
+    }
 
     # Capture build output to log file for diagnostics
     $buildLog = Join-Path $PSScriptRoot "AutoBuild_detail.log"
@@ -53,10 +59,16 @@ function Run-Build {
     $exitCode = $LASTEXITCODE
     $output | Out-File -FilePath $buildLog -Encoding UTF8 -Force
 
+    # Check success: DLL exists AND was updated (newer timestamp)
     $dllExists = Test-Path $dllPath
-    $success = ($exitCode -eq 0) -and $dllExists
+    $dllUpdated = $false
+    if ($dllExists) {
+        $dllTimeAfter = (Get-Item $dllPath).LastWriteTime
+        $dllUpdated = ($dllTimeBefore -eq $null) -or ($dllTimeAfter -gt $dllTimeBefore)
+    }
+    $success = $dllExists -and $dllUpdated
 
-    Write-Log "Build result: exitCode=$exitCode, dllExists=$dllExists, success=$success" "Gray"
+    Write-Log "Build result: exitCode=$exitCode, dllExists=$dllExists, dllUpdated=$dllUpdated, success=$success" "Gray"
 
     # Log build details on failure
     if (-not $success) {
