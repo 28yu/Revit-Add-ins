@@ -136,9 +136,15 @@ try {
     # 全DLLを 28Tools サブフォルダにコピー（Tools28.dll + ClosedXML等の依存ライブラリ）
     $buildOutputDir = ".\bin\Release\Revit$RevitVersion\"
     $allDlls = Get-ChildItem -Path $buildOutputDir -Filter "*.dll"
+    $copyFailed = @()
     foreach ($dll in $allDlls) {
-        Copy-Item $dll.FullName $targetToolsDir -Force
-        Write-Host "✓ $($dll.Name) をコピーしました" -ForegroundColor Green
+        try {
+            Copy-Item $dll.FullName $targetToolsDir -Force -ErrorAction Stop
+            Write-Host "✓ $($dll.Name) をコピーしました" -ForegroundColor Green
+        } catch {
+            $copyFailed += $dll.Name
+            Write-Host "⚠ $($dll.Name) はロックされているためスキップしました（既存ファイルを使用）" -ForegroundColor Yellow
+        }
     }
 
     # PDBをコピー（デバッグ用）
@@ -157,6 +163,17 @@ try {
     if (Test-Path $oldRootDll) {
         Remove-Item $oldRootDll -Force
         Write-Host "✓ 旧 Tools28.dll（ルート直置き）を削除しました" -ForegroundColor Yellow
+    }
+
+    # Tools28.dll のコピーに失敗した場合は致命的エラー
+    if ($copyFailed -contains "Tools28.dll") {
+        throw "Tools28.dll のコピーに失敗しました。Revit を閉じてから再実行してください。"
+    }
+
+    if ($copyFailed.Count -gt 0) {
+        Write-Host ""
+        Write-Host "⚠ 一部のDLL ($($copyFailed -join ', ')) はロック中のためスキップされました" -ForegroundColor Yellow
+        Write-Host "  Revit 再起動後に再度実行すると全ファイルが更新されます" -ForegroundColor Yellow
     }
 
     Write-Host ""
