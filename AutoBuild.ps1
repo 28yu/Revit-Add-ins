@@ -156,10 +156,10 @@ if ($localHead -ne $remoteLatest) {
 
     if ($buildSuccess) {
         Write-Log "Startup build OK! Restart Revit to test." "Green"
-        Show-Notification "Deploy OK - $shortInfo" "Tools28 Build OK" "Information"
+        Show-Notification "デプロイ完了`n`n$commitMsg`n`nRevit を再起動してください" "Tools28 ビルド成功" "Information"
     } else {
         Write-Log "Startup build FAILED." "Red"
-        Show-Notification "Build FAILED - $shortInfo" "Tools28 Build FAILED" "Error"
+        Show-Notification "ビルド失敗`n`n$commitMsg" "Tools28 ビルド失敗" "Error"
     }
     Write-Host ""
 } else {
@@ -220,10 +220,10 @@ while ($true) {
 
             if ($buildSuccess) {
                 Write-Log "Build & Deploy OK! Restart Revit to test." "Green"
-                Show-Notification "Deploy OK - $shortInfo" "Tools28 Build OK" "Information"
+                Show-Notification "デプロイ完了`n`n$commitMsg`n`nRevit を再起動してください" "Tools28 ビルド成功" "Information"
             } else {
                 Write-Log "Build FAILED." "Red"
-                Show-Notification "Build FAILED - $shortInfo" "Tools28 Build FAILED" "Error"
+                Show-Notification "ビルド失敗`n`n$commitMsg" "Tools28 ビルド失敗" "Error"
             }
 
             $lastCommit = $remoteCommit
