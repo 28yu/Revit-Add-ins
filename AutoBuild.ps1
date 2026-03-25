@@ -32,10 +32,12 @@ function Write-Log {
 
 function Show-Notification {
     param([string]$Body, [string]$Title, [string]$Icon = "Information")
-    # Japanese text via JSON file to avoid encoding issues
+    # Write JSON with .NET to ensure proper UTF-8 encoding
     $dataFile = Join-Path $env:TEMP "Tools28_notify.json"
-    @{ Body = $Body; Title = $Title; Icon = $Icon } | ConvertTo-Json | Set-Content $dataFile -Encoding UTF8
-    $readScript = "`$d = Get-Content '$dataFile' -Raw -Encoding UTF8 | ConvertFrom-Json; Add-Type -AssemblyName System.Windows.Forms; `$i = if (`$d.Icon -eq 'Error') {[System.Windows.Forms.MessageBoxIcon]::Error} else {[System.Windows.Forms.MessageBoxIcon]::Information}; [System.Windows.Forms.MessageBox]::Show(`$d.Body, `$d.Title, [System.Windows.Forms.MessageBoxButtons]::OK, `$i); Remove-Item '$dataFile' -Force -ErrorAction SilentlyContinue"
+    $json = @{ Body = $Body; Title = $Title; Icon = $Icon } | ConvertTo-Json
+    [System.IO.File]::WriteAllText($dataFile, $json, [System.Text.Encoding]::UTF8)
+    # Read script uses .NET for reliable UTF-8 reading
+    $readScript = "`$json = [System.IO.File]::ReadAllText('$dataFile', [System.Text.Encoding]::UTF8); `$d = `$json | ConvertFrom-Json; Add-Type -AssemblyName System.Windows.Forms; `$i = if (`$d.Icon -eq 'Error') {[System.Windows.Forms.MessageBoxIcon]::Error} else {[System.Windows.Forms.MessageBoxIcon]::Information}; [System.Windows.Forms.MessageBox]::Show(`$d.Body, `$d.Title, [System.Windows.Forms.MessageBoxButtons]::OK, `$i); Remove-Item '$dataFile' -Force -ErrorAction SilentlyContinue"
     $bytes = [System.Text.Encoding]::Unicode.GetBytes($readScript)
     $encoded = [Convert]::ToBase64String($bytes)
     Start-Process powershell -ArgumentList '-NoProfile', '-WindowStyle', 'Hidden', '-EncodedCommand', $encoded -WindowStyle Hidden
