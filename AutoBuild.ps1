@@ -119,24 +119,24 @@ while ($true) {
             Write-Log "ビルド & デプロイ開始..." "Yellow"
             Write-Host ""
 
-            # QuickBuild の出力をキャプチャ
-            $buildLog = & .\QuickBuild.ps1 *>&1
-            $buildLog | ForEach-Object { Write-Host $_ }
-            $buildLog | Out-File -FilePath "$LogFile.build" -Append -Encoding UTF8
+            # ビルド開始時刻を記録（成功判定に使用）
+            $buildStartTime = Get-Date
 
-            # ビルド成功判定: $LASTEXITCODE は不安定なため、出力内容で判定する
-            $buildOutput = ($buildLog | ForEach-Object { $_.ToString() }) -join "`n"
-            $buildSuccess = $buildOutput -match "完了しました"
+            # QuickBuild を実行（出力はそのままコンソールに表示）
+            & .\QuickBuild.ps1
 
-            # ビルド失敗時は全出力をログに記録（原因特定用）
-            if (-not $buildSuccess) {
-                Add-Content -Path $LogFile -Value "  --- ビルド全出力 ---" -ErrorAction SilentlyContinue
-                $buildLog | ForEach-Object {
-                    $line = $_.ToString()
-                    Add-Content -Path $LogFile -Value "  $line" -ErrorAction SilentlyContinue
-                }
-                Add-Content -Path $LogFile -Value "  --- ビルド全出力 ここまで ---" -ErrorAction SilentlyContinue
+            # ビルド成功判定: DLLファイルがビルド開始後に更新されたかで判定
+            # （Write-Host の出力キャプチャは PowerShell のストリーム処理で不安定なため使用しない）
+            $configPath = ".\dev-config.json"
+            $checkVersion = "2022"
+            if (Test-Path $configPath) {
+                try {
+                    $cfg = Get-Content $configPath -Raw | ConvertFrom-Json
+                    $checkVersion = $cfg.defaultRevitVersion
+                } catch { }
             }
+            $builtDll = ".\bin\Release\Revit$checkVersion\Tools28.dll"
+            $buildSuccess = (Test-Path $builtDll) -and ((Get-Item $builtDll).LastWriteTime -gt $buildStartTime)
 
             if ($buildSuccess) {
                 # 通知（成功）
