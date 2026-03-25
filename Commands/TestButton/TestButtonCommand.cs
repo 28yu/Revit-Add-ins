@@ -12,7 +12,7 @@ namespace Tools28.Commands.TestButton
             ref string message,
             ElementSet elements)
         {
-            TaskDialog.Show("自動デプロイ確認 v25", "バックグラウンド自動デプロイ成功！\n\n(v25: AutoBuild成功判定をDLLタイムスタンプ方式に修正)");
+            TaskDialog.Show("自動デプロイ確認 v26", "バックグラウンド自動デプロイ成功！\n\n(v26: AutoBuild管理者権限で起動するよう修正)");
             return Result.Succeeded;
         }
     }
