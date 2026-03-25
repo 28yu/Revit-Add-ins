@@ -47,7 +47,8 @@ function Run-Build {
     $revitVer = Get-RevitVersion
     $dllPath = ".\bin\Release\Revit$revitVer\Tools28.dll"
 
-    & .\QuickBuild.ps1
+    # Out-Host prevents QuickBuild stdout from polluting function return value
+    & .\QuickBuild.ps1 | Out-Host
     $exitCode = $LASTEXITCODE
 
     $dllExists = Test-Path $dllPath
@@ -55,6 +56,15 @@ function Run-Build {
 
     Write-Log "Build result: exitCode=$exitCode, dllExists=$dllExists, success=$success" "Gray"
     return $success
+}
+
+# ========================================
+# Duplicate instance prevention
+# ========================================
+$mutex = New-Object System.Threading.Mutex($false, "Global\Tools28_AutoBuild")
+if (-not $mutex.WaitOne(0)) {
+    # Another instance is already running - exit silently
+    exit 0
 }
 
 $host.UI.RawUI.WindowTitle = "Tools28 AutoBuild"
