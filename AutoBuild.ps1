@@ -32,10 +32,11 @@ function Write-Log {
 
 function Show-Notification {
     param([string]$Body, [string]$Title, [string]$Icon = "Information")
-    $escapedBody = $Body -replace "'", "''"
-    $escapedTitle = $Title -replace "'", "''"
-    $script = "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.MessageBox]::Show(`"$escapedBody`", `"$escapedTitle`", 'OK', '$Icon')"
-    $bytes = [System.Text.Encoding]::Unicode.GetBytes($script)
+    # Japanese text via JSON file to avoid encoding issues
+    $dataFile = Join-Path $env:TEMP "Tools28_notify.json"
+    @{ Body = $Body; Title = $Title; Icon = $Icon } | ConvertTo-Json | Set-Content $dataFile -Encoding UTF8
+    $readScript = "`$d = Get-Content '$dataFile' -Raw -Encoding UTF8 | ConvertFrom-Json; Add-Type -AssemblyName System.Windows.Forms; `$i = if (`$d.Icon -eq 'Error') {[System.Windows.Forms.MessageBoxIcon]::Error} else {[System.Windows.Forms.MessageBoxIcon]::Information}; [System.Windows.Forms.MessageBox]::Show(`$d.Body, `$d.Title, [System.Windows.Forms.MessageBoxButtons]::OK, `$i); Remove-Item '$dataFile' -Force -ErrorAction SilentlyContinue"
+    $bytes = [System.Text.Encoding]::Unicode.GetBytes($readScript)
     $encoded = [Convert]::ToBase64String($bytes)
     Start-Process powershell -ArgumentList '-NoProfile', '-WindowStyle', 'Hidden', '-EncodedCommand', $encoded -WindowStyle Hidden
 }
