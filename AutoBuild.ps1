@@ -164,10 +164,14 @@ if ($localHead -ne $remoteLatest) {
 
     if ($buildSuccess) {
         Write-Log "Startup build OK! Restart Revit to test." "Green"
-        Show-Notification "デプロイ完了`n`n$commitMsg`n`nRevit を再起動してください" "Tools28 ビルド成功" "Information"
+        $t = "Tools28 " + (-join([char[]]@(0x30D3,0x30EB,0x30C9,0x6210,0x529F)))
+        $b = (-join([char[]]@(0x30C7,0x30D7,0x30ED,0x30A4,0x5B8C,0x4E86))) + "`n`n$commitMsg`n`nRevit " + (-join([char[]]@(0x3092,0x518D,0x8D77,0x52D5,0x3057,0x3066,0x304F,0x3060,0x3055,0x3044)))
+        Show-Notification $b $t "Information"
     } else {
         Write-Log "Startup build FAILED." "Red"
-        Show-Notification "ビルド失敗`n`n$commitMsg" "Tools28 ビルド失敗" "Error"
+        $t = "Tools28 " + (-join([char[]]@(0x30D3,0x30EB,0x30C9,0x5931,0x6557)))
+        $b = (-join([char[]]@(0x30D3,0x30EB,0x30C9,0x5931,0x6557))) + "`n`n$commitMsg"
+        Show-Notification $b $t "Error"
     }
     Write-Host ""
 } else {
@@ -228,10 +232,14 @@ while ($true) {
 
             if ($buildSuccess) {
                 Write-Log "Build & Deploy OK! Restart Revit to test." "Green"
-                Show-Notification "デプロイ完了`n`n$commitMsg`n`nRevit を再起動してください" "Tools28 ビルド成功" "Information"
+                $t = "Tools28 " + (-join([char[]]@(0x30D3,0x30EB,0x30C9,0x6210,0x529F)))
+                $b = (-join([char[]]@(0x30C7,0x30D7,0x30ED,0x30A4,0x5B8C,0x4E86))) + "`n`n$commitMsg`n`nRevit " + (-join([char[]]@(0x3092,0x518D,0x8D77,0x52D5,0x3057,0x3066,0x304F,0x3060,0x3055,0x3044)))
+                Show-Notification $b $t "Information"
             } else {
                 Write-Log "Build FAILED." "Red"
-                Show-Notification "ビルド失敗`n`n$commitMsg" "Tools28 ビルド失敗" "Error"
+                $t = "Tools28 " + (-join([char[]]@(0x30D3,0x30EB,0x30C9,0x5931,0x6557)))
+                $b = (-join([char[]]@(0x30D3,0x30EB,0x30C9,0x5931,0x6557))) + "`n`n$commitMsg"
+                Show-Notification $b $t "Error"
             }
 
             $lastCommit = $remoteCommit
