@@ -43,7 +43,6 @@ namespace Tools28
                 CreateAnnotationPanel(application, tabName, assemblyPath);
                 CreateStructuralPanel(application, tabName, assemblyPath);
                 CreateExcelPanel(application, tabName, assemblyPath);
-                CreateTestPanel(application, tabName, assemblyPath);
 
                 return Result.Succeeded;
             }
@@ -322,21 +321,6 @@ namespace Tools28
             panel.AddItem(importButtonData);
         }
 
-        /// <summary>
-        /// テストパネルを作成
-        /// </summary>
-        private void CreateTestPanel(UIControlledApplication application, string tabName, string assemblyPath)
-        {
-            RibbonPanel panel = application.CreateRibbonPanel(tabName, "テスト");
-
-            PushButtonData testButtonData = new PushButtonData(
-                "TestButton",
-                "テスト",
-                assemblyPath,
-                "Tools28.Commands.TestButton.TestButtonCommand");
-            testButtonData.ToolTip = "動作確認用のテストボタンです";
-            panel.AddItem(testButtonData);
-        }
 
         /// <summary>
         /// 画像を読み込み（ハイブリッド方式）
