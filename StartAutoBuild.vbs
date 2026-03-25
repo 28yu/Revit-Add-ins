@@ -1,11 +1,9 @@
-' Tools28 - AutoBuild.ps1 を管理者権限・ウィンドウ非表示で起動するラッパー
+' Tools28 - AutoBuild.ps1 をウィンドウ非表示で起動するラッパー
 ' タスクスケジューラやスタートアップから呼び出し用
+' ※管理者昇格は AutoBuild.ps1 内で自動実行される
 
-Set objFSO = CreateObject("Scripting.FileSystemObject")
-strScriptDir = objFSO.GetParentFolderName(WScript.ScriptFullName)
-strCommand = "powershell.exe"
-strArgs = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File """ & strScriptDir & "\AutoBuild.ps1"""
-
-' 管理者権限で起動 (runas) - C:\ProgramData への書き込みに必要
-Set objShellApp = CreateObject("Shell.Application")
-objShellApp.ShellExecute strCommand, strArgs, strScriptDir, "runas", 0
+Set objShell = CreateObject("WScript.Shell")
+strScriptDir = CreateObject("Scripting.FileSystemObject").GetParentFolderName(WScript.ScriptFullName)
+strCommand = "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File """ & strScriptDir & "\AutoBuild.ps1"""
+objShell.CurrentDirectory = strScriptDir
+objShell.Run strCommand, 0, False
