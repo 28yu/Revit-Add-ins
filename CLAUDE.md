@@ -313,6 +313,52 @@ git push -u origin claude/<branch-name>
 これを怠ると PR が作成されてもマージできず、手動でのコンフリクト解消が必要になる。
 特に同じファイル（例: `Docs/workflow-diagram.html`）を連続して変更する場合は要注意。
 
+#### AutoBuild（バックグラウンド自動ビルド＆デプロイ）
+
+**起動方法**: `StartAutoBuild.vbs` をダブルクリック → UAC「はい」→ バックグラウンドで常駐
+
+**動作フロー**:
+1. 30秒間隔で `origin/main` を `git fetch`
+2. 変更検知 → `git reset --hard origin/main` → `QuickBuild.ps1` 実行
+3. ビルド成功 → `C:\ProgramData` にデプロイ → 日本語通知ダイアログ表示
+
+**ファイル構成**:
+- `StartAutoBuild.vbs` — VBS ラッパー（`Shell.Application.ShellExecute` + `runas` で管理者昇格）
+- `AutoBuild.ps1` — メインスクリプト（監視ループ、ビルド、通知）
+- `AutoBuild.log` — メインログ（リポジトリ直下）
+- `AutoBuild_detail.log` — ビルド詳細出力（リポジトリ直下）
+
+**⚠️ AutoBuild.ps1 自体を変更した場合の再起動手順**:
+1. タスクマネージャー → 詳細タブ → AutoBuild の `powershell.exe` を終了（管理者権限で動作中のため、通常の `Stop-Process` では権限エラー）
+2. `git pull origin main` で最新を取得
+3. `StartAutoBuild.vbs` をダブルクリック → UAC「はい」
+
+#### 開発で得た知見（AutoBuild）
+
+##### 管理者権限
+- `C:\ProgramData\Autodesk\Revit\Addins\` への書き込みには管理者権限が必要
+- VBS の `ShellExecute "runas"` で UAC 昇格 → 管理者権限の PowerShell を起動
+- 昇格後のプロセスは `C:\Windows\System32` がカレントディレクトリになるため、`Set-Location $PSScriptRoot` が必須
+
+##### PowerShell 5.1 での日本語文字化け
+- Windows PowerShell 5.1 は `.ps1` ファイルをシステムロケール（Shift-JIS）で読む
+- UTF-8 BOM を付けても `git reset --hard` 後に失われる場合がある
+- **解決策**: 日本語文字列は Unicode エスケープで記述する
+  ```powershell
+  # "ビルド成功" を Unicode エスケープで
+  $msg = -join([char[]]@(0x30D3,0x30EB,0x30C9,0x6210,0x529F))
+  ```
+- 通知ダイアログへの日本語テキスト受け渡しは JSON ファイル経由 + `[System.IO.File]::WriteAllText/ReadAllText` で UTF-8 を明示指定
+
+##### 通知ダイアログ (MessageBox)
+- `Start-Process powershell -Command` で日本語を渡すと文字化け
+- `-EncodedCommand`（Base64）でも日本語を含むスクリプトは失敗
+- **解決策**: 日本語テキストを JSON ファイルに書き出し、`-EncodedCommand` のスクリプトは JSON を読むだけ（ASCII のみ）にする
+
+##### ビルド成功判定
+- `& .\QuickBuild.ps1` の `$LASTEXITCODE` は信頼できない（PowerShell スクリプト呼び出しでは正しく伝搬しない）
+- **解決策**: ビルド前後の DLL タイムスタンプを比較して成功判定
+
 #### ⚠️ ローカルでの pull 失敗に注意
 
 Claude Code で push → 自動マージ後、ユーザーがローカルで `git pull origin main` する際：
