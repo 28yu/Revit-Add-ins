@@ -1,4 +1,4 @@
-# Tools28 - Auto Build & Deploy Monitor
+# Tools28 - Auto Build & Deploy Monitor (v17)
 # Usage:
 #   .\AutoBuild.ps1                     # Default (30s interval)
 #   .\AutoBuild.ps1 -Interval 60        # 60s interval
