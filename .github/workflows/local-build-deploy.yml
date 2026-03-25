@@ -1,4 +1,4 @@
-name: Local Build & Deploy
+name: ローカルビルド＆デプロイ
 
 on:
   push:
