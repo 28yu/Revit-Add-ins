@@ -43,24 +43,24 @@
 
   <!-- リソースファイル -->
   <ItemGroup>
-    <Resource Include="Resources\Icons\both_32.png" />
-    <Resource Include="Resources\Icons\left_32.png" />
-    <Resource Include="Resources\Icons\right_32.png" />
-    <Resource Include="Resources\Icons\sheet_creation_32.png" />
-    <Resource Include="Resources\Icons\view_copy_32.png" />
-    <Resource Include="Resources\Icons\view_paste_32.png" />
-    <Resource Include="Resources\Icons\sectionbox_copy_32.png" />
-    <Resource Include="Resources\Icons\sectionbox_paste_32.png" />
-    <Resource Include="Resources\Icons\viewport_copy_32.png" />
-    <Resource Include="Resources\Icons\viewport_paste_32.png" />
-    <Resource Include="Resources\Icons\cropbox_copy_32.png" />
-    <Resource Include="Resources\Icons\cropbox_paste_32.png" />
-    <Resource Include="Resources\Icons\filled_region_32.png" />
-    <Resource Include="Resources\Icons\beam_under_level_32.png" />
-    <Resource Include="Resources\Icons\beam_top_level_32.png" />
-    <Resource Include="Resources\Icons\room_tag_32.png" />
-    <Resource Include="Resources\Icons\excel_export_32.png" />
-    <Resource Include="Resources\Icons\excel_import_32.png" />
+    <Resource Include="Resources\Icons\both_96.png" />
+    <Resource Include="Resources\Icons\left_96.png" />
+    <Resource Include="Resources\Icons\right_96.png" />
+    <Resource Include="Resources\Icons\sheet_creation_96.png" />
+    <Resource Include="Resources\Icons\view_copy_96.png" />
+    <Resource Include="Resources\Icons\view_paste_96.png" />
+    <Resource Include="Resources\Icons\sectionbox_copy_96.png" />
+    <Resource Include="Resources\Icons\sectionbox_paste_96.png" />
+    <Resource Include="Resources\Icons\viewport_copy_96.png" />
+    <Resource Include="Resources\Icons\viewport_paste_96.png" />
+    <Resource Include="Resources\Icons\cropbox_copy_96.png" />
+    <Resource Include="Resources\Icons\cropbox_paste_96.png" />
+    <Resource Include="Resources\Icons\filled_region_96.png" />
+    <Resource Include="Resources\Icons\beam_under_level_96.png" />
+    <Resource Include="Resources\Icons\beam_top_level_96.png" />
+    <Resource Include="Resources\Icons\room_tag_96.png" />
+    <Resource Include="Resources\Icons\excel_export_96.png" />
+    <Resource Include="Resources\Icons\excel_import_96.png" />
   </ItemGroup>
 
 

@@ -95,7 +95,7 @@ namespace Tools28
                 assemblyPath,
                 "Tools28.Commands.GridBubble.ExecuteGridBubbleBothCommand");
             bothButtonData.ToolTip = "通り芯・レベルの符号を両端に表示します";
-            bothButtonData.LargeImage = LoadImage("both_32.png");
+            bothButtonData.LargeImage = LoadImage("both_96.png");
             panel.AddItem(bothButtonData);
 
             // 左端ボタン
@@ -105,7 +105,7 @@ namespace Tools28
                 assemblyPath,
                 "Tools28.Commands.GridBubble.ExecuteGridBubbleLeftCommand");
             leftButtonData.ToolTip = "通り芯・レベルの符号を左端のみに表示します";
-            leftButtonData.LargeImage = LoadImage("left_32.png");
+            leftButtonData.LargeImage = LoadImage("left_96.png");
             panel.AddItem(leftButtonData);
 
             // 右端ボタン
@@ -115,7 +115,7 @@ namespace Tools28
                 assemblyPath,
                 "Tools28.Commands.GridBubble.ExecuteGridBubbleRightCommand");
             rightButtonData.ToolTip = "通り芯・レベルの符号を右端のみに表示します";
-            rightButtonData.LargeImage = LoadImage("right_32.png");
+            rightButtonData.LargeImage = LoadImage("right_96.png");
             panel.AddItem(rightButtonData);
         }
 
@@ -133,7 +133,7 @@ namespace Tools28
                 assemblyPath,
                 "Tools28.Commands.SheetCreation.ExecuteSheetCreationCommand");
             sheetButtonData.ToolTip = "図枠を指定して複数のシートを一括作成します";
-            sheetButtonData.LargeImage = LoadImage("sheet_creation_32.png");
+            sheetButtonData.LargeImage = LoadImage("sheet_creation_96.png");
             panel.AddItem(sheetButtonData);
 
             // セパレータ
@@ -146,7 +146,7 @@ namespace Tools28
                 assemblyPath,
                 "Tools28.Commands.ViewportPosition.ExecuteViewportPositionCopyCommand");
             viewportCopyButtonData.ToolTip = "シート上のビューポート位置をコピーします";
-            viewportCopyButtonData.LargeImage = LoadImage("viewport_copy_32.png");
+            viewportCopyButtonData.LargeImage = LoadImage("viewport_copy_96.png");
             panel.AddItem(viewportCopyButtonData);
 
             // ビューポート位置ペーストボタン
@@ -156,7 +156,7 @@ namespace Tools28
                 assemblyPath,
                 "Tools28.Commands.ViewportPosition.ExecuteViewportPositionPasteCommand");
             viewportPasteButtonData.ToolTip = "コピーしたビューポート位置を他のシートに適用します";
-            viewportPasteButtonData.LargeImage = LoadImage("viewport_paste_32.png");
+            viewportPasteButtonData.LargeImage = LoadImage("viewport_paste_96.png");
             panel.AddItem(viewportPasteButtonData);
 
             // セパレータ
@@ -169,7 +169,7 @@ namespace Tools28
                 assemblyPath,
                 "Tools28.Commands.CropBoxCopy.ExecuteCropBoxCopyCommand");
             cropBoxCopyButtonData.ToolTip = "ビューのトリミング領域をコピーします";
-            cropBoxCopyButtonData.LargeImage = LoadImage("cropbox_copy_32.png");
+            cropBoxCopyButtonData.LargeImage = LoadImage("cropbox_copy_96.png");
             panel.AddItem(cropBoxCopyButtonData);
 
             // トリミング領域ペーストボタン
@@ -179,7 +179,7 @@ namespace Tools28
                 assemblyPath,
                 "Tools28.Commands.CropBoxCopy.ExecuteCropBoxPasteCommand");
             cropBoxPasteButtonData.ToolTip = "コピーしたトリミング領域を他のビューに適用します";
-            cropBoxPasteButtonData.LargeImage = LoadImage("cropbox_paste_32.png");
+            cropBoxPasteButtonData.LargeImage = LoadImage("cropbox_paste_96.png");
             panel.AddItem(cropBoxPasteButtonData);
         }
 
@@ -197,7 +197,7 @@ namespace Tools28
                 assemblyPath,
                 "Tools28.Commands.ViewCopy.ExecuteViewCopyCommand");
             viewCopyButtonData.ToolTip = "3Dビューの視点をコピーします";
-            viewCopyButtonData.LargeImage = LoadImage("view_copy_32.png");
+            viewCopyButtonData.LargeImage = LoadImage("view_copy_96.png");
             panel.AddItem(viewCopyButtonData);
 
             // 視点ペーストボタン
@@ -207,7 +207,7 @@ namespace Tools28
                 assemblyPath,
                 "Tools28.Commands.ViewCopy.ExecuteViewPasteCommand");
             viewPasteButtonData.ToolTip = "コピーした視点を他の3Dビューに適用します";
-            viewPasteButtonData.LargeImage = LoadImage("view_paste_32.png");
+            viewPasteButtonData.LargeImage = LoadImage("view_paste_96.png");
             panel.AddItem(viewPasteButtonData);
 
             // セパレータ
@@ -220,7 +220,7 @@ namespace Tools28
                 assemblyPath,
                 "Tools28.Commands.SectionBoxCopy.ExecuteSectionBoxCopyCommand");
             sectionBoxCopyButtonData.ToolTip = "3Dビューの切断ボックスをコピーします";
-            sectionBoxCopyButtonData.LargeImage = LoadImage("sectionbox_copy_32.png");
+            sectionBoxCopyButtonData.LargeImage = LoadImage("sectionbox_copy_96.png");
             panel.AddItem(sectionBoxCopyButtonData);
 
             // 切断ボックスペーストボタン
@@ -230,7 +230,7 @@ namespace Tools28
                 assemblyPath,
                 "Tools28.Commands.SectionBoxCopy.ExecuteSectionBoxPasteCommand");
             sectionBoxPasteButtonData.ToolTip = "コピーした切断ボックスを他の3Dビューに適用します";
-            sectionBoxPasteButtonData.LargeImage = LoadImage("sectionbox_paste_32.png");
+            sectionBoxPasteButtonData.LargeImage = LoadImage("sectionbox_paste_96.png");
             panel.AddItem(sectionBoxPasteButtonData);
         }
 
@@ -248,7 +248,7 @@ namespace Tools28
                 assemblyPath,
                 "Tools28.Commands.RoomTagCreator.RoomTagAutoCreatorCommand");
             roomTagButtonData.ToolTip = "ビューポート内の部屋タグを指定方向・間隔で自動配置します";
-            roomTagButtonData.LargeImage = LoadImage("room_tag_32.png");
+            roomTagButtonData.LargeImage = LoadImage("room_tag_96.png");
             panel.AddItem(roomTagButtonData);
 
             // セパレータ
@@ -261,7 +261,7 @@ namespace Tools28
                 assemblyPath,
                 "Tools28.Commands.FilledRegionSplitMerge.FilledRegionSplitMergeCommand");
             filledRegionButtonData.ToolTip = "配置されている塗潰領域を分割/統合します";
-            filledRegionButtonData.LargeImage = LoadImage("filled_region_32.png");
+            filledRegionButtonData.LargeImage = LoadImage("filled_region_96.png");
             panel.AddItem(filledRegionButtonData);
         }
 
@@ -279,7 +279,7 @@ namespace Tools28
                 assemblyPath,
                 "Tools28.Commands.BeamUnderLevel.BeamUnderLevelCommand");
             beamUnderLevelButtonData.ToolTip = "天井伏図の梁下端レベルを自動算出し、レベル別に色分け表示します";
-            beamUnderLevelButtonData.LargeImage = LoadImage("beam_under_level_32.png");
+            beamUnderLevelButtonData.LargeImage = LoadImage("beam_under_level_96.png");
             panel.AddItem(beamUnderLevelButtonData);
 
             // 梁天端色分けボタン
@@ -289,7 +289,7 @@ namespace Tools28
                 assemblyPath,
                 "Tools28.Commands.BeamTopLevel.BeamTopLevelCommand");
             beamTopLevelButtonData.ToolTip = "平面ビューの梁天端レベルをパラメータから取得し、レベル別に色分け表示します";
-            beamTopLevelButtonData.LargeImage = LoadImage("beam_top_level_32.png");
+            beamTopLevelButtonData.LargeImage = LoadImage("beam_top_level_96.png");
             panel.AddItem(beamTopLevelButtonData);
         }
 
@@ -307,7 +307,7 @@ namespace Tools28
                 assemblyPath,
                 "Tools28.Commands.ExcelExportImport.ExcelExportCommand");
             exportButtonData.ToolTip = "パラメータをExcelに書き出します";
-            exportButtonData.LargeImage = LoadImage("excel_export_32.png");
+            exportButtonData.LargeImage = LoadImage("excel_export_96.png");
             panel.AddItem(exportButtonData);
 
             // Excelインポートボタン
@@ -317,7 +317,7 @@ namespace Tools28
                 assemblyPath,
                 "Tools28.Commands.ExcelExportImport.ExcelImportCommand");
             importButtonData.ToolTip = "Excelからパラメータを読み込みます";
-            importButtonData.LargeImage = LoadImage("excel_import_32.png");
+            importButtonData.LargeImage = LoadImage("excel_import_96.png");
             panel.AddItem(importButtonData);
         }
 
