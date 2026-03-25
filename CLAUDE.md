@@ -293,6 +293,11 @@ GitHub Actions が自動的に:
 ### 手動実行
 GitHub → Actions → "Build and Release" → Run workflow → バージョン番号を入力
 
+### ワークフロー実行タイトル (run-name)
+- 各ワークフローに `run-name:` を設定し、Actions 一覧の太字タイトルを日本語化
+- `name:` はサイドバーのワークフロー名（英語のまま）、`run-name:` は各実行のタイトル
+- auto-merge: コミットメッセージをそのまま表示（`${{ github.event.head_commit.message }}`）
+
 ### Revit API 参照
 NuGet パッケージ `Nice3point.Revit.Api` を使用 (ローカル Revit 不要)
 
@@ -359,6 +364,10 @@ git push -u origin claude/<branch-name>
 - `Start-Process powershell -Command` で日本語を渡すと文字化け
 - `-EncodedCommand`（Base64）でも日本語を含むスクリプトは失敗
 - **解決策**: 日本語テキストを JSON ファイルに書き出し、`-EncodedCommand` のスクリプトは JSON を読むだけ（ASCII のみ）にする
+
+##### 外部コマンド (git) の日本語出力
+- `git log` 等の出力は UTF-8 だが、PowerShell 5.1 はシステムロケール（Shift-JIS）で読み取る
+- **解決策**: スクリプト冒頭で `[Console]::OutputEncoding = [System.Text.Encoding]::UTF8` を設定
 
 ##### ビルド成功判定
 - `& .\QuickBuild.ps1` の `$LASTEXITCODE` は信頼できない（PowerShell スクリプト呼び出しでは正しく伝搬しない）
