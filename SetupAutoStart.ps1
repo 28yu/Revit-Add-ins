@@ -21,20 +21,19 @@ if ($Remove) {
 }
 
 $repoRoot = $PSScriptRoot
-$autoBuildScript = Join-Path $repoRoot "AutoBuild.ps1"
+$vbsPath = Join-Path $repoRoot "StartAutoBuild.vbs"
 
-if (-not (Test-Path $autoBuildScript)) {
-    Write-Host "Error: AutoBuild.ps1 not found: $autoBuildScript" -ForegroundColor Red
+if (-not (Test-Path $vbsPath)) {
+    Write-Host "Error: StartAutoBuild.vbs not found: $vbsPath" -ForegroundColor Red
     exit 1
 }
 
 $shell = New-Object -ComObject WScript.Shell
 $shortcut = $shell.CreateShortcut($shortcutPath)
-$shortcut.TargetPath = "powershell.exe"
-$shortcut.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$autoBuildScript`""
+$shortcut.TargetPath = "wscript.exe"
+$shortcut.Arguments = "`"$vbsPath`""
 $shortcut.WorkingDirectory = $repoRoot
-$shortcut.Description = "Tools28 AutoBuild"
-$shortcut.WindowStyle = 1
+$shortcut.Description = "Tools28 AutoBuild (background)"
 $shortcut.Save()
 
 Write-Host ""
