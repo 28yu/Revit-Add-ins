@@ -120,7 +120,7 @@ while ($true) {
             Write-Host ""
 
             # QuickBuild の出力をキャプチャ
-            $buildLog = & .\QuickBuild.ps1 2>&1
+            $buildLog = & .\QuickBuild.ps1 *>&1
             $buildLog | ForEach-Object { Write-Host $_ }
             $buildLog | Out-File -FilePath "$LogFile.build" -Append -Encoding UTF8
 
