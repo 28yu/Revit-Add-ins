@@ -34,7 +34,7 @@ function Show-Notification {
     param([string]$Body, [string]$Title, [string]$Icon = "Information")
     $escapedBody = $Body -replace "'", "''"
     $escapedTitle = $Title -replace "'", "''"
-    $script = "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.MessageBox]::Show('$escapedBody', '$escapedTitle', 'OK', '$Icon')"
+    $script = "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.MessageBox]::Show(`"$escapedBody`", `"$escapedTitle`", 'OK', '$Icon')"
     $bytes = [System.Text.Encoding]::Unicode.GetBytes($script)
     $encoded = [Convert]::ToBase64String($bytes)
     Start-Process powershell -ArgumentList '-NoProfile', '-WindowStyle', 'Hidden', '-EncodedCommand', $encoded -WindowStyle Hidden
