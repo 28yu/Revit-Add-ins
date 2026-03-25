@@ -94,39 +94,11 @@ while ($true) {
             Write-Log "変更を検知！ (ビルド #$buildCount) コミット: $commitMsg" "Yellow"
             Write-Host ""
 
-            # ローカルの未コミット変更を退避してから pull
+            # ローカルを origin/main に強制同期（ローカル変更は破棄）
             Write-Log "pull 開始..." "Yellow"
 
-            # 未コミット変更がある場合は stash で退避
-            $stashed = $false
-            $statusOutput = git status --porcelain 2>$null
-            if ($statusOutput) {
-                Write-Log "  未コミット変更を検出 → stash で退避" "Yellow"
-                git stash push -u -m "AutoBuild: auto-stash before pull" 2>$null
-                $stashed = ($LASTEXITCODE -eq 0)
-            }
-
-            git pull origin main 2>$null
-
-            if ($LASTEXITCODE -ne 0) {
-                Write-Log "  pull 失敗 → reset --hard + clean で強制同期" "Yellow"
-                git reset --hard origin/main 2>$null
-                git clean -fd 2>$null
-                # reset --hard 後は stash pop 不要（クリーンな状態を維持）
-                $stashed = $false
-            }
-
-            # stash を戻す（コンフリクトしても無視）
-            if ($stashed) {
-                Write-Log "  stash を復元中..." "Gray"
-                git stash pop 2>$null
-                if ($LASTEXITCODE -ne 0) {
-                    Write-Log "  stash 復元コンフリクト → stash を破棄 + clean" "Yellow"
-                    git checkout -- . 2>$null
-                    git clean -fd 2>$null
-                    git stash drop 2>$null
-                }
-            }
+            git reset --hard origin/main 2>$null
+            git clean -fd 2>$null
 
             # pull 後の確認
             $localHead = git rev-parse HEAD 2>$null
@@ -156,16 +128,14 @@ while ($true) {
             $buildOutput = ($buildLog | ForEach-Object { $_.ToString() }) -join "`n"
             $buildSuccess = $buildOutput -match "完了しました"
 
-            # ビルド失敗時はエラー詳細をログに記録
+            # ビルド失敗時は全出力をログに記録（原因特定用）
             if (-not $buildSuccess) {
-                Add-Content -Path $LogFile -Value "  --- ビルドエラー詳細 ---" -ErrorAction SilentlyContinue
+                Add-Content -Path $LogFile -Value "  --- ビルド全出力 ---" -ErrorAction SilentlyContinue
                 $buildLog | ForEach-Object {
                     $line = $_.ToString()
-                    if ($line -match "error|エラー|失敗") {
-                        Add-Content -Path $LogFile -Value "  $line" -ErrorAction SilentlyContinue
-                    }
+                    Add-Content -Path $LogFile -Value "  $line" -ErrorAction SilentlyContinue
                 }
-                Add-Content -Path $LogFile -Value "  --- ビルドエラー詳細 ここまで ---" -ErrorAction SilentlyContinue
+                Add-Content -Path $LogFile -Value "  --- ビルド全出力 ここまで ---" -ErrorAction SilentlyContinue
             }
 
             if ($buildSuccess) {
