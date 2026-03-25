@@ -12,7 +12,7 @@ namespace Tools28.Commands.TestButton
             ref string message,
             ElementSet elements)
         {
-            TaskDialog.Show("自動デプロイ確認 v10", "通知ダイアログ変更テスト\n\nビルド完了通知がMessageBoxに変更され、\n手動で閉じるまで表示されるようになりました。\n\n(v10: ビルドリトライ)");
+            TaskDialog.Show("自動デプロイ確認 v11", "Revit閉じてから再ビルドテスト\n\nClosedXML.dllのロック解除後の\n自動デプロイ確認です。\n\n(v11: DLLロック解消後のリトライ)");
             return Result.Succeeded;
         }
     }
