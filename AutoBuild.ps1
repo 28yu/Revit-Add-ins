@@ -47,14 +47,24 @@ function Run-Build {
     $revitVer = Get-RevitVersion
     $dllPath = ".\bin\Release\Revit$revitVer\Tools28.dll"
 
-    # Out-Host prevents QuickBuild stdout from polluting function return value
-    & .\QuickBuild.ps1 | Out-Host
+    # Capture build output to log file for diagnostics
+    $buildLog = Join-Path $PSScriptRoot "AutoBuild_detail.log"
+    & .\QuickBuild.ps1 *> $buildLog
     $exitCode = $LASTEXITCODE
 
     $dllExists = Test-Path $dllPath
     $success = ($exitCode -eq 0) -and $dllExists
 
     Write-Log "Build result: exitCode=$exitCode, dllExists=$dllExists, success=$success" "Gray"
+
+    # Log build details on failure
+    if (-not $success -and (Test-Path $buildLog)) {
+        Write-Log "--- Build output (last 20 lines) ---" "Yellow"
+        Get-Content $buildLog -Tail 20 | ForEach-Object { Write-Log "  $_" "Gray" }
+        Write-Log "--- End build output ---" "Yellow"
+        Write-Log "Full build log: $buildLog" "Gray"
+    }
+
     return $success
 }
 
