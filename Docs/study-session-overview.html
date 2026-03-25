@@ -143,6 +143,13 @@ body{
   border:2px solid;
   flex-shrink:0;
   position:relative;
+  overflow:hidden;
+}
+.wf-circle img{
+  width:75%;
+  height:75%;
+  object-fit:contain;
+  display:block;
 }
 .wf-you .wf-circle{
   background:#BFDCCF;
@@ -261,9 +268,14 @@ body{
   color:#3a3a3a;
 }
 .tool-icon{
-  font-size:10pt;
   text-align:center;
-  width:8mm;
+  width:10mm;
+}
+.tool-icon img{
+  width:6mm;
+  height:6mm;
+  object-fit:contain;
+  vertical-align:middle;
 }
 
 /* ===== Concept Diagram ===== */
@@ -511,7 +523,7 @@ body{
 
         <div class="wf-step wf-you">
           <div class="wf-circle">
-            💬
+            <img src="icons/workflow/you.png" alt="自分">
             <div class="wf-num">1</div>
           </div>
           <div class="wf-label">日本語で<br>指示を出す</div>
@@ -522,7 +534,7 @@ body{
 
         <div class="wf-step wf-auto">
           <div class="wf-circle">
-            🤖
+            <img src="icons/workflow/claude.png" alt="Claude Code">
             <div class="wf-num">2</div>
           </div>
           <div class="wf-label">AIが<br>コードを書く</div>
@@ -533,7 +545,7 @@ body{
 
         <div class="wf-step wf-auto">
           <div class="wf-circle">
-            ☁️
+            <img src="icons/workflow/github.png" alt="GitHub">
             <div class="wf-num">3</div>
           </div>
           <div class="wf-label">GitHubに<br>アップロード</div>
@@ -544,7 +556,7 @@ body{
 
         <div class="wf-step wf-auto">
           <div class="wf-circle">
-            ⚙️
+            <img src="icons/workflow/action.png" alt="GitHub Actions">
             <div class="wf-num">4</div>
           </div>
           <div class="wf-label">自動で<br>ビルド&amp;ZIP</div>
@@ -555,7 +567,7 @@ body{
 
         <div class="wf-step wf-you" style="position:relative">
           <div class="wf-circle">
-            🏗️
+            <img src="icons/workflow/revit.png" alt="Revit">
             <div class="wf-num">5</div>
           </div>
           <div class="wf-label">Revitで<br>動作確認</div>
@@ -567,7 +579,7 @@ body{
 
         <div class="wf-step wf-you">
           <div class="wf-circle">
-            🏷️
+            <img src="icons/workflow/you.png" alt="自分">
             <div class="wf-num">6</div>
           </div>
           <div class="wf-label">タグ付け<br>でリリース</div>
@@ -578,7 +590,7 @@ body{
 
         <div class="wf-step wf-auto">
           <div class="wf-circle">
-            📦
+            <img src="icons/workflow/action.png" alt="GitHub Actions">
             <div class="wf-num">7</div>
           </div>
           <div class="wf-label">自動で<br>配布公開</div>
@@ -615,25 +627,25 @@ body{
           <th>例えるなら</th>
         </tr>
         <tr>
-          <td class="tool-icon">🤖</td>
+          <td class="tool-icon"><img src="icons/workflow/claude.png" alt="Claude Code"></td>
           <td class="tool-name">Claude Code</td>
           <td>AIに日本語で指示 → コード作成・アップロードまで自動</td>
           <td>専属のプログラマー</td>
         </tr>
         <tr>
-          <td class="tool-icon">☁️</td>
+          <td class="tool-icon"><img src="icons/workflow/github.png" alt="GitHub"></td>
           <td class="tool-name">GitHub</td>
           <td>コードの保管・バージョン管理</td>
           <td>クラウド上の倉庫</td>
         </tr>
         <tr>
-          <td class="tool-icon">⚙️</td>
+          <td class="tool-icon"><img src="icons/workflow/action.png" alt="GitHub Actions"></td>
           <td class="tool-name">GitHub Actions</td>
           <td>ビルド・ZIP作成・配布を自動実行</td>
           <td>24時間働くロボット</td>
         </tr>
         <tr>
-          <td class="tool-icon">🏗️</td>
+          <td class="tool-icon"><img src="icons/workflow/revit.png" alt="Revit"></td>
           <td class="tool-name">Revit</td>
           <td>アドインの動作確認・テスト</td>
           <td>本番環境</td>
