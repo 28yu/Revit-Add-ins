@@ -333,7 +333,12 @@ namespace Tools28
             try
             {
                 string packUri = $"pack://application:,,,/Tools28;component/Resources/Icons/{fileName}";
-                image = new BitmapImage(new Uri(packUri));
+                image = new BitmapImage();
+                image.BeginInit();
+                image.UriSource = new Uri(packUri);
+                image.DecodePixelWidth = 32;
+                image.DecodePixelHeight = 32;
+                image.EndInit();
                 image.Freeze();
                 return image;
             }
