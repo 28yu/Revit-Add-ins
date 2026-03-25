@@ -1,4 +1,4 @@
-name: GitHub Pages デプロイ
+name: Deploy Workflow Diagram to GitHub Pages
 
 on:
   push:

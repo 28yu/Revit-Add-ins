@@ -1,4 +1,4 @@
-name: 自動マージ (claude ブランチ)
+name: Auto-merge Claude branches
 
 on:
   push:

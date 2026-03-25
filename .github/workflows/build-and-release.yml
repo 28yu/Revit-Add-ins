@@ -1,4 +1,4 @@
-name: ビルド＆リリース
+name: Build and Release
 
 on:
   # タグ push で自動リリース (例: git tag v1.0 && git push --tags)
