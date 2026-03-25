@@ -12,7 +12,7 @@ namespace Tools28.Commands.TestButton
             ref string message,
             ElementSet elements)
         {
-            TaskDialog.Show("自動デプロイ確認 v18", "バックグラウンド自動デプロイのテスト\n\nAutoBuild.ps1ウィンドウを閉じた状態で\nタスクスケジューラ経由の自動デプロイを確認\n\n(v18: バックグラウンド動作テスト)");
+            TaskDialog.Show("自動デプロイ確認 v19", "バックグラウンド自動デプロイ成功！\n\nウィンドウなしでバックグラウンド監視 → 自動ビルド → デプロイ完了\n\n(v19: バックグラウンド自動デプロイ環境構築完了)");
             return Result.Succeeded;
         }
     }
