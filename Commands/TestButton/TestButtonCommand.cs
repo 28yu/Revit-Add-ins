@@ -12,7 +12,7 @@ namespace Tools28.Commands.TestButton
             ref string message,
             ElementSet elements)
         {
-            TaskDialog.Show("自動デプロイ確認 v42", "バックグラウンド自動デプロイ成功！\n\n(v42: Unicode エスケープで文字化け解消)");
+            TaskDialog.Show("自動デプロイ確認 v43", "バックグラウンド自動デプロイ成功！\n\n(v43: 日本語通知テスト)");
             return Result.Succeeded;
         }
     }
