@@ -1,4 +1,5 @@
 name: Build and Release
+run-name: "ビルド＆リリース ${{ github.ref_name }}"
 
 on:
   # タグ push で自動リリース (例: git tag v1.0 && git push --tags)

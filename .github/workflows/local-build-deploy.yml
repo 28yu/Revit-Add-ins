@@ -1,4 +1,5 @@
 name: Local Build & Deploy
+run-name: "ローカルビルド＆デプロイ"
 
 on:
   push:
