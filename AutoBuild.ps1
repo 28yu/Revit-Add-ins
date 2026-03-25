@@ -97,20 +97,28 @@ if ($localHead -ne $remoteLatest) {
     $builtDll = ".\bin\Release\Revit$checkVersion\Tools28.dll"
     $buildSuccess = (Test-Path $builtDll) -and ((Get-Item $builtDll).LastWriteTime -gt $buildStartTime)
 
+    $startupCommitMsg = git log HEAD -1 --format="%s" 2>$null
+    $startupHash = $localHead.Substring(0, 7)
+    $startupNotify = "$startupCommitMsg ($startupHash)"
+
     if ($buildSuccess) {
         Write-Log "初回ビルド & デプロイ完了！ Revit を再起動してテストしてください。" "Green"
-        Start-Process powershell -ArgumentList '-NoProfile', '-WindowStyle', 'Hidden', '-Command', "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.MessageBox]::Show('ビルド & デプロイが完了しました。`nRevit を再起動してテストしてください。', 'Tools28 ビルド完了', 'OK', 'Information')" -WindowStyle Hidden
+        $escapedMsg = $startupNotify -replace "'", "''"
+        Start-Process powershell -ArgumentList '-NoProfile', '-WindowStyle', 'Hidden', '-Command', "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.MessageBox]::Show('Deploy OK`n$escapedMsg', 'Tools28 Build OK', 'OK', 'Information')" -WindowStyle Hidden
     } else {
         Write-Log "ビルドに失敗しました。" "Red"
-        Start-Process powershell -ArgumentList '-NoProfile', '-WindowStyle', 'Hidden', '-Command', "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.MessageBox]::Show('ビルドに失敗しました。`nログを確認してください。', 'Tools28 ビルド失敗', 'OK', 'Error')" -WindowStyle Hidden
+        $escapedMsg = $startupNotify -replace "'", "''"
+        Start-Process powershell -ArgumentList '-NoProfile', '-WindowStyle', 'Hidden', '-Command', "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.MessageBox]::Show('Build FAILED`n$escapedMsg', 'Tools28 Build FAILED', 'OK', 'Error')" -WindowStyle Hidden
     }
     Write-Host ""
 } else {
     Write-Log "ローカルは最新です。新しい変更を待機します。" "Green"
 }
 
+# 監視ループ開始前に最新を再取得（起動時ビルド中に別のmergeが来た場合の二重ビルド防止）
+git fetch origin main 2>$null
+$lastCommit = git rev-parse origin/main 2>$null
 Write-Host ""
-$lastCommit = $remoteLatest
 
 # ========================================
 # 監視ループ
@@ -185,18 +193,18 @@ while ($true) {
             $builtDll = ".\bin\Release\Revit$checkVersion\Tools28.dll"
             $buildSuccess = (Test-Path $builtDll) -and ((Get-Item $builtDll).LastWriteTime -gt $buildStartTime)
 
+            # 通知メッセージにコミット情報を含める
+            $shortHash = $remoteCommit.Substring(0, 7)
+            $notifyMsg = "$commitMsg ($shortHash)"
+
             if ($buildSuccess) {
-                # 通知（成功）
                 Write-Log "自動ビルド & デプロイ完了！ Revit を再起動してテストしてください。" "Green"
-
-                # 通知（成功）— 別プロセスで表示（監視ループをブロックしない）
-                Start-Process powershell -ArgumentList '-NoProfile', '-WindowStyle', 'Hidden', '-Command', "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.MessageBox]::Show('ビルド & デプロイが完了しました。`nRevit を再起動してテストしてください。', 'Tools28 ビルド完了', 'OK', 'Information')" -WindowStyle Hidden
+                $escapedMsg = $notifyMsg -replace "'", "''"
+                Start-Process powershell -ArgumentList '-NoProfile', '-WindowStyle', 'Hidden', '-Command', "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.MessageBox]::Show('Deploy OK`n$escapedMsg', 'Tools28 Build OK', 'OK', 'Information')" -WindowStyle Hidden
             } else {
-                # 通知（失敗）
                 Write-Log "ビルドに失敗しました。" "Red"
-
-                # 通知（失敗）— 別プロセスで表示（監視ループをブロックしない）
-                Start-Process powershell -ArgumentList '-NoProfile', '-WindowStyle', 'Hidden', '-Command', "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.MessageBox]::Show('ビルドに失敗しました。`nログを確認してください。', 'Tools28 ビルド失敗', 'OK', 'Error')" -WindowStyle Hidden
+                $escapedMsg = $notifyMsg -replace "'", "''"
+                Start-Process powershell -ArgumentList '-NoProfile', '-WindowStyle', 'Hidden', '-Command', "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.MessageBox]::Show('Build FAILED`n$escapedMsg', 'Tools28 Build FAILED', 'OK', 'Error')" -WindowStyle Hidden
             }
 
             $lastCommit = $remoteCommit
