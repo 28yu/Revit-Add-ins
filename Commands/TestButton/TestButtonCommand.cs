@@ -12,7 +12,7 @@ namespace Tools28.Commands.TestButton
             ref string message,
             ElementSet elements)
         {
-            TaskDialog.Show("自動デプロイ確認 v32", "バックグラウンド自動デプロイ成功！\n\n(v32: 通知メッセージ日本語化)");
+            TaskDialog.Show("自動デプロイ確認 v33", "バックグラウンド自動デプロイ成功！\n\n(v33: 通知の文字化け修正)");
             return Result.Succeeded;
         }
     }
