@@ -20,6 +20,9 @@ Set-Location $PSScriptRoot
 # Setup
 # ========================================
 
+# Git output is UTF-8, but PowerShell 5.1 defaults to system locale (Shift-JIS)
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+
 $LogFile = Join-Path $PSScriptRoot "AutoBuild.log"
 
 function Write-Log {
