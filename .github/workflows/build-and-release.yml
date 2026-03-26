@@ -149,3 +149,18 @@ jobs:
           files: dist/*.zip
           tag_name: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', steps.version.outputs.version) || github.ref_name }}
           generate_release_notes: false
+
+      - name: Upload to download site (28tools-download)
+        uses: softprops/action-gh-release@v2
+        with:
+          repository: 28yu/28tools-download
+          name: "28 Tools v${{ steps.version.outputs.version }}"
+          body: |
+            ## 28 Tools v${{ steps.version.outputs.version }}
+
+            Revit 2021 / 2022 / 2023 / 2024 / 2025 / 2026 対応
+          files: dist/*.zip
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', steps.version.outputs.version) || github.ref_name }}
+          generate_release_notes: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.DOWNLOAD_SITE_TOKEN }}
