@@ -254,6 +254,18 @@ namespace Tools28
             // セパレータ
             panel.AddSeparator();
 
+            // 壁面積集計ボタン
+            PushButtonData wallAreaButtonData = new PushButtonData(
+                "WallAreaSummary",
+                "壁面積\n集計",
+                assemblyPath,
+                "Tools28.Commands.WallAreaSummary.WallAreaSummaryCommand");
+            wallAreaButtonData.ToolTip = "アクティブなビューの壁面積をタイプ別に集計します";
+            panel.AddItem(wallAreaButtonData);
+
+            // セパレータ
+            panel.AddSeparator();
+
             // 塗潰し領域 分割/統合ボタン
             PushButtonData filledRegionButtonData = new PushButtonData(
                 "FilledRegionSplitMerge2",
