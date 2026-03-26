@@ -767,3 +767,32 @@ git stash pop  # 必要なら退避した変更を戻す
 git checkout -- <ファイル名>
 git pull origin main
 ```
+
+## TODO: 配布ZIPの自動アップロード設定（次回セッション）
+
+### 概要
+Revit-Add-ins リポジトリでタグ push → ビルド → ZIP作成後、配布サイトリポジトリ（28yu/28tools-download）の GitHub Releases にも ZIP を自動アップロードする仕組みを構築する。
+
+### 現在の手動フロー
+1. Revit-Add-ins でタグ push → GitHub Actions がビルド & ZIP作成 → Revit-Add-ins の Releases に公開
+2. **手動**: Revit-Add-ins の Releases から ZIP をダウンロード
+3. **手動**: 28yu/28tools-download の Releases に ZIP をアップロード
+4. 配布サイト（28tools.com）は 28tools-download の Releases を参照 → ユーザーがダウンロード可能に
+
+### 自動化後のフロー
+1. Revit-Add-ins でタグ push → GitHub Actions がビルド & ZIP作成
+2. **自動**: 同じワークフロー内で 28tools-download の Releases にも ZIP をアップロード
+3. 配布サイトは自動的に最新ZIPを提供
+
+### 必要な作業
+1. **Personal Access Token（PAT）の作成** — GitHub Settings で作成（`repo` スコープ）
+2. **Secretsへの登録** — Revit-Add-ins リポジトリの Settings → Secrets に PAT を登録
+3. **ワークフロー修正** — `build-and-release.yml` に 28tools-download への Releases アップロードステップを追加
+
+### 関連情報
+- **配布サイトリポジトリ**: `28yu/28tools-download`
+- **配布サイトURL**: `https://28tools.com/`
+- **配布方式**: GitHub Pages（リポジトリ自体がウェブサイト）
+- **ZIPの配置先**: 28tools-download の GitHub Releases
+- **サイト側の更新**: 不要（Releases の最新を自動参照する仕組み）
+- **ダウンロードパスワード**: 28tools
