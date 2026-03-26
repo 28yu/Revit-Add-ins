@@ -45,7 +45,7 @@ namespace Tools28.Commands.WallAreaSummary
                         Parameter areaParam = w.get_Parameter(BuiltInParameter.HOST_AREA_COMPUTED);
                         if (areaParam != null && areaParam.HasValue)
                         {
-#if REVIT2021 || REVIT2022
+#if REVIT2021
                             return UnitUtils.ConvertFromInternalUnits(areaParam.AsDouble(), DisplayUnitType.DUT_SQUARE_METERS);
 #else
                             return UnitUtils.ConvertFromInternalUnits(areaParam.AsDouble(), UnitTypeId.SquareMeters);
