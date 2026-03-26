@@ -6,6 +6,9 @@ on:
   push:
     tags:
       - 'v*'
+    # release/v* ブランチ push でもリリース (Claude Code環境用)
+    branches:
+      - 'release/v*'
   # 手動実行も可能
   workflow_dispatch:
     inputs:
@@ -70,7 +73,7 @@ jobs:
   release:
     needs: build
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    if: startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/heads/release/v') || github.event_name == 'workflow_dispatch'
     permissions:
       contents: write
 
@@ -81,9 +84,10 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
           else
-            # タグ名から v を除去 (v1.0 -> 1.0)
-            TAG="${{ github.ref_name }}"
-            echo "version=${TAG#v}" >> $GITHUB_OUTPUT
+            REF="${{ github.ref_name }}"
+            # release/v2.2 -> v2.2 -> 2.2 or v2.2 -> 2.2
+            REF="${REF#release/}"
+            echo "version=${REF#v}" >> $GITHUB_OUTPUT
           fi
 
       - name: Download all artifacts
@@ -147,7 +151,7 @@ jobs:
             - Excelエクスポート（パラメータをExcelに書き出し）
             - Excelインポート（Excelからパラメータを読み込み）
           files: dist/*.zip
-          tag_name: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', steps.version.outputs.version) || github.ref_name }}
+          tag_name: v${{ steps.version.outputs.version }}
           generate_release_notes: false
 
       - name: Upload to download site (28tools-download)
@@ -161,5 +165,9 @@ jobs:
 
             Revit 2021 / 2022 / 2023 / 2024 / 2025 / 2026 対応
           files: dist/*.zip
-          tag_name: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', steps.version.outputs.version) || github.ref_name }}
+          tag_name: v${{ steps.version.outputs.version }}
           generate_release_notes: false
+
+      - name: Delete release branch
+        if: startsWith(github.ref, 'refs/heads/release/v')
+        run: git push origin --delete "${{ github.ref_name }}" || true
