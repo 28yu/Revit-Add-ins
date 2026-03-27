@@ -264,6 +264,18 @@ namespace Tools28
             filledRegionButtonData.LargeImage = LoadImage("filled_region_96.png");
             panel.AddItem(filledRegionButtonData);
 
+            // セパレータ
+            panel.AddSeparator();
+
+            // 壁面積集計ボタン
+            PushButtonData wallAreaButtonData = new PushButtonData(
+                "WallAreaCalculator",
+                "壁面積\n集計",
+                assemblyPath,
+                "Tools28.Commands.WallAreaCalculator.WallAreaCalculatorCommand");
+            wallAreaButtonData.ToolTip = "アクティブビューに表示されている壁の面積を壁タイプ別に集計して表示します";
+            panel.AddItem(wallAreaButtonData);
+
         }
 
         /// <summary>
