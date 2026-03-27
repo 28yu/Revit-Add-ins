@@ -23,17 +23,17 @@ body{
   max-width:100vw;
   margin:0 auto;
   background:#fff;
-  padding:10mm 12mm 8mm;
+  padding:8mm 10mm 6mm;
   box-shadow:0 1px 12px rgba(95,150,142,0.10);
 }
 
 /* ===== Title ===== */
 .title{
   text-align:center;
-  margin-bottom:3mm;
+  margin-bottom:2mm;
 }
 .title h1{
-  font-size:16pt;
+  font-size:15pt;
   font-weight:900;
   color:#3a3a3a;
   display:inline;
@@ -42,23 +42,23 @@ body{
 }
 .title-sub{
   display:block;
-  font-size:8pt;
+  font-size:7.5pt;
   color:#8a8580;
   font-weight:700;
-  margin-top:1.5mm;
+  margin-top:1mm;
 }
 
 /* ===== Section ===== */
 .section{
   border:1.5px solid #5F968E;
-  border-radius:8px;
-  margin-bottom:2.5mm;
+  border-radius:7px;
+  margin-bottom:2mm;
   overflow:hidden;
 }
 .section-header{
   background:#5F968E;
-  padding:1.5mm 4mm;
-  font-size:9pt;
+  padding:1.2mm 3.5mm;
+  font-size:8pt;
   font-weight:900;
   color:#fff;
   display:flex;
@@ -68,48 +68,48 @@ body{
 .section-num{
   background:rgba(255,255,255,0.25);
   border-radius:50%;
-  width:5.5mm;
-  height:5.5mm;
+  width:5mm;
+  height:5mm;
   display:flex;
   align-items:center;
   justify-content:center;
-  font-size:8pt;
+  font-size:7.5pt;
   flex-shrink:0;
 }
 .section-body{
-  padding:2.5mm 4mm;
+  padding:2mm 3.5mm;
 }
 
 /* ===== Feature Cards ===== */
 .feature-grid{
   display:grid;
   grid-template-columns:1fr 1fr 1fr;
-  gap:2.5mm;
+  gap:2mm;
 }
 .feature-card{
   border:1.5px solid #d0d0d0;
-  border-radius:6px;
-  padding:2mm 3mm;
+  border-radius:5px;
+  padding:1.5mm 2.5mm;
   background:#fff;
 }
 .feature-card-header{
-  font-size:7.5pt;
+  font-size:7pt;
   font-weight:900;
   color:#5F968E;
-  margin-bottom:1mm;
+  margin-bottom:0.8mm;
   display:flex;
   align-items:center;
   gap:1.5mm;
 }
 .feature-card-icon{
-  font-size:10pt;
+  font-size:9pt;
 }
 .feature-card ul{
   list-style:none;
-  font-size:6.5pt;
+  font-size:6pt;
   font-weight:500;
   color:#555;
-  line-height:1.5;
+  line-height:1.45;
 }
 .feature-card li::before{
   content:"▸ ";
@@ -117,14 +117,40 @@ body{
   font-weight:900;
 }
 .feature-card-note{
-  font-size:5.5pt;
+  font-size:5pt;
   font-weight:500;
   color:#8a8580;
-  margin-top:1mm;
+  margin-top:0.8mm;
   font-style:italic;
 }
 
 /* ===== Workflow ===== */
+.workflow-section{
+  display:flex;
+  gap:3mm;
+  align-items:flex-start;
+}
+.workflow-col{
+  flex:1;
+}
+.workflow-col-label{
+  font-size:6.5pt;
+  font-weight:900;
+  text-align:center;
+  padding:1mm 0;
+  border-radius:4px;
+  margin-bottom:1.5mm;
+}
+.workflow-col-label-old{
+  background:#f0efec;
+  color:#8a8580;
+  border:1px solid #d0d0d0;
+}
+.workflow-col-label-new{
+  background:#BFDCCF;
+  color:#5F968E;
+  border:1px solid #5F968E;
+}
 .workflow{
   display:flex;
   align-items:stretch;
@@ -136,25 +162,25 @@ body{
   flex-direction:column;
   align-items:center;
   flex:1;
-  max-width:28mm;
+  max-width:22mm;
   position:relative;
 }
 .wf-circle{
-  width:12mm;
-  height:12mm;
+  width:9mm;
+  height:9mm;
   border-radius:50%;
   display:flex;
   align-items:center;
   justify-content:center;
-  font-size:14pt;
-  border:2px solid;
+  font-size:11pt;
+  border:1.5px solid;
   flex-shrink:0;
   position:relative;
   overflow:hidden;
 }
 .wf-circle img{
-  width:75%;
-  height:75%;
+  width:70%;
+  height:70%;
   object-fit:contain;
   display:block;
 }
@@ -168,14 +194,14 @@ body{
 }
 .wf-num{
   position:absolute;
-  top:-1.5mm;
-  right:-1.5mm;
+  top:-1mm;
+  right:-1mm;
   background:#5F968E;
   color:#fff;
-  font-size:5.5pt;
+  font-size:5pt;
   font-weight:900;
-  width:4mm;
-  height:4mm;
+  width:3.5mm;
+  height:3.5mm;
   border-radius:50%;
   display:flex;
   align-items:center;
@@ -185,65 +211,72 @@ body{
   background:#b5a78f;
 }
 .wf-label{
-  font-size:7pt;
+  font-size:5.5pt;
   font-weight:900;
   color:#3a3a3a;
   text-align:center;
-  margin-top:1.5mm;
-  line-height:1.3;
+  margin-top:1mm;
+  line-height:1.25;
 }
 .wf-who{
-  font-size:5.5pt;
+  font-size:5pt;
   font-weight:700;
   color:#8a8580;
   text-align:center;
-  margin-top:0.5mm;
+  margin-top:0.3mm;
 }
 .wf-arrow{
   display:flex;
   align-items:center;
-  padding-top:1mm;
+  padding-top:0.5mm;
   flex-shrink:0;
 }
 .wf-arrow-line{
-  width:3mm;
+  width:1.5mm;
   height:1.5px;
   background:#9fb8b2;
 }
 .wf-arrow-head{
   width:0;height:0;
-  border-top:2.5px solid transparent;
-  border-bottom:2.5px solid transparent;
-  border-left:4px solid #5F968E;
+  border-top:2px solid transparent;
+  border-bottom:2px solid transparent;
+  border-left:3px solid #5F968E;
 }
 .wf-loop{
   position:absolute;
-  bottom:-6mm;
+  bottom:-5mm;
   left:50%;
   transform:translateX(-50%);
-  font-size:5.5pt;
+  font-size:5pt;
   font-weight:700;
   color:#E05858;
   white-space:nowrap;
+}
+/* divider between workflow columns */
+.workflow-divider{
+  width:1px;
+  background:#d0d0d0;
+  align-self:stretch;
+  margin:0 1mm;
 }
 
 /* ===== Key Point Box ===== */
 .key-point{
   background:#BFDCCF;
   border:1.5px solid #5F968E;
-  border-radius:7px;
-  padding:2.5mm 4mm;
-  margin-top:2.5mm;
+  border-radius:6px;
+  padding:2mm 3.5mm;
+  margin-top:2mm;
   text-align:center;
 }
 .key-point-title{
-  font-size:9pt;
+  font-size:8pt;
   font-weight:900;
   color:#3a3a3a;
-  margin-bottom:1mm;
+  margin-bottom:0.8mm;
 }
 .key-point-text{
-  font-size:7.5pt;
+  font-size:7pt;
   font-weight:700;
   color:#3a3a3a;
   line-height:1.5;
@@ -253,19 +286,19 @@ body{
 .tool-table{
   width:100%;
   border-collapse:collapse;
-  font-size:7pt;
+  font-size:6.5pt;
 }
 .tool-table th{
   background:none;
   color:#8a8580;
   font-weight:900;
-  padding:1.5mm 3mm;
+  padding:1mm 2.5mm;
   text-align:left;
-  font-size:7pt;
+  font-size:6.5pt;
   border-bottom:1.5px solid #5F968E;
 }
 .tool-table td{
-  padding:1.5mm 3mm;
+  padding:1mm 2.5mm;
   border-bottom:1px solid #e0e0e0;
   font-weight:500;
   vertical-align:top;
@@ -277,136 +310,55 @@ body{
 }
 .tool-icon{
   text-align:center;
-  width:10mm;
+  width:8mm;
 }
 .tool-icon img{
-  width:6mm;
-  height:6mm;
+  width:5mm;
+  height:5mm;
   object-fit:contain;
   vertical-align:middle;
-}
-
-/* ===== Concept Diagram ===== */
-.concept{
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  gap:3mm;
-  padding:2mm 0;
-}
-.concept-box{
-  border-radius:7px;
-  padding:2.5mm 4mm;
-  text-align:center;
-  border:1.5px solid;
-  min-width:32mm;
-}
-.concept-you{
-  background:#BFDCCF;
-  border-color:#5F968E;
-}
-.concept-ai{
-  background:#efe8da;
-  border-color:#D5C9B1;
-}
-.concept-result{
-  background:#fff;
-  border-color:#5F968E;
-  border-style:dashed;
-}
-.concept-box-label{
-  font-size:6pt;
-  font-weight:700;
-  color:#8a8580;
-}
-.concept-box-main{
-  font-size:8pt;
-  font-weight:900;
-  color:#3a3a3a;
-  line-height:1.35;
-}
-.concept-plus{
-  font-size:14pt;
-  font-weight:900;
-  color:#5F968E;
-}
-.concept-eq{
-  font-size:14pt;
-  font-weight:900;
-  color:#5F968E;
 }
 
 /* ===== Tips ===== */
 .tips{
   display:grid;
   grid-template-columns:1fr 1fr 1fr;
-  gap:2.5mm;
+  gap:2mm;
 }
 .tip{
   background:#efe8da;
   border:1.5px solid #D5C9B1;
-  border-radius:6px;
-  padding:2mm 3mm;
+  border-radius:5px;
+  padding:1.5mm 2.5mm;
 }
 .tip-header{
-  font-size:7pt;
+  font-size:6.5pt;
   font-weight:900;
   color:#b5a78f;
-  margin-bottom:1mm;
+  margin-bottom:0.8mm;
 }
 .tip-text{
-  font-size:6.5pt;
+  font-size:6pt;
   font-weight:500;
   color:#555;
-  line-height:1.45;
+  line-height:1.4;
 }
 .tip-good{color:#5F968E;font-weight:700}
 .tip-bad{color:#E05858;font-weight:700}
 
-/* ===== Legend ===== */
-.legend{
-  display:flex;
-  justify-content:center;
-  gap:12px;
-  margin-bottom:3mm;
-}
-.legend-item{
-  display:flex;align-items:center;gap:4px;
-  font-size:6.5pt;font-weight:700;color:#8a8580;
-}
-.legend-dot{
-  width:7px;height:7px;border-radius:50%;
-  border:1.5px solid;
-}
-.ld-you{background:#BFDCCF;border-color:#5F968E}
-.ld-auto{background:#efe8da;border-color:#D5C9B1}
-
-/* ===== Footer ===== */
-.footer{
-  text-align:center;
-  margin-top:2mm;
-  font-size:6.5pt;
-  color:#b8b0a0;
-  font-weight:700;
-}
-.footer a{
-  color:#5F968E;
-  text-decoration:none;
-}
-
 /* ===== Print ===== */
 @media print{
   body{background:#fff}
-  .page{box-shadow:none;padding:8mm 10mm 6mm;min-height:auto}
+  .page{box-shadow:none;padding:6mm 8mm 5mm;min-height:auto}
   .section-header,
   .wf-circle,
   .wf-num,
   .key-point,
-  .concept-box,
   .tool-table th,
   .tip,
   .feature-card,
-  .legend-dot{
+  .workflow-col-label-old,
+  .workflow-col-label-new{
     -webkit-print-color-adjust:exact;
     print-color-adjust:exact;
   }
@@ -415,9 +367,9 @@ body{
 @media(max-width:600px){
   .page{width:100%;padding:4mm 3mm;min-height:auto}
   .feature-grid{grid-template-columns:1fr}
+  .workflow-section{flex-direction:column}
   .workflow{flex-wrap:wrap}
   .tips{grid-template-columns:1fr}
-  .concept{flex-direction:column}
 }
 </style>
 </head>
@@ -493,86 +445,96 @@ body{
   <div class="section">
     <div class="section-header">
       <div class="section-num">2</div>
-      開発の流れ — 自分がやるのは「チャットで指示」と「Revitで確認」だけ
+      開発の流れ — これまでのAI vs 今回のAI
     </div>
     <div class="section-body">
 
-      <div class="workflow">
+      <div class="workflow-section">
 
-        <div class="wf-step wf-you">
-          <div class="wf-circle">
-            <img src="icons/workflow/you.png" alt="自分">
-            <div class="wf-num">1</div>
+        <!-- 左: これまでのAI -->
+        <div class="workflow-col">
+          <div class="workflow-col-label workflow-col-label-old">これまでのAI — コードを教えてくれる「相談相手」</div>
+          <div class="workflow">
+            <div class="wf-step wf-you">
+              <div class="wf-circle">
+                <img src="icons/workflow/you.png" alt="自分">
+                <div class="wf-num">1</div>
+              </div>
+              <div class="wf-label">AIに<br>コードを聞く</div>
+              <div class="wf-who">自分</div>
+            </div>
+            <div class="wf-arrow"><div class="wf-arrow-line"></div><div class="wf-arrow-head"></div></div>
+            <div class="wf-step wf-you">
+              <div class="wf-circle">
+                <img src="icons/workflow/you.png" alt="自分">
+                <div class="wf-num">2</div>
+              </div>
+              <div class="wf-label">コピペして<br>ファイル作成</div>
+              <div class="wf-who">自分</div>
+            </div>
+            <div class="wf-arrow"><div class="wf-arrow-line"></div><div class="wf-arrow-head"></div></div>
+            <div class="wf-step wf-you">
+              <div class="wf-circle">
+                <img src="icons/workflow/you.png" alt="自分">
+                <div class="wf-num">3</div>
+              </div>
+              <div class="wf-label">自分で<br>ビルド</div>
+              <div class="wf-who">自分</div>
+            </div>
+            <div class="wf-arrow"><div class="wf-arrow-line"></div><div class="wf-arrow-head"></div></div>
+            <div class="wf-step wf-you">
+              <div class="wf-circle">
+                <img src="icons/workflow/revit.png" alt="Revit">
+                <div class="wf-num">4</div>
+              </div>
+              <div class="wf-label">動作確認<br>&amp;修正</div>
+              <div class="wf-who">自分</div>
+            </div>
           </div>
-          <div class="wf-label">チャットで<br>指示を出す</div>
-          <div class="wf-who">自分</div>
         </div>
 
-        <div class="wf-arrow"><div class="wf-arrow-line"></div><div class="wf-arrow-head"></div></div>
+        <div class="workflow-divider"></div>
 
-        <div class="wf-step wf-auto">
-          <div class="wf-circle">
-            <img src="icons/workflow/claude.png" alt="Claude Code">
-            <div class="wf-num">2</div>
+        <!-- 右: 今回のAI -->
+        <div class="workflow-col">
+          <div class="workflow-col-label workflow-col-label-new">今回のAI（Claude Code） — 実行までしてくれる「専属プログラマー」</div>
+          <div class="workflow">
+            <div class="wf-step wf-you">
+              <div class="wf-circle">
+                <img src="icons/workflow/you.png" alt="自分">
+                <div class="wf-num">1</div>
+              </div>
+              <div class="wf-label">チャットで<br>指示を出す</div>
+              <div class="wf-who">自分</div>
+            </div>
+            <div class="wf-arrow"><div class="wf-arrow-line"></div><div class="wf-arrow-head"></div></div>
+            <div class="wf-step wf-auto">
+              <div class="wf-circle">
+                <img src="icons/workflow/claude.png" alt="Claude Code">
+                <div class="wf-num">2</div>
+              </div>
+              <div class="wf-label">コード作成<br>&amp;アップロード</div>
+              <div class="wf-who">Claude Code</div>
+            </div>
+            <div class="wf-arrow"><div class="wf-arrow-line"></div><div class="wf-arrow-head"></div></div>
+            <div class="wf-step wf-auto">
+              <div class="wf-circle">
+                <img src="icons/workflow/action.png" alt="GitHub Actions">
+                <div class="wf-num">3</div>
+              </div>
+              <div class="wf-label">自動で<br>ビルド&amp;配布</div>
+              <div class="wf-who">自動</div>
+            </div>
+            <div class="wf-arrow"><div class="wf-arrow-line"></div><div class="wf-arrow-head"></div></div>
+            <div class="wf-step wf-you" style="position:relative">
+              <div class="wf-circle">
+                <img src="icons/workflow/revit.png" alt="Revit">
+                <div class="wf-num">4</div>
+              </div>
+              <div class="wf-label">Revitで<br>動作確認</div>
+              <div class="wf-who">自分</div>
+            </div>
           </div>
-          <div class="wf-label">AIが<br>コードを書く</div>
-          <div class="wf-who">Claude Code</div>
-        </div>
-
-        <div class="wf-arrow"><div class="wf-arrow-line"></div><div class="wf-arrow-head"></div></div>
-
-        <div class="wf-step wf-auto">
-          <div class="wf-circle">
-            <img src="icons/workflow/github.png" alt="GitHub">
-            <div class="wf-num">3</div>
-          </div>
-          <div class="wf-label">GitHubに<br>アップロード</div>
-          <div class="wf-who">Claude Code</div>
-        </div>
-
-        <div class="wf-arrow"><div class="wf-arrow-line"></div><div class="wf-arrow-head"></div></div>
-
-        <div class="wf-step wf-auto">
-          <div class="wf-circle">
-            <img src="icons/workflow/action.png" alt="GitHub Actions">
-            <div class="wf-num">4</div>
-          </div>
-          <div class="wf-label">自動で<br>ビルド&amp;ZIP</div>
-          <div class="wf-who">GitHub Actions</div>
-        </div>
-
-        <div class="wf-arrow"><div class="wf-arrow-line"></div><div class="wf-arrow-head"></div></div>
-
-        <div class="wf-step wf-you" style="position:relative">
-          <div class="wf-circle">
-            <img src="icons/workflow/revit.png" alt="Revit">
-            <div class="wf-num">5</div>
-          </div>
-          <div class="wf-label">Revitで<br>動作確認</div>
-          <div class="wf-who">自分</div>
-          <div class="wf-loop">修正があれば ① に戻る ↩</div>
-        </div>
-
-        <div class="wf-arrow"><div class="wf-arrow-line"></div><div class="wf-arrow-head"></div></div>
-
-        <div class="wf-step wf-auto">
-          <div class="wf-circle">
-            <img src="icons/workflow/claude.png" alt="Claude Code">
-            <div class="wf-num">6</div>
-          </div>
-          <div class="wf-label">タグ付け<br>でリリース</div>
-          <div class="wf-who">Claude Code</div>
-        </div>
-
-        <div class="wf-arrow"><div class="wf-arrow-line"></div><div class="wf-arrow-head"></div></div>
-
-        <div class="wf-step wf-auto">
-          <div class="wf-circle">
-            <img src="icons/workflow/action.png" alt="GitHub Actions">
-            <div class="wf-num">7</div>
-          </div>
-          <div class="wf-label">自動で<br>配布公開</div>
-          <div class="wf-who">GitHub Actions</div>
         </div>
 
       </div>
@@ -675,18 +637,18 @@ body{
       ダウンロード・配布サイト
     </div>
     <div class="section-body" style="text-align:center">
-      <div style="font-size:8pt;font-weight:700;color:#3a3a3a;margin-bottom:1.5mm">
+      <div style="font-size:7.5pt;font-weight:700;color:#3a3a3a;margin-bottom:1.5mm">
         今日紹介したアドインは下記サイトからダウンロードできます
       </div>
-      <div style="background:#efe8da;border:1.5px solid #D5C9B1;border-radius:7px;padding:2.5mm 5mm;display:inline-block">
-        <div style="font-size:11pt;font-weight:900;color:#5F968E;letter-spacing:0.5px">
+      <div style="background:#efe8da;border:1.5px solid #D5C9B1;border-radius:7px;padding:2mm 5mm;display:inline-block">
+        <div style="font-size:10pt;font-weight:900;color:#5F968E;letter-spacing:0.5px">
           <a href="https://28tools.com/" target="_blank" style="color:#5F968E;text-decoration:none">https://28tools.com/</a>
         </div>
       </div>
-      <div style="margin-top:2mm;font-size:7.5pt;font-weight:700;color:#3a3a3a">
-        ダウンロードパスワード: <span style="background:#fff;border:1.5px solid #5F968E;border-radius:4px;padding:0.5mm 3mm;font-size:9pt;font-weight:900;color:#5F968E;letter-spacing:1px">28tools</span>
+      <div style="margin-top:1.5mm;font-size:7pt;font-weight:700;color:#3a3a3a">
+        ダウンロードパスワード: <span style="background:#fff;border:1.5px solid #5F968E;border-radius:4px;padding:0.5mm 3mm;font-size:8.5pt;font-weight:900;color:#5F968E;letter-spacing:1px">28tools</span>
       </div>
-      <div style="font-size:6.5pt;font-weight:500;color:#8a8580;margin-top:1.5mm">
+      <div style="font-size:6pt;font-weight:500;color:#8a8580;margin-top:1mm">
         インストール手順・マニュアル・対応Revitバージョン（2021〜2026）の情報も掲載しています
       </div>
     </div>
@@ -697,7 +659,7 @@ body{
   <!-- ============================== -->
   <div class="key-point" style="margin-top:0">
     <div class="key-point-title">まとめ</div>
-    <div class="key-point-text" style="font-size:8pt">
+    <div class="key-point-text" style="font-size:7.5pt">
       ❶ 作図業務を効率化するツールを作成 — 興味があればぜひ使ってみてください<br>
       ❷ AIを使えば「自分にはできない」と思っていたことができるようになる<br>
       ❸ AIは会話だけでなく、コード作成からファイル操作・実行まで自動でやってくれる時代に
