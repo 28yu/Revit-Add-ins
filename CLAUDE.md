@@ -768,31 +768,50 @@ git checkout -- <ファイル名>
 git pull origin main
 ```
 
-## TODO: 配布ZIPの自動アップロード設定（次回セッション）
+## 配布ZIP自動アップロード（完了）
 
 ### 概要
-Revit-Add-ins リポジトリでタグ push → ビルド → ZIP作成後、配布サイトリポジトリ（28yu/28tools-download）の GitHub Releases にも ZIP を自動アップロードする仕組みを構築する。
+Revit-Add-ins でリリースすると、28yu/28tools-download の GitHub Releases にも ZIP が自動アップロードされ、配布サイトのダウンロードリンクも自動更新される。
 
-### 現在の手動フロー
-1. Revit-Add-ins でタグ push → GitHub Actions がビルド & ZIP作成 → Revit-Add-ins の Releases に公開
-2. **手動**: Revit-Add-ins の Releases から ZIP をダウンロード
-3. **手動**: 28yu/28tools-download の Releases に ZIP をアップロード
-4. 配布サイト（28tools.com）は 28tools-download の Releases を参照 → ユーザーがダウンロード可能に
+### 自動化フロー
+1. Claude Code で「v2.1をリリースして」→ `release/v2.1` ブランチを push
+2. GitHub Actions が全6バージョンをビルド & ZIP作成
+3. **Revit-Add-ins** の Releases に v2.1 を作成（ZIPアップロード）
+4. **28tools-download** の Releases にも v2.1 を作成（ZIPアップロード）
+5. 配布サイト（28tools.com）は GitHub API で latest release を自動取得 → ダウンロードリンク自動更新
+6. `release/v2.1` ブランチは自動削除
 
-### 自動化後のフロー
-1. Revit-Add-ins でタグ push → GitHub Actions がビルド & ZIP作成
-2. **自動**: 同じワークフロー内で 28tools-download の Releases にも ZIP をアップロード
-3. 配布サイトは自動的に最新ZIPを提供
+### テストビルド（リリースなし）
+Claude Code で「テストビルドして」→ `build/test` ブランチを push
+- 全6バージョンをビルド、リリースは作成しない
+- Actions の実行結果ページ → Artifacts セクションから各バージョンのZIPをダウンロード可能
+- GitHub Actions 画面から手動実行も可能（「テストビルドのみ」チェックボックスをON）
 
-### 必要な作業
-1. **Personal Access Token（PAT）の作成** — GitHub Settings で作成（`repo` スコープ）
-2. **Secretsへの登録** — Revit-Add-ins リポジトリの Settings → Secrets に PAT を登録
-3. **ワークフロー修正** — `build-and-release.yml` に 28tools-download への Releases アップロードステップを追加
+### リリーストリガー方法（3種類）
+| 方法 | トリガー | 用途 |
+|------|---------|------|
+| `release/v*` ブランチ push | Claude Code から | 通常のリリース |
+| タグ push (`v*`) | ローカルPCから `git tag v2.1 && git push --tags` | 通常のリリース |
+| workflow_dispatch | GitHub Actions 画面で手動実行 | 手動リリース or テストビルド |
+
+### 設定済みの項目
+- **PAT**: Classic token（`repo` スコープ）— Fine-grained token では権限不足でリリース作成が失敗する
+- **Secret名**: `DOWNLOAD_SITE_TOKEN`（Revit-Add-ins リポジトリの Settings → Secrets → Actions に登録）
+- **トークン指定方法**: `softprops/action-gh-release` は `with: token:` で指定（`env: GITHUB_TOKEN:` では動作しない）
+- **配布サイト側**: `js/main.js` の `downloadConfig.urls` を GitHub API (`releases/latest`) で自動取得に改修済み
+
+### リリース本文
+- 両リポジトリで同じ形式（新機能テーブル + 全機能一覧）
+- 新機能追加時は `build-and-release.yml` の body セクション（2箇所: Revit-Add-ins用 と 28tools-download用）を更新
+
+### Claude Code 環境の制限
+- **タグの push は 403 で失敗する**（プロキシ制限）→ `release/v*` ブランチ方式で代替
+- **ブランチの push は可能** → `release/v*`, `build/*`, `claude/*` の push は正常動作
+- ローカルPCからはタグ push も正常動作
 
 ### 関連情報
 - **配布サイトリポジトリ**: `28yu/28tools-download`
 - **配布サイトURL**: `https://28tools.com/`
 - **配布方式**: GitHub Pages（リポジトリ自体がウェブサイト）
 - **ZIPの配置先**: 28tools-download の GitHub Releases
-- **サイト側の更新**: 不要（Releases の最新を自動参照する仕組み）
 - **ダウンロードパスワード**: 28tools
