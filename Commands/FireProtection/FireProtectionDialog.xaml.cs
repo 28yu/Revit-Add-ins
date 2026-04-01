@@ -365,7 +365,7 @@ namespace Tools28.Commands.FireProtection
                 colorRect.MouseLeftButtonDown += (s, ev) =>
                 {
                     _colorEditIndex = idx;
-                    ShowColorPicker(s as Rectangle);
+                    ShowColorPicker(s as WpfRectangle);
                 };
                 panel.Children.Add(colorRect);
 
