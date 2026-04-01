@@ -190,16 +190,8 @@ namespace Tools28.Commands.FireProtection
 
                     // 外周ループ（反時計回り）のみ採用。
                     // 穴ループ（時計回り）は耐火被覆では不要なので除外
-                    try
+                    if (IsLoopCounterClockwise(flatLoop))
                     {
-                        if (flatLoop.IsCounterClockwise(XYZ.BasisZ))
-                        {
-                            result.MergedLoops.Add(flatLoop);
-                        }
-                    }
-                    catch
-                    {
-                        // IsCounterClockwise が失敗した場合は採用
                         result.MergedLoops.Add(flatLoop);
                     }
                 }
@@ -234,6 +226,23 @@ namespace Tools28.Commands.FireProtection
             }
 
             return flatLoop;
+        }
+
+        /// <summary>
+        /// CurveLoopが反時計回り（外周）かどうかをShoelace公式で判定
+        /// Revit 2022にはCurveLoop.IsCounterClockwiseがないため手動実装
+        /// </summary>
+        private static bool IsLoopCounterClockwise(CurveLoop loop)
+        {
+            double signedArea = 0;
+            foreach (Curve c in loop)
+            {
+                XYZ p0 = c.GetEndPoint(0);
+                XYZ p1 = c.GetEndPoint(1);
+                signedArea += (p1.X - p0.X) * (p1.Y + p0.Y);
+            }
+            // signedArea < 0 → 反時計回り（XY平面、Y上向き）
+            return signedArea < 0;
         }
 
         /// <summary>

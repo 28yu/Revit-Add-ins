@@ -380,7 +380,7 @@ namespace Tools28.Commands.FireProtection
             }
         }
 
-        private void ShowColorPicker(Rectangle target)
+        private void ShowColorPicker(WpfRectangle target)
         {
             ColorSwatchPanel.Children.Clear();
 
