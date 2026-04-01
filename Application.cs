@@ -267,11 +267,11 @@ namespace Tools28
         }
 
         /// <summary>
-        /// 構造パネルを作成
+        /// 色分けパネルを作成
         /// </summary>
         private void CreateStructuralPanel(UIControlledApplication application, string tabName, string assemblyPath)
         {
-            RibbonPanel panel = application.CreateRibbonPanel(tabName, "構造");
+            RibbonPanel panel = application.CreateRibbonPanel(tabName, "色分け");
 
             // 梁下端色分けボタン
             PushButtonData beamUnderLevelButtonData = new PushButtonData(
@@ -292,6 +292,19 @@ namespace Tools28
             beamTopLevelButtonData.ToolTip = "平面ビューの梁天端レベルをパラメータから取得し、レベル別に色分け表示します";
             beamTopLevelButtonData.LargeImage = LoadImage("beam_top_level_96.png");
             panel.AddItem(beamTopLevelButtonData);
+
+            // セパレータ
+            panel.AddSeparator();
+
+            // 耐火被覆色分けボタン
+            PushButtonData fireProtectionButtonData = new PushButtonData(
+                "FireProtection",
+                "耐火被覆\n色分け",
+                assemblyPath,
+                "Tools28.Commands.FireProtection.FireProtectionCommand");
+            fireProtectionButtonData.ToolTip = "梁の耐火被覆範囲を自動検出し、種類別に色分けした塗潰領域を作成します";
+            // fireProtectionButtonData.LargeImage = LoadImage("fire_protection_96.png");
+            panel.AddItem(fireProtectionButtonData);
         }
 
         /// <summary>

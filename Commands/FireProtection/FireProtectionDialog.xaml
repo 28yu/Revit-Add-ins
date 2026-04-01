@@ -1,0 +1,377 @@
+<Window x:Class="Tools28.Commands.FireProtection.FireProtectionDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="耐火被覆 色分け"
+        Width="620"
+        SizeToContent="Height"
+        MaxHeight="800"
+        WindowStartupLocation="CenterScreen"
+        Background="#F5F5F5"
+        KeyDown="Window_KeyDown">
+
+    <Window.Resources>
+        <SolidColorBrush x:Key="RevitBlue" Color="#0066CC"/>
+        <SolidColorBrush x:Key="RevitHoverBlue" Color="#0052A3"/>
+        <SolidColorBrush x:Key="RevitDarkGray" Color="#333333"/>
+        <SolidColorBrush x:Key="RevitLightGray" Color="#E6E6E6"/>
+
+        <Style x:Key="SectionHeader" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="{StaticResource RevitDarkGray}"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
+        </Style>
+
+        <Style x:Key="LabelStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Foreground" Value="{StaticResource RevitDarkGray}"/>
+            <Setter Property="Margin" Value="0,2"/>
+        </Style>
+
+        <Style x:Key="ValueStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="{StaticResource RevitBlue}"/>
+            <Setter Property="Margin" Value="0,2"/>
+        </Style>
+
+        <Style x:Key="NoteStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="Foreground" Value="#666666"/>
+            <Setter Property="Margin" Value="0,4,0,0"/>
+        </Style>
+
+        <Style x:Key="PrimaryButtonStyle" TargetType="Button">
+            <Setter Property="MinWidth" Value="90"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="Padding" Value="12,0"/>
+            <Setter Property="Margin" Value="5,0,0,0"/>
+            <Setter Property="Background" Value="{StaticResource RevitBlue}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="{StaticResource RevitBlue}"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="2"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                            VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{StaticResource RevitHoverBlue}"/>
+                    <Setter Property="BorderBrush" Value="{StaticResource RevitHoverBlue}"/>
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Background" Value="{StaticResource RevitLightGray}"/>
+                    <Setter Property="BorderBrush" Value="{StaticResource RevitLightGray}"/>
+                    <Setter Property="Foreground" Value="#999999"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="SecondaryButtonStyle" TargetType="Button">
+            <Setter Property="MinWidth" Value="90"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="Padding" Value="12,0"/>
+            <Setter Property="Margin" Value="5,0,0,0"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="Foreground" Value="{StaticResource RevitDarkGray}"/>
+            <Setter Property="BorderBrush" Value="#ADADAD"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="2"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                            VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#E5F3FF"/>
+                    <Setter Property="BorderBrush" Value="#0078D7"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="SmallButtonStyle" TargetType="Button">
+            <Setter Property="MinWidth" Value="50"/>
+            <Setter Property="Height" Value="26"/>
+            <Setter Property="Padding" Value="8,0"/>
+            <Setter Property="Margin" Value="5,0,0,0"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="Foreground" Value="{StaticResource RevitDarkGray}"/>
+            <Setter Property="BorderBrush" Value="#ADADAD"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="2"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                            VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#E5F3FF"/>
+                    <Setter Property="BorderBrush" Value="#0078D7"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="ComboBoxStyle" TargetType="ComboBox">
+            <Setter Property="Height" Value="28"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Padding" Value="6,4"/>
+            <Setter Property="BorderBrush" Value="{StaticResource RevitLightGray}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Step Indicator -->
+        <Border Grid.Row="0" Background="White" BorderBrush="#D3D3D3"
+                BorderThickness="0,0,0,1" Padding="20,12">
+            <TextBlock x:Name="StepIndicator" FontSize="14" FontWeight="Bold"
+                       Foreground="{StaticResource RevitDarkGray}"
+                       Text="ステップ 1 / 4  耐火被覆種類の定義"/>
+        </Border>
+
+        <!-- Step Content -->
+        <Grid Grid.Row="1" Margin="20,15,20,10">
+
+            <!-- Step 1: 耐火被覆種類の定義 -->
+            <ScrollViewer x:Name="Step1Panel" Visibility="Visible"
+                          VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <!-- ビュー情報 -->
+                    <Border Background="White" BorderBrush="#D3D3D3"
+                            BorderThickness="1" CornerRadius="3" Padding="15,12" Margin="0,0,0,12">
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource SectionHeader}" Text="ビュー情報"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="100"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0" Grid.Column="0" Style="{StaticResource LabelStyle}"
+                                           Text="ビュー名:"/>
+                                <TextBlock Grid.Row="0" Grid.Column="1" Style="{StaticResource ValueStyle}"
+                                           x:Name="ViewNameText"/>
+
+                                <TextBlock Grid.Row="1" Grid.Column="0" Style="{StaticResource LabelStyle}"
+                                           Text="梁数:"/>
+                                <TextBlock Grid.Row="1" Grid.Column="1" Style="{StaticResource ValueStyle}"
+                                           x:Name="BeamCountText"/>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- 耐火被覆種類の追加 -->
+                    <Border Background="White" BorderBrush="#D3D3D3"
+                            BorderThickness="1" CornerRadius="3" Padding="15,12" Margin="0,0,0,12">
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource SectionHeader}" Text="耐火被覆の種類"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                <TextBox x:Name="TypeNameInput" Width="300" Height="28"
+                                         FontSize="12" Padding="6,4"
+                                         VerticalContentAlignment="Center"
+                                         KeyDown="TypeNameInput_KeyDown"/>
+                                <Button Content="追加" Style="{StaticResource SmallButtonStyle}"
+                                        Click="AddType_Click"/>
+                            </StackPanel>
+                            <StackPanel x:Name="TypeListPanel"/>
+                            <TextBlock Style="{StaticResource NoteStyle}"
+                                       Text="※ 耐火被覆の種類名を入力して追加してください（例: 1時間耐火, ケイカル板 等）"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- オフセット設定 -->
+                    <Border Background="White" BorderBrush="#D3D3D3"
+                            BorderThickness="1" CornerRadius="3" Padding="15,12" Margin="0,0,0,12">
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource SectionHeader}" Text="オフセット設定"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                <RadioButton x:Name="CommonOffsetRadio" Content="共通オフセット"
+                                             IsChecked="True" FontSize="12"
+                                             VerticalAlignment="Center" Margin="0,0,15,0"
+                                             Checked="OffsetMode_Changed"/>
+                                <TextBox x:Name="CommonOffsetInput" Width="80" Height="26"
+                                         FontSize="12" Padding="4,2" Text="50"
+                                         VerticalContentAlignment="Center"/>
+                                <TextBlock Text=" mm" FontSize="12"
+                                           VerticalAlignment="Center" Margin="4,0,0,0"/>
+                            </StackPanel>
+                            <RadioButton x:Name="PerTypeOffsetRadio" Content="種類ごとに個別オフセット"
+                                         FontSize="12" Margin="0,0,0,4"
+                                         Checked="OffsetMode_Changed"/>
+                            <TextBlock Style="{StaticResource NoteStyle}"
+                                       Text="※ 梁のエッジからの距離（mm）。個別を選択すると種類ごとにオフセット値を設定できます"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- Step 2: 梁の分類 -->
+            <ScrollViewer x:Name="Step2Panel" Visibility="Collapsed"
+                          VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource SectionHeader}" Text="梁の分類"/>
+                    <TextBlock Style="{StaticResource NoteStyle}" Margin="0,0,0,12"
+                               Text="※ 各梁タイプをどの耐火被覆種類に割り当てるか選択してください"/>
+                    <StackPanel x:Name="BeamAssignmentPanel"/>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- Step 3: 表示設定 -->
+            <Grid x:Name="Step3Panel" Visibility="Collapsed">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <Border Grid.Row="0" Background="White" BorderBrush="#D3D3D3"
+                        BorderThickness="1" CornerRadius="3" Padding="15,12" Margin="0,0,0,12">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionHeader}" Text="表示設定"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="140"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="8"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="8"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Grid.Column="0" Style="{StaticResource LabelStyle}"
+                                       Text="境界線の線種:" VerticalAlignment="Center"/>
+                            <ComboBox Grid.Row="0" Grid.Column="1"
+                                      x:Name="LineStyleComboBox"
+                                      Style="{StaticResource ComboBoxStyle}"/>
+
+                            <TextBlock Grid.Row="2" Grid.Column="0" Style="{StaticResource LabelStyle}"
+                                       Text="塗りパターン:" VerticalAlignment="Center"/>
+                            <ComboBox Grid.Row="2" Grid.Column="1"
+                                      x:Name="FillPatternComboBox"
+                                      Style="{StaticResource ComboBoxStyle}"/>
+
+                            <TextBlock Grid.Row="4" Grid.Column="0" Style="{StaticResource LabelStyle}"
+                                       Text="凡例の文字タイプ:" VerticalAlignment="Center"/>
+                            <ComboBox Grid.Row="4" Grid.Column="1"
+                                      x:Name="TextNoteTypeComboBox"
+                                      Style="{StaticResource ComboBoxStyle}"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Row="1" Background="White" BorderBrush="#D3D3D3"
+                        BorderThickness="1" CornerRadius="3" Padding="15,12">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionHeader}" Text="色のプレビュー"/>
+                        <StackPanel x:Name="ColorPreviewPanel"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- Step 4: 確認・実行 -->
+            <ScrollViewer x:Name="Step4Panel" Visibility="Collapsed"
+                          VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <Border Background="White" BorderBrush="#D3D3D3"
+                            BorderThickness="1" CornerRadius="3" Padding="15,12" Margin="0,0,0,12">
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource SectionHeader}" Text="処理概要"/>
+                            <TextBlock x:Name="SummaryText" Style="{StaticResource LabelStyle}"
+                                       TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="White" BorderBrush="#D3D3D3"
+                            BorderThickness="1" CornerRadius="3" Padding="15,12" Margin="0,0,0,12">
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource SectionHeader}" Text="処理内容"/>
+                            <CheckBox Content="耐火被覆種類ごとの塗潰領域タイプ作成"
+                                      IsChecked="True" IsEnabled="False" Margin="0,3"/>
+                            <CheckBox Content="梁周囲に塗潰領域を自動配置（重なり部分は統合）"
+                                      IsChecked="True" IsEnabled="False" Margin="0,3"/>
+                            <CheckBox Content="凡例の製図ビュー作成"
+                                      IsChecked="True" IsEnabled="False" Margin="0,3"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="#FFF8E1" BorderBrush="#FFD54F"
+                            BorderThickness="1" CornerRadius="3" Padding="15,12">
+                        <StackPanel>
+                            <TextBlock FontSize="12" FontWeight="Bold" Foreground="#F57F17"
+                                       Text="既存の耐火被覆について" Margin="0,0,0,5"/>
+                            <CheckBox x:Name="OverwriteCheckBox" IsChecked="True"
+                                      Content="既存の「耐火被覆_」塗潰領域・凡例を上書きする"
+                                      FontSize="11" Margin="0,3"/>
+                            <TextBlock Style="{StaticResource NoteStyle}"
+                                       Text="※ チェックを外すと既存の塗潰領域・凡例はそのまま残ります"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+
+        <!-- Button Area -->
+        <Border Grid.Row="2" Background="White" BorderBrush="#D3D3D3"
+                BorderThickness="0,1,0,0" Padding="20,12">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button x:Name="BackButton" Content="戻る"
+                        Style="{StaticResource SecondaryButtonStyle}"
+                        Click="BackButton_Click"
+                        IsEnabled="False"/>
+                <Button x:Name="NextButton" Content="次へ"
+                        Style="{StaticResource PrimaryButtonStyle}"
+                        Click="NextButton_Click"/>
+                <Button Content="キャンセル"
+                        Style="{StaticResource SecondaryButtonStyle}"
+                        Click="CancelButton_Click"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>
