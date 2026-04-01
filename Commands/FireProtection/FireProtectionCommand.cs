@@ -197,6 +197,10 @@ namespace Tools28.Commands.FireProtection
             catch (Exception ex)
             {
                 message = $"耐火被覆色分け処理中にエラーが発生しました。\n\n{ex.Message}" +
+                    $"\n\n--- スタックトレース ---\n{ex.StackTrace}" +
+                    (ex.InnerException != null
+                        ? $"\n\n--- InnerException ---\n{ex.InnerException.Message}\n{ex.InnerException.StackTrace}"
+                        : "") +
                     "\n\nマニュアル: https://28yu.github.io/28tools-manual/" +
                     "\n配布サイト: https://28yu.github.io/28tools-download/";
                 return Result.Failed;
