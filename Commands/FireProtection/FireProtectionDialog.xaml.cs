@@ -6,7 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Shapes;
+using WpfRectangle = System.Windows.Shapes.Rectangle;
 using Autodesk.Revit.DB;
 using WpfGrid = System.Windows.Controls.Grid;
 
@@ -223,7 +223,7 @@ namespace Tools28.Commands.FireProtection
                     Margin = new Thickness(0, 2, 0, 2)
                 };
 
-                var colorRect = new Rectangle
+                var colorRect = new WpfRectangle
                 {
                     Width = 18,
                     Height = 14,
@@ -351,7 +351,7 @@ namespace Tools28.Commands.FireProtection
                 };
 
                 int idx = i;
-                var colorRect = new Rectangle
+                var colorRect = new WpfRectangle
                 {
                     Width = 30, Height = 20,
                     Fill = new SolidColorBrush(System.Windows.Media.Color.FromRgb(
@@ -390,7 +390,7 @@ namespace Tools28.Commands.FireProtection
                     .ConvertFromString(hex);
                 string capturedHex = hex;
 
-                var swatch = new Rectangle
+                var swatch = new WpfRectangle
                 {
                     Width = 30, Height = 24,
                     Fill = new SolidColorBrush(color),
