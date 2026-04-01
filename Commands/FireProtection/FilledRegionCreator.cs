@@ -59,19 +59,65 @@ namespace Tools28.Commands.FireProtection
 
                 if (outlines.Count == 0) continue;
 
-                // 各要素の塗潰領域を個別に作成
-                // 梁交差部では自然に重なり、囲まれた部分は埋まらない
-                foreach (var outline in outlines)
+                // 断面ビュー: 個別に作成（座標系が異なるためboolean union不可）
+                // 平面ビュー: boolean unionで統合（穴ループも保持）
+                if (activeView.ViewType == ViewType.Section)
                 {
-                    try
+                    foreach (var outline in outlines)
                     {
-                        var region = FilledRegion.Create(
-                            doc, regionTypeId, activeView.Id,
-                            new List<CurveLoop> { outline });
-                        ApplyLineStyle(region, lineStyleId);
-                        totalCreated++;
+                        try
+                        {
+                            var region = FilledRegion.Create(
+                                doc, regionTypeId, activeView.Id,
+                                new List<CurveLoop> { outline });
+                            ApplyLineStyle(region, lineStyleId);
+                            totalCreated++;
+                        }
+                        catch { }
                     }
-                    catch { }
+                }
+                else
+                {
+                    var mergeResult = BeamGeometryHelper.MergeOutlines(outlines);
+
+                    if (mergeResult.MergedLoops.Count > 0)
+                    {
+                        try
+                        {
+                            var region = FilledRegion.Create(
+                                doc, regionTypeId, activeView.Id, mergeResult.MergedLoops);
+                            ApplyLineStyle(region, lineStyleId);
+                            totalCreated++;
+                        }
+                        catch
+                        {
+                            foreach (var loop in mergeResult.MergedLoops)
+                            {
+                                try
+                                {
+                                    var region = FilledRegion.Create(
+                                        doc, regionTypeId, activeView.Id,
+                                        new List<CurveLoop> { loop });
+                                    ApplyLineStyle(region, lineStyleId);
+                                    totalCreated++;
+                                }
+                                catch { }
+                            }
+                        }
+                    }
+
+                    foreach (var loop in mergeResult.UnmergedLoops)
+                    {
+                        try
+                        {
+                            var region = FilledRegion.Create(
+                                doc, regionTypeId, activeView.Id,
+                                new List<CurveLoop> { loop });
+                            ApplyLineStyle(region, lineStyleId);
+                            totalCreated++;
+                        }
+                        catch { }
+                    }
                 }
             }
 

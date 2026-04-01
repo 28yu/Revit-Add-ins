@@ -16,6 +16,12 @@ namespace Tools28.Commands.FireProtection
         public static CurveLoop GetElementOffsetOutline(
             Element element, View view, double offsetFeet)
         {
+            // 断面ビュー: BoundingBoxをビュー座標系に変換
+            if (view.ViewType == ViewType.Section)
+            {
+                return GetOutlineForSectionView(element, view, offsetFeet);
+            }
+
             var fi = element as FamilyInstance;
             if (fi == null) return null;
 
@@ -29,6 +35,74 @@ namespace Tools28.Commands.FireProtection
 
             // 柱・フォールバック: BoundingBoxから矩形を生成
             return GetOutlineFromBoundingBox(element, view, offsetFeet);
+        }
+
+        /// <summary>
+        /// 断面ビュー用: BoundingBoxをビュー座標系に投影して矩形を生成
+        /// </summary>
+        private static CurveLoop GetOutlineForSectionView(
+            Element element, View view, double offsetFeet)
+        {
+            BoundingBoxXYZ bb = element.get_BoundingBox(view);
+            if (bb == null)
+                bb = element.get_BoundingBox(null);
+            if (bb == null) return null;
+
+            Transform viewTransform;
+            try
+            {
+                viewTransform = view.CropBox.Transform;
+            }
+            catch
+            {
+                return GetOutlineFromBoundingBox(element, view, offsetFeet);
+            }
+
+            Transform inverse = viewTransform.Inverse;
+            XYZ origin = viewTransform.Origin;
+            XYZ rightDir = viewTransform.BasisX;
+            XYZ upDir = viewTransform.BasisY;
+
+            // BoundingBox全8頂点をビュー座標に変換し2D範囲を取得
+            double minX = double.MaxValue, minY = double.MaxValue;
+            double maxX = double.MinValue, maxY = double.MinValue;
+
+            for (int ix = 0; ix <= 1; ix++)
+            for (int iy = 0; iy <= 1; iy++)
+            for (int iz = 0; iz <= 1; iz++)
+            {
+                XYZ corner = new XYZ(
+                    ix == 0 ? bb.Min.X : bb.Max.X,
+                    iy == 0 ? bb.Min.Y : bb.Max.Y,
+                    iz == 0 ? bb.Min.Z : bb.Max.Z);
+                XYZ vp = inverse.OfPoint(corner);
+                if (vp.X < minX) minX = vp.X;
+                if (vp.Y < minY) minY = vp.Y;
+                if (vp.X > maxX) maxX = vp.X;
+                if (vp.Y > maxY) maxY = vp.Y;
+            }
+
+            minX -= offsetFeet;
+            minY -= offsetFeet;
+            maxX += offsetFeet;
+            maxY += offsetFeet;
+
+            if (maxX - minX < 0.001 || maxY - minY < 0.001)
+                return null;
+
+            // ビュー座標→モデル座標（断面平面上の3D点）
+            XYZ p0 = origin + minX * rightDir + minY * upDir;
+            XYZ p1 = origin + maxX * rightDir + minY * upDir;
+            XYZ p2 = origin + maxX * rightDir + maxY * upDir;
+            XYZ p3 = origin + minX * rightDir + maxY * upDir;
+
+            CurveLoop loop = new CurveLoop();
+            loop.Append(Line.CreateBound(p0, p1));
+            loop.Append(Line.CreateBound(p1, p2));
+            loop.Append(Line.CreateBound(p2, p3));
+            loop.Append(Line.CreateBound(p3, p0));
+
+            return loop;
         }
 
         /// <summary>
@@ -188,12 +262,9 @@ namespace Tools28.Commands.FireProtection
                     if (flatLoop == null || flatLoop.Count() == 0)
                         continue;
 
-                    // 外周ループ（反時計回り）のみ採用。
-                    // 穴ループ（時計回り）は耐火被覆では不要なので除外
-                    if (IsLoopCounterClockwise(flatLoop))
-                    {
-                        result.MergedLoops.Add(flatLoop);
-                    }
+                    // 外周ループ（反時計回り）と穴ループ（時計回り）の
+                    // 両方を保持。梁で囲まれた空間は穴として正しく表現
+                    result.MergedLoops.Add(flatLoop);
                 }
             }
         }

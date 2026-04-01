@@ -88,12 +88,25 @@ namespace Tools28.Commands.FireProtection
                 var beamParams = BeamGeometryHelper.DetectFireProtectionParameters(beams);
                 var columnParams = BeamGeometryHelper.DetectFireProtectionParameters(columns);
 
-                // 線種取得（注釈の詳細線分と同じ = Lines カテゴリのサブカテゴリ）
+                // 線種取得（塗潰領域の境界線と同じ = Linesカテゴリのサブカテゴリ）
                 var lineStyles = new List<LineStyleItem>();
                 Category linesCat = doc.Settings.Categories
                     .get_Item(BuiltInCategory.OST_Lines);
                 if (linesCat != null)
                 {
+                    // 親カテゴリの線種（<Lines>）
+                    GraphicsStyle parentGs = linesCat.GetGraphicsStyle(
+                        GraphicsStyleType.Projection);
+                    if (parentGs != null)
+                    {
+                        lineStyles.Add(new LineStyleItem
+                        {
+                            Id = parentGs.Id,
+                            Name = "<Lines>"
+                        });
+                    }
+
+                    // サブカテゴリの線種
                     foreach (Category subCat in linesCat.SubCategories)
                     {
                         GraphicsStyle gs = subCat.GetGraphicsStyle(

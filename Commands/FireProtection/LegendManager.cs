@@ -11,7 +11,6 @@ namespace Tools28.Commands.FireProtection
     public static class LegendManager
     {
         private const string LegendViewName = "耐火被覆色分け凡例";
-        private const string RegionTypePrefix = "耐火被覆_凡例_";
 
         public static ElementId CreateLegendDraftingView(
             Document doc,
@@ -79,8 +78,10 @@ namespace Tools28.Commands.FireProtection
 
                     double rowY = startY - rowPitch * i;
 
+                    // ビューで作成済みのタイプを再利用、なければ新規作成
+                    string viewTypeName = FilledRegionCreator.TypePrefix + entry.Name;
                     CreateColoredRectangle(doc, draftingView.Id,
-                        solidFillPatternId, color, RegionTypePrefix + entry.Name,
+                        solidFillPatternId, color, viewTypeName,
                         0, rowY, rectWidth, rectHeight);
 
                     XYZ textPos = new XYZ(textOffsetX, rowY + textYOffset, 0);
@@ -125,13 +126,14 @@ namespace Tools28.Commands.FireProtection
             Document doc, ElementId solidFillPatternId,
             Color color, string typeName)
         {
+            // ビューで作成済みのタイプがあればそのまま再利用
             var existing = new FilteredElementCollector(doc)
                 .OfClass(typeof(FilledRegionType))
                 .Cast<FilledRegionType>()
                 .FirstOrDefault(t => t.Name == typeName);
 
             if (existing != null)
-                doc.Delete(existing.Id);
+                return existing.Id;
 
             var baseType = new FilteredElementCollector(doc)
                 .OfClass(typeof(FilledRegionType))
@@ -198,16 +200,8 @@ namespace Tools28.Commands.FireProtection
 
         private static void CleanupLegendRegionTypes(Document doc)
         {
-            var legendTypes = new FilteredElementCollector(doc)
-                .OfClass(typeof(FilledRegionType))
-                .Cast<FilledRegionType>()
-                .Where(t => t.Name.StartsWith(RegionTypePrefix))
-                .ToList();
-
-            foreach (var type in legendTypes)
-            {
-                try { doc.Delete(type.Id); } catch { }
-            }
+            // ビュー用タイプと共有のため、凡例独自のクリーンアップは不要
+            // （FilledRegionCreatorのCleanupで処理済み）
         }
     }
 }
