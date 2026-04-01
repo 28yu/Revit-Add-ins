@@ -7,6 +7,9 @@ using Autodesk.Revit.UI;
 
 namespace Tools28.Commands.FireProtection
 {
+    /// <summary>
+    /// 耐火被覆範囲色分け図コマンド
+    /// </summary>
     [Transaction(TransactionMode.Manual)]
     [Regeneration(RegenerationOption.Manual)]
     public class FireProtectionCommand : IExternalCommand
