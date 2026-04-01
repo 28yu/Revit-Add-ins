@@ -196,10 +196,9 @@ namespace Tools28.Commands.FireProtection
 
         private void OffsetMode_Changed(object sender, RoutedEventArgs e)
         {
-            if (CommonOffsetInput != null)
-            {
-                CommonOffsetInput.IsEnabled = CommonOffsetRadio.IsChecked == true;
-            }
+            if (TypeListPanel == null) return;
+
+            CommonOffsetInput.IsEnabled = CommonOffsetRadio.IsChecked == true;
             RefreshTypeListUI();
         }
 
