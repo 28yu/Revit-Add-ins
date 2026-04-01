@@ -7,6 +7,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using Autodesk.Revit.DB;
+using WpfGrid = System.Windows.Controls.Grid;
 
 namespace Tools28.Commands.FireProtection
 {
@@ -227,7 +228,7 @@ namespace Tools28.Commands.FireProtection
                     Margin = new Thickness(0, 0, 0, 6)
                 };
 
-                var grid = new Grid();
+                var grid = new WpfGrid();
                 grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
                 grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(50, GridUnitType.Pixel) });
                 grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(180, GridUnitType.Pixel) });
@@ -240,7 +241,7 @@ namespace Tools28.Commands.FireProtection
                     TextTrimming = TextTrimming.CharacterEllipsis,
                     ToolTip = beamType.DisplayName
                 };
-                Grid.SetColumn(nameBlock, 0);
+                WpfGrid.SetColumn(nameBlock, 0);
                 grid.Children.Add(nameBlock);
 
                 var countBlock = new TextBlock
@@ -252,7 +253,7 @@ namespace Tools28.Commands.FireProtection
                     VerticalAlignment = VerticalAlignment.Center,
                     HorizontalAlignment = HorizontalAlignment.Center
                 };
-                Grid.SetColumn(countBlock, 1);
+                WpfGrid.SetColumn(countBlock, 1);
                 grid.Children.Add(countBlock);
 
                 var combo = new ComboBox
@@ -266,7 +267,7 @@ namespace Tools28.Commands.FireProtection
 
                 combo.SelectedIndex = options.Count > 1 ? 1 : 0;
 
-                Grid.SetColumn(combo, 2);
+                WpfGrid.SetColumn(combo, 2);
                 grid.Children.Add(combo);
 
                 _beamAssignmentCombos[beamType.DisplayName] = combo;
@@ -409,10 +410,10 @@ namespace Tools28.Commands.FireProtection
         {
             _currentStep = step;
 
-            Step1Panel.Visibility = step == 1 ? Visibility.Visible : Visibility.Collapsed;
-            Step2Panel.Visibility = step == 2 ? Visibility.Visible : Visibility.Collapsed;
-            Step3Panel.Visibility = step == 3 ? Visibility.Visible : Visibility.Collapsed;
-            Step4Panel.Visibility = step == 4 ? Visibility.Visible : Visibility.Collapsed;
+            Step1Panel.Visibility = step == 1 ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+            Step2Panel.Visibility = step == 2 ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+            Step3Panel.Visibility = step == 3 ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+            Step4Panel.Visibility = step == 4 ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
 
             BackButton.IsEnabled = step > 1;
             NextButton.Content = step == TotalSteps ? "実行" : "次へ";
