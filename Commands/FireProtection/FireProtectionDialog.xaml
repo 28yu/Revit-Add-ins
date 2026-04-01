@@ -202,6 +202,7 @@
                             <TextBlock Style="{StaticResource SectionHeader}" Text="オフセット設定"/>
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                 <RadioButton x:Name="CommonOffsetRadio" Content="共通オフセット"
+                                             GroupName="OffsetMode"
                                              IsChecked="True" FontSize="12"
                                              VerticalAlignment="Center" Margin="0,0,15,0"
                                              Checked="OffsetMode_Changed"/>
@@ -212,6 +213,7 @@
                                            VerticalAlignment="Center" Margin="4,0,0,0"/>
                             </StackPanel>
                             <RadioButton x:Name="PerTypeOffsetRadio" Content="種類ごとに個別オフセット"
+                                         GroupName="OffsetMode"
                                          FontSize="12" Margin="0,0,0,4"
                                          Checked="OffsetMode_Changed"/>
                             <StackPanel x:Name="PerTypeOffsetPanel"/>
@@ -303,15 +305,6 @@
                 </StackPanel>
             </ScrollViewer>
         </Grid>
-
-        <!-- Color Picker Popup -->
-        <Popup x:Name="ColorPickerPopup" StaysOpen="False" Placement="Bottom"
-               AllowsTransparency="True">
-            <Border Background="White" BorderBrush="#999" BorderThickness="1"
-                    CornerRadius="3" Padding="6">
-                <WrapPanel x:Name="ColorSwatchPanel" Width="210"/>
-            </Border>
-        </Popup>
 
         <!-- Button Area -->
         <Border Grid.Row="2" Background="White" BorderBrush="#D3D3D3"

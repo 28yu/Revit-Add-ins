@@ -3,11 +3,11 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using WpfRectangle = System.Windows.Shapes.Rectangle;
 using Autodesk.Revit.DB;
+using WinForms = System.Windows.Forms;
 using WpfGrid = System.Windows.Controls.Grid;
 
 namespace Tools28.Commands.FireProtection
@@ -21,15 +21,6 @@ namespace Tools28.Commands.FireProtection
         private List<FireProtectionTypeEntry> _typeEntries = new List<FireProtectionTypeEntry>();
         private readonly Dictionary<string, TextBox> _perTypeOffsetBoxes =
             new Dictionary<string, TextBox>();
-        private int _colorEditIndex = -1;
-
-        private static readonly string[] PresetColorHexes = new[]
-        {
-            "#90AFC5", "#A5C498", "#D2A578", "#B496B4", "#78B4BE",
-            "#C8A096", "#A0B982", "#B9AA8C", "#96AAC8", "#C8B996",
-            "#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4", "#FFEAA7",
-            "#DDA0DD", "#98D8C8", "#F7DC6F", "#BB8FCE", "#85C1E9"
-        };
 
         public FireProtectionDialog(FireProtectionDialogData data)
         {
@@ -364,8 +355,7 @@ namespace Tools28.Commands.FireProtection
                 };
                 colorRect.MouseLeftButtonDown += (s, ev) =>
                 {
-                    _colorEditIndex = idx;
-                    ShowColorPicker(s as WpfRectangle);
+                    ShowColorPicker(idx);
                 };
                 panel.Children.Add(colorRect);
 
@@ -380,44 +370,25 @@ namespace Tools28.Commands.FireProtection
             }
         }
 
-        private void ShowColorPicker(WpfRectangle target)
+        private void ShowColorPicker(int typeIndex)
         {
-            ColorSwatchPanel.Children.Clear();
+            if (typeIndex < 0 || typeIndex >= _typeEntries.Count) return;
 
-            foreach (var hex in PresetColorHexes)
+            var entry = _typeEntries[typeIndex];
+            var colorDialog = new WinForms.ColorDialog
             {
-                var color = (System.Windows.Media.Color)System.Windows.Media.ColorConverter
-                    .ConvertFromString(hex);
-                string capturedHex = hex;
+                FullOpen = true,
+                Color = System.Drawing.Color.FromArgb(
+                    entry.ColorR, entry.ColorG, entry.ColorB)
+            };
 
-                var swatch = new WpfRectangle
-                {
-                    Width = 30, Height = 24,
-                    Fill = new SolidColorBrush(color),
-                    Stroke = new SolidColorBrush(
-                        System.Windows.Media.Color.FromRgb(0xCC, 0xCC, 0xCC)),
-                    StrokeThickness = 1,
-                    Margin = new Thickness(2),
-                    Cursor = Cursors.Hand
-                };
-                swatch.MouseLeftButtonDown += (s, ev) =>
-                {
-                    if (_colorEditIndex >= 0 && _colorEditIndex < _typeEntries.Count)
-                    {
-                        var c = (System.Windows.Media.Color)System.Windows.Media.ColorConverter
-                            .ConvertFromString(capturedHex);
-                        _typeEntries[_colorEditIndex].ColorR = c.R;
-                        _typeEntries[_colorEditIndex].ColorG = c.G;
-                        _typeEntries[_colorEditIndex].ColorB = c.B;
-                        RefreshColorSettings();
-                    }
-                    ColorPickerPopup.IsOpen = false;
-                };
-                ColorSwatchPanel.Children.Add(swatch);
+            if (colorDialog.ShowDialog() == WinForms.DialogResult.OK)
+            {
+                entry.ColorR = colorDialog.Color.R;
+                entry.ColorG = colorDialog.Color.G;
+                entry.ColorB = colorDialog.Color.B;
+                RefreshColorSettings();
             }
-
-            ColorPickerPopup.PlacementTarget = target;
-            ColorPickerPopup.IsOpen = true;
         }
 
         #endregion

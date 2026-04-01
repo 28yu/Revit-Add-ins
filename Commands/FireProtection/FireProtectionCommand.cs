@@ -88,17 +88,27 @@ namespace Tools28.Commands.FireProtection
                 var beamParams = BeamGeometryHelper.DetectFireProtectionParameters(beams);
                 var columnParams = BeamGeometryHelper.DetectFireProtectionParameters(columns);
 
-                // 線種取得（重複排除）
-                var lineStyles = new FilteredElementCollector(doc)
-                    .OfClass(typeof(GraphicsStyle))
-                    .Cast<GraphicsStyle>()
-                    .Where(gs => gs.GraphicsStyleType == GraphicsStyleType.Projection
-                              && gs.GraphicsStyleCategory != null)
-                    .GroupBy(gs => gs.Name)
-                    .Select(g => g.First())
-                    .OrderBy(gs => gs.Name)
-                    .Select(gs => new LineStyleItem { Id = gs.Id, Name = gs.Name })
-                    .ToList();
+                // 線種取得（注釈の詳細線分と同じ = Lines カテゴリのサブカテゴリ）
+                var lineStyles = new List<LineStyleItem>();
+                Category linesCat = doc.Settings.Categories
+                    .get_Item(BuiltInCategory.OST_Lines);
+                if (linesCat != null)
+                {
+                    foreach (Category subCat in linesCat.SubCategories)
+                    {
+                        GraphicsStyle gs = subCat.GetGraphicsStyle(
+                            GraphicsStyleType.Projection);
+                        if (gs != null)
+                        {
+                            lineStyles.Add(new LineStyleItem
+                            {
+                                Id = gs.Id,
+                                Name = subCat.Name
+                            });
+                        }
+                    }
+                    lineStyles = lineStyles.OrderBy(ls => ls.Name).ToList();
+                }
 
                 // 塗りパターン取得
                 var fillPatterns = new FilteredElementCollector(doc)

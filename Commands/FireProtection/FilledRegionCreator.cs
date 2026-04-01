@@ -59,43 +59,15 @@ namespace Tools28.Commands.FireProtection
 
                 if (outlines.Count == 0) continue;
 
-                var mergeResult = BeamGeometryHelper.MergeOutlines(outlines);
-
-                // 統合済みループから塗潰領域を作成
-                if (mergeResult.MergedLoops.Count > 0)
-                {
-                    try
-                    {
-                        var region = FilledRegion.Create(
-                            doc, regionTypeId, activeView.Id, mergeResult.MergedLoops);
-                        ApplyLineStyle(region, lineStyleId);
-                        totalCreated++;
-                    }
-                    catch
-                    {
-                        foreach (var loop in mergeResult.MergedLoops)
-                        {
-                            try
-                            {
-                                var region = FilledRegion.Create(
-                                    doc, regionTypeId, activeView.Id,
-                                    new List<CurveLoop> { loop });
-                                ApplyLineStyle(region, lineStyleId);
-                                totalCreated++;
-                            }
-                            catch { }
-                        }
-                    }
-                }
-
-                // 統合失敗ループは個別に作成
-                foreach (var loop in mergeResult.UnmergedLoops)
+                // 各要素の塗潰領域を個別に作成
+                // 梁交差部では自然に重なり、囲まれた部分は埋まらない
+                foreach (var outline in outlines)
                 {
                     try
                     {
                         var region = FilledRegion.Create(
                             doc, regionTypeId, activeView.Id,
-                            new List<CurveLoop> { loop });
+                            new List<CurveLoop> { outline });
                         ApplyLineStyle(region, lineStyleId);
                         totalCreated++;
                     }
