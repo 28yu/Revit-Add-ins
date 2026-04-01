@@ -88,40 +88,24 @@ namespace Tools28.Commands.FireProtection
                 var beamParams = BeamGeometryHelper.DetectFireProtectionParameters(beams);
                 var columnParams = BeamGeometryHelper.DetectFireProtectionParameters(columns);
 
-                // 線種取得（塗潰領域の境界線と同じ = Linesカテゴリのサブカテゴリ）
-                var lineStyles = new List<LineStyleItem>();
-                Category linesCat = doc.Settings.Categories
-                    .get_Item(BuiltInCategory.OST_Lines);
-                if (linesCat != null)
-                {
-                    // 親カテゴリの線種（<Lines>）
-                    GraphicsStyle parentGs = linesCat.GetGraphicsStyle(
-                        GraphicsStyleType.Projection);
-                    if (parentGs != null)
+                // 線種取得（塗潰領域の境界で選択できる線種と同じ）
+                // GraphicsStyleのうち、Linesカテゴリのサブカテゴリに属する投影線種
+                var lineStyles = new FilteredElementCollector(doc)
+                    .OfClass(typeof(GraphicsStyle))
+                    .Cast<GraphicsStyle>()
+                    .Where(gs =>
                     {
-                        lineStyles.Add(new LineStyleItem
-                        {
-                            Id = parentGs.Id,
-                            Name = "<Lines>"
-                        });
-                    }
-
-                    // サブカテゴリの線種
-                    foreach (Category subCat in linesCat.SubCategories)
-                    {
-                        GraphicsStyle gs = subCat.GetGraphicsStyle(
-                            GraphicsStyleType.Projection);
-                        if (gs != null)
-                        {
-                            lineStyles.Add(new LineStyleItem
-                            {
-                                Id = gs.Id,
-                                Name = subCat.Name
-                            });
-                        }
-                    }
-                    lineStyles = lineStyles.OrderBy(ls => ls.Name).ToList();
-                }
+                        if (gs.GraphicsStyleType != GraphicsStyleType.Projection)
+                            return false;
+                        Category cat = gs.GraphicsStyleCategory;
+                        if (cat == null) return false;
+                        Category parent = cat.Parent;
+                        return parent != null &&
+                            parent.Id.IntegerValue == (int)BuiltInCategory.OST_Lines;
+                    })
+                    .OrderBy(gs => gs.Name)
+                    .Select(gs => new LineStyleItem { Id = gs.Id, Name = gs.Name })
+                    .ToList();
 
                 // 塗りパターン取得
                 var fillPatterns = new FilteredElementCollector(doc)

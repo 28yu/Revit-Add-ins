@@ -48,80 +48,129 @@ namespace Tools28.Commands.FireProtection
                     doc, regionTypeName, fillPatternId, color);
                 if (regionTypeId == null) continue;
 
+                // 全要素の最大梁幅を取得（端部延長量の計算用）
+                double maxBeamHalfWidth = 0;
+                foreach (var elem in elements)
+                {
+                    var fi = elem as FamilyInstance;
+                    if (fi != null && elem.Category.Id.IntegerValue ==
+                        (int)BuiltInCategory.OST_StructuralFraming)
+                    {
+                        double w = BeamGeometryHelper.GetBeamWidth(fi);
+                        if (w / 2.0 > maxBeamHalfWidth)
+                            maxBeamHalfWidth = w / 2.0;
+                    }
+                }
+                double endExtension = maxBeamHalfWidth + offsetFeet;
+
                 var outlines = new List<CurveLoop>();
                 foreach (var elem in elements)
                 {
                     var outline = BeamGeometryHelper.GetElementOffsetOutline(
-                        elem, activeView, offsetFeet);
+                        elem, activeView, offsetFeet, endExtension);
                     if (outline != null)
                         outlines.Add(outline);
                 }
 
                 if (outlines.Count == 0) continue;
 
-                // 断面ビュー: 個別に作成（座標系が異なるためboolean union不可）
-                // 平面ビュー: boolean unionで統合（穴ループも保持）
+                // 断面ビュー: ビュー座標→XY平面に変換してunion→戻す
+                List<CurveLoop> mergeInput = outlines;
+                Transform sectionTransform = null;
+                Transform sectionInverse = null;
+
                 if (activeView.ViewType == ViewType.Section)
                 {
-                    foreach (var outline in outlines)
+                    try
                     {
-                        try
-                        {
-                            var region = FilledRegion.Create(
-                                doc, regionTypeId, activeView.Id,
-                                new List<CurveLoop> { outline });
-                            ApplyLineStyle(region, lineStyleId);
-                            totalCreated++;
-                        }
-                        catch { }
+                        sectionTransform = activeView.CropBox.Transform;
+                        sectionInverse = sectionTransform.Inverse;
+                        mergeInput = outlines
+                            .Select(loop => TransformLoop(loop, sectionInverse))
+                            .Where(loop => loop != null)
+                            .ToList();
+                    }
+                    catch
+                    {
+                        sectionTransform = null;
+                        mergeInput = outlines;
                     }
                 }
-                else
+
+                var mergeResult = BeamGeometryHelper.MergeOutlines(mergeInput);
+
+                // 断面ビューの場合、マージ結果をモデル座標に戻す
+                if (sectionTransform != null)
                 {
-                    var mergeResult = BeamGeometryHelper.MergeOutlines(outlines);
+                    mergeResult.MergedLoops = mergeResult.MergedLoops
+                        .Select(loop => TransformLoop(loop, sectionTransform))
+                        .Where(loop => loop != null)
+                        .ToList();
+                    mergeResult.UnmergedLoops = mergeResult.UnmergedLoops
+                        .Select(loop => TransformLoop(loop, sectionTransform))
+                        .Where(loop => loop != null)
+                        .ToList();
+                }
 
-                    if (mergeResult.MergedLoops.Count > 0)
+                // 統合済みループから塗潰領域を作成
+                if (mergeResult.MergedLoops.Count > 0)
+                {
+                    try
                     {
-                        try
+                        var region = FilledRegion.Create(
+                            doc, regionTypeId, activeView.Id, mergeResult.MergedLoops);
+                        ApplyLineStyle(region, lineStyleId);
+                        totalCreated++;
+                    }
+                    catch
+                    {
+                        foreach (var loop in mergeResult.MergedLoops)
                         {
-                            var region = FilledRegion.Create(
-                                doc, regionTypeId, activeView.Id, mergeResult.MergedLoops);
-                            ApplyLineStyle(region, lineStyleId);
-                            totalCreated++;
-                        }
-                        catch
-                        {
-                            foreach (var loop in mergeResult.MergedLoops)
+                            try
                             {
-                                try
-                                {
-                                    var region = FilledRegion.Create(
-                                        doc, regionTypeId, activeView.Id,
-                                        new List<CurveLoop> { loop });
-                                    ApplyLineStyle(region, lineStyleId);
-                                    totalCreated++;
-                                }
-                                catch { }
+                                var region = FilledRegion.Create(
+                                    doc, regionTypeId, activeView.Id,
+                                    new List<CurveLoop> { loop });
+                                ApplyLineStyle(region, lineStyleId);
+                                totalCreated++;
                             }
+                            catch { }
                         }
                     }
+                }
 
-                    foreach (var loop in mergeResult.UnmergedLoops)
+                foreach (var loop in mergeResult.UnmergedLoops)
+                {
+                    try
                     {
-                        try
-                        {
-                            var region = FilledRegion.Create(
-                                doc, regionTypeId, activeView.Id,
-                                new List<CurveLoop> { loop });
-                            ApplyLineStyle(region, lineStyleId);
-                            totalCreated++;
-                        }
-                        catch { }
+                        var region = FilledRegion.Create(
+                            doc, regionTypeId, activeView.Id,
+                            new List<CurveLoop> { loop });
+                        ApplyLineStyle(region, lineStyleId);
+                        totalCreated++;
                     }
+                    catch { }
                 }
             }
 
             return totalCreated;
+        }
+
+        private static CurveLoop TransformLoop(CurveLoop loop, Transform transform)
+        {
+            try
+            {
+                var newLoop = new CurveLoop();
+                foreach (Curve c in loop)
+                {
+                    XYZ s = transform.OfPoint(c.GetEndPoint(0));
+                    XYZ e = transform.OfPoint(c.GetEndPoint(1));
+                    if (s.DistanceTo(e) < 0.0001) continue;
+                    newLoop.Append(Line.CreateBound(s, e));
+                }
+                return newLoop.Count() > 0 ? newLoop : null;
+            }
+            catch { return null; }
         }
 
         private static void ApplyLineStyle(FilledRegion region, ElementId lineStyleId)
