@@ -13,13 +13,10 @@ namespace Tools28.Commands.FireProtection
         private const string LegendViewName = "耐火被覆色分け凡例";
         private const string RegionTypePrefix = "耐火被覆_凡例_";
 
-        /// <summary>
-        /// 凡例用の製図ビューを作成
-        /// </summary>
         public static ElementId CreateLegendDraftingView(
             Document doc,
             List<FireProtectionTypeEntry> types,
-            Dictionary<string, int> beamCounts,
+            Dictionary<string, int> elementCounts,
             bool overwriteExisting,
             ElementId textNoteTypeId = null)
         {
@@ -41,10 +38,7 @@ namespace Tools28.Commands.FireProtection
                 if (viewFamilyTypeId == null) return null;
 
                 ViewDrafting draftingView = ViewDrafting.Create(doc, viewFamilyTypeId);
-                try
-                {
-                    draftingView.Name = LegendViewName;
-                }
+                try { draftingView.Name = LegendViewName; }
                 catch
                 {
                     draftingView.Name = LegendViewName + "_" +
@@ -60,9 +54,7 @@ namespace Tools28.Commands.FireProtection
                     textNoteTypeId = GetDefaultTextNoteTypeId(doc);
                 if (textNoteTypeId == null) return draftingView.Id;
 
-                var colors = FilledRegionCreator.GenerateColors(types.Count);
                 double textHeight = GetTextHeight(doc, textNoteTypeId);
-
                 double rectHeight = textHeight * 1.8;
                 double rectWidth = textHeight * 4.0;
                 double textOffsetX = rectWidth + textHeight * 0.8;
@@ -80,18 +72,19 @@ namespace Tools28.Commands.FireProtection
 
                 for (int i = 0; i < types.Count; i++)
                 {
-                    string name = types[i].Name;
-                    Color color = colors[i];
-                    int count = beamCounts.ContainsKey(name) ? beamCounts[name] : 0;
+                    var entry = types[i];
+                    Color color = new Color(entry.ColorR, entry.ColorG, entry.ColorB);
+                    int count = elementCounts.ContainsKey(entry.Name)
+                        ? elementCounts[entry.Name] : 0;
 
                     double rowY = startY - rowPitch * i;
 
                     CreateColoredRectangle(doc, draftingView.Id,
-                        solidFillPatternId, color, RegionTypePrefix + name,
+                        solidFillPatternId, color, RegionTypePrefix + entry.Name,
                         0, rowY, rectWidth, rectHeight);
 
                     XYZ textPos = new XYZ(textOffsetX, rowY + textYOffset, 0);
-                    string label = $"- {name}\uff08{count}\u672c\uff09";
+                    string label = $"- {entry.Name}\uff08{count}\u672c\uff09";
                     TextNote.Create(doc, draftingView.Id, textPos, label, textNoteTypeId);
                 }
 
@@ -124,8 +117,8 @@ namespace Tools28.Commands.FireProtection
             loop.Append(Line.CreateBound(p2, p3));
             loop.Append(Line.CreateBound(p3, p0));
 
-            var loops = new List<CurveLoop> { loop };
-            FilledRegion.Create(doc, regionTypeId, viewId, loops);
+            FilledRegion.Create(doc, regionTypeId, viewId,
+                new List<CurveLoop> { loop });
         }
 
         private static ElementId GetOrCreateFilledRegionType(
@@ -160,15 +153,13 @@ namespace Tools28.Commands.FireProtection
 
         private static double GetTextHeight(Document doc, ElementId textNoteTypeId)
         {
-            var textNoteType = doc.GetElement(textNoteTypeId) as TextNoteType;
-            if (textNoteType != null)
+            var tnt = doc.GetElement(textNoteTypeId) as TextNoteType;
+            if (tnt != null)
             {
-                Parameter sizeParam = textNoteType.get_Parameter(
-                    BuiltInParameter.TEXT_SIZE);
+                Parameter sizeParam = tnt.get_Parameter(BuiltInParameter.TEXT_SIZE);
                 if (sizeParam != null)
                     return sizeParam.AsDouble();
             }
-
             return 2.5 / 304.8;
         }
 
@@ -183,32 +174,26 @@ namespace Tools28.Commands.FireProtection
 
         private static ElementId GetDraftingViewFamilyTypeId(Document doc)
         {
-            var viewFamilyType = new FilteredElementCollector(doc)
+            return new FilteredElementCollector(doc)
                 .OfClass(typeof(ViewFamilyType))
                 .Cast<ViewFamilyType>()
-                .FirstOrDefault(vft => vft.ViewFamily == ViewFamily.Drafting);
-
-            return viewFamilyType?.Id;
+                .FirstOrDefault(vft => vft.ViewFamily == ViewFamily.Drafting)?.Id;
         }
 
         private static ElementId GetDefaultTextNoteTypeId(Document doc)
         {
-            var textNoteType = new FilteredElementCollector(doc)
+            return new FilteredElementCollector(doc)
                 .OfClass(typeof(TextNoteType))
                 .Cast<TextNoteType>()
-                .FirstOrDefault();
-
-            return textNoteType?.Id;
+                .FirstOrDefault()?.Id;
         }
 
         private static ElementId GetSolidFillPatternId(Document doc)
         {
-            var fillPattern = new FilteredElementCollector(doc)
+            return new FilteredElementCollector(doc)
                 .OfClass(typeof(FillPatternElement))
                 .Cast<FillPatternElement>()
-                .FirstOrDefault(fp => fp.GetFillPattern().IsSolidFill);
-
-            return fillPattern?.Id;
+                .FirstOrDefault(fp => fp.GetFillPattern().IsSolidFill)?.Id;
         }
 
         private static void CleanupLegendRegionTypes(Document doc)

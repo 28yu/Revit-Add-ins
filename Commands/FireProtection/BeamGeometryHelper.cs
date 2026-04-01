@@ -6,20 +6,41 @@ using Autodesk.Revit.DB;
 namespace Tools28.Commands.FireProtection
 {
     /// <summary>
-    /// 梁の平面輪郭取得とオフセット・統合処理
+    /// 梁・柱の平面輪郭取得とオフセット・統合処理
     /// </summary>
     public static class BeamGeometryHelper
     {
         /// <summary>
-        /// 梁の平面投影輪郭をオフセットした矩形CurveLoopを取得
+        /// 要素のオフセット輪郭を取得（梁はロケーションカーブ、柱はBoundingBox）
         /// </summary>
-        public static CurveLoop GetBeamOffsetOutline(FamilyInstance beam, double offsetFeet)
+        public static CurveLoop GetElementOffsetOutline(
+            Element element, View view, double offsetFeet)
+        {
+            var fi = element as FamilyInstance;
+            if (fi == null) return null;
+
+            // 梁: ロケーションカーブから矩形を生成（平面ビュー用）
+            if (element.Category.Id.IntegerValue ==
+                (int)BuiltInCategory.OST_StructuralFraming)
+            {
+                var outline = GetBeamOutlineFromCurve(fi, offsetFeet);
+                if (outline != null) return outline;
+            }
+
+            // 柱・フォールバック: BoundingBoxから矩形を生成
+            return GetOutlineFromBoundingBox(element, view, offsetFeet);
+        }
+
+        /// <summary>
+        /// 梁のロケーションカーブから平面輪郭を生成
+        /// </summary>
+        private static CurveLoop GetBeamOutlineFromCurve(
+            FamilyInstance beam, double offsetFeet)
         {
             LocationCurve locCurve = beam.Location as LocationCurve;
             if (locCurve == null) return null;
 
-            Curve curve = locCurve.Curve;
-            Line line = curve as Line;
+            Line line = locCurve.Curve as Line;
             if (line == null) return null;
 
             XYZ start = new XYZ(line.GetEndPoint(0).X, line.GetEndPoint(0).Y, 0);
@@ -52,15 +73,54 @@ namespace Tools28.Commands.FireProtection
         }
 
         /// <summary>
-        /// 複数の輪郭をソリッドブーリアン演算で統合
+        /// BoundingBoxからオフセット矩形を生成
         /// </summary>
-        public static List<CurveLoop> MergeOutlines(List<CurveLoop> outlines)
+        private static CurveLoop GetOutlineFromBoundingBox(
+            Element element, View view, double offsetFeet)
         {
-            if (outlines.Count <= 1)
-                return outlines;
+            BoundingBoxXYZ bb = element.get_BoundingBox(view);
+            if (bb == null)
+                bb = element.get_BoundingBox(null);
+            if (bb == null) return null;
 
-            Solid result = null;
-            var failedLoops = new List<CurveLoop>();
+            double minX = bb.Min.X - offsetFeet;
+            double minY = bb.Min.Y - offsetFeet;
+            double maxX = bb.Max.X + offsetFeet;
+            double maxY = bb.Max.Y + offsetFeet;
+
+            if (maxX - minX < 0.001 || maxY - minY < 0.001)
+                return null;
+
+            XYZ p0 = new XYZ(minX, minY, 0);
+            XYZ p1 = new XYZ(maxX, minY, 0);
+            XYZ p2 = new XYZ(maxX, maxY, 0);
+            XYZ p3 = new XYZ(minX, maxY, 0);
+
+            CurveLoop loop = new CurveLoop();
+            loop.Append(Line.CreateBound(p0, p1));
+            loop.Append(Line.CreateBound(p1, p2));
+            loop.Append(Line.CreateBound(p2, p3));
+            loop.Append(Line.CreateBound(p3, p0));
+
+            return loop;
+        }
+
+        /// <summary>
+        /// 複数の輪郭をソリッドブーリアン演算で統合し、
+        /// 外周ループと統合失敗ループを分離して返す
+        /// </summary>
+        public static MergeResult MergeOutlines(List<CurveLoop> outlines)
+        {
+            var result = new MergeResult();
+
+            if (outlines.Count == 0) return result;
+            if (outlines.Count == 1)
+            {
+                result.MergedLoops.Add(outlines[0]);
+                return result;
+            }
+
+            Solid unionSolid = null;
 
             foreach (var outline in outlines)
             {
@@ -69,77 +129,115 @@ namespace Tools28.Commands.FireProtection
                     Solid extrusion = GeometryCreationUtilities.CreateExtrusionGeometry(
                         new List<CurveLoop> { outline }, XYZ.BasisZ, 1.0);
 
-                    if (result == null)
+                    if (unionSolid == null)
                     {
-                        result = extrusion;
+                        unionSolid = extrusion;
                     }
                     else
                     {
                         try
                         {
-                            result = BooleanOperationsUtils.ExecuteBooleanOperation(
-                                result, extrusion, BooleanOperationsType.Union);
+                            unionSolid = BooleanOperationsUtils.ExecuteBooleanOperation(
+                                unionSolid, extrusion, BooleanOperationsType.Union);
                         }
                         catch
                         {
-                            failedLoops.Add(outline);
+                            result.UnmergedLoops.Add(outline);
                         }
                     }
                 }
                 catch
                 {
-                    failedLoops.Add(outline);
+                    result.UnmergedLoops.Add(outline);
                 }
             }
 
-            var mergedLoops = new List<CurveLoop>();
-
-            if (result != null)
+            if (unionSolid != null)
             {
-                foreach (Face face in result.Faces)
+                ExtractOuterLoopsFromSolid(unionSolid, result);
+
+                if (result.MergedLoops.Count == 0)
                 {
-                    PlanarFace pf = face as PlanarFace;
-                    if (pf != null && Math.Abs(pf.FaceNormal.Z - 1.0) < 0.01)
-                    {
-                        foreach (var edgeLoop in pf.GetEdgesAsCurveLoops())
-                        {
-                            var flatLoop = new CurveLoop();
-                            bool valid = true;
-
-                            foreach (Curve c in edgeLoop)
-                            {
-                                XYZ s = c.GetEndPoint(0);
-                                XYZ e = c.GetEndPoint(1);
-                                XYZ fs = new XYZ(s.X, s.Y, 0);
-                                XYZ fe = new XYZ(e.X, e.Y, 0);
-
-                                if (fs.DistanceTo(fe) < 0.0001)
-                                    continue;
-
-                                try
-                                {
-                                    flatLoop.Append(Line.CreateBound(fs, fe));
-                                }
-                                catch
-                                {
-                                    valid = false;
-                                    break;
-                                }
-                            }
-
-                            if (valid && flatLoop.Count() > 0)
-                                mergedLoops.Add(flatLoop);
-                        }
-                    }
+                    result.UnmergedLoops.Clear();
+                    result.UnmergedLoops.AddRange(outlines);
                 }
             }
+            else
+            {
+                result.UnmergedLoops.AddRange(outlines);
+            }
 
-            mergedLoops.AddRange(failedLoops);
-            return mergedLoops.Count > 0 ? mergedLoops : outlines;
+            return result;
         }
 
         /// <summary>
-        /// 梁幅を取得（パラメータ探索→BoundingBox→デフォルト値）
+        /// ソリッドの上面から外周ループのみ抽出（穴ループは除外）
+        /// </summary>
+        private static void ExtractOuterLoopsFromSolid(
+            Solid solid, MergeResult result)
+        {
+            foreach (Face face in solid.Faces)
+            {
+                PlanarFace pf = face as PlanarFace;
+                if (pf == null || Math.Abs(pf.FaceNormal.Z - 1.0) > 0.01)
+                    continue;
+
+                foreach (var edgeLoop in pf.GetEdgesAsCurveLoops())
+                {
+                    CurveLoop flatLoop = FlattenLoop(edgeLoop);
+                    if (flatLoop == null || flatLoop.Count() == 0)
+                        continue;
+
+                    // 外周ループ（反時計回り）のみ採用。
+                    // 穴ループ（時計回り）は耐火被覆では不要なので除外
+                    try
+                    {
+                        if (flatLoop.IsCounterClockwise(XYZ.BasisZ))
+                        {
+                            result.MergedLoops.Add(flatLoop);
+                        }
+                    }
+                    catch
+                    {
+                        // IsCounterClockwise が失敗した場合は採用
+                        result.MergedLoops.Add(flatLoop);
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// CurveLoopをZ=0に平坦化
+        /// </summary>
+        private static CurveLoop FlattenLoop(IEnumerable<Curve> edgeLoop)
+        {
+            var flatLoop = new CurveLoop();
+
+            foreach (Curve c in edgeLoop)
+            {
+                XYZ s = c.GetEndPoint(0);
+                XYZ e = c.GetEndPoint(1);
+                XYZ fs = new XYZ(s.X, s.Y, 0);
+                XYZ fe = new XYZ(e.X, e.Y, 0);
+
+                if (fs.DistanceTo(fe) < 0.0001)
+                    continue;
+
+                try
+                {
+                    flatLoop.Append(Line.CreateBound(fs, fe));
+                }
+                catch
+                {
+                    return null;
+                }
+            }
+
+            return flatLoop;
+        }
+
+        /// <summary>
+        /// 梁幅を取得
         /// </summary>
         public static double GetBeamWidth(FamilyInstance beam)
         {
@@ -183,6 +281,56 @@ namespace Tools28.Commands.FireProtection
             }
 
             return 200.0 / 304.8;
+        }
+
+        /// <summary>
+        /// 要素群から「耐火被覆」を含むパラメータを検出
+        /// </summary>
+        public static List<FireProtectionParameterInfo> DetectFireProtectionParameters(
+            IEnumerable<Element> elements)
+        {
+            var paramValues = new Dictionary<string, HashSet<string>>();
+            var paramCounts = new Dictionary<string, int>();
+
+            foreach (var elem in elements)
+            {
+                foreach (Parameter p in elem.Parameters)
+                {
+                    if (p.Definition == null) continue;
+                    string name = p.Definition.Name;
+                    if (!name.Contains("耐火被覆")) continue;
+
+                    if (!paramValues.ContainsKey(name))
+                    {
+                        paramValues[name] = new HashSet<string>();
+                        paramCounts[name] = 0;
+                    }
+
+                    string value = null;
+                    if (p.StorageType == StorageType.String)
+                        value = p.AsString();
+                    else if (p.StorageType == StorageType.Integer)
+                        value = p.AsValueString();
+                    else if (p.StorageType == StorageType.Double)
+                        value = p.AsValueString();
+
+                    if (!string.IsNullOrEmpty(value) && value.Trim().Length > 0)
+                    {
+                        paramValues[name].Add(value.Trim());
+                        paramCounts[name]++;
+                    }
+                }
+            }
+
+            return paramValues
+                .Select(kv => new FireProtectionParameterInfo
+                {
+                    ParameterName = kv.Key,
+                    DetectedCount = paramCounts[kv.Key],
+                    UniqueValues = kv.Value.OrderBy(v => v).ToList()
+                })
+                .OrderByDescending(p => p.DetectedCount)
+                .ToList();
         }
     }
 }

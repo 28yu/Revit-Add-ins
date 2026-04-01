@@ -18,7 +18,7 @@ namespace Tools28.Commands.FireProtection
         public static int CreateFilledRegions(
             Document doc,
             View activeView,
-            Dictionary<string, List<FamilyInstance>> beamsByType,
+            Dictionary<string, List<Element>> elementsByType,
             Dictionary<string, double> offsetByType,
             ElementId fillPatternId,
             ElementId lineStyleId,
@@ -30,19 +30,18 @@ namespace Tools28.Commands.FireProtection
                 CleanupExistingRegions(doc, activeView);
             }
 
-            var colors = GenerateColors(orderedTypes.Count);
             int totalCreated = 0;
 
-            for (int i = 0; i < orderedTypes.Count; i++)
+            foreach (var typeEntry in orderedTypes)
             {
-                string typeName = orderedTypes[i].Name;
-                if (!beamsByType.ContainsKey(typeName))
+                string typeName = typeEntry.Name;
+                if (!elementsByType.ContainsKey(typeName))
                     continue;
 
-                var beams = beamsByType[typeName];
+                var elements = elementsByType[typeName];
                 double offsetFeet = offsetByType.ContainsKey(typeName)
                     ? offsetByType[typeName] : 0;
-                Color color = colors[i];
+                Color color = new Color(typeEntry.ColorR, typeEntry.ColorG, typeEntry.ColorB);
 
                 string regionTypeName = TypePrefix + typeName;
                 ElementId regionTypeId = GetOrCreateFilledRegionType(
@@ -50,52 +49,69 @@ namespace Tools28.Commands.FireProtection
                 if (regionTypeId == null) continue;
 
                 var outlines = new List<CurveLoop>();
-                foreach (var beam in beams)
+                foreach (var elem in elements)
                 {
-                    var outline = BeamGeometryHelper.GetBeamOffsetOutline(beam, offsetFeet);
+                    var outline = BeamGeometryHelper.GetElementOffsetOutline(
+                        elem, activeView, offsetFeet);
                     if (outline != null)
                         outlines.Add(outline);
                 }
 
                 if (outlines.Count == 0) continue;
 
-                var mergedOutlines = BeamGeometryHelper.MergeOutlines(outlines);
+                var mergeResult = BeamGeometryHelper.MergeOutlines(outlines);
 
-                try
+                // 統合済みループから塗潰領域を作成
+                if (mergeResult.MergedLoops.Count > 0)
                 {
-                    var region = FilledRegion.Create(
-                        doc, regionTypeId, activeView.Id, mergedOutlines);
-
-                    if (lineStyleId != null && lineStyleId != ElementId.InvalidElementId)
+                    try
                     {
-                        region.SetLineStyleId(lineStyleId);
+                        var region = FilledRegion.Create(
+                            doc, regionTypeId, activeView.Id, mergeResult.MergedLoops);
+                        ApplyLineStyle(region, lineStyleId);
+                        totalCreated++;
                     }
-
-                    totalCreated++;
-                }
-                catch
-                {
-                    foreach (var outline in outlines)
+                    catch
                     {
-                        try
+                        foreach (var loop in mergeResult.MergedLoops)
                         {
-                            var region = FilledRegion.Create(
-                                doc, regionTypeId, activeView.Id,
-                                new List<CurveLoop> { outline });
-
-                            if (lineStyleId != null && lineStyleId != ElementId.InvalidElementId)
+                            try
                             {
-                                region.SetLineStyleId(lineStyleId);
+                                var region = FilledRegion.Create(
+                                    doc, regionTypeId, activeView.Id,
+                                    new List<CurveLoop> { loop });
+                                ApplyLineStyle(region, lineStyleId);
+                                totalCreated++;
                             }
-
-                            totalCreated++;
+                            catch { }
                         }
-                        catch { }
                     }
+                }
+
+                // 統合失敗ループは個別に作成
+                foreach (var loop in mergeResult.UnmergedLoops)
+                {
+                    try
+                    {
+                        var region = FilledRegion.Create(
+                            doc, regionTypeId, activeView.Id,
+                            new List<CurveLoop> { loop });
+                        ApplyLineStyle(region, lineStyleId);
+                        totalCreated++;
+                    }
+                    catch { }
                 }
             }
 
             return totalCreated;
+        }
+
+        private static void ApplyLineStyle(FilledRegion region, ElementId lineStyleId)
+        {
+            if (lineStyleId != null && lineStyleId != ElementId.InvalidElementId)
+            {
+                region.SetLineStyleId(lineStyleId);
+            }
         }
 
         private static ElementId GetOrCreateFilledRegionType(

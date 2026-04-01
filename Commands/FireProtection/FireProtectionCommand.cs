@@ -27,15 +27,18 @@ namespace Tools28.Commands.FireProtection
             {
                 View activeView = doc.ActiveView;
 
+                // 対応ビュータイプ: 平面、天伏、構造伏、断面
                 if (activeView.ViewType != ViewType.FloorPlan &&
                     activeView.ViewType != ViewType.CeilingPlan &&
-                    activeView.ViewType != ViewType.EngineeringPlan)
+                    activeView.ViewType != ViewType.EngineeringPlan &&
+                    activeView.ViewType != ViewType.Section)
                 {
                     TaskDialog.Show("エラー",
-                        "平面ビュー、天井伏図、または構造伏図で実行してください。");
+                        "平面ビュー、天井伏図、構造伏図、または断面図で実行してください。");
                     return Result.Cancelled;
                 }
 
+                // ビューテンプレート確認
                 if (activeView.ViewTemplateId != ElementId.InvalidElementId)
                 {
                     TaskDialogResult templateResult = TaskDialog.Show(
@@ -60,38 +63,44 @@ namespace Tools28.Commands.FireProtection
                     }
                 }
 
+                // 梁を取得
                 var beams = new FilteredElementCollector(doc, activeView.Id)
                     .OfCategory(BuiltInCategory.OST_StructuralFraming)
                     .WhereElementIsNotElementType()
-                    .Cast<FamilyInstance>()
+                    .Cast<Element>()
                     .ToList();
 
-                if (beams.Count == 0)
+                // 柱を取得
+                var columns = new FilteredElementCollector(doc, activeView.Id)
+                    .OfCategory(BuiltInCategory.OST_StructuralColumns)
+                    .WhereElementIsNotElementType()
+                    .Cast<Element>()
+                    .ToList();
+
+                if (beams.Count == 0 && columns.Count == 0)
                 {
-                    TaskDialog.Show("エラー", "ビュー内に梁（構造フレーム）が見つかりません。");
+                    TaskDialog.Show("エラー",
+                        "ビュー内に梁（構造フレーム）または柱（構造柱）が見つかりません。");
                     return Result.Cancelled;
                 }
 
-                var beamTypes = beams
-                    .GroupBy(b => $"{b.Symbol.Family.Name}: {b.Symbol.Name}")
-                    .Select(g => new BeamTypeInfo
-                    {
-                        FamilyName = g.First().Symbol.Family.Name,
-                        TypeName = g.First().Symbol.Name,
-                        Count = g.Count(),
-                        Beams = g.ToList()
-                    })
-                    .OrderBy(bt => bt.DisplayName)
-                    .ToList();
+                // パラメータ自動検出
+                var beamParams = BeamGeometryHelper.DetectFireProtectionParameters(beams);
+                var columnParams = BeamGeometryHelper.DetectFireProtectionParameters(columns);
 
+                // 線種取得（重複排除）
                 var lineStyles = new FilteredElementCollector(doc)
                     .OfClass(typeof(GraphicsStyle))
                     .Cast<GraphicsStyle>()
-                    .Where(gs => gs.GraphicsStyleType == GraphicsStyleType.Projection)
+                    .Where(gs => gs.GraphicsStyleType == GraphicsStyleType.Projection
+                              && gs.GraphicsStyleCategory != null)
+                    .GroupBy(gs => gs.Name)
+                    .Select(g => g.First())
                     .OrderBy(gs => gs.Name)
                     .Select(gs => new LineStyleItem { Id = gs.Id, Name = gs.Name })
                     .ToList();
 
+                // 塗りパターン取得
                 var fillPatterns = new FilteredElementCollector(doc)
                     .OfClass(typeof(FillPatternElement))
                     .Cast<FillPatternElement>()
@@ -99,6 +108,7 @@ namespace Tools28.Commands.FireProtection
                     .Select(fp => new FillPatternItem { Id = fp.Id, Name = fp.Name })
                     .ToList();
 
+                // 文字タイプ取得
                 var textNoteTypes = new FilteredElementCollector(doc)
                     .OfClass(typeof(TextNoteType))
                     .Cast<TextNoteType>()
@@ -106,14 +116,26 @@ namespace Tools28.Commands.FireProtection
                     .Select(t => new FpTextNoteTypeItem(t))
                     .ToList();
 
-                Level refLevel = activeView.GenLevel;
+                string viewTypeName;
+                switch (activeView.ViewType)
+                {
+                    case ViewType.FloorPlan: viewTypeName = "平面ビュー"; break;
+                    case ViewType.CeilingPlan: viewTypeName = "天井伏図"; break;
+                    case ViewType.EngineeringPlan: viewTypeName = "構造伏図"; break;
+                    case ViewType.Section: viewTypeName = "断面図"; break;
+                    default: viewTypeName = activeView.ViewType.ToString(); break;
+                }
 
                 var dialogData = new FireProtectionDialogData
                 {
                     ViewName = activeView.Name,
+                    ViewTypeName = viewTypeName,
                     BeamCount = beams.Count,
-                    RefLevel = refLevel,
-                    BeamTypes = beamTypes,
+                    ColumnCount = columns.Count,
+                    HasBeams = beams.Count > 0,
+                    HasColumns = columns.Count > 0,
+                    BeamParameters = beamParams,
+                    ColumnParameters = columnParams,
                     TextNoteTypes = textNoteTypes,
                     LineStyles = lineStyles,
                     FillPatterns = fillPatterns
@@ -125,35 +147,56 @@ namespace Tools28.Commands.FireProtection
 
                 var settings = dialog.GetResult();
 
-                var beamsByFpType = new Dictionary<string, List<FamilyInstance>>();
+                // 対象要素を収集
+                var targetElements = new List<Element>();
+                if (settings.IncludeBeams) targetElements.AddRange(beams);
+                if (settings.IncludeColumns) targetElements.AddRange(columns);
+
+                // パラメータ名を取得（表示用テキストを除去）
+                string paramName = settings.SelectedParameterName;
+                if (paramName != null && paramName.Contains("（"))
+                    paramName = paramName.Substring(0, paramName.IndexOf("（"));
+
+                // 要素をパラメータ値でグループ化
+                var elementsByType = new Dictionary<string, List<Element>>();
                 var beamCountByType = new Dictionary<string, int>();
 
-                foreach (var bt in beamTypes)
+                foreach (var elem in targetElements)
                 {
-                    string assignment;
-                    if (!settings.BeamTypeAssignments.TryGetValue(
-                            bt.DisplayName, out assignment))
+                    Parameter p = elem.LookupParameter(paramName);
+                    if (p == null) continue;
+
+                    string value = null;
+                    if (p.StorageType == StorageType.String)
+                        value = p.AsString();
+                    else
+                        value = p.AsValueString();
+
+                    if (string.IsNullOrEmpty(value) || value.Trim().Length == 0)
                         continue;
-                    if (assignment == "除外") continue;
 
-                    if (!beamsByFpType.ContainsKey(assignment))
-                        beamsByFpType[assignment] = new List<FamilyInstance>();
-                    beamsByFpType[assignment].AddRange(bt.Beams);
+                    value = value.Trim();
 
-                    if (!beamCountByType.ContainsKey(assignment))
-                        beamCountByType[assignment] = 0;
-                    beamCountByType[assignment] += bt.Count;
+                    if (!elementsByType.ContainsKey(value))
+                    {
+                        elementsByType[value] = new List<Element>();
+                        beamCountByType[value] = 0;
+                    }
+                    elementsByType[value].Add(elem);
+                    beamCountByType[value]++;
                 }
 
+                // オフセット辞書
                 var offsetByType = new Dictionary<string, double>();
-                foreach (var fpType in settings.Types)
+                foreach (var typeEntry in settings.Types)
                 {
                     double offsetMm = settings.UseCommonOffset
                         ? settings.CommonOffsetMm
-                        : fpType.OffsetMm;
-                    offsetByType[fpType.Name] = offsetMm / 304.8;
+                        : typeEntry.OffsetMm;
+                    offsetByType[typeEntry.Name] = offsetMm / 304.8;
                 }
 
+                // 実行
                 ElementId legendViewId = null;
                 int regionCount = 0;
 
@@ -164,7 +207,7 @@ namespace Tools28.Commands.FireProtection
                     try
                     {
                         regionCount = FilledRegionCreator.CreateFilledRegions(
-                            doc, activeView, beamsByFpType, offsetByType,
+                            doc, activeView, elementsByType, offsetByType,
                             settings.FillPatternId, settings.LineStyleId,
                             settings.Types, settings.OverwriteExisting);
 
@@ -178,7 +221,8 @@ namespace Tools28.Commands.FireProtection
                     {
                         trans.RollBack();
                         throw new Exception(
-                            "トランザクション内でエラーが発生しました: " + ex.Message, ex);
+                            "トランザクション内でエラー: " + ex.Message +
+                            "\n" + ex.StackTrace, ex);
                     }
                 }
 
@@ -186,11 +230,11 @@ namespace Tools28.Commands.FireProtection
                     ? "凡例ビュー「耐火被覆色分け凡例」を作成しました"
                     : "凡例ビュー作成をスキップしました";
 
-                int totalBeams = beamsByFpType.Values.Sum(b => b.Count);
+                int totalElements = elementsByType.Values.Sum(b => b.Count);
 
                 TaskDialog.Show("耐火被覆色分け - 完了",
                     $"処理が完了しました。\n\n" +
-                    $"対象梁数: {totalBeams}\n" +
+                    $"対象要素数: {totalElements}\n" +
                     $"塗潰領域: {regionCount} 個作成\n" +
                     $"耐火被覆種類: {settings.Types.Count}\n" +
                     $"{legendInfo}");

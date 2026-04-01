@@ -3,19 +3,11 @@ using Autodesk.Revit.DB;
 
 namespace Tools28.Commands.FireProtection
 {
-    public class FireProtectionTypeEntry
+    public class FireProtectionParameterInfo
     {
-        public string Name { get; set; }
-        public double OffsetMm { get; set; }
-    }
-
-    public class BeamTypeInfo
-    {
-        public string FamilyName { get; set; }
-        public string TypeName { get; set; }
-        public string DisplayName => $"{FamilyName}: {TypeName}";
-        public int Count { get; set; }
-        public List<FamilyInstance> Beams { get; set; }
+        public string ParameterName { get; set; }
+        public int DetectedCount { get; set; }
+        public List<string> UniqueValues { get; set; }
     }
 
     public class LineStyleItem
@@ -46,12 +38,25 @@ namespace Tools28.Commands.FireProtection
         public override string ToString() => Name;
     }
 
+    public class FireProtectionTypeEntry
+    {
+        public string Name { get; set; }
+        public double OffsetMm { get; set; }
+        public byte ColorR { get; set; }
+        public byte ColorG { get; set; }
+        public byte ColorB { get; set; }
+    }
+
     public class FireProtectionDialogData
     {
         public string ViewName { get; set; }
+        public string ViewTypeName { get; set; }
         public int BeamCount { get; set; }
-        public Level RefLevel { get; set; }
-        public List<BeamTypeInfo> BeamTypes { get; set; }
+        public int ColumnCount { get; set; }
+        public bool HasBeams { get; set; }
+        public bool HasColumns { get; set; }
+        public List<FireProtectionParameterInfo> BeamParameters { get; set; }
+        public List<FireProtectionParameterInfo> ColumnParameters { get; set; }
         public List<FpTextNoteTypeItem> TextNoteTypes { get; set; }
         public List<LineStyleItem> LineStyles { get; set; }
         public List<FillPatternItem> FillPatterns { get; set; }
@@ -59,13 +64,21 @@ namespace Tools28.Commands.FireProtection
 
     public class FireProtectionResult
     {
+        public bool IncludeBeams { get; set; }
+        public bool IncludeColumns { get; set; }
+        public string SelectedParameterName { get; set; }
         public List<FireProtectionTypeEntry> Types { get; set; }
         public bool UseCommonOffset { get; set; }
         public double CommonOffsetMm { get; set; }
-        public Dictionary<string, string> BeamTypeAssignments { get; set; }
         public ElementId LineStyleId { get; set; }
         public ElementId FillPatternId { get; set; }
         public ElementId TextNoteTypeId { get; set; }
         public bool OverwriteExisting { get; set; }
+    }
+
+    public class MergeResult
+    {
+        public List<CurveLoop> MergedLoops { get; set; } = new List<CurveLoop>();
+        public List<CurveLoop> UnmergedLoops { get; set; } = new List<CurveLoop>();
     }
 }
