@@ -8,7 +8,7 @@ using Autodesk.Revit.UI;
 namespace Tools28.Commands.FireProtection
 {
     /// <summary>
-    /// 耐火被覆範囲色分け図コマンド
+    /// 耐火被覆範囲色分け図コマンド（梁・柱の耐火被覆を色分け表示）
     /// </summary>
     [Transaction(TransactionMode.Manual)]
     [Regeneration(RegenerationOption.Manual)]
