@@ -48,75 +48,13 @@ namespace Tools28.Commands.FireProtection
                     doc, regionTypeName, fillPatternId, color);
                 if (regionTypeId == null) continue;
 
-                // 梁の線分情報を収集（インデックス付き）
-                var beamInfoList = new List<int>();    // elementsリスト内のインデックス
-                var beamStarts = new List<XYZ>();
-                var beamEnds = new List<XYZ>();
-                double maxBeamHalfWidth = 0;
-
-                for (int ei = 0; ei < elements.Count; ei++)
-                {
-                    var fi = elements[ei] as FamilyInstance;
-                    if (fi == null) continue;
-                    if (elements[ei].Category.Id.IntegerValue !=
-                        (int)BuiltInCategory.OST_StructuralFraming) continue;
-
-                    LocationCurve lc = fi.Location as LocationCurve;
-                    if (lc == null || lc.Curve == null) continue;
-
-                    double w = BeamGeometryHelper.GetBeamWidth(fi);
-                    if (w / 2.0 > maxBeamHalfWidth) maxBeamHalfWidth = w / 2.0;
-
-                    var s = lc.Curve.GetEndPoint(0);
-                    var e = lc.Curve.GetEndPoint(1);
-                    beamInfoList.Add(ei);
-                    beamStarts.Add(new XYZ(s.X, s.Y, 0));
-                    beamEnds.Add(new XYZ(e.X, e.Y, 0));
-                }
-
-                double connExtension = maxBeamHalfWidth + offsetFeet;
-                double connTolerance = 500.0 / 304.8;
-                var processedIndices = new HashSet<int>();
-
-                // 梁: 端部ごとに接続判定して延長量を決定
                 var outlines = new List<CurveLoop>();
-                for (int bi = 0; bi < beamInfoList.Count; bi++)
+                foreach (var elem in elements)
                 {
-                    int ei = beamInfoList[bi];
-                    processedIndices.Add(ei);
-                    XYZ s2d = beamStarts[bi];
-                    XYZ e2d = beamEnds[bi];
-
-                    bool sConn = false, eConn = false;
-                    for (int bj = 0; bj < beamInfoList.Count; bj++)
-                    {
-                        if (bi == bj) continue; // インデックスで自分自身をスキップ
-
-                        double sDist = PointToSegDist(
-                            s2d, beamStarts[bj], beamEnds[bj]);
-                        double eDist = PointToSegDist(
-                            e2d, beamStarts[bj], beamEnds[bj]);
-
-                        if (sDist < connTolerance) sConn = true;
-                        if (eDist < connTolerance) eConn = true;
-                        if (sConn && eConn) break;
-                    }
-
-                    double sExt = sConn ? connExtension : offsetFeet;
-                    double eExt = eConn ? connExtension : offsetFeet;
-
                     var outline = BeamGeometryHelper.GetElementOffsetOutline(
-                        elements[ei], activeView, offsetFeet, sExt, eExt);
-                    if (outline != null) outlines.Add(outline);
-                }
-
-                // 柱等（梁以外）: デフォルトoffsetで生成
-                for (int ei = 0; ei < elements.Count; ei++)
-                {
-                    if (processedIndices.Contains(ei)) continue;
-                    var outline = BeamGeometryHelper.GetElementOffsetOutline(
-                        elements[ei], activeView, offsetFeet);
-                    if (outline != null) outlines.Add(outline);
+                        elem, activeView, offsetFeet);
+                    if (outline != null)
+                        outlines.Add(outline);
                 }
 
                 if (outlines.Count == 0) continue;
@@ -201,18 +139,6 @@ namespace Tools28.Commands.FireProtection
             }
 
             return totalCreated;
-        }
-
-        private static double PointToSegDist(XYZ pt, XYZ a, XYZ b)
-        {
-            double vx = b.X - a.X, vy = b.Y - a.Y;
-            double wx = pt.X - a.X, wy = pt.Y - a.Y;
-            double c1 = wx * vx + wy * vy;
-            if (c1 <= 0) return pt.DistanceTo(a);
-            double c2 = vx * vx + vy * vy;
-            if (c2 <= c1) return pt.DistanceTo(b);
-            double t = c1 / c2;
-            return pt.DistanceTo(new XYZ(a.X + t * vx, a.Y + t * vy, 0));
         }
 
         private static CurveLoop TransformLoop(CurveLoop loop, Transform transform)
