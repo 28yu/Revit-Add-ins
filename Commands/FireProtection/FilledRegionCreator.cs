@@ -77,7 +77,7 @@ namespace Tools28.Commands.FireProtection
                         if (re.Category.Id.IntegerValue == (int)BuiltInCategory.OST_StructuralFraming)
                             refWidths.Add(BeamGeometryHelper.GetBeamWidth(rfi));
                         else
-                            refWidths.Add(GetColumnWidth(rfi));
+                            refWidths.Add(GetElementPlanWidth(re, activeView));
                         continue;
                     }
 
@@ -89,7 +89,8 @@ namespace Tools28.Commands.FireProtection
                         if (rbb == null) rbb = re.get_BoundingBox(null);
                         if (rbb != null)
                         {
-                            double cw = Math.Max(rbb.Max.X - rbb.Min.X, rbb.Max.Y - rbb.Min.Y);
+                            double cw = Math.Min(rbb.Max.X - rbb.Min.X, rbb.Max.Y - rbb.Min.Y);
+                            cw = Math.Min(cw, 600.0 / 304.8); // 上限600mm
                             XYZ cp = new XYZ(rlp.Point.X, rlp.Point.Y, 0);
                             refStarts.Add(new XYZ(cp.X, cp.Y - 0.01, 0));
                             refEnds.Add(new XYZ(cp.X, cp.Y + 0.01, 0));
@@ -314,15 +315,46 @@ namespace Tools28.Commands.FireProtection
             return totalCreated;
         }
 
-        private static double GetColumnWidth(FamilyInstance column)
+        /// <summary>
+        /// 構造要素の平面幅を取得（パラメータ優先、BoundingBox上限付きフォールバック）
+        /// </summary>
+        private static double GetElementPlanWidth(Element elem, View view)
         {
-            BoundingBoxXYZ bb = column.get_BoundingBox(null);
+            var fi = elem as FamilyInstance;
+            if (fi == null) return 400.0 / 304.8;
+
+            // 梁カテゴリならGetBeamWidthを使用
+            if (elem.Category.Id.IntegerValue == (int)BuiltInCategory.OST_StructuralFraming)
+                return BeamGeometryHelper.GetBeamWidth(fi);
+
+            // 柱: パラメータから幅を探す
+            var paramNames = new[] { "b", "B", "幅", "柱幅", "W", "w", "Width", "width", "D", "d" };
+            foreach (string name in paramNames)
+            {
+                Parameter p = fi.LookupParameter(name);
+                if (p != null && p.StorageType == StorageType.Double && p.AsDouble() > 0)
+                    return p.AsDouble();
+            }
+            ElementType eType = elem.Document.GetElement(fi.GetTypeId()) as ElementType;
+            if (eType != null)
+            {
+                foreach (string name in paramNames)
+                {
+                    Parameter p = eType.LookupParameter(name);
+                    if (p != null && p.StorageType == StorageType.Double && p.AsDouble() > 0)
+                        return p.AsDouble();
+                }
+            }
+
+            // フォールバック: BoundingBox(view)のMin、上限600mm
+            BoundingBoxXYZ bb = elem.get_BoundingBox(view);
+            if (bb == null) bb = elem.get_BoundingBox(null);
             if (bb != null)
             {
                 double xExt = bb.Max.X - bb.Min.X;
                 double yExt = bb.Max.Y - bb.Min.Y;
-                // 小さい方の寸法 = 平面上の幅（大きい方は高さや奥行の可能性）
-                return Math.Min(xExt, yExt);
+                double w = Math.Min(xExt, yExt);
+                return Math.Min(w, 600.0 / 304.8);
             }
             return 400.0 / 304.8;
         }
