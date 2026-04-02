@@ -169,7 +169,7 @@
                             BorderThickness="1" CornerRadius="3" Padding="15,12" Margin="0,0,0,10">
                         <StackPanel>
                             <TextBlock Style="{StaticResource SectionHeader}" Text="検出された耐火被覆の種類"/>
-                            <TextBlock Style="{StaticResource NoteStyle}" Margin="0,0,0,6"
+                            <TextBlock Margin="0,0,0,6" FontSize="10" Foreground="Red"
                                        Text="※ 色の四角をクリックすると変更できます"/>
                             <StackPanel x:Name="DetectedTypesPanel"/>
                         </StackPanel>

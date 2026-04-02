@@ -42,11 +42,13 @@ namespace Tools28.Commands.FireProtection
                 var elements = elementsByType[typeName];
                 double offsetFeet = offsetByType.ContainsKey(typeName)
                     ? offsetByType[typeName] : 0;
-                Color color = new Color(typeEntry.ColorR, typeEntry.ColorG, typeEntry.ColorB);
+                Color fgColor = new Color(typeEntry.ColorR, typeEntry.ColorG, typeEntry.ColorB);
+                Color bgColor = new Color(typeEntry.BgColorR, typeEntry.BgColorG, typeEntry.BgColorB);
 
                 string regionTypeName = TypePrefix + typeName;
                 ElementId regionTypeId = GetOrCreateFilledRegionType(
-                    doc, regionTypeName, fillPatternId, color);
+                    doc, regionTypeName, fillPatternId, fgColor,
+                    typeEntry.ForegroundVisible, bgColor, typeEntry.BackgroundVisible);
                 if (regionTypeId == null) continue;
 
                 // 各要素のアウトラインを生成
@@ -179,7 +181,8 @@ namespace Tools28.Commands.FireProtection
         }
 
         private static ElementId GetOrCreateFilledRegionType(
-            Document doc, string typeName, ElementId fillPatternId, Color color)
+            Document doc, string typeName, ElementId fillPatternId, Color fgColor,
+            bool fgVisible = true, Color bgColor = null, bool bgVisible = false)
         {
             var existing = new FilteredElementCollector(doc)
                 .OfClass(typeof(FilledRegionType))
@@ -199,10 +202,29 @@ namespace Tools28.Commands.FireProtection
             var newType = baseType.Duplicate(typeName) as FilledRegionType;
             if (newType == null) return null;
 
-            newType.ForegroundPatternColor = color;
-            if (fillPatternId != null && fillPatternId != ElementId.InvalidElementId)
+            // 前景
+            if (fgVisible && fillPatternId != null && fillPatternId != ElementId.InvalidElementId)
+            {
+                newType.ForegroundPatternColor = fgColor;
                 newType.ForegroundPatternId = fillPatternId;
-            newType.BackgroundPatternId = ElementId.InvalidElementId;
+            }
+            else
+            {
+                newType.ForegroundPatternId = ElementId.InvalidElementId;
+            }
+
+            // 背景
+            if (bgVisible && bgColor != null && fillPatternId != null
+                && fillPatternId != ElementId.InvalidElementId)
+            {
+                newType.BackgroundPatternColor = bgColor;
+                newType.BackgroundPatternId = fillPatternId;
+            }
+            else
+            {
+                newType.BackgroundPatternId = ElementId.InvalidElementId;
+            }
+
             newType.IsMasking = false;
 
             return newType.Id;

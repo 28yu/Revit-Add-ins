@@ -64,7 +64,7 @@ namespace Tools28.Commands.FireProtection
         {
             IncludeBeamsCheck.IsChecked = _data.HasBeams;
             IncludeBeamsCheck.IsEnabled = _data.HasBeams;
-            IncludeColumnsCheck.IsChecked = _data.HasColumns;
+            IncludeColumnsCheck.IsChecked = false; // デフォルトOFF
             IncludeColumnsCheck.IsEnabled = _data.HasColumns;
 
             UpdateCategoryCount();
@@ -208,39 +208,89 @@ namespace Tools28.Commands.FireProtection
                 var entry = _typeEntries[i];
                 int idx = i;
 
-                var panel = new StackPanel
+                // 種類名ヘッダー
+                var headerBlock = new TextBlock
+                {
+                    Text = entry.Name,
+                    FontSize = 12,
+                    FontWeight = FontWeights.Bold,
+                    Margin = new Thickness(4, i > 0 ? 8 : 0, 0, 4)
+                };
+                DetectedTypesPanel.Children.Add(headerBlock);
+
+                // 前景行
+                var fgPanel = new StackPanel
                 {
                     Orientation = Orientation.Horizontal,
-                    Margin = new Thickness(0, 2, 0, 2)
+                    Margin = new Thickness(12, 2, 0, 2)
                 };
-
-                var colorRect = new WpfRectangle
+                var fgCheck = new CheckBox
                 {
-                    Width = 22,
-                    Height = 16,
+                    Content = "前景:",
+                    IsChecked = entry.ForegroundVisible,
+                    FontSize = 11,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(0, 0, 6, 0)
+                };
+                int fgIdx = idx;
+                fgCheck.Checked += (s, ev) => { _typeEntries[fgIdx].ForegroundVisible = true; };
+                fgCheck.Unchecked += (s, ev) => { _typeEntries[fgIdx].ForegroundVisible = false; };
+                fgPanel.Children.Add(fgCheck);
+
+                var fgRect = new WpfRectangle
+                {
+                    Width = 32, Height = 20,
                     Fill = new SolidColorBrush(System.Windows.Media.Color.FromRgb(
                         entry.ColorR, entry.ColorG, entry.ColorB)),
                     Stroke = new SolidColorBrush(
                         System.Windows.Media.Color.FromRgb(0x66, 0x66, 0x66)),
                     StrokeThickness = 1,
-                    Margin = new Thickness(4, 0, 8, 0),
-                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(0, 0, 4, 0),
                     Cursor = Cursors.Hand
                 };
-                colorRect.MouseLeftButtonDown += (s, ev) =>
+                fgRect.MouseLeftButtonDown += (s, ev) =>
                 {
-                    ShowColorPicker(idx);
+                    ShowColorPicker(fgIdx);
                 };
-                panel.Children.Add(colorRect);
+                fgPanel.Children.Add(fgRect);
+                DetectedTypesPanel.Children.Add(fgPanel);
 
-                panel.Children.Add(new TextBlock
+                // 背景行
+                var bgPanel = new StackPanel
                 {
-                    Text = entry.Name,
-                    FontSize = 12,
-                    VerticalAlignment = VerticalAlignment.Center
-                });
+                    Orientation = Orientation.Horizontal,
+                    Margin = new Thickness(12, 2, 0, 2)
+                };
+                var bgCheck = new CheckBox
+                {
+                    Content = "背景:",
+                    IsChecked = entry.BackgroundVisible,
+                    FontSize = 11,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(0, 0, 6, 0)
+                };
+                int bgIdx = idx;
+                bgCheck.Checked += (s, ev) => { _typeEntries[bgIdx].BackgroundVisible = true; };
+                bgCheck.Unchecked += (s, ev) => { _typeEntries[bgIdx].BackgroundVisible = false; };
+                bgPanel.Children.Add(bgCheck);
 
-                DetectedTypesPanel.Children.Add(panel);
+                var bgRect = new WpfRectangle
+                {
+                    Width = 32, Height = 20,
+                    Fill = new SolidColorBrush(System.Windows.Media.Color.FromRgb(
+                        entry.BgColorR, entry.BgColorG, entry.BgColorB)),
+                    Stroke = new SolidColorBrush(
+                        System.Windows.Media.Color.FromRgb(0x66, 0x66, 0x66)),
+                    StrokeThickness = 1,
+                    Margin = new Thickness(0, 0, 4, 0),
+                    Cursor = Cursors.Hand
+                };
+                bgRect.MouseLeftButtonDown += (s, ev) =>
+                {
+                    ShowBgColorPicker(bgIdx);
+                };
+                bgPanel.Children.Add(bgRect);
+                DetectedTypesPanel.Children.Add(bgPanel);
             }
         }
 
@@ -348,6 +398,27 @@ namespace Tools28.Commands.FireProtection
                 entry.ColorR = colorDialog.Color.R;
                 entry.ColorG = colorDialog.Color.G;
                 entry.ColorB = colorDialog.Color.B;
+                RefreshDetectedTypesUI();
+            }
+        }
+
+        private void ShowBgColorPicker(int typeIndex)
+        {
+            if (typeIndex < 0 || typeIndex >= _typeEntries.Count) return;
+
+            var entry = _typeEntries[typeIndex];
+            var colorDialog = new WinForms.ColorDialog
+            {
+                FullOpen = true,
+                Color = System.Drawing.Color.FromArgb(
+                    entry.BgColorR, entry.BgColorG, entry.BgColorB)
+            };
+
+            if (colorDialog.ShowDialog() == WinForms.DialogResult.OK)
+            {
+                entry.BgColorR = colorDialog.Color.R;
+                entry.BgColorG = colorDialog.Color.G;
+                entry.BgColorB = colorDialog.Color.B;
                 RefreshDetectedTypesUI();
             }
         }

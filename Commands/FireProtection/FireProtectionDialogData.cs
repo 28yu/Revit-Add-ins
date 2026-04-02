@@ -42,9 +42,16 @@ namespace Tools28.Commands.FireProtection
     {
         public string Name { get; set; }
         public double OffsetMm { get; set; }
+        // 前景
         public byte ColorR { get; set; }
         public byte ColorG { get; set; }
         public byte ColorB { get; set; }
+        public bool ForegroundVisible { get; set; } = true;
+        // 背景
+        public byte BgColorR { get; set; } = 255;
+        public byte BgColorG { get; set; } = 255;
+        public byte BgColorB { get; set; } = 255;
+        public bool BackgroundVisible { get; set; }
     }
 
     public class FireProtectionDialogData
