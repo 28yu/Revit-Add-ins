@@ -156,15 +156,13 @@ namespace Tools28.Commands.FireProtection
                                     isTjunc = true;
                                 }
 
-                                if (isTjunc)
+                                if (isTjunc && refIsProcessing)
                                 {
                                     // 処理対象: 接続先のoffset端まで延長
-                                    // 非処理対象: 接続先の面まで延長（飛び出し防止）
-                                    sExt = refIsProcessing
-                                        ? refWidths[rj] / 2.0 + offsetFeet
-                                        : refWidths[rj] / 2.0;
-                                    debugLines.Add($"  beam[{bi}]start T ref[{rj}] ext={sExt * 304.8:F0}mm {(refIsProcessing ? "proc" : "face")}");
+                                    sExt = refWidths[rj] / 2.0 + offsetFeet;
+                                    debugLines.Add($"  beam[{bi}]start T ref[{rj}] ext={sExt * 304.8:F0}mm proc");
                                 }
+                                // 非処理対象: 延長しない（offsetのみ）
                             }
                         }
 
@@ -186,12 +184,10 @@ namespace Tools28.Commands.FireProtection
                                     isTjunc = true;
                                 }
 
-                                if (isTjunc)
+                                if (isTjunc && refIsProcessing)
                                 {
-                                    eExt = refIsProcessing
-                                        ? refWidths[rj] / 2.0 + offsetFeet
-                                        : refWidths[rj] / 2.0;
-                                    debugLines.Add($"  beam[{bi}]end T ref[{rj}] ext={eExt * 304.8:F0}mm {(refIsProcessing ? "proc" : "face")}");
+                                    eExt = refWidths[rj] / 2.0 + offsetFeet;
+                                    debugLines.Add($"  beam[{bi}]end T ref[{rj}] ext={eExt * 304.8:F0}mm proc");
                                 }
                             }
                         }
