@@ -12,20 +12,25 @@ namespace Tools28.Commands.FireProtection
     {
         /// <summary>
         /// 要素のオフセット輪郭を取得
-        /// BoundingBox(view) + 均一offsetで矩形を生成
+        /// 梁: LocationCurve（方向+幅が正確）、柱: BoundingBox
         /// </summary>
         public static CurveLoop GetElementOffsetOutline(
             Element element, View view, double offsetFeet,
             double startExt = -1, double endExt = -1)
         {
-            // 断面ビュー
             if (view.ViewType == ViewType.Section)
-            {
                 return GetOutlineForSectionView(element, view, offsetFeet);
+
+            var fi = element as FamilyInstance;
+            if (fi == null) return null;
+
+            if (element.Category.Id.IntegerValue ==
+                (int)BuiltInCategory.OST_StructuralFraming)
+            {
+                var outline = GetBeamOutlineFromCurve(fi, offsetFeet);
+                if (outline != null) return outline;
             }
 
-            // BoundingBox(view) + 均一offset
-            // BBoxは梁の実際の端部位置（柱面カットバック含む）を反映
             return GetOutlineFromBoundingBox(element, view, offsetFeet);
         }
 
@@ -101,8 +106,7 @@ namespace Tools28.Commands.FireProtection
         /// 梁のロケーションカーブから平面輪郭を生成
         /// </summary>
         private static CurveLoop GetBeamOutlineFromCurve(
-            FamilyInstance beam, double offsetFeet,
-            double startExtension, double endExtension)
+            FamilyInstance beam, double offsetFeet)
         {
             LocationCurve locCurve = beam.Location as LocationCurve;
             if (locCurve == null) return null;
@@ -122,8 +126,8 @@ namespace Tools28.Commands.FireProtection
             double beamWidth = GetBeamWidth(beam);
             double halfExtent = beamWidth / 2.0 + offsetFeet;
 
-            XYZ extStart = start - direction * startExtension;
-            XYZ extEnd = end + direction * endExtension;
+            XYZ extStart = start - direction * offsetFeet;
+            XYZ extEnd = end + direction * offsetFeet;
 
             XYZ p0 = extStart - perp * halfExtent;
             XYZ p1 = extEnd - perp * halfExtent;
