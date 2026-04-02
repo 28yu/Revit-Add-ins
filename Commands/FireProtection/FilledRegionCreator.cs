@@ -161,16 +161,15 @@ namespace Tools28.Commands.FireProtection
                                 }
                                 else { isTjunc = true; }
 
-                                if (isTjunc)
+                                if (isTjunc && refIsProcessing)
                                 {
-                                    // 端点からBBox遠端までの実距離を計算
                                     double ext = CalcExtToFarEdge(
                                         bStarts[bi], beamDir.Negate(),
-                                        refBBoxes[rj], refIsProcessing, offsetFeet);
+                                        refBBoxes[rj], true, offsetFeet);
                                     if (ext > sExt)
                                     {
                                         sExt = ext;
-                                        debugLines.Add($"  beam[{bi}]start T ref[{rj}] ext={sExt * 304.8:F0}mm {(refIsProcessing ? "proc" : "face")}");
+                                        debugLines.Add($"  beam[{bi}]start T ref[{rj}] ext={sExt * 304.8:F0}mm proc");
                                     }
                                 }
                             }
@@ -191,15 +190,15 @@ namespace Tools28.Commands.FireProtection
                                 }
                                 else { isTjunc = true; }
 
-                                if (isTjunc)
+                                if (isTjunc && refIsProcessing)
                                 {
                                     double ext = CalcExtToFarEdge(
                                         bEnds[bi], beamDir,
-                                        refBBoxes[rj], refIsProcessing, offsetFeet);
+                                        refBBoxes[rj], true, offsetFeet);
                                     if (ext > eExt)
                                     {
                                         eExt = ext;
-                                        debugLines.Add($"  beam[{bi}]end T ref[{rj}] ext={eExt * 304.8:F0}mm {(refIsProcessing ? "proc" : "face")}");
+                                        debugLines.Add($"  beam[{bi}]end T ref[{rj}] ext={eExt * 304.8:F0}mm proc");
                                     }
                                 }
                             }
