@@ -55,7 +55,6 @@ namespace Tools28.Commands.FireProtection
                 var refStarts = new List<XYZ>();
                 var refEnds = new List<XYZ>();
                 var refWidths = new List<double>();
-                var refSource = allStructuralElements ?? elements.SelectMany(kv => kv.Value).Distinct().ToList();
 
                 foreach (var re in (allStructuralElements ?? new List<Element>()))
                 {
