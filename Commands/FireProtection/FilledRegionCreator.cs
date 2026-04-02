@@ -56,7 +56,8 @@ namespace Tools28.Commands.FireProtection
                 var refStarts = new List<XYZ>();
                 var refEnds = new List<XYZ>();
                 var refWidths = new List<double>();
-                var refElemIds = new List<int>(); // 参照要素のElementId
+                var refElemIds = new List<int>();
+                var refBBoxes = new List<BoundingBoxXYZ>(); // 参照要素のElementId
 
                 foreach (var re in (allStructuralElements ?? new List<Element>()))
                 {
@@ -73,6 +74,8 @@ namespace Tools28.Commands.FireProtection
                         refStarts.Add(new XYZ(rs.X, rs.Y, 0));
                         refEnds.Add(new XYZ(re2.X, re2.Y, 0));
                         refElemIds.Add(reId);
+                        var rbb1 = re.get_BoundingBox(activeView) ?? re.get_BoundingBox(null);
+                        refBBoxes.Add(rbb1);
 
                         if (re.Category.Id.IntegerValue == (int)BuiltInCategory.OST_StructuralFraming)
                             refWidths.Add(BeamGeometryHelper.GetBeamWidth(rfi));
@@ -96,6 +99,7 @@ namespace Tools28.Commands.FireProtection
                             refEnds.Add(new XYZ(cp.X, cp.Y + 0.01, 0));
                             refWidths.Add(cw);
                             refElemIds.Add(reId);
+                            refBBoxes.Add(rbb);
                         }
                     }
                 }
@@ -133,13 +137,16 @@ namespace Tools28.Commands.FireProtection
                     double sExt = offsetFeet;
                     double eExt = offsetFeet;
 
-                    // 全構造要素に対してT字判定
+                    XYZ beamDir = (bEnds[bi] - bStarts[bi]);
+                    double beamLen = beamDir.GetLength();
+                    if (beamLen > 0.001) beamDir = beamDir.Normalize();
+
                     for (int rj = 0; rj < refStarts.Count; rj++)
                     {
                         bool refIsProcessing = processingElementIds != null
                             && processingElementIds.Contains(refElemIds[rj]);
 
-                        // 始端
+                        // 始端（延長方向は -beamDir）
                         if (sExt <= offsetFeet + 0.001)
                         {
                             double dist = PointToSegDist(bStarts[bi], refStarts[rj], refEnds[rj]);
@@ -152,28 +159,24 @@ namespace Tools28.Commands.FireProtection
                                     double p = ProjectParam(bStarts[bi], refStarts[rj], refEnds[rj]);
                                     isTjunc = (p > 0.05 && p < 0.95);
                                 }
-                                else
-                                {
-                                    isTjunc = true;
-                                }
+                                else { isTjunc = true; }
 
                                 if (isTjunc)
                                 {
-                                    double hw = refWidths[rj] / 2.0;
-                                    // 処理対象: offset端に合わせる
-                                    // 非処理対象: 要素面まで（offsetは足さない）
-                                    double ext = refIsProcessing ? hw + offsetFeet : hw;
-                                    // offsetより小さければ延長不要
+                                    // 端点からBBox遠端までの実距離を計算
+                                    double ext = CalcExtToFarEdge(
+                                        bStarts[bi], beamDir.Negate(),
+                                        refBBoxes[rj], refIsProcessing, offsetFeet);
                                     if (ext > sExt)
                                     {
                                         sExt = ext;
-                                        debugLines.Add($"  beam[{bi}]start T ref[{rj}] ext={sExt * 304.8:F0}mm rw={refWidths[rj] * 304.8:F0}mm {(refIsProcessing ? "proc" : "face")}");
+                                        debugLines.Add($"  beam[{bi}]start T ref[{rj}] ext={sExt * 304.8:F0}mm {(refIsProcessing ? "proc" : "face")}");
                                     }
                                 }
                             }
                         }
 
-                        // 終端
+                        // 終端（延長方向は +beamDir）
                         if (eExt <= offsetFeet + 0.001)
                         {
                             double dist = PointToSegDist(bEnds[bi], refStarts[rj], refEnds[rj]);
@@ -186,19 +189,17 @@ namespace Tools28.Commands.FireProtection
                                     double p = ProjectParam(bEnds[bi], refStarts[rj], refEnds[rj]);
                                     isTjunc = (p > 0.05 && p < 0.95);
                                 }
-                                else
-                                {
-                                    isTjunc = true;
-                                }
+                                else { isTjunc = true; }
 
                                 if (isTjunc)
                                 {
-                                    double hw = refWidths[rj] / 2.0;
-                                    double ext = refIsProcessing ? hw + offsetFeet : hw;
+                                    double ext = CalcExtToFarEdge(
+                                        bEnds[bi], beamDir,
+                                        refBBoxes[rj], refIsProcessing, offsetFeet);
                                     if (ext > eExt)
                                     {
                                         eExt = ext;
-                                        debugLines.Add($"  beam[{bi}]end T ref[{rj}] ext={eExt * 304.8:F0}mm rw={refWidths[rj] * 304.8:F0}mm {(refIsProcessing ? "proc" : "face")}");
+                                        debugLines.Add($"  beam[{bi}]end T ref[{rj}] ext={eExt * 304.8:F0}mm {(refIsProcessing ? "proc" : "face")}");
                                     }
                                 }
                             }
@@ -313,6 +314,43 @@ namespace Tools28.Commands.FireProtection
             }
 
             return totalCreated;
+        }
+
+        /// <summary>
+        /// 梁端点から接続先BBoxの遠端までの実距離を計算
+        /// 処理対象: +offset で塗潰領域端に合わせる
+        /// 非処理対象: BBox遠端ちょうどまで（飛び出さない）
+        /// </summary>
+        private static double CalcExtToFarEdge(
+            XYZ endpoint, XYZ extDir,
+            BoundingBoxXYZ refBBox, bool isProcessing, double offsetFeet)
+        {
+            if (refBBox == null) return offsetFeet;
+
+            // BBoxの4隅を延長方向に射影して遠端を求める
+            double epProj = endpoint.X * extDir.X + endpoint.Y * extDir.Y;
+
+            double farEdge = double.MinValue;
+            double[] xs = { refBBox.Min.X, refBBox.Max.X };
+            double[] ys = { refBBox.Min.Y, refBBox.Max.Y };
+            foreach (double x in xs)
+                foreach (double y in ys)
+                {
+                    double proj = x * extDir.X + y * extDir.Y;
+                    if (proj > farEdge) farEdge = proj;
+                }
+
+            double distToEdge = farEdge - epProj;
+
+            if (distToEdge <= 0) return offsetFeet;
+
+            // 処理対象: BBox端+offset（塗潰領域端に合わせる）
+            // 非処理対象: BBox端ちょうど（要素面で止まる）
+            double ext = isProcessing ? distToEdge + offsetFeet : distToEdge;
+
+            // 安全上限: 1000mm
+            double maxExt = 1000.0 / 304.8;
+            return Math.Min(ext, maxExt);
         }
 
         /// <summary>
