@@ -11,35 +11,21 @@ namespace Tools28.Commands.FireProtection
     public static class BeamGeometryHelper
     {
         /// <summary>
-        /// 要素のオフセット輪郭を取得（梁はロケーションカーブ、柱はBoundingBox）
+        /// 要素のオフセット輪郭を取得
+        /// BoundingBox(view) + 均一offsetで矩形を生成
         /// </summary>
-        /// <param name="startExt">梁始端の延長量。省略時はoffsetFeet</param>
-        /// <param name="endExt">梁終端の延長量。省略時はoffsetFeet</param>
         public static CurveLoop GetElementOffsetOutline(
             Element element, View view, double offsetFeet,
             double startExt = -1, double endExt = -1)
         {
-            if (startExt < 0) startExt = offsetFeet;
-            if (endExt < 0) endExt = offsetFeet;
-
-            // 断面ビュー: BoundingBoxをビュー座標系に投影して矩形を生成
+            // 断面ビュー
             if (view.ViewType == ViewType.Section)
             {
                 return GetOutlineForSectionView(element, view, offsetFeet);
             }
 
-            var fi = element as FamilyInstance;
-            if (fi == null) return null;
-
-            // 梁: ロケーションカーブから矩形を生成（平面ビュー用）
-            if (element.Category.Id.IntegerValue ==
-                (int)BuiltInCategory.OST_StructuralFraming)
-            {
-                var outline = GetBeamOutlineFromCurve(fi, offsetFeet, startExt, endExt);
-                if (outline != null) return outline;
-            }
-
-            // 柱・フォールバック: BoundingBoxから矩形を生成
+            // BoundingBox(view) + 均一offset
+            // BBoxは梁の実際の端部位置（柱面カットバック含む）を反映
             return GetOutlineFromBoundingBox(element, view, offsetFeet);
         }
 

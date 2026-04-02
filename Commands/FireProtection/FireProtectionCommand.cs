@@ -236,21 +236,10 @@ namespace Tools28.Commands.FireProtection
 
                     try
                     {
-                        // T字接合判定用: 全構造要素 + 塗潰領域を作成する要素のID
-                        var allStructural = new List<Element>();
-                        allStructural.AddRange(beams);
-                        allStructural.AddRange(columns);
-
-                        var processingIds = new HashSet<int>();
-                        foreach (var kvp in elementsByType)
-                            foreach (var el in kvp.Value)
-                                processingIds.Add(el.Id.IntegerValue);
-
                         regionCount = FilledRegionCreator.CreateFilledRegions(
                             doc, activeView, elementsByType, offsetByType,
                             settings.FillPatternId, settings.LineStyleId,
-                            settings.Types, settings.OverwriteExisting,
-                            allStructural, processingIds);
+                            settings.Types, settings.OverwriteExisting);
 
                         legendViewId = LegendManager.CreateLegendDraftingView(
                             doc, settings.Types, beamCountByType,

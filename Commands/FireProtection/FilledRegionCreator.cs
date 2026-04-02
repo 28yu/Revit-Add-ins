@@ -24,9 +24,7 @@ namespace Tools28.Commands.FireProtection
             ElementId fillPatternId,
             ElementId lineStyleId,
             List<FireProtectionTypeEntry> orderedTypes,
-            bool overwriteExisting,
-            List<Element> allStructuralElements = null,
-            HashSet<int> processingElementIds = null)
+            bool overwriteExisting)
         {
             if (overwriteExisting)
             {
@@ -51,185 +49,16 @@ namespace Tools28.Commands.FireProtection
                     doc, regionTypeName, fillPatternId, color);
                 if (regionTypeId == null) continue;
 
-                // T字接合判定用: 全構造要素（梁+柱）の線分/位置を収集
-                // カテゴリ選択に関わらず、接続先の幅を考慮するため
-                var refStarts = new List<XYZ>();
-                var refEnds = new List<XYZ>();
-                var refWidths = new List<double>();
-                var refElemIds = new List<int>();
-                var refBBoxes = new List<BoundingBoxXYZ>(); // 参照要素のElementId
-
-                foreach (var re in (allStructuralElements ?? new List<Element>()))
-                {
-                    var rfi = re as FamilyInstance;
-                    if (rfi == null) continue;
-                    int reId = re.Id.IntegerValue;
-
-                    // 梁: LocationCurve
-                    LocationCurve rlc = rfi.Location as LocationCurve;
-                    if (rlc?.Curve != null)
-                    {
-                        var rs = rlc.Curve.GetEndPoint(0);
-                        var re2 = rlc.Curve.GetEndPoint(1);
-                        refStarts.Add(new XYZ(rs.X, rs.Y, 0));
-                        refEnds.Add(new XYZ(re2.X, re2.Y, 0));
-                        refElemIds.Add(reId);
-                        var rbb1 = re.get_BoundingBox(activeView) ?? re.get_BoundingBox(null);
-                        refBBoxes.Add(rbb1);
-
-                        if (re.Category.Id.IntegerValue == (int)BuiltInCategory.OST_StructuralFraming)
-                            refWidths.Add(BeamGeometryHelper.GetBeamWidth(rfi));
-                        else
-                            refWidths.Add(GetElementPlanWidth(re, activeView));
-                        continue;
-                    }
-
-                    // 柱: LocationPointからBoundingBoxで幅推定
-                    LocationPoint rlp = rfi.Location as LocationPoint;
-                    if (rlp != null)
-                    {
-                        BoundingBoxXYZ rbb = re.get_BoundingBox(activeView);
-                        if (rbb == null) rbb = re.get_BoundingBox(null);
-                        if (rbb != null)
-                        {
-                            double cw = Math.Min(rbb.Max.X - rbb.Min.X, rbb.Max.Y - rbb.Min.Y);
-                            cw = Math.Min(cw, 600.0 / 304.8); // 上限600mm
-                            XYZ cp = new XYZ(rlp.Point.X, rlp.Point.Y, 0);
-                            refStarts.Add(new XYZ(cp.X, cp.Y - 0.01, 0));
-                            refEnds.Add(new XYZ(cp.X, cp.Y + 0.01, 0));
-                            refWidths.Add(cw);
-                            refElemIds.Add(reId);
-                            refBBoxes.Add(rbb);
-                        }
-                    }
-                }
-
-                // 処理対象梁の情報
-                var bStarts = new List<XYZ>();
-                var bEnds = new List<XYZ>();
-                var bIdx = new List<int>();
-
-                for (int ei = 0; ei < elements.Count; ei++)
-                {
-                    var fi = elements[ei] as FamilyInstance;
-                    if (fi == null) continue;
-                    if (elements[ei].Category.Id.IntegerValue !=
-                        (int)BuiltInCategory.OST_StructuralFraming) continue;
-                    LocationCurve lc = fi.Location as LocationCurve;
-                    if (lc?.Curve == null) continue;
-
-                    var s = lc.Curve.GetEndPoint(0);
-                    var e = lc.Curve.GetEndPoint(1);
-                    bStarts.Add(new XYZ(s.X, s.Y, 0));
-                    bEnds.Add(new XYZ(e.X, e.Y, 0));
-                    bIdx.Add(ei);
-                }
-
-                double tol = 500.0 / 304.8;
-                var processed = new HashSet<int>();
-                var debugLines = new System.Collections.Generic.List<string>();
-                debugLines.Add($"refElements={refStarts.Count}, targetBeams={bIdx.Count}");
-
+                // BBox + 均一offset で各要素のアウトラインを生成
+                // T字検出・端部延長は廃止。BBoxが実際の梁端位置を反映
                 var outlines = new List<CurveLoop>();
-                for (int bi = 0; bi < bIdx.Count; bi++)
+                foreach (var elem in elements)
                 {
-                    processed.Add(bIdx[bi]);
-                    double sExt = offsetFeet;
-                    double eExt = offsetFeet;
-
-                    XYZ beamDir = (bEnds[bi] - bStarts[bi]);
-                    double beamLen = beamDir.GetLength();
-                    if (beamLen > 0.001) beamDir = beamDir.Normalize();
-
-                    for (int rj = 0; rj < refStarts.Count; rj++)
-                    {
-                        bool refIsProcessing = processingElementIds != null
-                            && processingElementIds.Contains(refElemIds[rj]);
-
-                        // 始端（延長方向は -beamDir）
-                        if (sExt <= offsetFeet + 0.001)
-                        {
-                            double dist = PointToSegDist(bStarts[bi], refStarts[rj], refEnds[rj]);
-                            if (dist < tol)
-                            {
-                                bool isTjunc = false;
-                                double segLen = refStarts[rj].DistanceTo(refEnds[rj]);
-                                if (segLen > 0.02)
-                                {
-                                    double p = ProjectParam(bStarts[bi], refStarts[rj], refEnds[rj]);
-                                    isTjunc = (p > 0.05 && p < 0.95);
-                                }
-                                else { isTjunc = true; }
-
-                                if (isTjunc && refIsProcessing)
-                                {
-                                    double ext = CalcExtToFarEdge(
-                                        bStarts[bi], beamDir.Negate(),
-                                        refBBoxes[rj], true, offsetFeet);
-                                    if (ext > sExt)
-                                    {
-                                        sExt = ext;
-                                        debugLines.Add($"  beam[{bi}]start T ref[{rj}] ext={sExt * 304.8:F0}mm proc");
-                                    }
-                                }
-                            }
-                        }
-
-                        // 終端（延長方向は +beamDir）
-                        if (eExt <= offsetFeet + 0.001)
-                        {
-                            double dist = PointToSegDist(bEnds[bi], refStarts[rj], refEnds[rj]);
-                            if (dist < tol)
-                            {
-                                bool isTjunc = false;
-                                double segLen = refStarts[rj].DistanceTo(refEnds[rj]);
-                                if (segLen > 0.02)
-                                {
-                                    double p = ProjectParam(bEnds[bi], refStarts[rj], refEnds[rj]);
-                                    isTjunc = (p > 0.05 && p < 0.95);
-                                }
-                                else { isTjunc = true; }
-
-                                if (isTjunc && refIsProcessing)
-                                {
-                                    double ext = CalcExtToFarEdge(
-                                        bEnds[bi], beamDir,
-                                        refBBoxes[rj], true, offsetFeet);
-                                    if (ext > eExt)
-                                    {
-                                        eExt = ext;
-                                        debugLines.Add($"  beam[{bi}]end T ref[{rj}] ext={eExt * 304.8:F0}mm proc");
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    debugLines.Add($"  beam[{bi}] sExt={sExt * 304.8:F0}mm eExt={eExt * 304.8:F0}mm");
-
                     var outline = BeamGeometryHelper.GetElementOffsetOutline(
-                        elements[bIdx[bi]], activeView, offsetFeet, sExt, eExt);
-                    if (outline != null) outlines.Add(outline);
+                        elem, activeView, offsetFeet);
+                    if (outline != null)
+                        outlines.Add(outline);
                 }
-
-                // 梁以外（柱等）
-                for (int ei = 0; ei < elements.Count; ei++)
-                {
-                    if (processed.Contains(ei)) continue;
-                    var outline = BeamGeometryHelper.GetElementOffsetOutline(
-                        elements[ei], activeView, offsetFeet);
-                    if (outline != null) outlines.Add(outline);
-                }
-
-                // デバッグログ
-                try
-                {
-                    System.IO.Directory.CreateDirectory(@"C:\temp");
-                    System.IO.File.AppendAllText(@"C:\temp\FireProtection_debug.txt",
-                        $"\n[{System.DateTime.Now:HH:mm:ss}] {typeName} offset={offsetFeet * 304.8:F0}mm\n"
-                        + string.Join("\n", debugLines) + "\n");
-                }
-                catch { }
 
                 if (outlines.Count == 0) continue;
 
@@ -313,110 +142,6 @@ namespace Tools28.Commands.FireProtection
             }
 
             return totalCreated;
-        }
-
-        /// <summary>
-        /// 梁端点から接続先BBoxの遠端までの実距離を計算
-        /// 処理対象: +offset で塗潰領域端に合わせる
-        /// 非処理対象: BBox遠端ちょうどまで（飛び出さない）
-        /// </summary>
-        private static double CalcExtToFarEdge(
-            XYZ endpoint, XYZ extDir,
-            BoundingBoxXYZ refBBox, bool isProcessing, double offsetFeet)
-        {
-            if (refBBox == null) return offsetFeet;
-
-            // BBoxの4隅を延長方向に射影して遠端を求める
-            double epProj = endpoint.X * extDir.X + endpoint.Y * extDir.Y;
-
-            double farEdge = double.MinValue;
-            double[] xs = { refBBox.Min.X, refBBox.Max.X };
-            double[] ys = { refBBox.Min.Y, refBBox.Max.Y };
-            foreach (double x in xs)
-                foreach (double y in ys)
-                {
-                    double proj = x * extDir.X + y * extDir.Y;
-                    if (proj > farEdge) farEdge = proj;
-                }
-
-            double distToEdge = farEdge - epProj;
-
-            if (distToEdge <= 0) return offsetFeet;
-
-            // 処理対象: BBox端+offset（塗潰領域端に合わせる）
-            // 非処理対象: BBox端ちょうど（要素面で止まる）
-            double ext = isProcessing ? distToEdge + offsetFeet : distToEdge;
-
-            // 安全上限: 1000mm
-            double maxExt = 1000.0 / 304.8;
-            return Math.Min(ext, maxExt);
-        }
-
-        /// <summary>
-        /// 構造要素の平面幅を取得（パラメータ優先、BoundingBox上限付きフォールバック）
-        /// </summary>
-        private static double GetElementPlanWidth(Element elem, View view)
-        {
-            var fi = elem as FamilyInstance;
-            if (fi == null) return 400.0 / 304.8;
-
-            // 梁カテゴリならGetBeamWidthを使用
-            if (elem.Category.Id.IntegerValue == (int)BuiltInCategory.OST_StructuralFraming)
-                return BeamGeometryHelper.GetBeamWidth(fi);
-
-            // 柱: パラメータから幅を探す
-            var paramNames = new[] { "b", "B", "幅", "柱幅", "W", "w", "Width", "width", "D", "d" };
-            foreach (string name in paramNames)
-            {
-                Parameter p = fi.LookupParameter(name);
-                if (p != null && p.StorageType == StorageType.Double && p.AsDouble() > 0)
-                    return p.AsDouble();
-            }
-            ElementType eType = elem.Document.GetElement(fi.GetTypeId()) as ElementType;
-            if (eType != null)
-            {
-                foreach (string name in paramNames)
-                {
-                    Parameter p = eType.LookupParameter(name);
-                    if (p != null && p.StorageType == StorageType.Double && p.AsDouble() > 0)
-                        return p.AsDouble();
-                }
-            }
-
-            // フォールバック: BoundingBox(view)のMin、上限600mm
-            BoundingBoxXYZ bb = elem.get_BoundingBox(view);
-            if (bb == null) bb = elem.get_BoundingBox(null);
-            if (bb != null)
-            {
-                double xExt = bb.Max.X - bb.Min.X;
-                double yExt = bb.Max.Y - bb.Min.Y;
-                double w = Math.Min(xExt, yExt);
-                return Math.Min(w, 600.0 / 304.8);
-            }
-            return 400.0 / 304.8;
-        }
-
-        /// <summary>
-        /// 点を線分に射影したパラメータ（0=始点、1=終点）
-        /// </summary>
-        private static double ProjectParam(XYZ pt, XYZ a, XYZ b)
-        {
-            double vx = b.X - a.X, vy = b.Y - a.Y;
-            double wx = pt.X - a.X, wy = pt.Y - a.Y;
-            double c2 = vx * vx + vy * vy;
-            if (c2 < 1e-10) return 0;
-            return (wx * vx + wy * vy) / c2;
-        }
-
-        /// <summary>
-        /// 2D点から線分への最短距離
-        /// </summary>
-        private static double PointToSegDist(XYZ pt, XYZ a, XYZ b)
-        {
-            double t = ProjectParam(pt, a, b);
-            if (t <= 0) return pt.DistanceTo(a);
-            if (t >= 1) return pt.DistanceTo(b);
-            return pt.DistanceTo(new XYZ(a.X + t * (b.X - a.X), a.Y + t * (b.Y - a.Y), 0));
         }
 
         private static CurveLoop TransformLoop(CurveLoop loop, Transform transform)
