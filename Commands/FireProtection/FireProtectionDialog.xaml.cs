@@ -208,34 +208,39 @@ namespace Tools28.Commands.FireProtection
                 var entry = _typeEntries[i];
                 int idx = i;
 
-                // 種類名ヘッダー
-                var headerBlock = new TextBlock
+                // 1行: 種類名 + 前景 + 背景 を横並び
+                var rowPanel = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    Margin = new Thickness(0, i > 0 ? 6 : 0, 0, 0)
+                };
+
+                // 種類名
+                rowPanel.Children.Add(new TextBlock
                 {
                     Text = entry.Name,
                     FontSize = 12,
                     FontWeight = FontWeights.Bold,
-                    Margin = new Thickness(4, i > 0 ? 8 : 0, 0, 4)
-                };
-                DetectedTypesPanel.Children.Add(headerBlock);
+                    Width = 140,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    TextTrimming = TextTrimming.CharacterEllipsis,
+                    ToolTip = entry.Name,
+                    Margin = new Thickness(4, 0, 8, 0)
+                });
 
-                // 前景行
-                var fgPanel = new StackPanel
-                {
-                    Orientation = Orientation.Horizontal,
-                    Margin = new Thickness(12, 2, 0, 2)
-                };
+                // 前景
+                int fgIdx = idx;
                 var fgCheck = new CheckBox
                 {
-                    Content = "前景:",
+                    Content = "前景",
                     IsChecked = entry.ForegroundVisible,
                     FontSize = 11,
                     VerticalAlignment = VerticalAlignment.Center,
-                    Margin = new Thickness(0, 0, 6, 0)
+                    Margin = new Thickness(0, 0, 4, 0)
                 };
-                int fgIdx = idx;
                 fgCheck.Checked += (s, ev) => { _typeEntries[fgIdx].ForegroundVisible = true; };
                 fgCheck.Unchecked += (s, ev) => { _typeEntries[fgIdx].ForegroundVisible = false; };
-                fgPanel.Children.Add(fgCheck);
+                rowPanel.Children.Add(fgCheck);
 
                 var fgRect = new WpfRectangle
                 {
@@ -245,34 +250,25 @@ namespace Tools28.Commands.FireProtection
                     Stroke = new SolidColorBrush(
                         System.Windows.Media.Color.FromRgb(0x66, 0x66, 0x66)),
                     StrokeThickness = 1,
-                    Margin = new Thickness(0, 0, 4, 0),
+                    Margin = new Thickness(0, 0, 16, 0),
                     Cursor = Cursors.Hand
                 };
-                fgRect.MouseLeftButtonDown += (s, ev) =>
-                {
-                    ShowColorPicker(fgIdx);
-                };
-                fgPanel.Children.Add(fgRect);
-                DetectedTypesPanel.Children.Add(fgPanel);
+                fgRect.MouseLeftButtonDown += (s, ev) => { ShowColorPicker(fgIdx); };
+                rowPanel.Children.Add(fgRect);
 
-                // 背景行
-                var bgPanel = new StackPanel
-                {
-                    Orientation = Orientation.Horizontal,
-                    Margin = new Thickness(12, 2, 0, 2)
-                };
+                // 背景
+                int bgIdx = idx;
                 var bgCheck = new CheckBox
                 {
-                    Content = "背景:",
+                    Content = "背景",
                     IsChecked = entry.BackgroundVisible,
                     FontSize = 11,
                     VerticalAlignment = VerticalAlignment.Center,
-                    Margin = new Thickness(0, 0, 6, 0)
+                    Margin = new Thickness(0, 0, 4, 0)
                 };
-                int bgIdx = idx;
                 bgCheck.Checked += (s, ev) => { _typeEntries[bgIdx].BackgroundVisible = true; };
                 bgCheck.Unchecked += (s, ev) => { _typeEntries[bgIdx].BackgroundVisible = false; };
-                bgPanel.Children.Add(bgCheck);
+                rowPanel.Children.Add(bgCheck);
 
                 var bgRect = new WpfRectangle
                 {
@@ -282,15 +278,12 @@ namespace Tools28.Commands.FireProtection
                     Stroke = new SolidColorBrush(
                         System.Windows.Media.Color.FromRgb(0x66, 0x66, 0x66)),
                     StrokeThickness = 1,
-                    Margin = new Thickness(0, 0, 4, 0),
                     Cursor = Cursors.Hand
                 };
-                bgRect.MouseLeftButtonDown += (s, ev) =>
-                {
-                    ShowBgColorPicker(bgIdx);
-                };
-                bgPanel.Children.Add(bgRect);
-                DetectedTypesPanel.Children.Add(bgPanel);
+                bgRect.MouseLeftButtonDown += (s, ev) => { ShowBgColorPicker(bgIdx); };
+                rowPanel.Children.Add(bgRect);
+
+                DetectedTypesPanel.Children.Add(rowPanel);
             }
         }
 

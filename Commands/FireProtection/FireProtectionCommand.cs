@@ -128,6 +128,30 @@ namespace Tools28.Commands.FireProtection
                         }
                     }
                     lineStyles = lineStyles.OrderBy(ls => ls.Name).ToList();
+
+                    // <非表示>（Invisible Lines）をSubCategoriesにない場合に追加
+                    if (!lineStyles.Any(ls => ls.Name.Contains("非表示") || ls.Name.Contains("Invisible")))
+                    {
+                        try
+                        {
+                            Category invisCat = doc.Settings.Categories
+                                .get_Item(BuiltInCategory.OST_InvisibleLines);
+                            if (invisCat != null)
+                            {
+                                GraphicsStyle invisGs = invisCat.GetGraphicsStyle(
+                                    GraphicsStyleType.Projection);
+                                if (invisGs != null)
+                                {
+                                    lineStyles.Add(new LineStyleItem
+                                    {
+                                        Id = invisGs.Id,
+                                        Name = invisCat.Name
+                                    });
+                                }
+                            }
+                        }
+                        catch { }
+                    }
                 }
 
                 // 塗りパターン取得
