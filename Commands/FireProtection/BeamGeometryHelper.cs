@@ -126,8 +126,10 @@ namespace Tools28.Commands.FireProtection
             double beamWidth = GetBeamWidth(beam);
             double halfExtent = beamWidth / 2.0 + offsetFeet;
 
-            XYZ extStart = start - direction * offsetFeet;
-            XYZ extEnd = end + direction * offsetFeet;
+            // 端部延長: max(offset, 梁幅/2) で接合部のギャップをカバー
+            double endExt = Math.Max(offsetFeet, beamWidth / 2.0);
+            XYZ extStart = start - direction * endExt;
+            XYZ extEnd = end + direction * endExt;
 
             XYZ p0 = extStart - perp * halfExtent;
             XYZ p1 = extEnd - perp * halfExtent;

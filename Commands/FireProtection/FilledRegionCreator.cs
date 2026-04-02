@@ -49,88 +49,14 @@ namespace Tools28.Commands.FireProtection
                     doc, regionTypeName, fillPatternId, color);
                 if (regionTypeId == null) continue;
 
-                // LocationCurve+offsetで各要素のアウトラインを生成
+                // 各要素のアウトラインを生成
                 var outlines = new List<CurveLoop>();
-                var beamSegments = new List<int>(); // outlines内のindex→elementsのindex
-                var beamStarts = new List<XYZ>();
-                var beamEnds = new List<XYZ>();
-
-                for (int ei = 0; ei < elements.Count; ei++)
+                foreach (var elem in elements)
                 {
                     var outline = BeamGeometryHelper.GetElementOffsetOutline(
-                        elements[ei], activeView, offsetFeet);
-                    if (outline == null) continue;
-                    outlines.Add(outline);
-
-                    // 梁の端点情報を記録（T字パッチ用）
-                    var fi = elements[ei] as FamilyInstance;
-                    if (fi != null && elements[ei].Category.Id.IntegerValue ==
-                        (int)BuiltInCategory.OST_StructuralFraming)
-                    {
-                        LocationCurve lc = fi.Location as LocationCurve;
-                        if (lc?.Curve != null)
-                        {
-                            var s = lc.Curve.GetEndPoint(0);
-                            var e = lc.Curve.GetEndPoint(1);
-                            beamSegments.Add(ei);
-                            beamStarts.Add(new XYZ(s.X, s.Y, 0));
-                            beamEnds.Add(new XYZ(e.X, e.Y, 0));
-                        }
-                    }
-                }
-
-                // T字接合パッチ: 処理対象梁同士のT字接合点にパッチ矩形を追加
-                // （L字コーナー/自由端/非処理対象にはパッチなし）
-                double patchTol = 500.0 / 304.8;
-                var patchKeys = new HashSet<string>();
-
-                for (int bi = 0; bi < beamSegments.Count; bi++)
-                {
-                    XYZ[] eps = { beamStarts[bi], beamEnds[bi] };
-                    foreach (var ep in eps)
-                    {
-                        for (int bj = 0; bj < beamSegments.Count; bj++)
-                        {
-                            if (bi == bj) continue;
-
-                            // T字判定: paramが0.05〜0.95なら梁本体上
-                            double segLen = beamStarts[bj].DistanceTo(beamEnds[bj]);
-                            if (segLen < 0.02) continue;
-
-                            XYZ v = beamEnds[bj] - beamStarts[bj];
-                            XYZ w = ep - beamStarts[bj];
-                            double param = (w.X * v.X + w.Y * v.Y) / (v.X * v.X + v.Y * v.Y);
-                            if (param <= 0.05 || param >= 0.95) continue;
-
-                            // 最近点距離
-                            XYZ closest = beamStarts[bj] + param * v;
-                            if (ep.DistanceTo(closest) > patchTol) continue;
-
-                            // 重複防止
-                            string key = $"{Math.Round(ep.X, 3)},{Math.Round(ep.Y, 3)}";
-                            if (patchKeys.Contains(key)) continue;
-                            patchKeys.Add(key);
-
-                            // パッチ: 接続先梁の半幅+offset の正方形
-                            var cfi = elements[beamSegments[bj]] as FamilyInstance;
-                            double cHalfW = cfi != null
-                                ? BeamGeometryHelper.GetBeamWidth(cfi) / 2.0 + offsetFeet
-                                : offsetFeet * 3;
-
-                            XYZ p0 = new XYZ(ep.X - cHalfW, ep.Y - cHalfW, 0);
-                            XYZ p1 = new XYZ(ep.X + cHalfW, ep.Y - cHalfW, 0);
-                            XYZ p2 = new XYZ(ep.X + cHalfW, ep.Y + cHalfW, 0);
-                            XYZ p3 = new XYZ(ep.X - cHalfW, ep.Y + cHalfW, 0);
-
-                            var patch = new CurveLoop();
-                            patch.Append(Line.CreateBound(p0, p1));
-                            patch.Append(Line.CreateBound(p1, p2));
-                            patch.Append(Line.CreateBound(p2, p3));
-                            patch.Append(Line.CreateBound(p3, p0));
-                            outlines.Add(patch);
-                            break;
-                        }
-                    }
+                        elem, activeView, offsetFeet);
+                    if (outline != null)
+                        outlines.Add(outline);
                 }
 
                 // デバッグログ
@@ -139,7 +65,7 @@ namespace Tools28.Commands.FireProtection
                     System.IO.Directory.CreateDirectory(@"C:\temp");
                     System.IO.File.AppendAllText(@"C:\temp\FireProtection_debug.txt",
                         $"\n[{System.DateTime.Now:HH:mm:ss}] {typeName} offset={offsetFeet * 304.8:F0}mm" +
-                        $" beams={beamSegments.Count} patches={patchKeys.Count} outlines={outlines.Count}\n");
+                        $" outlines={outlines.Count}\n");
                 }
                 catch { }
 
