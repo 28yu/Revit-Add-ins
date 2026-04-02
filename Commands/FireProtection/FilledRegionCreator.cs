@@ -48,9 +48,9 @@ namespace Tools28.Commands.FireProtection
                     doc, regionTypeName, fillPatternId, color);
                 if (regionTypeId == null) continue;
 
-                // 梁端部の接続判定用: 全梁の端点と最大梁幅を収集
+                // 梁端部の接続判定用: 全梁の線分情報と最大梁幅を収集
                 double maxBeamHalfWidth = 0;
-                var beamEndpoints = new List<XYZ>();
+                var beamSegments = new List<KeyValuePair<XYZ, XYZ>>(); // 2D線分リスト
                 double connTolerance = 500.0 / 304.8; // 500mm
 
                 foreach (var elem in elements)
@@ -69,40 +69,44 @@ namespace Tools28.Commands.FireProtection
                         {
                             var s = lc.Curve.GetEndPoint(0);
                             var e = lc.Curve.GetEndPoint(1);
-                            beamEndpoints.Add(new XYZ(s.X, s.Y, 0));
-                            beamEndpoints.Add(new XYZ(e.X, e.Y, 0));
+                            beamSegments.Add(new KeyValuePair<XYZ, XYZ>(
+                                new XYZ(s.X, s.Y, 0),
+                                new XYZ(e.X, e.Y, 0)));
                         }
                     }
                 }
                 double connExtension = maxBeamHalfWidth + offsetFeet;
 
                 var outlines = new List<CurveLoop>();
+                int segIdx = 0;
                 foreach (var elem in elements)
                 {
-                    // 梁: 端部ごとに接続判定して延長量を決定
                     var fi = elem as FamilyInstance;
                     if (fi != null && elem.Category.Id.IntegerValue ==
                         (int)BuiltInCategory.OST_StructuralFraming)
                     {
                         LocationCurve lc = fi.Location as LocationCurve;
-                        if (lc != null && lc.Curve != null)
+                        if (lc != null && lc.Curve != null && segIdx < beamSegments.Count)
                         {
-                            var s = lc.Curve.GetEndPoint(0);
-                            var e = lc.Curve.GetEndPoint(1);
-                            XYZ s2d = new XYZ(s.X, s.Y, 0);
-                            XYZ e2d = new XYZ(e.X, e.Y, 0);
+                            XYZ s2d = beamSegments[segIdx].Key;
+                            XYZ e2d = beamSegments[segIdx].Value;
+                            segIdx++;
 
-                            // 自分以外の端点が近くにあれば接続端
+                            // 端点が他の梁の線分に近いか判定（端点一致+T字接合に対応）
                             bool sConn = false, eConn = false;
-                            foreach (var ep in beamEndpoints)
+                            for (int j = 0; j < beamSegments.Count; j++)
                             {
-                                if (ep.DistanceTo(s2d) < 0.001) continue;
-                                if (ep.DistanceTo(s2d) < connTolerance) { sConn = true; break; }
-                            }
-                            foreach (var ep in beamEndpoints)
-                            {
-                                if (ep.DistanceTo(e2d) < 0.001) continue;
-                                if (ep.DistanceTo(e2d) < connTolerance) { eConn = true; break; }
+                                if (beamSegments[j].Key == s2d && beamSegments[j].Value == e2d)
+                                    continue; // 自分自身をスキップ
+
+                                double sDist = PointToSegmentDistance2D(
+                                    s2d, beamSegments[j].Key, beamSegments[j].Value);
+                                double eDist = PointToSegmentDistance2D(
+                                    e2d, beamSegments[j].Key, beamSegments[j].Value);
+
+                                if (sDist < connTolerance) sConn = true;
+                                if (eDist < connTolerance) eConn = true;
+                                if (sConn && eConn) break;
                             }
 
                             double sExt = sConn ? connExtension : offsetFeet;
@@ -203,6 +207,22 @@ namespace Tools28.Commands.FireProtection
             }
 
             return totalCreated;
+        }
+
+        /// <summary>
+        /// 2D点から線分への最短距離
+        /// </summary>
+        private static double PointToSegmentDistance2D(XYZ pt, XYZ segA, XYZ segB)
+        {
+            XYZ v = segB - segA;
+            XYZ w = pt - segA;
+            double c1 = w.X * v.X + w.Y * v.Y;
+            if (c1 <= 0) return pt.DistanceTo(segA);
+            double c2 = v.X * v.X + v.Y * v.Y;
+            if (c2 <= c1) return pt.DistanceTo(segB);
+            double b = c1 / c2;
+            XYZ closest = new XYZ(segA.X + b * v.X, segA.Y + b * v.Y, 0);
+            return pt.DistanceTo(closest);
         }
 
         private static CurveLoop TransformLoop(CurveLoop loop, Transform transform)

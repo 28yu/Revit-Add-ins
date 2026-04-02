@@ -62,9 +62,6 @@ namespace Tools28.Commands.FireProtection
 
         private void InitializeStep1()
         {
-            ViewNameText.Text = _data.ViewName;
-            ViewTypeText.Text = _data.ViewTypeName;
-
             IncludeBeamsCheck.IsChecked = _data.HasBeams;
             IncludeBeamsCheck.IsEnabled = _data.HasBeams;
             IncludeColumnsCheck.IsChecked = _data.HasColumns;
@@ -206,8 +203,11 @@ namespace Tools28.Commands.FireProtection
                 return;
             }
 
-            foreach (var entry in _typeEntries)
+            for (int i = 0; i < _typeEntries.Count; i++)
             {
+                var entry = _typeEntries[i];
+                int idx = i;
+
                 var panel = new StackPanel
                 {
                     Orientation = Orientation.Horizontal,
@@ -216,15 +216,20 @@ namespace Tools28.Commands.FireProtection
 
                 var colorRect = new WpfRectangle
                 {
-                    Width = 18,
-                    Height = 14,
+                    Width = 22,
+                    Height = 16,
                     Fill = new SolidColorBrush(System.Windows.Media.Color.FromRgb(
                         entry.ColorR, entry.ColorG, entry.ColorB)),
                     Stroke = new SolidColorBrush(
-                        System.Windows.Media.Color.FromRgb(0x99, 0x99, 0x99)),
+                        System.Windows.Media.Color.FromRgb(0x66, 0x66, 0x66)),
                     StrokeThickness = 1,
                     Margin = new Thickness(4, 0, 8, 0),
-                    VerticalAlignment = VerticalAlignment.Center
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Cursor = Cursors.Hand
+                };
+                colorRect.MouseLeftButtonDown += (s, ev) =>
+                {
+                    ShowColorPicker(idx);
                 };
                 panel.Children.Add(colorRect);
 
@@ -324,50 +329,6 @@ namespace Tools28.Commands.FireProtection
                 if (_data.TextNoteTypes.Count > 0)
                     TextNoteTypeComboBox.SelectedIndex = 0;
             }
-
-            RefreshColorSettings();
-        }
-
-        private void RefreshColorSettings()
-        {
-            ColorSettingsPanel.Children.Clear();
-
-            for (int i = 0; i < _typeEntries.Count; i++)
-            {
-                var entry = _typeEntries[i];
-                var panel = new StackPanel
-                {
-                    Orientation = Orientation.Horizontal,
-                    Margin = new Thickness(0, 3, 0, 3)
-                };
-
-                int idx = i;
-                var colorRect = new WpfRectangle
-                {
-                    Width = 30, Height = 20,
-                    Fill = new SolidColorBrush(System.Windows.Media.Color.FromRgb(
-                        entry.ColorR, entry.ColorG, entry.ColorB)),
-                    Stroke = new SolidColorBrush(
-                        System.Windows.Media.Color.FromRgb(0x66, 0x66, 0x66)),
-                    StrokeThickness = 1,
-                    Margin = new Thickness(0, 0, 10, 0),
-                    Cursor = Cursors.Hand
-                };
-                colorRect.MouseLeftButtonDown += (s, ev) =>
-                {
-                    ShowColorPicker(idx);
-                };
-                panel.Children.Add(colorRect);
-
-                panel.Children.Add(new TextBlock
-                {
-                    Text = entry.Name,
-                    FontSize = 12,
-                    VerticalAlignment = VerticalAlignment.Center
-                });
-
-                ColorSettingsPanel.Children.Add(panel);
-            }
         }
 
         private void ShowColorPicker(int typeIndex)
@@ -387,7 +348,7 @@ namespace Tools28.Commands.FireProtection
                 entry.ColorR = colorDialog.Color.R;
                 entry.ColorG = colorDialog.Color.G;
                 entry.ColorB = colorDialog.Color.B;
-                RefreshColorSettings();
+                RefreshDetectedTypesUI();
             }
         }
 
