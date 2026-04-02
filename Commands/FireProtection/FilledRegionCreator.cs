@@ -25,7 +25,8 @@ namespace Tools28.Commands.FireProtection
             ElementId lineStyleId,
             List<FireProtectionTypeEntry> orderedTypes,
             bool overwriteExisting,
-            List<Element> allStructuralElements = null)
+            List<Element> allStructuralElements = null,
+            HashSet<int> processingElementIds = null)
         {
             if (overwriteExisting)
             {
@@ -55,11 +56,13 @@ namespace Tools28.Commands.FireProtection
                 var refStarts = new List<XYZ>();
                 var refEnds = new List<XYZ>();
                 var refWidths = new List<double>();
+                var refElemIds = new List<int>(); // 参照要素のElementId
 
                 foreach (var re in (allStructuralElements ?? new List<Element>()))
                 {
                     var rfi = re as FamilyInstance;
                     if (rfi == null) continue;
+                    int reId = re.Id.IntegerValue;
 
                     // 梁: LocationCurve
                     LocationCurve rlc = rfi.Location as LocationCurve;
@@ -69,6 +72,7 @@ namespace Tools28.Commands.FireProtection
                         var re2 = rlc.Curve.GetEndPoint(1);
                         refStarts.Add(new XYZ(rs.X, rs.Y, 0));
                         refEnds.Add(new XYZ(re2.X, re2.Y, 0));
+                        refElemIds.Add(reId);
 
                         if (re.Category.Id.IntegerValue == (int)BuiltInCategory.OST_StructuralFraming)
                             refWidths.Add(BeamGeometryHelper.GetBeamWidth(rfi));
@@ -87,10 +91,10 @@ namespace Tools28.Commands.FireProtection
                         {
                             double cw = Math.Max(rbb.Max.X - rbb.Min.X, rbb.Max.Y - rbb.Min.Y);
                             XYZ cp = new XYZ(rlp.Point.X, rlp.Point.Y, 0);
-                            // 柱を短い縦線分として登録（高さ方向に微小長さ）
                             refStarts.Add(new XYZ(cp.X, cp.Y - 0.01, 0));
                             refEnds.Add(new XYZ(cp.X, cp.Y + 0.01, 0));
                             refWidths.Add(cw);
+                            refElemIds.Add(reId);
                         }
                     }
                 }
@@ -129,28 +133,39 @@ namespace Tools28.Commands.FireProtection
                     double eExt = offsetFeet;
 
                     // 全構造要素に対してT字判定
+                    // ただし接続先が塗潰領域を作成する要素の場合のみ延長
                     for (int rj = 0; rj < refStarts.Count; rj++)
                     {
+                        // 接続先が処理対象外（塗潰領域なし）→ 延長しない
+                        bool refIsProcessing = processingElementIds != null
+                            && processingElementIds.Contains(refElemIds[rj]);
+
                         // 始端
                         if (sExt <= offsetFeet + 0.001)
                         {
                             double dist = PointToSegDist(bStarts[bi], refStarts[rj], refEnds[rj]);
                             if (dist < tol)
                             {
+                                bool isTjunc = false;
                                 double segLen = refStarts[rj].DistanceTo(refEnds[rj]);
-                                if (segLen > 0.02) // 通常の梁
+                                if (segLen > 0.02)
                                 {
                                     double p = ProjectParam(bStarts[bi], refStarts[rj], refEnds[rj]);
-                                    if (p > 0.05 && p < 0.95)
-                                    {
-                                        sExt = refWidths[rj] / 2.0 + offsetFeet;
-                                        debugLines.Add($"  beam[{bi}]start T-junc w/ref[{rj}] p={p:F2} w={refWidths[rj] * 304.8:F0}mm ext={sExt * 304.8:F0}mm");
-                                    }
+                                    isTjunc = (p > 0.05 && p < 0.95);
                                 }
-                                else // 柱（点として登録）
+                                else
+                                {
+                                    isTjunc = true; // 柱（点）
+                                }
+
+                                if (isTjunc && refIsProcessing)
                                 {
                                     sExt = refWidths[rj] / 2.0 + offsetFeet;
-                                    debugLines.Add($"  beam[{bi}]start column ref[{rj}] w={refWidths[rj] * 304.8:F0}mm ext={sExt * 304.8:F0}mm");
+                                    debugLines.Add($"  beam[{bi}]start T-junc ref[{rj}] ext={sExt * 304.8:F0}mm (processing)");
+                                }
+                                else if (isTjunc)
+                                {
+                                    debugLines.Add($"  beam[{bi}]start T-junc ref[{rj}] SKIP (not processing)");
                                 }
                             }
                         }
@@ -161,20 +176,26 @@ namespace Tools28.Commands.FireProtection
                             double dist = PointToSegDist(bEnds[bi], refStarts[rj], refEnds[rj]);
                             if (dist < tol)
                             {
+                                bool isTjunc = false;
                                 double segLen = refStarts[rj].DistanceTo(refEnds[rj]);
                                 if (segLen > 0.02)
                                 {
                                     double p = ProjectParam(bEnds[bi], refStarts[rj], refEnds[rj]);
-                                    if (p > 0.05 && p < 0.95)
-                                    {
-                                        eExt = refWidths[rj] / 2.0 + offsetFeet;
-                                        debugLines.Add($"  beam[{bi}]end T-junc w/ref[{rj}] p={p:F2} w={refWidths[rj] * 304.8:F0}mm ext={eExt * 304.8:F0}mm");
-                                    }
+                                    isTjunc = (p > 0.05 && p < 0.95);
                                 }
                                 else
                                 {
+                                    isTjunc = true;
+                                }
+
+                                if (isTjunc && refIsProcessing)
+                                {
                                     eExt = refWidths[rj] / 2.0 + offsetFeet;
-                                    debugLines.Add($"  beam[{bi}]end column ref[{rj}] w={refWidths[rj] * 304.8:F0}mm ext={eExt * 304.8:F0}mm");
+                                    debugLines.Add($"  beam[{bi}]end T-junc ref[{rj}] ext={eExt * 304.8:F0}mm (processing)");
+                                }
+                                else if (isTjunc)
+                                {
+                                    debugLines.Add($"  beam[{bi}]end T-junc ref[{rj}] SKIP (not processing)");
                                 }
                             }
                         }
