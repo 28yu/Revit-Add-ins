@@ -48,13 +48,90 @@ namespace Tools28.Commands.FireProtection
                     doc, regionTypeName, fillPatternId, color);
                 if (regionTypeId == null) continue;
 
-                var outlines = new List<CurveLoop>();
-                foreach (var elem in elements)
+                // 梁情報を収集
+                var beamStarts = new List<XYZ>();
+                var beamEnds = new List<XYZ>();
+                var beamElements = new List<int>(); // elementsのインデックス
+                double maxBeamHalfWidth = 0;
+
+                for (int ei = 0; ei < elements.Count; ei++)
                 {
+                    var fi = elements[ei] as FamilyInstance;
+                    if (fi == null) continue;
+                    if (elements[ei].Category.Id.IntegerValue !=
+                        (int)BuiltInCategory.OST_StructuralFraming) continue;
+                    LocationCurve lc = fi.Location as LocationCurve;
+                    if (lc?.Curve == null) continue;
+
+                    double w = BeamGeometryHelper.GetBeamWidth(fi);
+                    if (w / 2.0 > maxBeamHalfWidth) maxBeamHalfWidth = w / 2.0;
+
+                    var s = lc.Curve.GetEndPoint(0);
+                    var e = lc.Curve.GetEndPoint(1);
+                    beamStarts.Add(new XYZ(s.X, s.Y, 0));
+                    beamEnds.Add(new XYZ(e.X, e.Y, 0));
+                    beamElements.Add(ei);
+                }
+
+                double connExtension = maxBeamHalfWidth + offsetFeet;
+                double tolerance = 500.0 / 304.8;
+                var processedSet = new HashSet<int>();
+
+                var outlines = new List<CurveLoop>();
+                for (int bi = 0; bi < beamElements.Count; bi++)
+                {
+                    int ei = beamElements[bi];
+                    processedSet.Add(ei);
+                    XYZ s2d = beamStarts[bi];
+                    XYZ e2d = beamEnds[bi];
+
+                    // 各端部: T字接合（端点が他梁の本体中間部にある）のみ延長
+                    double sExt = offsetFeet;
+                    double eExt = offsetFeet;
+
+                    for (int bj = 0; bj < beamElements.Count; bj++)
+                    {
+                        if (bi == bj) continue;
+                        XYZ oS = beamStarts[bj];
+                        XYZ oE = beamEnds[bj];
+
+                        // 始端の判定
+                        if (sExt == offsetFeet)
+                        {
+                            double param = ProjectParam(s2d, oS, oE);
+                            if (param > 0.05 && param < 0.95)
+                            {
+                                double dist = PointToSegDist(s2d, oS, oE);
+                                if (dist < tolerance) sExt = connExtension;
+                            }
+                        }
+
+                        // 終端の判定
+                        if (eExt == offsetFeet)
+                        {
+                            double param = ProjectParam(e2d, oS, oE);
+                            if (param > 0.05 && param < 0.95)
+                            {
+                                double dist = PointToSegDist(e2d, oS, oE);
+                                if (dist < tolerance) eExt = connExtension;
+                            }
+                        }
+
+                        if (sExt > offsetFeet && eExt > offsetFeet) break;
+                    }
+
                     var outline = BeamGeometryHelper.GetElementOffsetOutline(
-                        elem, activeView, offsetFeet);
-                    if (outline != null)
-                        outlines.Add(outline);
+                        elements[ei], activeView, offsetFeet, sExt, eExt);
+                    if (outline != null) outlines.Add(outline);
+                }
+
+                // 梁以外
+                for (int ei = 0; ei < elements.Count; ei++)
+                {
+                    if (processedSet.Contains(ei)) continue;
+                    var outline = BeamGeometryHelper.GetElementOffsetOutline(
+                        elements[ei], activeView, offsetFeet);
+                    if (outline != null) outlines.Add(outline);
                 }
 
                 if (outlines.Count == 0) continue;
@@ -139,6 +216,29 @@ namespace Tools28.Commands.FireProtection
             }
 
             return totalCreated;
+        }
+
+        /// <summary>
+        /// 点を線分に射影したパラメータ（0=始点、1=終点）
+        /// </summary>
+        private static double ProjectParam(XYZ pt, XYZ a, XYZ b)
+        {
+            double vx = b.X - a.X, vy = b.Y - a.Y;
+            double wx = pt.X - a.X, wy = pt.Y - a.Y;
+            double c2 = vx * vx + vy * vy;
+            if (c2 < 1e-10) return 0;
+            return (wx * vx + wy * vy) / c2;
+        }
+
+        /// <summary>
+        /// 2D点から線分への最短距離
+        /// </summary>
+        private static double PointToSegDist(XYZ pt, XYZ a, XYZ b)
+        {
+            double t = ProjectParam(pt, a, b);
+            if (t <= 0) return pt.DistanceTo(a);
+            if (t >= 1) return pt.DistanceTo(b);
+            return pt.DistanceTo(new XYZ(a.X + t * (b.X - a.X), a.Y + t * (b.Y - a.Y), 0));
         }
 
         private static CurveLoop TransformLoop(CurveLoop loop, Transform transform)
