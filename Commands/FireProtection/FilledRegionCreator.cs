@@ -133,10 +133,8 @@ namespace Tools28.Commands.FireProtection
                     double eExt = offsetFeet;
 
                     // 全構造要素に対してT字判定
-                    // ただし接続先が塗潰領域を作成する要素の場合のみ延長
                     for (int rj = 0; rj < refStarts.Count; rj++)
                     {
-                        // 接続先が処理対象外（塗潰領域なし）→ 延長しない
                         bool refIsProcessing = processingElementIds != null
                             && processingElementIds.Contains(refElemIds[rj]);
 
@@ -155,17 +153,17 @@ namespace Tools28.Commands.FireProtection
                                 }
                                 else
                                 {
-                                    isTjunc = true; // 柱（点）
+                                    isTjunc = true;
                                 }
 
-                                if (isTjunc && refIsProcessing)
+                                if (isTjunc)
                                 {
-                                    sExt = refWidths[rj] / 2.0 + offsetFeet;
-                                    debugLines.Add($"  beam[{bi}]start T-junc ref[{rj}] ext={sExt * 304.8:F0}mm (processing)");
-                                }
-                                else if (isTjunc)
-                                {
-                                    debugLines.Add($"  beam[{bi}]start T-junc ref[{rj}] SKIP (not processing)");
+                                    // 処理対象: 接続先のoffset端まで延長
+                                    // 非処理対象: 接続先の面まで延長（飛び出し防止）
+                                    sExt = refIsProcessing
+                                        ? refWidths[rj] / 2.0 + offsetFeet
+                                        : refWidths[rj] / 2.0;
+                                    debugLines.Add($"  beam[{bi}]start T ref[{rj}] ext={sExt * 304.8:F0}mm {(refIsProcessing ? "proc" : "face")}");
                                 }
                             }
                         }
@@ -188,14 +186,12 @@ namespace Tools28.Commands.FireProtection
                                     isTjunc = true;
                                 }
 
-                                if (isTjunc && refIsProcessing)
+                                if (isTjunc)
                                 {
-                                    eExt = refWidths[rj] / 2.0 + offsetFeet;
-                                    debugLines.Add($"  beam[{bi}]end T-junc ref[{rj}] ext={eExt * 304.8:F0}mm (processing)");
-                                }
-                                else if (isTjunc)
-                                {
-                                    debugLines.Add($"  beam[{bi}]end T-junc ref[{rj}] SKIP (not processing)");
+                                    eExt = refIsProcessing
+                                        ? refWidths[rj] / 2.0 + offsetFeet
+                                        : refWidths[rj] / 2.0;
+                                    debugLines.Add($"  beam[{bi}]end T ref[{rj}] ext={eExt * 304.8:F0}mm {(refIsProcessing ? "proc" : "face")}");
                                 }
                             }
                         }
