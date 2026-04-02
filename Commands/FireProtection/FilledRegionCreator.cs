@@ -48,11 +48,11 @@ namespace Tools28.Commands.FireProtection
                     doc, regionTypeName, fillPatternId, color);
                 if (regionTypeId == null) continue;
 
-                // 梁情報を収集
-                var beamStarts = new List<XYZ>();
-                var beamEnds = new List<XYZ>();
-                var beamElements = new List<int>(); // elementsのインデックス
-                double maxBeamHalfWidth = 0;
+                // 梁情報を収集（インデックス・端点・幅）
+                var bStarts = new List<XYZ>();
+                var bEnds = new List<XYZ>();
+                var bWidths = new List<double>();
+                var bIdx = new List<int>();
 
                 for (int ei = 0; ei < elements.Count; ei++)
                 {
@@ -63,76 +63,85 @@ namespace Tools28.Commands.FireProtection
                     LocationCurve lc = fi.Location as LocationCurve;
                     if (lc?.Curve == null) continue;
 
-                    double w = BeamGeometryHelper.GetBeamWidth(fi);
-                    if (w / 2.0 > maxBeamHalfWidth) maxBeamHalfWidth = w / 2.0;
-
                     var s = lc.Curve.GetEndPoint(0);
                     var e = lc.Curve.GetEndPoint(1);
-                    beamStarts.Add(new XYZ(s.X, s.Y, 0));
-                    beamEnds.Add(new XYZ(e.X, e.Y, 0));
-                    beamElements.Add(ei);
+                    bStarts.Add(new XYZ(s.X, s.Y, 0));
+                    bEnds.Add(new XYZ(e.X, e.Y, 0));
+                    bWidths.Add(BeamGeometryHelper.GetBeamWidth(fi));
+                    bIdx.Add(ei);
                 }
 
-                double connExtension = maxBeamHalfWidth + offsetFeet;
-                double tolerance = 500.0 / 304.8;
-                var processedSet = new HashSet<int>();
+                double tol = 500.0 / 304.8;
+                var processed = new HashSet<int>();
+                var debugLines = new System.Collections.Generic.List<string>();
 
                 var outlines = new List<CurveLoop>();
-                for (int bi = 0; bi < beamElements.Count; bi++)
+                for (int bi = 0; bi < bIdx.Count; bi++)
                 {
-                    int ei = beamElements[bi];
-                    processedSet.Add(ei);
-                    XYZ s2d = beamStarts[bi];
-                    XYZ e2d = beamEnds[bi];
-
-                    // 各端部: T字接合（端点が他梁の本体中間部にある）のみ延長
+                    processed.Add(bIdx[bi]);
                     double sExt = offsetFeet;
                     double eExt = offsetFeet;
 
-                    for (int bj = 0; bj < beamElements.Count; bj++)
+                    for (int bj = 0; bj < bIdx.Count; bj++)
                     {
                         if (bi == bj) continue;
-                        XYZ oS = beamStarts[bj];
-                        XYZ oE = beamEnds[bj];
 
-                        // 始端の判定
-                        if (sExt == offsetFeet)
+                        // 始端: T字接合なら接続先梁の実幅で延長
+                        if (sExt <= offsetFeet + 0.001)
                         {
-                            double param = ProjectParam(s2d, oS, oE);
-                            if (param > 0.05 && param < 0.95)
+                            double dist = PointToSegDist(bStarts[bi], bStarts[bj], bEnds[bj]);
+                            if (dist < tol)
                             {
-                                double dist = PointToSegDist(s2d, oS, oE);
-                                if (dist < tolerance) sExt = connExtension;
+                                double p = ProjectParam(bStarts[bi], bStarts[bj], bEnds[bj]);
+                                if (p > 0.05 && p < 0.95)
+                                {
+                                    sExt = bWidths[bj] / 2.0 + offsetFeet;
+                                    debugLines.Add($"beam[{bi}]start T-junc w/[{bj}] p={p:F2} ext={sExt * 304.8:F0}mm");
+                                }
                             }
                         }
 
-                        // 終端の判定
-                        if (eExt == offsetFeet)
+                        // 終端: T字接合なら接続先梁の実幅で延長
+                        if (eExt <= offsetFeet + 0.001)
                         {
-                            double param = ProjectParam(e2d, oS, oE);
-                            if (param > 0.05 && param < 0.95)
+                            double dist = PointToSegDist(bEnds[bi], bStarts[bj], bEnds[bj]);
+                            if (dist < tol)
                             {
-                                double dist = PointToSegDist(e2d, oS, oE);
-                                if (dist < tolerance) eExt = connExtension;
+                                double p = ProjectParam(bEnds[bi], bStarts[bj], bEnds[bj]);
+                                if (p > 0.05 && p < 0.95)
+                                {
+                                    eExt = bWidths[bj] / 2.0 + offsetFeet;
+                                    debugLines.Add($"beam[{bi}]end T-junc w/[{bj}] p={p:F2} ext={eExt * 304.8:F0}mm");
+                                }
                             }
                         }
-
-                        if (sExt > offsetFeet && eExt > offsetFeet) break;
                     }
 
+                    debugLines.Add($"beam[{bi}] sExt={sExt * 304.8:F0}mm eExt={eExt * 304.8:F0}mm w={bWidths[bi] * 304.8:F0}mm");
+
                     var outline = BeamGeometryHelper.GetElementOffsetOutline(
-                        elements[ei], activeView, offsetFeet, sExt, eExt);
+                        elements[bIdx[bi]], activeView, offsetFeet, sExt, eExt);
                     if (outline != null) outlines.Add(outline);
                 }
 
                 // 梁以外
                 for (int ei = 0; ei < elements.Count; ei++)
                 {
-                    if (processedSet.Contains(ei)) continue;
+                    if (processed.Contains(ei)) continue;
                     var outline = BeamGeometryHelper.GetElementOffsetOutline(
                         elements[ei], activeView, offsetFeet);
                     if (outline != null) outlines.Add(outline);
                 }
+
+                // デバッグログ
+                try
+                {
+                    System.IO.Directory.CreateDirectory(@"C:\temp");
+                    System.IO.File.AppendAllText(@"C:\temp\FireProtection_debug.txt",
+                        $"\n[{System.DateTime.Now:HH:mm:ss}] {typeName} offset={offsetFeet * 304.8:F0}mm beams={bIdx.Count}\n"
+                        + string.Join("\n", debugLines) + "\n");
+                }
+                catch { }
 
                 if (outlines.Count == 0) continue;
 
