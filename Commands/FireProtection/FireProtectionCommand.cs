@@ -236,10 +236,16 @@ namespace Tools28.Commands.FireProtection
 
                     try
                     {
+                        // T字接合判定用: カテゴリ選択に関わらず全構造要素を渡す
+                        var allStructural = new List<Element>();
+                        allStructural.AddRange(beams);
+                        allStructural.AddRange(columns);
+
                         regionCount = FilledRegionCreator.CreateFilledRegions(
                             doc, activeView, elementsByType, offsetByType,
                             settings.FillPatternId, settings.LineStyleId,
-                            settings.Types, settings.OverwriteExisting);
+                            settings.Types, settings.OverwriteExisting,
+                            allStructural);
 
                         legendViewId = LegendManager.CreateLegendDraftingView(
                             doc, settings.Types, beamCountByType,

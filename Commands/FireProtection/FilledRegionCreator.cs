@@ -15,6 +15,7 @@ namespace Tools28.Commands.FireProtection
         /// <summary>
         /// 耐火被覆種類ごとに塗潰領域を作成
         /// </summary>
+        /// <param name="allStructuralElements">T字接合判定用の全構造要素（梁+柱、カテゴリ選択に関わらず）</param>
         public static int CreateFilledRegions(
             Document doc,
             View activeView,
@@ -23,7 +24,8 @@ namespace Tools28.Commands.FireProtection
             ElementId fillPatternId,
             ElementId lineStyleId,
             List<FireProtectionTypeEntry> orderedTypes,
-            bool overwriteExisting)
+            bool overwriteExisting,
+            List<Element> allStructuralElements = null)
         {
             if (overwriteExisting)
             {
@@ -48,10 +50,55 @@ namespace Tools28.Commands.FireProtection
                     doc, regionTypeName, fillPatternId, color);
                 if (regionTypeId == null) continue;
 
-                // 梁情報を収集（インデックス・端点・幅）
+                // T字接合判定用: 全構造要素（梁+柱）の線分/位置を収集
+                // カテゴリ選択に関わらず、接続先の幅を考慮するため
+                var refStarts = new List<XYZ>();
+                var refEnds = new List<XYZ>();
+                var refWidths = new List<double>();
+                var refSource = allStructuralElements ?? elements.SelectMany(kv => kv.Value).Distinct().ToList();
+
+                foreach (var re in (allStructuralElements ?? new List<Element>()))
+                {
+                    var rfi = re as FamilyInstance;
+                    if (rfi == null) continue;
+
+                    // 梁: LocationCurve
+                    LocationCurve rlc = rfi.Location as LocationCurve;
+                    if (rlc?.Curve != null)
+                    {
+                        var rs = rlc.Curve.GetEndPoint(0);
+                        var re2 = rlc.Curve.GetEndPoint(1);
+                        refStarts.Add(new XYZ(rs.X, rs.Y, 0));
+                        refEnds.Add(new XYZ(re2.X, re2.Y, 0));
+
+                        if (re.Category.Id.IntegerValue == (int)BuiltInCategory.OST_StructuralFraming)
+                            refWidths.Add(BeamGeometryHelper.GetBeamWidth(rfi));
+                        else
+                            refWidths.Add(GetColumnWidth(rfi));
+                        continue;
+                    }
+
+                    // 柱: LocationPointからBoundingBoxで幅推定
+                    LocationPoint rlp = rfi.Location as LocationPoint;
+                    if (rlp != null)
+                    {
+                        BoundingBoxXYZ rbb = re.get_BoundingBox(activeView);
+                        if (rbb == null) rbb = re.get_BoundingBox(null);
+                        if (rbb != null)
+                        {
+                            double cw = Math.Max(rbb.Max.X - rbb.Min.X, rbb.Max.Y - rbb.Min.Y);
+                            XYZ cp = new XYZ(rlp.Point.X, rlp.Point.Y, 0);
+                            // 柱を短い縦線分として登録（高さ方向に微小長さ）
+                            refStarts.Add(new XYZ(cp.X, cp.Y - 0.01, 0));
+                            refEnds.Add(new XYZ(cp.X, cp.Y + 0.01, 0));
+                            refWidths.Add(cw);
+                        }
+                    }
+                }
+
+                // 処理対象梁の情報
                 var bStarts = new List<XYZ>();
                 var bEnds = new List<XYZ>();
-                var bWidths = new List<double>();
                 var bIdx = new List<int>();
 
                 for (int ei = 0; ei < elements.Count; ei++)
@@ -67,13 +114,13 @@ namespace Tools28.Commands.FireProtection
                     var e = lc.Curve.GetEndPoint(1);
                     bStarts.Add(new XYZ(s.X, s.Y, 0));
                     bEnds.Add(new XYZ(e.X, e.Y, 0));
-                    bWidths.Add(BeamGeometryHelper.GetBeamWidth(fi));
                     bIdx.Add(ei);
                 }
 
                 double tol = 500.0 / 304.8;
                 var processed = new HashSet<int>();
                 var debugLines = new System.Collections.Generic.List<string>();
+                debugLines.Add($"refElements={refStarts.Count}, targetBeams={bIdx.Count}");
 
                 var outlines = new List<CurveLoop>();
                 for (int bi = 0; bi < bIdx.Count; bi++)
@@ -82,49 +129,66 @@ namespace Tools28.Commands.FireProtection
                     double sExt = offsetFeet;
                     double eExt = offsetFeet;
 
-                    for (int bj = 0; bj < bIdx.Count; bj++)
+                    // 全構造要素に対してT字判定
+                    for (int rj = 0; rj < refStarts.Count; rj++)
                     {
-                        if (bi == bj) continue;
-
-                        // 始端: T字接合なら接続先梁の実幅で延長
+                        // 始端
                         if (sExt <= offsetFeet + 0.001)
                         {
-                            double dist = PointToSegDist(bStarts[bi], bStarts[bj], bEnds[bj]);
+                            double dist = PointToSegDist(bStarts[bi], refStarts[rj], refEnds[rj]);
                             if (dist < tol)
                             {
-                                double p = ProjectParam(bStarts[bi], bStarts[bj], bEnds[bj]);
-                                if (p > 0.05 && p < 0.95)
+                                double segLen = refStarts[rj].DistanceTo(refEnds[rj]);
+                                if (segLen > 0.02) // 通常の梁
                                 {
-                                    sExt = bWidths[bj] / 2.0 + offsetFeet;
-                                    debugLines.Add($"beam[{bi}]start T-junc w/[{bj}] p={p:F2} ext={sExt * 304.8:F0}mm");
+                                    double p = ProjectParam(bStarts[bi], refStarts[rj], refEnds[rj]);
+                                    if (p > 0.05 && p < 0.95)
+                                    {
+                                        sExt = refWidths[rj] / 2.0 + offsetFeet;
+                                        debugLines.Add($"  beam[{bi}]start T-junc w/ref[{rj}] p={p:F2} w={refWidths[rj] * 304.8:F0}mm ext={sExt * 304.8:F0}mm");
+                                    }
+                                }
+                                else // 柱（点として登録）
+                                {
+                                    sExt = refWidths[rj] / 2.0 + offsetFeet;
+                                    debugLines.Add($"  beam[{bi}]start column ref[{rj}] w={refWidths[rj] * 304.8:F0}mm ext={sExt * 304.8:F0}mm");
                                 }
                             }
                         }
 
-                        // 終端: T字接合なら接続先梁の実幅で延長
+                        // 終端
                         if (eExt <= offsetFeet + 0.001)
                         {
-                            double dist = PointToSegDist(bEnds[bi], bStarts[bj], bEnds[bj]);
+                            double dist = PointToSegDist(bEnds[bi], refStarts[rj], refEnds[rj]);
                             if (dist < tol)
                             {
-                                double p = ProjectParam(bEnds[bi], bStarts[bj], bEnds[bj]);
-                                if (p > 0.05 && p < 0.95)
+                                double segLen = refStarts[rj].DistanceTo(refEnds[rj]);
+                                if (segLen > 0.02)
                                 {
-                                    eExt = bWidths[bj] / 2.0 + offsetFeet;
-                                    debugLines.Add($"beam[{bi}]end T-junc w/[{bj}] p={p:F2} ext={eExt * 304.8:F0}mm");
+                                    double p = ProjectParam(bEnds[bi], refStarts[rj], refEnds[rj]);
+                                    if (p > 0.05 && p < 0.95)
+                                    {
+                                        eExt = refWidths[rj] / 2.0 + offsetFeet;
+                                        debugLines.Add($"  beam[{bi}]end T-junc w/ref[{rj}] p={p:F2} w={refWidths[rj] * 304.8:F0}mm ext={eExt * 304.8:F0}mm");
+                                    }
+                                }
+                                else
+                                {
+                                    eExt = refWidths[rj] / 2.0 + offsetFeet;
+                                    debugLines.Add($"  beam[{bi}]end column ref[{rj}] w={refWidths[rj] * 304.8:F0}mm ext={eExt * 304.8:F0}mm");
                                 }
                             }
                         }
                     }
 
-                    debugLines.Add($"beam[{bi}] sExt={sExt * 304.8:F0}mm eExt={eExt * 304.8:F0}mm w={bWidths[bi] * 304.8:F0}mm");
+                    debugLines.Add($"  beam[{bi}] sExt={sExt * 304.8:F0}mm eExt={eExt * 304.8:F0}mm");
 
                     var outline = BeamGeometryHelper.GetElementOffsetOutline(
                         elements[bIdx[bi]], activeView, offsetFeet, sExt, eExt);
                     if (outline != null) outlines.Add(outline);
                 }
 
-                // 梁以外
+                // 梁以外（柱等）
                 for (int ei = 0; ei < elements.Count; ei++)
                 {
                     if (processed.Contains(ei)) continue;
@@ -138,7 +202,7 @@ namespace Tools28.Commands.FireProtection
                 {
                     System.IO.Directory.CreateDirectory(@"C:\temp");
                     System.IO.File.AppendAllText(@"C:\temp\FireProtection_debug.txt",
-                        $"\n[{System.DateTime.Now:HH:mm:ss}] {typeName} offset={offsetFeet * 304.8:F0}mm beams={bIdx.Count}\n"
+                        $"\n[{System.DateTime.Now:HH:mm:ss}] {typeName} offset={offsetFeet * 304.8:F0}mm\n"
                         + string.Join("\n", debugLines) + "\n");
                 }
                 catch { }
@@ -225,6 +289,14 @@ namespace Tools28.Commands.FireProtection
             }
 
             return totalCreated;
+        }
+
+        private static double GetColumnWidth(FamilyInstance column)
+        {
+            BoundingBoxXYZ bb = column.get_BoundingBox(null);
+            if (bb != null)
+                return Math.Max(bb.Max.X - bb.Min.X, bb.Max.Y - bb.Min.Y);
+            return 400.0 / 304.8;
         }
 
         /// <summary>
