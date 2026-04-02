@@ -48,10 +48,10 @@ namespace Tools28.Commands.FireProtection
                     doc, regionTypeName, fillPatternId, color);
                 if (regionTypeId == null) continue;
 
-                // 梁端部の接続判定用: 全梁の線分情報と最大梁幅を収集
+                // 全梁の線分情報と最大梁幅を収集
                 double maxBeamHalfWidth = 0;
-                var beamSegments = new List<KeyValuePair<XYZ, XYZ>>(); // 2D線分リスト
-                double connTolerance = 500.0 / 304.8; // 500mm
+                var beamSegments = new List<KeyValuePair<XYZ, XYZ>>();
+                double connTolerance = 500.0 / 304.8;
 
                 foreach (var elem in elements)
                 {
@@ -75,54 +75,51 @@ namespace Tools28.Commands.FireProtection
                         }
                     }
                 }
-                double connExtension = maxBeamHalfWidth + offsetFeet;
 
+                // 通常のオフセット矩形を作成（端部延長なし）
                 var outlines = new List<CurveLoop>();
-                int segIdx = 0;
                 foreach (var elem in elements)
                 {
-                    var fi = elem as FamilyInstance;
-                    if (fi != null && elem.Category.Id.IntegerValue ==
-                        (int)BuiltInCategory.OST_StructuralFraming)
+                    var outline = BeamGeometryHelper.GetElementOffsetOutline(
+                        elem, activeView, offsetFeet);
+                    if (outline != null)
+                        outlines.Add(outline);
+                }
+
+                // 接続点にパッチ矩形を追加（L字/T字交差部の欠けを埋める）
+                double patchExtent = maxBeamHalfWidth + offsetFeet;
+                var addedPatches = new HashSet<string>();
+
+                for (int i = 0; i < beamSegments.Count; i++)
+                {
+                    XYZ[] endpoints = { beamSegments[i].Key, beamSegments[i].Value };
+                    foreach (var ep in endpoints)
                     {
-                        LocationCurve lc = fi.Location as LocationCurve;
-                        if (lc != null && lc.Curve != null && segIdx < beamSegments.Count)
+                        // 同じ位置にパッチ済みならスキップ
+                        string key = $"{Math.Round(ep.X, 4)},{Math.Round(ep.Y, 4)}";
+                        if (addedPatches.Contains(key)) continue;
+
+                        // 他の梁の線分と接続しているか判定
+                        bool connected = false;
+                        for (int j = 0; j < beamSegments.Count; j++)
                         {
-                            XYZ s2d = beamSegments[segIdx].Key;
-                            XYZ e2d = beamSegments[segIdx].Value;
-                            segIdx++;
-
-                            // 端点が他の梁の線分に近いか判定（端点一致+T字接合に対応）
-                            bool sConn = false, eConn = false;
-                            for (int j = 0; j < beamSegments.Count; j++)
+                            if (i == j) continue;
+                            double dist = PointToSegmentDistance2D(
+                                ep, beamSegments[j].Key, beamSegments[j].Value);
+                            if (dist < connTolerance)
                             {
-                                if (beamSegments[j].Key == s2d && beamSegments[j].Value == e2d)
-                                    continue; // 自分自身をスキップ
-
-                                double sDist = PointToSegmentDistance2D(
-                                    s2d, beamSegments[j].Key, beamSegments[j].Value);
-                                double eDist = PointToSegmentDistance2D(
-                                    e2d, beamSegments[j].Key, beamSegments[j].Value);
-
-                                if (sDist < connTolerance) sConn = true;
-                                if (eDist < connTolerance) eConn = true;
-                                if (sConn && eConn) break;
+                                connected = true;
+                                break;
                             }
+                        }
 
-                            double sExt = sConn ? connExtension : offsetFeet;
-                            double eExt = eConn ? connExtension : offsetFeet;
-
-                            var outline = BeamGeometryHelper.GetElementOffsetOutline(
-                                elem, activeView, offsetFeet, sExt, eExt);
-                            if (outline != null) outlines.Add(outline);
-                            continue;
+                        if (connected)
+                        {
+                            addedPatches.Add(key);
+                            var patch = CreatePatchRectangle(ep, patchExtent);
+                            if (patch != null) outlines.Add(patch);
                         }
                     }
-
-                    // 柱等: デフォルトのoffsetで生成
-                    var defaultOutline = BeamGeometryHelper.GetElementOffsetOutline(
-                        elem, activeView, offsetFeet);
-                    if (defaultOutline != null) outlines.Add(defaultOutline);
                 }
 
                 if (outlines.Count == 0) continue;
@@ -207,6 +204,24 @@ namespace Tools28.Commands.FireProtection
             }
 
             return totalCreated;
+        }
+
+        /// <summary>
+        /// 接続点に配置するパッチ矩形（L字/T字交差部の欠けを埋める）
+        /// </summary>
+        private static CurveLoop CreatePatchRectangle(XYZ center, double extent)
+        {
+            XYZ p0 = new XYZ(center.X - extent, center.Y - extent, 0);
+            XYZ p1 = new XYZ(center.X + extent, center.Y - extent, 0);
+            XYZ p2 = new XYZ(center.X + extent, center.Y + extent, 0);
+            XYZ p3 = new XYZ(center.X - extent, center.Y + extent, 0);
+
+            CurveLoop loop = new CurveLoop();
+            loop.Append(Line.CreateBound(p0, p1));
+            loop.Append(Line.CreateBound(p1, p2));
+            loop.Append(Line.CreateBound(p2, p3));
+            loop.Append(Line.CreateBound(p3, p0));
+            return loop;
         }
 
         /// <summary>

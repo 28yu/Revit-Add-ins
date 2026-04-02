@@ -89,14 +89,33 @@ namespace Tools28.Commands.FireProtection
                 var columnParams = BeamGeometryHelper.DetectFireProtectionParameters(columns);
 
                 // 線種取得（塗潰領域の境界で選択できる線種と同じ）
-                // Linesカテゴリの全サブカテゴリから投影用GraphicsStyleを取得
+                // Linesカテゴリのサブカテゴリからツール専用の線種を除外
                 var lineStyles = new List<LineStyleItem>();
                 Category linesCat = doc.Settings.Categories
                     .get_Item(BuiltInCategory.OST_Lines);
                 if (linesCat != null)
                 {
+                    // ツール専用線種の除外キーワード（日英両対応）
+                    var excludeKeywords = new[]
+                    {
+                        "スケッチ", "Sketch",
+                        "部屋を分割", "Room Separation",
+                        "スペースの分割", "Space Separator",
+                        "メッシュ筋", "Fabric", "Area Reinforcement",
+                        "回転の軸", "Axis of Rotation",
+                        "断熱層", "Insulation Batting",
+                    };
+
                     foreach (Category subCat in linesCat.SubCategories)
                     {
+                        string name = subCat.Name;
+                        bool excluded = false;
+                        foreach (var kw in excludeKeywords)
+                        {
+                            if (name.Contains(kw)) { excluded = true; break; }
+                        }
+                        if (excluded) continue;
+
                         GraphicsStyle gs = subCat.GetGraphicsStyle(
                             GraphicsStyleType.Projection);
                         if (gs != null)
@@ -104,7 +123,7 @@ namespace Tools28.Commands.FireProtection
                             lineStyles.Add(new LineStyleItem
                             {
                                 Id = gs.Id,
-                                Name = subCat.Name
+                                Name = name
                             });
                         }
                     }
