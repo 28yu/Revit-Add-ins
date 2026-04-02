@@ -13,11 +13,14 @@ namespace Tools28.Commands.FireProtection
         /// <summary>
         /// 要素のオフセット輪郭を取得（梁はロケーションカーブ、柱はBoundingBox）
         /// </summary>
-        /// <param name="endExtension">梁端部の延長量（feet）。-1の場合はoffsetFeetを使用</param>
+        /// <param name="startExt">梁始端の延長量（feet）。-1の場合はoffsetFeetを使用</param>
+        /// <param name="endExt">梁終端の延長量（feet）。-1の場合はoffsetFeetを使用</param>
         public static CurveLoop GetElementOffsetOutline(
-            Element element, View view, double offsetFeet, double endExtension = -1)
+            Element element, View view, double offsetFeet,
+            double startExt = -1, double endExt = -1)
         {
-            if (endExtension < 0) endExtension = offsetFeet;
+            if (startExt < 0) startExt = offsetFeet;
+            if (endExt < 0) endExt = offsetFeet;
 
             // 断面ビュー: BoundingBoxをビュー座標系に投影して矩形を生成
             if (view.ViewType == ViewType.Section)
@@ -32,7 +35,7 @@ namespace Tools28.Commands.FireProtection
             if (element.Category.Id.IntegerValue ==
                 (int)BuiltInCategory.OST_StructuralFraming)
             {
-                var outline = GetBeamOutlineFromCurve(fi, offsetFeet, endExtension);
+                var outline = GetBeamOutlineFromCurve(fi, offsetFeet, startExt, endExt);
                 if (outline != null) return outline;
             }
 
@@ -113,7 +116,8 @@ namespace Tools28.Commands.FireProtection
         /// </summary>
         /// <param name="endExtension">梁端部の延長量（交差部の欠け防止用）</param>
         private static CurveLoop GetBeamOutlineFromCurve(
-            FamilyInstance beam, double offsetFeet, double endExtension)
+            FamilyInstance beam, double offsetFeet,
+            double startExtension, double endExtension)
         {
             LocationCurve locCurve = beam.Location as LocationCurve;
             if (locCurve == null) return null;
@@ -133,8 +137,8 @@ namespace Tools28.Commands.FireProtection
             double beamWidth = GetBeamWidth(beam);
             double halfExtent = beamWidth / 2.0 + offsetFeet;
 
-            // 端部を延長（交差する梁の幅分をカバーして欠けを防止）
-            XYZ extStart = start - direction * endExtension;
+            // 端部を延長（接続端は交差する梁の幅分、自由端はoffset分）
+            XYZ extStart = start - direction * startExtension;
             XYZ extEnd = end + direction * endExtension;
 
             XYZ p0 = extStart - perp * halfExtent;

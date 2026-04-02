@@ -48,28 +48,77 @@ namespace Tools28.Commands.FireProtection
                     doc, regionTypeName, fillPatternId, color);
                 if (regionTypeId == null) continue;
 
-                // 全要素の最大梁幅を取得（端部延長量の計算用）
+                // 梁端部の接続判定用: 全梁の端点と最大梁幅を収集
                 double maxBeamHalfWidth = 0;
+                var beamEndpoints = new List<XYZ>();
+                double connTolerance = 500.0 / 304.8; // 500mm
+
                 foreach (var elem in elements)
                 {
                     var fi = elem as FamilyInstance;
-                    if (fi != null && elem.Category.Id.IntegerValue ==
+                    if (fi == null) continue;
+                    if (elem.Category.Id.IntegerValue ==
                         (int)BuiltInCategory.OST_StructuralFraming)
                     {
                         double w = BeamGeometryHelper.GetBeamWidth(fi);
                         if (w / 2.0 > maxBeamHalfWidth)
                             maxBeamHalfWidth = w / 2.0;
+
+                        LocationCurve lc = fi.Location as LocationCurve;
+                        if (lc != null && lc.Curve != null)
+                        {
+                            var s = lc.Curve.GetEndPoint(0);
+                            var e = lc.Curve.GetEndPoint(1);
+                            beamEndpoints.Add(new XYZ(s.X, s.Y, 0));
+                            beamEndpoints.Add(new XYZ(e.X, e.Y, 0));
+                        }
                     }
                 }
-                double endExtension = maxBeamHalfWidth + offsetFeet;
+                double connExtension = maxBeamHalfWidth + offsetFeet;
 
                 var outlines = new List<CurveLoop>();
                 foreach (var elem in elements)
                 {
-                    var outline = BeamGeometryHelper.GetElementOffsetOutline(
-                        elem, activeView, offsetFeet, endExtension);
-                    if (outline != null)
-                        outlines.Add(outline);
+                    // 梁: 端部ごとに接続判定して延長量を決定
+                    var fi = elem as FamilyInstance;
+                    if (fi != null && elem.Category.Id.IntegerValue ==
+                        (int)BuiltInCategory.OST_StructuralFraming)
+                    {
+                        LocationCurve lc = fi.Location as LocationCurve;
+                        if (lc != null && lc.Curve != null)
+                        {
+                            var s = lc.Curve.GetEndPoint(0);
+                            var e = lc.Curve.GetEndPoint(1);
+                            XYZ s2d = new XYZ(s.X, s.Y, 0);
+                            XYZ e2d = new XYZ(e.X, e.Y, 0);
+
+                            // 自分以外の端点が近くにあれば接続端
+                            bool sConn = false, eConn = false;
+                            foreach (var ep in beamEndpoints)
+                            {
+                                if (ep.DistanceTo(s2d) < 0.001) continue;
+                                if (ep.DistanceTo(s2d) < connTolerance) { sConn = true; break; }
+                            }
+                            foreach (var ep in beamEndpoints)
+                            {
+                                if (ep.DistanceTo(e2d) < 0.001) continue;
+                                if (ep.DistanceTo(e2d) < connTolerance) { eConn = true; break; }
+                            }
+
+                            double sExt = sConn ? connExtension : offsetFeet;
+                            double eExt = eConn ? connExtension : offsetFeet;
+
+                            var outline = BeamGeometryHelper.GetElementOffsetOutline(
+                                elem, activeView, offsetFeet, sExt, eExt);
+                            if (outline != null) outlines.Add(outline);
+                            continue;
+                        }
+                    }
+
+                    // 柱等: デフォルトのoffsetで生成
+                    var defaultOutline = BeamGeometryHelper.GetElementOffsetOutline(
+                        elem, activeView, offsetFeet);
+                    if (defaultOutline != null) outlines.Add(defaultOutline);
                 }
 
                 if (outlines.Count == 0) continue;

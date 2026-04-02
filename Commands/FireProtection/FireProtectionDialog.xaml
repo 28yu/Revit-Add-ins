@@ -194,7 +194,13 @@
                             <StackPanel x:Name="DetectedTypesPanel"/>
                         </StackPanel>
                     </Border>
+                </StackPanel>
+            </ScrollViewer>
 
+            <!-- Step 2: オフセット・表示設定 -->
+            <ScrollViewer x:Name="Step2Panel" Visibility="Collapsed"
+                          VerticalScrollBarVisibility="Auto">
+                <StackPanel>
                     <!-- オフセット設定 -->
                     <Border Background="White" BorderBrush="#D3D3D3"
                             BorderThickness="1" CornerRadius="3" Padding="15,12" Margin="0,0,0,10">
@@ -221,13 +227,6 @@
                                        Text="※ 梁・柱のエッジからの距離（mm）"/>
                         </StackPanel>
                     </Border>
-                </StackPanel>
-            </ScrollViewer>
-
-            <!-- Step 2: 表示設定 -->
-            <ScrollViewer x:Name="Step2Panel" Visibility="Collapsed"
-                          VerticalScrollBarVisibility="Auto">
-                <StackPanel>
                     <Border Background="White" BorderBrush="#D3D3D3"
                             BorderThickness="1" CornerRadius="3" Padding="15,12" Margin="0,0,0,10">
                         <StackPanel>

@@ -445,7 +445,7 @@ namespace Tools28.Commands.FireProtection
             BackButton.IsEnabled = step > 1;
             NextButton.Content = step == TotalSteps ? "実行" : "次へ";
 
-            string[] stepNames = { "", "基本設定", "表示設定", "処理確認" };
+            string[] stepNames = { "", "基本設定", "オフセット・表示設定", "処理確認" };
             StepIndicator.Text = $"ステップ {step} / {TotalSteps}  {stepNames[step]}";
         }
 
