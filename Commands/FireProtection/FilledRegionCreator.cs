@@ -156,13 +156,19 @@ namespace Tools28.Commands.FireProtection
                                     isTjunc = true;
                                 }
 
-                                if (isTjunc && refIsProcessing)
+                                if (isTjunc)
                                 {
-                                    // 処理対象: 接続先のoffset端まで延長
-                                    sExt = refWidths[rj] / 2.0 + offsetFeet;
-                                    debugLines.Add($"  beam[{bi}]start T ref[{rj}] ext={sExt * 304.8:F0}mm proc");
+                                    double hw = refWidths[rj] / 2.0;
+                                    // 処理対象: offset端に合わせる
+                                    // 非処理対象: 要素面まで（offsetは足さない）
+                                    double ext = refIsProcessing ? hw + offsetFeet : hw;
+                                    // offsetより小さければ延長不要
+                                    if (ext > sExt)
+                                    {
+                                        sExt = ext;
+                                        debugLines.Add($"  beam[{bi}]start T ref[{rj}] ext={sExt * 304.8:F0}mm rw={refWidths[rj] * 304.8:F0}mm {(refIsProcessing ? "proc" : "face")}");
+                                    }
                                 }
-                                // 非処理対象: 延長しない（offsetのみ）
                             }
                         }
 
@@ -184,10 +190,15 @@ namespace Tools28.Commands.FireProtection
                                     isTjunc = true;
                                 }
 
-                                if (isTjunc && refIsProcessing)
+                                if (isTjunc)
                                 {
-                                    eExt = refWidths[rj] / 2.0 + offsetFeet;
-                                    debugLines.Add($"  beam[{bi}]end T ref[{rj}] ext={eExt * 304.8:F0}mm proc");
+                                    double hw = refWidths[rj] / 2.0;
+                                    double ext = refIsProcessing ? hw + offsetFeet : hw;
+                                    if (ext > eExt)
+                                    {
+                                        eExt = ext;
+                                        debugLines.Add($"  beam[{bi}]end T ref[{rj}] ext={eExt * 304.8:F0}mm rw={refWidths[rj] * 304.8:F0}mm {(refIsProcessing ? "proc" : "face")}");
+                                    }
                                 }
                             }
                         }
@@ -307,7 +318,12 @@ namespace Tools28.Commands.FireProtection
         {
             BoundingBoxXYZ bb = column.get_BoundingBox(null);
             if (bb != null)
-                return Math.Max(bb.Max.X - bb.Min.X, bb.Max.Y - bb.Min.Y);
+            {
+                double xExt = bb.Max.X - bb.Min.X;
+                double yExt = bb.Max.Y - bb.Min.Y;
+                // 小さい方の寸法 = 平面上の幅（大きい方は高さや奥行の可能性）
+                return Math.Min(xExt, yExt);
+            }
             return 400.0 / 304.8;
         }
 
