@@ -31,7 +31,10 @@ namespace Tools28.Commands.FireProtection
                 if (outline != null) return outline;
             }
 
-            return GetOutlineFromBoundingBox(element, view, offsetFeet);
+            // 柱: 下部オフセットなし
+            bool isColumn = element.Category.Id.IntegerValue ==
+                (int)BuiltInCategory.OST_StructuralColumns;
+            return GetOutlineFromBoundingBox(element, view, offsetFeet, isColumn);
         }
 
         /// <summary>
@@ -79,8 +82,10 @@ namespace Tools28.Commands.FireProtection
                 if (vp.Y > maxY) maxY = vp.Y;
             }
 
+            bool isCol = element.Category.Id.IntegerValue ==
+                (int)BuiltInCategory.OST_StructuralColumns;
             minX -= offsetFeet;
-            minY -= offsetFeet;
+            minY -= isCol ? 0 : offsetFeet; // 柱の下部はオフセットなし
             maxX += offsetFeet;
             maxY += offsetFeet;
 
@@ -148,8 +153,10 @@ namespace Tools28.Commands.FireProtection
         /// <summary>
         /// BoundingBoxからオフセット矩形を生成
         /// </summary>
+        /// <param name="noBottomOffset">trueの場合minYにオフセットを適用しない（柱下部）</param>
         private static CurveLoop GetOutlineFromBoundingBox(
-            Element element, View view, double offsetFeet)
+            Element element, View view, double offsetFeet,
+            bool noBottomOffset = false)
         {
             BoundingBoxXYZ bb = element.get_BoundingBox(view);
             if (bb == null)
@@ -157,7 +164,7 @@ namespace Tools28.Commands.FireProtection
             if (bb == null) return null;
 
             double minX = bb.Min.X - offsetFeet;
-            double minY = bb.Min.Y - offsetFeet;
+            double minY = bb.Min.Y - (noBottomOffset ? 0 : offsetFeet);
             double maxX = bb.Max.X + offsetFeet;
             double maxY = bb.Max.Y + offsetFeet;
 

@@ -64,7 +64,8 @@ namespace Tools28.Commands.FireProtection
         {
             IncludeBeamsCheck.IsChecked = _data.HasBeams;
             IncludeBeamsCheck.IsEnabled = _data.HasBeams;
-            IncludeColumnsCheck.IsChecked = false; // デフォルトOFF
+            // 断面ビュー: 柱デフォルトON、それ以外: OFF
+            IncludeColumnsCheck.IsChecked = _data.IsSectionView && _data.HasColumns;
             IncludeColumnsCheck.IsEnabled = _data.HasColumns;
 
             UpdateCategoryCount();

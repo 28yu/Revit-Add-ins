@@ -129,9 +129,10 @@ namespace Tools28.Commands.FireProtection
                     }
                     lineStyles = lineStyles.OrderBy(ls => ls.Name).ToList();
 
-                    // <非表示>（Invisible Lines）をSubCategoriesにない場合に追加
+                    // <非表示>（Invisible Lines）を追加
                     if (!lineStyles.Any(ls => ls.Name.Contains("非表示") || ls.Name.Contains("Invisible")))
                     {
+                        // 方法1: BuiltInCategory
                         try
                         {
                             Category invisCat = doc.Settings.Categories
@@ -151,6 +152,25 @@ namespace Tools28.Commands.FireProtection
                             }
                         }
                         catch { }
+
+                        // 方法2: 全GraphicsStyleから検索
+                        if (!lineStyles.Any(ls => ls.Name.Contains("非表示") || ls.Name.Contains("Invisible")))
+                        {
+                            var invisStyle = new FilteredElementCollector(doc)
+                                .OfClass(typeof(GraphicsStyle))
+                                .Cast<GraphicsStyle>()
+                                .FirstOrDefault(gs =>
+                                    gs.GraphicsStyleType == GraphicsStyleType.Projection &&
+                                    (gs.Name.Contains("非表示") || gs.Name.Contains("Invisible")));
+                            if (invisStyle != null)
+                            {
+                                lineStyles.Add(new LineStyleItem
+                                {
+                                    Id = invisStyle.Id,
+                                    Name = invisStyle.Name
+                                });
+                            }
+                        }
                     }
                 }
 
@@ -184,6 +204,7 @@ namespace Tools28.Commands.FireProtection
                 {
                     ViewName = activeView.Name,
                     ViewTypeName = viewTypeName,
+                    IsSectionView = activeView.ViewType == ViewType.Section,
                     BeamCount = beams.Count,
                     ColumnCount = columns.Count,
                     HasBeams = beams.Count > 0,

@@ -58,6 +58,7 @@ namespace Tools28.Commands.FireProtection
     {
         public string ViewName { get; set; }
         public string ViewTypeName { get; set; }
+        public bool IsSectionView { get; set; }
         public int BeamCount { get; set; }
         public int ColumnCount { get; set; }
         public bool HasBeams { get; set; }
