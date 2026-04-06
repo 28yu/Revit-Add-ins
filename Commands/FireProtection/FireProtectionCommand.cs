@@ -228,6 +228,12 @@ namespace Tools28.Commands.FireProtection
 
                     try
                     {
+                        // Type削除は全ビュー処理前に1回だけ
+                        if (settings.OverwriteExisting)
+                        {
+                            FilledRegionCreator.CleanupExistingTypes(doc);
+                        }
+
                         foreach (var view in targetViews)
                         {
                             // このビューの要素を収集

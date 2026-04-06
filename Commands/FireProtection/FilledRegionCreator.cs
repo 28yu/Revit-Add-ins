@@ -282,13 +282,14 @@ namespace Tools28.Commands.FireProtection
             Document doc, string typeName, ElementId fillPatternId, Color fgColor,
             bool fgVisible = true, Color bgColor = null, bool bgVisible = false)
         {
+            // 既存タイプがあれば再利用（複数ビュー処理時に削除しない）
             var existing = new FilteredElementCollector(doc)
                 .OfClass(typeof(FilledRegionType))
                 .Cast<FilledRegionType>()
                 .FirstOrDefault(t => t.Name == typeName);
 
             if (existing != null)
-                doc.Delete(existing.Id);
+                return existing.Id;
 
             var baseType = new FilteredElementCollector(doc)
                 .OfClass(typeof(FilledRegionType))
@@ -328,8 +329,27 @@ namespace Tools28.Commands.FireProtection
             return newType.Id;
         }
 
+        /// <summary>
+        /// 全ビューの処理前に1回だけ呼ぶ: 既存のFilledRegionTypeを削除
+        /// </summary>
+        public static void CleanupExistingTypes(Document doc)
+        {
+            var existingTypes = new FilteredElementCollector(doc)
+                .OfClass(typeof(FilledRegionType))
+                .Cast<FilledRegionType>()
+                .Where(t => t.Name.StartsWith(TypePrefix))
+                .Select(t => t.Id)
+                .ToList();
+
+            foreach (var id in existingTypes)
+            {
+                try { doc.Delete(id); } catch { }
+            }
+        }
+
         private static void CleanupExistingRegions(Document doc, View view)
         {
+            // このビューのRegionだけ削除（Typeは削除しない）
             var existingRegions = new FilteredElementCollector(doc, view.Id)
                 .OfClass(typeof(FilledRegion))
                 .Cast<FilledRegion>()
@@ -345,18 +365,7 @@ namespace Tools28.Commands.FireProtection
             {
                 try { doc.Delete(id); } catch { }
             }
-
-            var existingTypes = new FilteredElementCollector(doc)
-                .OfClass(typeof(FilledRegionType))
-                .Cast<FilledRegionType>()
-                .Where(t => t.Name.StartsWith(TypePrefix))
-                .Select(t => t.Id)
-                .ToList();
-
-            foreach (var id in existingTypes)
-            {
-                try { doc.Delete(id); } catch { }
-            }
+        }
         }
 
         /// <summary>
