@@ -195,11 +195,20 @@ namespace Tools28.Commands.FireProtection
 
                 // 柱専用FilledRegionType
                 string colTypeName = TypePrefix + "柱_" + value;
-                Color colColor = new Color(typeEntry.ColColorR, typeEntry.ColColorG, typeEntry.ColColorB);
+                Color colFgColor = new Color(typeEntry.ColColorR, typeEntry.ColColorG, typeEntry.ColColorB);
+                Color colBgColor = new Color(typeEntry.ColBgColorR, typeEntry.ColBgColorG, typeEntry.ColBgColorB);
                 ElementId colTypeId = GetOrCreateFilledRegionType(
-                    doc, colTypeName, fillPatternId, colColor,
-                    typeEntry.ColForegroundVisible);
-                if (colTypeId == null) continue;
+                    doc, colTypeName, fillPatternId, colFgColor,
+                    typeEntry.ColForegroundVisible, colBgColor, typeEntry.ColBackgroundVisible);
+                if (colTypeId == null)
+                {
+                    try { System.IO.File.AppendAllText(@"C:\temp\FireProtection_debug.txt",
+                        $"  柱タイプ作成失敗: {colTypeName}\n"); } catch { }
+                    continue;
+                }
+
+                try { System.IO.File.AppendAllText(@"C:\temp\FireProtection_debug.txt",
+                    $"  柱枠作成: {value} center=({center.X * 304.8:F0},{center.Y * 304.8:F0}) A={aFeet * 304.8:F0} B={bFeet * 304.8:F0}\n"); } catch { }
 
                 // 外側矩形: center ± (A + B)
                 double outer = aFeet + bFeet;
@@ -218,7 +227,15 @@ namespace Tools28.Commands.FireProtection
                         region.SetLineStyleId(lineStyleId);
                     created++;
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    try
+                    {
+                        System.IO.File.AppendAllText(@"C:\temp\FireProtection_debug.txt",
+                            $"  柱枠エラー: {ex.Message}\n");
+                    }
+                    catch { }
+                }
             }
 
             return created;

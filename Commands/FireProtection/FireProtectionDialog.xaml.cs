@@ -184,7 +184,10 @@ namespace Tools28.Commands.FireProtection
                     ColorB = colors[i].Blue,
                     ColColorR = colors[i].Red,
                     ColColorG = colors[i].Green,
-                    ColColorB = colors[i].Blue
+                    ColColorB = colors[i].Blue,
+                    ColBgColorR = 255,
+                    ColBgColorG = 255,
+                    ColBgColorB = 255
                 });
             }
 
@@ -289,29 +292,81 @@ namespace Tools28.Commands.FireProtection
                 bgRect.MouseLeftButtonDown += (s, ev) => { ShowBgColorPicker(bgIdx); };
                 rowPanel.Children.Add(bgRect);
 
-                // 柱色（平面/天伏ビューのみ）
+                // 区切り + 柱色（平面/天伏ビューのみ）
                 if (!_data.IsSectionView)
                 {
                     int colIdx = idx;
+
+                    // 区切り線
+                    rowPanel.Children.Add(new WpfRectangle
+                    {
+                        Width = 1, Height = 18,
+                        Fill = new SolidColorBrush(
+                            System.Windows.Media.Color.FromRgb(0xCC, 0xCC, 0xCC)),
+                        Margin = new Thickness(12, 0, 12, 0),
+                        VerticalAlignment = VerticalAlignment.Center
+                    });
+
                     rowPanel.Children.Add(new TextBlock
                     {
-                        Text = "柱",
-                        FontSize = 11,
+                        Text = "柱:",
+                        FontSize = 11, FontWeight = FontWeights.Bold,
                         VerticalAlignment = VerticalAlignment.Center,
-                        Margin = new Thickness(16, 0, 4, 0)
+                        Margin = new Thickness(0, 0, 6, 0)
                     });
-                    var colRect = new WpfRectangle
+
+                    // 柱前景
+                    var colFgCheck = new CheckBox
                     {
-                        Width = 32, Height = 20,
+                        Content = "前景",
+                        IsChecked = entry.ColForegroundVisible,
+                        FontSize = 10,
+                        VerticalAlignment = VerticalAlignment.Center,
+                        Margin = new Thickness(0, 0, 3, 0)
+                    };
+                    colFgCheck.Checked += (s, ev) => { _typeEntries[colIdx].ColForegroundVisible = true; };
+                    colFgCheck.Unchecked += (s, ev) => { _typeEntries[colIdx].ColForegroundVisible = false; };
+                    rowPanel.Children.Add(colFgCheck);
+
+                    var colFgRect = new WpfRectangle
+                    {
+                        Width = 28, Height = 18,
                         Fill = new SolidColorBrush(System.Windows.Media.Color.FromRgb(
                             entry.ColColorR, entry.ColColorG, entry.ColColorB)),
                         Stroke = new SolidColorBrush(
                             System.Windows.Media.Color.FromRgb(0x66, 0x66, 0x66)),
                         StrokeThickness = 1,
+                        Margin = new Thickness(0, 0, 8, 0),
                         Cursor = Cursors.Hand
                     };
-                    colRect.MouseLeftButtonDown += (s, ev) => { ShowColColorPicker(colIdx); };
-                    rowPanel.Children.Add(colRect);
+                    colFgRect.MouseLeftButtonDown += (s, ev) => { ShowColColorPicker(colIdx); };
+                    rowPanel.Children.Add(colFgRect);
+
+                    // 柱背景
+                    var colBgCheck = new CheckBox
+                    {
+                        Content = "背景",
+                        IsChecked = entry.ColBackgroundVisible,
+                        FontSize = 10,
+                        VerticalAlignment = VerticalAlignment.Center,
+                        Margin = new Thickness(0, 0, 3, 0)
+                    };
+                    colBgCheck.Checked += (s, ev) => { _typeEntries[colIdx].ColBackgroundVisible = true; };
+                    colBgCheck.Unchecked += (s, ev) => { _typeEntries[colIdx].ColBackgroundVisible = false; };
+                    rowPanel.Children.Add(colBgCheck);
+
+                    var colBgRect = new WpfRectangle
+                    {
+                        Width = 28, Height = 18,
+                        Fill = new SolidColorBrush(System.Windows.Media.Color.FromRgb(
+                            entry.ColBgColorR, entry.ColBgColorG, entry.ColBgColorB)),
+                        Stroke = new SolidColorBrush(
+                            System.Windows.Media.Color.FromRgb(0x66, 0x66, 0x66)),
+                        StrokeThickness = 1,
+                        Cursor = Cursors.Hand
+                    };
+                    colBgRect.MouseLeftButtonDown += (s, ev) => { ShowColBgColorPicker(colIdx); };
+                    rowPanel.Children.Add(colBgRect);
                 }
 
                 DetectedTypesPanel.Children.Add(rowPanel);
@@ -468,6 +523,27 @@ namespace Tools28.Commands.FireProtection
                 entry.ColColorR = colorDialog.Color.R;
                 entry.ColColorG = colorDialog.Color.G;
                 entry.ColColorB = colorDialog.Color.B;
+                RefreshDetectedTypesUI();
+            }
+        }
+
+        private void ShowColBgColorPicker(int typeIndex)
+        {
+            if (typeIndex < 0 || typeIndex >= _typeEntries.Count) return;
+
+            var entry = _typeEntries[typeIndex];
+            var colorDialog = new WinForms.ColorDialog
+            {
+                FullOpen = true,
+                Color = System.Drawing.Color.FromArgb(
+                    entry.ColBgColorR, entry.ColBgColorG, entry.ColBgColorB)
+            };
+
+            if (colorDialog.ShowDialog() == WinForms.DialogResult.OK)
+            {
+                entry.ColBgColorR = colorDialog.Color.R;
+                entry.ColBgColorG = colorDialog.Color.G;
+                entry.ColBgColorB = colorDialog.Color.B;
                 RefreshDetectedTypesUI();
             }
         }

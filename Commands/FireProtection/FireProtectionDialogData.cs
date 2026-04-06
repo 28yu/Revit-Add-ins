@@ -57,6 +57,10 @@ namespace Tools28.Commands.FireProtection
         public byte ColColorG { get; set; }
         public byte ColColorB { get; set; }
         public bool ColForegroundVisible { get; set; } = true;
+        public byte ColBgColorR { get; set; } = 255;
+        public byte ColBgColorG { get; set; } = 255;
+        public byte ColBgColorB { get; set; } = 255;
+        public bool ColBackgroundVisible { get; set; }
     }
 
     public class FireProtectionDialogData
