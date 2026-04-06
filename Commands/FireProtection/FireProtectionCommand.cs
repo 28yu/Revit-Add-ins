@@ -330,27 +330,12 @@ namespace Tools28.Commands.FireProtection
 
                                 if (existingVPs.Count == 0)
                                 {
-                                    var titleBlocks = new FilteredElementCollector(doc, sheet.Id)
-                                        .OfCategory(BuiltInCategory.OST_TitleBlocks)
-                                        .WhereElementIsNotElementType()
-                                        .ToList();
-
-                                    BoundingBoxXYZ sheetBB = null;
-                                    if (titleBlocks.Count > 0)
-                                        sheetBB = titleBlocks[0].get_BoundingBox(null);
-
-                                    XYZ position;
-                                    if (sheetBB != null)
-                                    {
-                                        double margin = 20.0 / 304.8;
-                                        position = new XYZ(
-                                            sheetBB.Max.X - margin,
-                                            sheetBB.Min.Y + margin, 0);
-                                    }
-                                    else
-                                    {
-                                        position = new XYZ(0.5, 0.5, 0);
-                                    }
+                                    // シートのOutlineから配置位置を計算
+                                    BoundingBoxUV outline = sheet.Outline;
+                                    double margin = 50.0 / 304.8; // 50mm
+                                    XYZ position = new XYZ(
+                                        outline.Max.U - margin,
+                                        outline.Min.V + margin, 0);
 
                                     Viewport.Create(doc, sheet.Id, legendViewId, position);
 
