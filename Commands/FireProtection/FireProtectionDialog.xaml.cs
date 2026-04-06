@@ -495,10 +495,7 @@ namespace Tools28.Commands.FireProtection
         {
             SavePerTypeOffsets();
 
-            string catText = "";
-            if (IncludeBeamsCheck.IsChecked == true) catText += "梁";
-            if (IncludeColumnsCheck.IsChecked == true)
-                catText += (catText.Length > 0 ? "・" : "") + "柱";
+            string catText = _data.IsSectionView ? "梁・柱" : "梁";
 
             string summary = $"ビュー: {_data.ViewName}\n" +
                 $"対象カテゴリ: {catText}\n\n";
@@ -549,14 +546,6 @@ namespace Tools28.Commands.FireProtection
         {
             if (_currentStep == 1)
             {
-                if (IncludeBeamsCheck.IsChecked != true &&
-                    IncludeColumnsCheck.IsChecked != true)
-                {
-                    MessageBox.Show("対象カテゴリを1つ以上選択してください。",
-                        "入力エラー", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    return;
-                }
-
                 if (_typeEntries.Count == 0)
                 {
                     MessageBox.Show("耐火被覆パラメータに値が設定された要素がありません。\n" +
