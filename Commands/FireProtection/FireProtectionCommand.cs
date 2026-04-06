@@ -27,152 +27,127 @@ namespace Tools28.Commands.FireProtection
             {
                 View activeView = doc.ActiveView;
 
-                // 対応ビュータイプ: 平面、天伏、構造伏、断面
-                if (activeView.ViewType != ViewType.FloorPlan &&
-                    activeView.ViewType != ViewType.CeilingPlan &&
-                    activeView.ViewType != ViewType.EngineeringPlan &&
-                    activeView.ViewType != ViewType.Section)
-                {
-                    TaskDialog.Show("エラー",
-                        "平面ビュー、天井伏図、構造伏図、または断面図で実行してください。");
-                    return Result.Cancelled;
-                }
+                // シートビュー: 配置された全ビューを処理対象にする
+                List<View> targetViews = new List<View>();
+                bool isSheet = activeView.ViewType == ViewType.DrawingSheet;
 
-                // ビューテンプレート確認
-                if (activeView.ViewTemplateId != ElementId.InvalidElementId)
+                if (isSheet)
                 {
-                    TaskDialogResult templateResult = TaskDialog.Show(
-                        "ビューテンプレート確認",
-                        "ビューテンプレートが設定されています。\n" +
-                        "塗潰領域を配置するにはテンプレートを解除する必要があります。\n\n" +
-                        "テンプレートを解除しますか？",
-                        TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No);
-
-                    if (templateResult == TaskDialogResult.Yes)
+                    var sheet = activeView as ViewSheet;
+                    if (sheet != null)
                     {
-                        using (Transaction t = new Transaction(doc, "ビューテンプレート解除"))
+                        foreach (ElementId vpId in sheet.GetAllViewports())
                         {
-                            t.Start();
-                            activeView.ViewTemplateId = ElementId.InvalidElementId;
-                            t.Commit();
+                            var vp = doc.GetElement(vpId) as Viewport;
+                            if (vp == null) continue;
+                            var v = doc.GetElement(vp.ViewId) as View;
+                            if (v == null) continue;
+
+                            if (v.ViewType == ViewType.FloorPlan ||
+                                v.ViewType == ViewType.CeilingPlan ||
+                                v.ViewType == ViewType.EngineeringPlan ||
+                                v.ViewType == ViewType.Section)
+                            {
+                                targetViews.Add(v);
+                            }
                         }
                     }
-                    else
+
+                    if (targetViews.Count == 0)
                     {
+                        TaskDialog.Show("エラー",
+                            "シート上に対応するビュー（平面、天伏、構造伏、断面）がありません。");
                         return Result.Cancelled;
                     }
                 }
+                else if (activeView.ViewType == ViewType.FloorPlan ||
+                         activeView.ViewType == ViewType.CeilingPlan ||
+                         activeView.ViewType == ViewType.EngineeringPlan ||
+                         activeView.ViewType == ViewType.Section)
+                {
+                    targetViews.Add(activeView);
+                }
+                else
+                {
+                    TaskDialog.Show("エラー",
+                        "平面ビュー、天井伏図、構造伏図、断面図、またはシートで実行してください。");
+                    return Result.Cancelled;
+                }
 
-                // 梁を取得
-                var beams = new FilteredElementCollector(doc, activeView.Id)
-                    .OfCategory(BuiltInCategory.OST_StructuralFraming)
-                    .WhereElementIsNotElementType()
-                    .Cast<Element>()
-                    .ToList();
+                // 全ビューの要素を収集してダイアログ用データを構築
+                var allBeams = new List<Element>();
+                var allColumns = new List<Element>();
+                bool hasSectionView = false;
 
-                // 柱を取得
-                var columns = new FilteredElementCollector(doc, activeView.Id)
-                    .OfCategory(BuiltInCategory.OST_StructuralColumns)
-                    .WhereElementIsNotElementType()
-                    .Cast<Element>()
-                    .ToList();
+                foreach (var v in targetViews)
+                {
+                    var vBeams = new FilteredElementCollector(doc, v.Id)
+                        .OfCategory(BuiltInCategory.OST_StructuralFraming)
+                        .WhereElementIsNotElementType()
+                        .Cast<Element>().ToList();
+                    var vColumns = new FilteredElementCollector(doc, v.Id)
+                        .OfCategory(BuiltInCategory.OST_StructuralColumns)
+                        .WhereElementIsNotElementType()
+                        .Cast<Element>().ToList();
 
-                if (beams.Count == 0 && columns.Count == 0)
+                    allBeams.AddRange(vBeams);
+                    allColumns.AddRange(vColumns);
+
+                    if (v.ViewType == ViewType.Section)
+                        hasSectionView = true;
+                }
+
+                // 重複要素を除去（複数ビューに同じ要素が表示される場合）
+                allBeams = allBeams.GroupBy(e => e.Id.IntegerValue)
+                    .Select(g => g.First()).ToList();
+                allColumns = allColumns.GroupBy(e => e.Id.IntegerValue)
+                    .Select(g => g.First()).ToList();
+
+                if (allBeams.Count == 0 && allColumns.Count == 0)
                 {
                     TaskDialog.Show("エラー",
                         "ビュー内に梁（構造フレーム）または柱（構造柱）が見つかりません。");
                     return Result.Cancelled;
                 }
 
-                // パラメータ自動検出
-                var beamParams = BeamGeometryHelper.DetectFireProtectionParameters(beams);
-                var columnParams = BeamGeometryHelper.DetectFireProtectionParameters(columns);
-
-                // 線種取得（塗潰領域の境界で選択できる線種と同じ）
-                // Linesカテゴリのサブカテゴリからツール専用の線種を除外
-                var lineStyles = new List<LineStyleItem>();
-                Category linesCat = doc.Settings.Categories
-                    .get_Item(BuiltInCategory.OST_Lines);
-                if (linesCat != null)
+                // ビューテンプレート確認（各ビュー）
+                using (Transaction tpl = new Transaction(doc, "ビューテンプレート解除"))
                 {
-                    // ツール専用線種の除外キーワード（日英両対応）
-                    var excludeKeywords = new[]
-                    {
-                        "スケッチ", "Sketch",
-                        "部屋を分割", "Room Separation",
-                        "スペースの分割", "Space Separator",
-                        "メッシュ筋", "Fabric", "Area Reinforcement",
-                        "回転の軸", "Axis of Rotation",
-                        "断熱層", "Insulation Batting",
-                    };
+                    bool needTemplate = targetViews.Any(
+                        v => v.ViewTemplateId != ElementId.InvalidElementId);
 
-                    foreach (Category subCat in linesCat.SubCategories)
+                    if (needTemplate)
                     {
-                        string name = subCat.Name;
-                        bool excluded = false;
-                        foreach (var kw in excludeKeywords)
-                        {
-                            if (name.Contains(kw)) { excluded = true; break; }
-                        }
-                        if (excluded) continue;
+                        TaskDialogResult templateResult = TaskDialog.Show(
+                            "ビューテンプレート確認",
+                            "ビューテンプレートが設定されているビューがあります。\n" +
+                            "塗潰領域を配置するにはテンプレートを解除する必要があります。\n\n" +
+                            "テンプレートを解除しますか？",
+                            TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No);
 
-                        GraphicsStyle gs = subCat.GetGraphicsStyle(
-                            GraphicsStyleType.Projection);
-                        if (gs != null)
+                        if (templateResult == TaskDialogResult.Yes)
                         {
-                            lineStyles.Add(new LineStyleItem
+                            tpl.Start();
+                            foreach (var v in targetViews)
                             {
-                                Id = gs.Id,
-                                Name = name
-                            });
-                        }
-                    }
-                    lineStyles = lineStyles.OrderBy(ls => ls.Name).ToList();
-
-                    // <非表示>（Invisible Lines）を追加
-                    if (!lineStyles.Any(ls => ls.Name.Contains("非表示") || ls.Name.Contains("Invisible")))
-                    {
-                        // 方法1: BuiltInCategory
-                        try
-                        {
-                            Category invisCat = doc.Settings.Categories
-                                .get_Item(BuiltInCategory.OST_InvisibleLines);
-                            if (invisCat != null)
-                            {
-                                GraphicsStyle invisGs = invisCat.GetGraphicsStyle(
-                                    GraphicsStyleType.Projection);
-                                if (invisGs != null)
-                                {
-                                    lineStyles.Add(new LineStyleItem
-                                    {
-                                        Id = invisGs.Id,
-                                        Name = invisCat.Name
-                                    });
-                                }
+                                if (v.ViewTemplateId != ElementId.InvalidElementId)
+                                    v.ViewTemplateId = ElementId.InvalidElementId;
                             }
+                            tpl.Commit();
                         }
-                        catch { }
-
-                        // 方法2: 全GraphicsStyleから検索
-                        if (!lineStyles.Any(ls => ls.Name.Contains("非表示") || ls.Name.Contains("Invisible")))
+                        else
                         {
-                            var invisStyle = new FilteredElementCollector(doc)
-                                .OfClass(typeof(GraphicsStyle))
-                                .Cast<GraphicsStyle>()
-                                .FirstOrDefault(gs =>
-                                    gs.GraphicsStyleType == GraphicsStyleType.Projection &&
-                                    (gs.Name.Contains("非表示") || gs.Name.Contains("Invisible")));
-                            if (invisStyle != null)
-                            {
-                                lineStyles.Add(new LineStyleItem
-                                {
-                                    Id = invisStyle.Id,
-                                    Name = invisStyle.Name
-                                });
-                            }
+                            return Result.Cancelled;
                         }
                     }
                 }
+
+                // パラメータ自動検出
+                var beamParams = BeamGeometryHelper.DetectFireProtectionParameters(allBeams);
+                var columnParams = BeamGeometryHelper.DetectFireProtectionParameters(allColumns);
+
+                // 線種取得
+                var lineStyles = CollectLineStyles(doc);
 
                 // 塗りパターン取得
                 var fillPatterns = new FilteredElementCollector(doc)
@@ -191,24 +166,31 @@ namespace Tools28.Commands.FireProtection
                     .ToList();
 
                 string viewTypeName;
-                switch (activeView.ViewType)
+                if (isSheet)
+                    viewTypeName = $"シート（{targetViews.Count}ビュー）";
+                else
                 {
-                    case ViewType.FloorPlan: viewTypeName = "平面ビュー"; break;
-                    case ViewType.CeilingPlan: viewTypeName = "天井伏図"; break;
-                    case ViewType.EngineeringPlan: viewTypeName = "構造伏図"; break;
-                    case ViewType.Section: viewTypeName = "断面図"; break;
-                    default: viewTypeName = activeView.ViewType.ToString(); break;
+                    switch (activeView.ViewType)
+                    {
+                        case ViewType.FloorPlan: viewTypeName = "平面ビュー"; break;
+                        case ViewType.CeilingPlan: viewTypeName = "天井伏図"; break;
+                        case ViewType.EngineeringPlan: viewTypeName = "構造伏図"; break;
+                        case ViewType.Section: viewTypeName = "断面図"; break;
+                        default: viewTypeName = activeView.ViewType.ToString(); break;
+                    }
                 }
+
+                bool onlySections = targetViews.All(v => v.ViewType == ViewType.Section);
 
                 var dialogData = new FireProtectionDialogData
                 {
                     ViewName = activeView.Name,
                     ViewTypeName = viewTypeName,
-                    IsSectionView = activeView.ViewType == ViewType.Section,
-                    BeamCount = beams.Count,
-                    ColumnCount = columns.Count,
-                    HasBeams = beams.Count > 0,
-                    HasColumns = columns.Count > 0,
+                    IsSectionView = onlySections,
+                    BeamCount = allBeams.Count,
+                    ColumnCount = allColumns.Count,
+                    HasBeams = allBeams.Count > 0,
+                    HasColumns = allColumns.Count > 0,
                     BeamParameters = beamParams,
                     ColumnParameters = columnParams,
                     TextNoteTypes = textNoteTypes,
@@ -222,44 +204,9 @@ namespace Tools28.Commands.FireProtection
 
                 var settings = dialog.GetResult();
 
-                // 対象要素を収集
-                var targetElements = new List<Element>();
-                if (settings.IncludeBeams) targetElements.AddRange(beams);
-                if (settings.IncludeColumns) targetElements.AddRange(columns);
-
-                // パラメータ名を取得（表示用テキストを除去）
                 string paramName = settings.SelectedParameterName;
                 if (paramName != null && paramName.Contains("（"))
                     paramName = paramName.Substring(0, paramName.IndexOf("（"));
-
-                // 要素をパラメータ値でグループ化
-                var elementsByType = new Dictionary<string, List<Element>>();
-                var beamCountByType = new Dictionary<string, int>();
-
-                foreach (var elem in targetElements)
-                {
-                    Parameter p = elem.LookupParameter(paramName);
-                    if (p == null) continue;
-
-                    string value = null;
-                    if (p.StorageType == StorageType.String)
-                        value = p.AsString();
-                    else
-                        value = p.AsValueString();
-
-                    if (string.IsNullOrEmpty(value) || value.Trim().Length == 0)
-                        continue;
-
-                    value = value.Trim();
-
-                    if (!elementsByType.ContainsKey(value))
-                    {
-                        elementsByType[value] = new List<Element>();
-                        beamCountByType[value] = 0;
-                    }
-                    elementsByType[value].Add(elem);
-                    beamCountByType[value]++;
-                }
 
                 // オフセット辞書
                 var offsetByType = new Dictionary<string, double>();
@@ -271,7 +218,7 @@ namespace Tools28.Commands.FireProtection
                     offsetByType[typeEntry.Name] = offsetMm / 304.8;
                 }
 
-                // 実行
+                // 実行: 各ビューに対して処理
                 ElementId legendViewId = null;
                 int regionCount = 0;
 
@@ -281,27 +228,63 @@ namespace Tools28.Commands.FireProtection
 
                     try
                     {
-                        regionCount = FilledRegionCreator.CreateFilledRegions(
-                            doc, activeView, elementsByType, offsetByType,
-                            settings.FillPatternId, settings.LineStyleId,
-                            settings.Types, settings.OverwriteExisting);
-
-                        // 柱枠型塗潰領域（平面/天伏ビューのみ、柱チェックに関わらず）
-                        if (activeView.ViewType != ViewType.Section &&
-                            columns.Count > 0 && paramName != null)
+                        foreach (var view in targetViews)
                         {
-                            double aFeet = settings.ColumnA_mm / 304.8;
-                            double bFeet = settings.ColumnB_mm / 304.8;
-                            int colRegions = FilledRegionCreator.CreateColumnFrameRegions(
-                                doc, activeView, columns, paramName,
-                                aFeet, bFeet,
+                            // このビューの要素を収集
+                            var viewBeams = new FilteredElementCollector(doc, view.Id)
+                                .OfCategory(BuiltInCategory.OST_StructuralFraming)
+                                .WhereElementIsNotElementType()
+                                .Cast<Element>().ToList();
+                            var viewColumns = new FilteredElementCollector(doc, view.Id)
+                                .OfCategory(BuiltInCategory.OST_StructuralColumns)
+                                .WhereElementIsNotElementType()
+                                .Cast<Element>().ToList();
+
+                            var viewTargets = new List<Element>();
+                            if (settings.IncludeBeams) viewTargets.AddRange(viewBeams);
+                            if (settings.IncludeColumns) viewTargets.AddRange(viewColumns);
+
+                            // 要素をパラメータ値でグループ化
+                            var elementsByType = new Dictionary<string, List<Element>>();
+                            foreach (var elem in viewTargets)
+                            {
+                                Parameter p = elem.LookupParameter(paramName);
+                                if (p == null) continue;
+                                string value = p.StorageType == StorageType.String
+                                    ? p.AsString() : p.AsValueString();
+                                if (string.IsNullOrEmpty(value) || value.Trim().Length == 0)
+                                    continue;
+                                value = value.Trim();
+
+                                if (!elementsByType.ContainsKey(value))
+                                    elementsByType[value] = new List<Element>();
+                                elementsByType[value].Add(elem);
+                            }
+
+                            // 梁塗潰領域
+                            regionCount += FilledRegionCreator.CreateFilledRegions(
+                                doc, view, elementsByType, offsetByType,
                                 settings.FillPatternId, settings.LineStyleId,
                                 settings.Types, settings.OverwriteExisting);
-                            regionCount += colRegions;
+
+                            // 柱枠型塗潰領域（平面/天伏のみ）
+                            if (view.ViewType != ViewType.Section &&
+                                viewColumns.Count > 0 && paramName != null)
+                            {
+                                double aFeet = settings.ColumnA_mm / 304.8;
+                                double bFeet = settings.ColumnB_mm / 304.8;
+                                regionCount += FilledRegionCreator.CreateColumnFrameRegions(
+                                    doc, view, viewColumns, paramName,
+                                    aFeet, bFeet,
+                                    settings.FillPatternId, settings.LineStyleId,
+                                    settings.Types, settings.OverwriteExisting);
+                            }
                         }
 
-                        bool hasColumnFrame = activeView.ViewType != ViewType.Section
-                            && columns.Count > 0;
+                        // 凡例は1回だけ作成
+                        bool hasColumnFrame = targetViews.Any(
+                            v => v.ViewType != ViewType.Section);
+                        var beamCountByType = new Dictionary<string, int>();
                         legendViewId = LegendManager.CreateLegendDraftingView(
                             doc, settings.Types, beamCountByType,
                             settings.OverwriteExisting, settings.TextNoteTypeId,
@@ -324,11 +307,9 @@ namespace Tools28.Commands.FireProtection
                     ? "凡例ビュー「耐火被覆色分け凡例」を作成しました"
                     : "凡例ビュー作成をスキップしました";
 
-                int totalElements = elementsByType.Values.Sum(b => b.Count);
-
                 TaskDialog.Show("耐火被覆色分け - 完了",
                     $"処理が完了しました。\n\n" +
-                    $"対象要素数: {totalElements}\n" +
+                    $"対象ビュー数: {targetViews.Count}\n" +
                     $"塗潰領域: {regionCount} 個作成\n" +
                     $"耐火被覆種類: {settings.Types.Count}\n" +
                     $"{legendInfo}");
@@ -346,6 +327,75 @@ namespace Tools28.Commands.FireProtection
                     "\n配布サイト: https://28yu.github.io/28tools-download/";
                 return Result.Failed;
             }
+        }
+
+        /// <summary>
+        /// 塗潰領域の境界で選択できる線種を収集
+        /// </summary>
+        private static List<LineStyleItem> CollectLineStyles(Document doc)
+        {
+            var lineStyles = new List<LineStyleItem>();
+            Category linesCat = doc.Settings.Categories
+                .get_Item(BuiltInCategory.OST_Lines);
+            if (linesCat == null) return lineStyles;
+
+            var excludeKeywords = new[]
+            {
+                "スケッチ", "Sketch",
+                "部屋を分割", "Room Separation",
+                "スペースの分割", "Space Separator",
+                "メッシュ筋", "Fabric", "Area Reinforcement",
+                "回転の軸", "Axis of Rotation",
+                "断熱層", "Insulation Batting",
+            };
+
+            foreach (Category subCat in linesCat.SubCategories)
+            {
+                string name = subCat.Name;
+                bool excluded = false;
+                foreach (var kw in excludeKeywords)
+                {
+                    if (name.Contains(kw)) { excluded = true; break; }
+                }
+                if (excluded) continue;
+
+                GraphicsStyle gs = subCat.GetGraphicsStyle(GraphicsStyleType.Projection);
+                if (gs != null)
+                    lineStyles.Add(new LineStyleItem { Id = gs.Id, Name = name });
+            }
+            lineStyles = lineStyles.OrderBy(ls => ls.Name).ToList();
+
+            // <非表示>
+            if (!lineStyles.Any(ls => ls.Name.Contains("非表示") || ls.Name.Contains("Invisible")))
+            {
+                try
+                {
+                    Category invisCat = doc.Settings.Categories
+                        .get_Item(BuiltInCategory.OST_InvisibleLines);
+                    if (invisCat != null)
+                    {
+                        GraphicsStyle invisGs = invisCat.GetGraphicsStyle(
+                            GraphicsStyleType.Projection);
+                        if (invisGs != null)
+                            lineStyles.Add(new LineStyleItem { Id = invisGs.Id, Name = invisCat.Name });
+                    }
+                }
+                catch { }
+
+                if (!lineStyles.Any(ls => ls.Name.Contains("非表示") || ls.Name.Contains("Invisible")))
+                {
+                    var invisStyle = new FilteredElementCollector(doc)
+                        .OfClass(typeof(GraphicsStyle))
+                        .Cast<GraphicsStyle>()
+                        .FirstOrDefault(gs =>
+                            gs.GraphicsStyleType == GraphicsStyleType.Projection &&
+                            (gs.Name.Contains("非表示") || gs.Name.Contains("Invisible")));
+                    if (invisStyle != null)
+                        lineStyles.Add(new LineStyleItem { Id = invisStyle.Id, Name = invisStyle.Name });
+                }
+            }
+
+            return lineStyles;
         }
     }
 }
