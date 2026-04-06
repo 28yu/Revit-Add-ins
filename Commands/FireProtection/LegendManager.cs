@@ -90,16 +90,10 @@ namespace Tools28.Commands.FireProtection
                     TextNote.Create(doc, draftingView.Id, textPos, label, textNoteTypeId);
                 }
 
-                // 柱枠型の凡例行（平面/天伏ビュー用）
+                // 柱枠型の凡例行（平面/天伏ビュー用）— タイトルなし、ラベルに「柱：」
                 if (includeColumnFrame && columnA_feet > 0 && columnB_feet > 0)
                 {
-                    double colStartY = startY - rowPitch * types.Count - textHeight * 2;
-
-                    // 柱凡例タイトル
-                    XYZ colTitlePos = new XYZ(0, colStartY, 0);
-                    TextNote.Create(doc, draftingView.Id, colTitlePos,
-                        "柱 耐火被覆", textNoteTypeId);
-                    colStartY -= (textHeight + titleGap * 0.6);
+                    double colStartY = startY - rowPitch * types.Count - rowSpacing;
 
                     for (int i = 0; i < types.Count; i++)
                     {
@@ -108,7 +102,6 @@ namespace Tools28.Commands.FireProtection
 
                         double rowY = colStartY - rowPitch * i;
 
-                        // 枠型（外側矩形 + 内側穴）
                         string viewTypeName = FilledRegionCreator.TypePrefix + entry.Name;
                         double outerSize = rectHeight * 0.9;
                         double innerSize = outerSize * (columnA_feet / (columnA_feet + columnB_feet));
@@ -118,8 +111,7 @@ namespace Tools28.Commands.FireProtection
                             outerSize / 2.0, innerSize / 2.0);
 
                         XYZ textPos = new XYZ(textOffsetX, rowY + textYOffset, 0);
-                        string label = $"- {entry.Name}";
-                        TextNote.Create(doc, draftingView.Id, textPos, label, textNoteTypeId);
+                        string label = $"- 柱\uff1a{entry.Name}";                        TextNote.Create(doc, draftingView.Id, textPos, label, textNoteTypeId);
                     }
                 }
 
