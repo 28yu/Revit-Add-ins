@@ -300,9 +300,14 @@ namespace Tools28.Commands.FireProtection
                             regionCount += colRegions;
                         }
 
+                        bool hasColumnFrame = activeView.ViewType != ViewType.Section
+                            && columns.Count > 0;
                         legendViewId = LegendManager.CreateLegendDraftingView(
                             doc, settings.Types, beamCountByType,
-                            settings.OverwriteExisting, settings.TextNoteTypeId);
+                            settings.OverwriteExisting, settings.TextNoteTypeId,
+                            hasColumnFrame,
+                            settings.ColumnA_mm / 304.8,
+                            settings.ColumnB_mm / 304.8);
 
                         trans.Commit();
                     }

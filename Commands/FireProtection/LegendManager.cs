@@ -17,7 +17,10 @@ namespace Tools28.Commands.FireProtection
             List<FireProtectionTypeEntry> types,
             Dictionary<string, int> elementCounts,
             bool overwriteExisting,
-            ElementId textNoteTypeId = null)
+            ElementId textNoteTypeId = null,
+            bool includeColumnFrame = false,
+            double columnA_feet = 0,
+            double columnB_feet = 0)
         {
             try
             {
@@ -73,20 +76,51 @@ namespace Tools28.Commands.FireProtection
                 {
                     var entry = types[i];
                     Color color = new Color(entry.ColorR, entry.ColorG, entry.ColorB);
-                    int count = elementCounts.ContainsKey(entry.Name)
-                        ? elementCounts[entry.Name] : 0;
 
                     double rowY = startY - rowPitch * i;
 
-                    // ビューで作成済みのタイプを再利用、なければ新規作成
+                    // 梁の色付き矩形（ビュー用タイプを再利用）
                     string viewTypeName = FilledRegionCreator.TypePrefix + entry.Name;
                     CreateColoredRectangle(doc, draftingView.Id,
                         solidFillPatternId, color, viewTypeName,
                         0, rowY, rectWidth, rectHeight);
 
                     XYZ textPos = new XYZ(textOffsetX, rowY + textYOffset, 0);
-                    string label = $"- {entry.Name}\uff08{count}\u672c\uff09";
+                    string label = $"- {entry.Name}";
                     TextNote.Create(doc, draftingView.Id, textPos, label, textNoteTypeId);
+                }
+
+                // 柱枠型の凡例行（平面/天伏ビュー用）
+                if (includeColumnFrame && columnA_feet > 0 && columnB_feet > 0)
+                {
+                    double colStartY = startY - rowPitch * types.Count - textHeight * 2;
+
+                    // 柱凡例タイトル
+                    XYZ colTitlePos = new XYZ(0, colStartY, 0);
+                    TextNote.Create(doc, draftingView.Id, colTitlePos,
+                        "柱 耐火被覆", textNoteTypeId);
+                    colStartY -= (textHeight + titleGap * 0.6);
+
+                    for (int i = 0; i < types.Count; i++)
+                    {
+                        var entry = types[i];
+                        Color color = new Color(entry.ColorR, entry.ColorG, entry.ColorB);
+
+                        double rowY = colStartY - rowPitch * i;
+
+                        // 枠型（外側矩形 + 内側穴）
+                        string viewTypeName = FilledRegionCreator.TypePrefix + entry.Name;
+                        double outerSize = rectHeight * 0.9;
+                        double innerSize = outerSize * (columnA_feet / (columnA_feet + columnB_feet));
+                        CreateFrameRectangle(doc, draftingView.Id,
+                            solidFillPatternId, color, viewTypeName,
+                            rectWidth / 2.0, rowY + rectHeight / 2.0,
+                            outerSize / 2.0, innerSize / 2.0);
+
+                        XYZ textPos = new XYZ(textOffsetX, rowY + textYOffset, 0);
+                        string label = $"- {entry.Name}";
+                        TextNote.Create(doc, draftingView.Id, textPos, label, textNoteTypeId);
+                    }
                 }
 
                 return draftingView.Id;
@@ -120,6 +154,44 @@ namespace Tools28.Commands.FireProtection
 
             FilledRegion.Create(doc, regionTypeId, viewId,
                 new List<CurveLoop> { loop });
+        }
+
+        private static void CreateFrameRectangle(
+            Document doc, ElementId viewId,
+            ElementId solidFillPatternId, Color color,
+            string typeName,
+            double cx, double cy,
+            double outerHalf, double innerHalf)
+        {
+            ElementId regionTypeId = GetOrCreateFilledRegionType(
+                doc, solidFillPatternId, color, typeName);
+            if (regionTypeId == null) return;
+
+            // 外側（反時計回り）
+            CurveLoop outer = new CurveLoop();
+            XYZ o0 = new XYZ(cx - outerHalf, cy - outerHalf, 0);
+            XYZ o1 = new XYZ(cx + outerHalf, cy - outerHalf, 0);
+            XYZ o2 = new XYZ(cx + outerHalf, cy + outerHalf, 0);
+            XYZ o3 = new XYZ(cx - outerHalf, cy + outerHalf, 0);
+            outer.Append(Line.CreateBound(o0, o1));
+            outer.Append(Line.CreateBound(o1, o2));
+            outer.Append(Line.CreateBound(o2, o3));
+            outer.Append(Line.CreateBound(o3, o0));
+
+            // 内側（時計回り = 穴）
+            CurveLoop inner = new CurveLoop();
+            XYZ i0 = new XYZ(cx - innerHalf, cy - innerHalf, 0);
+            XYZ i1 = new XYZ(cx + innerHalf, cy - innerHalf, 0);
+            XYZ i2 = new XYZ(cx + innerHalf, cy + innerHalf, 0);
+            XYZ i3 = new XYZ(cx - innerHalf, cy + innerHalf, 0);
+            inner.Append(Line.CreateBound(i0, i1));
+            inner.Append(Line.CreateBound(i1, i2));
+            inner.Append(Line.CreateBound(i2, i3));
+            inner.Append(Line.CreateBound(i3, i0));
+            inner.Flip();
+
+            FilledRegion.Create(doc, regionTypeId, viewId,
+                new List<CurveLoop> { outer, inner });
         }
 
         private static ElementId GetOrCreateFilledRegionType(
