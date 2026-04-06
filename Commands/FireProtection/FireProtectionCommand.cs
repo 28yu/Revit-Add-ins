@@ -286,6 +286,20 @@ namespace Tools28.Commands.FireProtection
                             settings.FillPatternId, settings.LineStyleId,
                             settings.Types, settings.OverwriteExisting);
 
+                        // 柱枠型塗潰領域（平面/天伏ビューのみ、柱チェックに関わらず）
+                        if (activeView.ViewType != ViewType.Section &&
+                            columns.Count > 0 && paramName != null)
+                        {
+                            double aFeet = settings.ColumnA_mm / 304.8;
+                            double bFeet = settings.ColumnB_mm / 304.8;
+                            int colRegions = FilledRegionCreator.CreateColumnFrameRegions(
+                                doc, activeView, columns, paramName,
+                                aFeet, bFeet,
+                                settings.FillPatternId, settings.LineStyleId,
+                                settings.Types, settings.OverwriteExisting);
+                            regionCount += colRegions;
+                        }
+
                         legendViewId = LegendManager.CreateLegendDraftingView(
                             doc, settings.Types, beamCountByType,
                             settings.OverwriteExisting, settings.TextNoteTypeId);

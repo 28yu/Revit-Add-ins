@@ -40,7 +40,9 @@ namespace Tools28.Commands.FireProtection
                 Types = new List<FireProtectionTypeEntry>(_typeEntries),
                 UseCommonOffset = CommonOffsetRadio.IsChecked == true,
                 CommonOffsetMm = ParseDouble(CommonOffsetInput.Text, 50),
-                OverwriteExisting = OverwriteCheckBox.IsChecked == true
+                OverwriteExisting = OverwriteCheckBox.IsChecked == true,
+                ColumnA_mm = ParseDouble(ColumnAInput.Text, 400),
+                ColumnB_mm = ParseDouble(ColumnBInput.Text, 150)
             };
 
             var selectedParam = ParameterComboBox.SelectedItem as FireProtectionParameterInfo;
@@ -345,6 +347,10 @@ namespace Tools28.Commands.FireProtection
 
         private void InitializeStep2()
         {
+            // 断面ビューでは柱設定を非表示
+            ColumnSettingsPanel.Visibility = _data.IsSectionView
+                ? System.Windows.Visibility.Collapsed
+                : System.Windows.Visibility.Visible;
             if (LineStyleComboBox.Items.Count == 0)
             {
                 LineStyleComboBox.ItemsSource = _data.LineStyles;

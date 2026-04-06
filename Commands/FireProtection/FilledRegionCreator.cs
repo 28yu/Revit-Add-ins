@@ -155,6 +155,90 @@ namespace Tools28.Commands.FireProtection
             return totalCreated;
         }
 
+        /// <summary>
+        /// 柱の枠型（ドーナツ型）塗潰領域を作成
+        /// </summary>
+        public static int CreateColumnFrameRegions(
+            Document doc,
+            View activeView,
+            List<Element> allColumns,
+            string paramName,
+            double aFeet, double bFeet,
+            ElementId fillPatternId,
+            ElementId lineStyleId,
+            List<FireProtectionTypeEntry> orderedTypes,
+            bool overwriteExisting)
+        {
+            int created = 0;
+
+            foreach (var col in allColumns)
+            {
+                var fi = col as FamilyInstance;
+                if (fi == null) continue;
+
+                // パラメータ値を取得
+                Parameter p = col.LookupParameter(paramName);
+                if (p == null) continue;
+                string value = p.StorageType == StorageType.String
+                    ? p.AsString() : p.AsValueString();
+                if (string.IsNullOrEmpty(value) || value.Trim().Length == 0) continue;
+                value = value.Trim();
+
+                // 該当する種類を検索
+                var typeEntry = orderedTypes.FirstOrDefault(t => t.Name == value);
+                if (typeEntry == null) continue;
+
+                // 柱中心を取得
+                LocationPoint lp = fi.Location as LocationPoint;
+                if (lp == null) continue;
+                XYZ center = new XYZ(lp.Point.X, lp.Point.Y, 0);
+
+                // FilledRegionType（既存を再利用）
+                string regionTypeName = TypePrefix + value;
+                var existingType = new FilteredElementCollector(doc)
+                    .OfClass(typeof(FilledRegionType))
+                    .Cast<FilledRegionType>()
+                    .FirstOrDefault(t => t.Name == regionTypeName);
+                if (existingType == null) continue;
+
+                // 外側矩形: center ± (A + B)
+                double outer = aFeet + bFeet;
+                CurveLoop outerLoop = CreateRectLoop(center, outer);
+
+                // 内側矩形: center ± A（穴）
+                CurveLoop innerLoop = CreateRectLoop(center, aFeet);
+                // 穴ループは時計回りにする必要がある
+                innerLoop.Flip();
+
+                try
+                {
+                    var region = FilledRegion.Create(doc, existingType.Id,
+                        activeView.Id, new List<CurveLoop> { outerLoop, innerLoop });
+                    if (lineStyleId != null && lineStyleId != ElementId.InvalidElementId)
+                        region.SetLineStyleId(lineStyleId);
+                    created++;
+                }
+                catch { }
+            }
+
+            return created;
+        }
+
+        private static CurveLoop CreateRectLoop(XYZ center, double halfSize)
+        {
+            XYZ p0 = new XYZ(center.X - halfSize, center.Y - halfSize, 0);
+            XYZ p1 = new XYZ(center.X + halfSize, center.Y - halfSize, 0);
+            XYZ p2 = new XYZ(center.X + halfSize, center.Y + halfSize, 0);
+            XYZ p3 = new XYZ(center.X - halfSize, center.Y + halfSize, 0);
+
+            CurveLoop loop = new CurveLoop();
+            loop.Append(Line.CreateBound(p0, p1));
+            loop.Append(Line.CreateBound(p1, p2));
+            loop.Append(Line.CreateBound(p2, p3));
+            loop.Append(Line.CreateBound(p3, p0));
+            return loop;
+        }
+
         private static CurveLoop TransformLoop(CurveLoop loop, Transform transform)
         {
             try

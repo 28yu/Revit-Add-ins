@@ -82,6 +82,9 @@ namespace Tools28.Commands.FireProtection
         public ElementId FillPatternId { get; set; }
         public ElementId TextNoteTypeId { get; set; }
         public bool OverwriteExisting { get; set; }
+        // 柱設定（平面/天伏ビュー用）
+        public double ColumnA_mm { get; set; } = 400;
+        public double ColumnB_mm { get; set; } = 150;
     }
 
     public class MergeResult
