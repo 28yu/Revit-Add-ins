@@ -35,8 +35,8 @@ namespace Tools28.Commands.FireProtection
 
             var result = new FireProtectionResult
             {
-                IncludeBeams = IncludeBeamsCheck.IsChecked == true,
-                IncludeColumns = IncludeColumnsCheck.IsChecked == true,
+                IncludeBeams = true,
+                IncludeColumns = _data.IsSectionView,
                 Types = new List<FireProtectionTypeEntry>(_typeEntries),
                 UseCommonOffset = CommonOffsetRadio.IsChecked == true,
                 CommonOffsetMm = ParseDouble(CommonOffsetInput.Text, 50),
@@ -64,36 +64,14 @@ namespace Tools28.Commands.FireProtection
 
         private void InitializeStep1()
         {
-            IncludeBeamsCheck.IsChecked = _data.HasBeams;
-            IncludeBeamsCheck.IsEnabled = _data.HasBeams;
-            // 断面ビュー: 柱デフォルトON、それ以外: OFF
-            IncludeColumnsCheck.IsChecked = _data.IsSectionView && _data.HasColumns;
-            IncludeColumnsCheck.IsEnabled = _data.HasColumns;
-
-            UpdateCategoryCount();
             UpdateParameterList();
-        }
-
-        private void Category_Changed(object sender, RoutedEventArgs e)
-        {
-            if (ParameterComboBox == null) return;
-            UpdateCategoryCount();
-            UpdateParameterList();
-        }
-
-        private void UpdateCategoryCount()
-        {
-            int count = 0;
-            if (IncludeBeamsCheck.IsChecked == true) count += _data.BeamCount;
-            if (IncludeColumnsCheck.IsChecked == true) count += _data.ColumnCount;
-            CategoryCountText.Text = $"※ 対象要素数: {count}";
         }
 
         private void UpdateParameterList()
         {
             var allParams = new Dictionary<string, FireProtectionParameterInfo>();
 
-            if (IncludeBeamsCheck.IsChecked == true && _data.BeamParameters != null)
+            if (_data.BeamParameters != null)
             {
                 foreach (var p in _data.BeamParameters)
                 {
@@ -116,7 +94,7 @@ namespace Tools28.Commands.FireProtection
                 }
             }
 
-            if (IncludeColumnsCheck.IsChecked == true && _data.ColumnParameters != null)
+            if (_data.ColumnParameters != null)
             {
                 foreach (var p in _data.ColumnParameters)
                 {

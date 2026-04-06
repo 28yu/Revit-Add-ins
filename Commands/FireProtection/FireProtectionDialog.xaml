@@ -135,23 +135,6 @@
             <ScrollViewer x:Name="Step1Panel" Visibility="Visible"
                           VerticalScrollBarVisibility="Auto">
                 <StackPanel>
-                    <!-- カテゴリ選択 -->
-                    <Border Background="White" BorderBrush="#D3D3D3"
-                            BorderThickness="1" CornerRadius="3" Padding="15,12" Margin="0,0,0,10">
-                        <StackPanel>
-                            <TextBlock Style="{StaticResource SectionHeader}" Text="対象カテゴリ"/>
-                            <StackPanel Orientation="Horizontal">
-                                <CheckBox x:Name="IncludeBeamsCheck" Content="梁（構造フレーム）"
-                                          FontSize="12" Margin="0,0,20,0"
-                                          Checked="Category_Changed" Unchecked="Category_Changed"/>
-                                <CheckBox x:Name="IncludeColumnsCheck" Content="柱（構造柱）"
-                                          FontSize="12"
-                                          Checked="Category_Changed" Unchecked="Category_Changed"/>
-                            </StackPanel>
-                            <TextBlock x:Name="CategoryCountText" Style="{StaticResource NoteStyle}"/>
-                        </StackPanel>
-                    </Border>
-
                     <!-- パラメータ選択 -->
                     <Border Background="White" BorderBrush="#D3D3D3"
                             BorderThickness="1" CornerRadius="3" Padding="15,12" Margin="0,0,0,10">
@@ -174,18 +157,12 @@
                             <StackPanel x:Name="DetectedTypesPanel"/>
                         </StackPanel>
                     </Border>
-                </StackPanel>
-            </ScrollViewer>
 
-            <!-- Step 2: 梁オフセット・柱設定・表示設定 -->
-            <ScrollViewer x:Name="Step2Panel" Visibility="Collapsed"
-                          VerticalScrollBarVisibility="Auto">
-                <StackPanel>
-                    <!-- 梁オフセット設定 -->
+                    <!-- オフセット設定 -->
                     <Border Background="White" BorderBrush="#D3D3D3"
                             BorderThickness="1" CornerRadius="3" Padding="15,12" Margin="0,0,0,10">
                         <StackPanel>
-                            <TextBlock Style="{StaticResource SectionHeader}" Text="梁オフセット設定"/>
+                            <TextBlock Style="{StaticResource SectionHeader}" Text="オフセット設定"/>
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                 <RadioButton x:Name="CommonOffsetRadio" Content="共通オフセット"
                                              GroupName="OffsetMode"
@@ -207,66 +184,71 @@
                                        Text="※ 梁のエッジからの距離（mm）"/>
                         </StackPanel>
                     </Border>
+                </StackPanel>
+            </ScrollViewer>
 
+            <!-- Step 2: 柱設定・表示設定 -->
+            <ScrollViewer x:Name="Step2Panel" Visibility="Collapsed"
+                          VerticalScrollBarVisibility="Auto">
+                <StackPanel>
                     <!-- 柱設定（平面/天伏ビューのみ） -->
                     <Border x:Name="ColumnSettingsPanel" Background="White" BorderBrush="#D3D3D3"
                             BorderThickness="1" CornerRadius="3" Padding="15,12" Margin="0,0,0,10">
                         <StackPanel>
                             <TextBlock Style="{StaticResource SectionHeader}" Text="柱 耐火被覆設定"/>
-                            <TextBlock Style="{StaticResource NoteStyle}" Margin="0,0,0,8"
-                                       Text="※ 柱中心からの距離(A)とそこから外側の幅(B)で枠型の塗潰領域を作成します"/>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="200"/>
-                                    <ColumnDefinition Width="80"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="8"/>
-                                    <RowDefinition Height="Auto"/>
-                                </Grid.RowDefinitions>
-                                <TextBlock Grid.Row="0" Grid.Column="0" Style="{StaticResource LabelStyle}"
-                                           Text="A: 柱中心からの距離:" VerticalAlignment="Center"/>
-                                <TextBox Grid.Row="0" Grid.Column="1" x:Name="ColumnAInput"
-                                         Height="26" FontSize="12" Padding="4,2" Text="400"
-                                         VerticalContentAlignment="Center"/>
-                                <TextBlock Grid.Row="0" Grid.Column="2" Text=" mm" FontSize="12"
-                                           VerticalAlignment="Center" Margin="4,0,0,0"/>
-                                <TextBlock Grid.Row="2" Grid.Column="0" Style="{StaticResource LabelStyle}"
-                                           Text="B: 外側の幅:" VerticalAlignment="Center"/>
-                                <TextBox Grid.Row="2" Grid.Column="1" x:Name="ColumnBInput"
-                                         Height="26" FontSize="12" Padding="4,2" Text="150"
-                                         VerticalContentAlignment="Center"/>
-                                <TextBlock Grid.Row="2" Grid.Column="2" Text=" mm" FontSize="12"
-                                           VerticalAlignment="Center" Margin="4,0,0,0"/>
-                            </Grid>
+                            <StackPanel Orientation="Horizontal">
+                                <!-- 左: 入力欄 -->
+                                <StackPanel Margin="0,0,15,0">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="140"/>
+                                            <ColumnDefinition Width="70"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="8"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Grid.Row="0" Grid.Column="0" Style="{StaticResource LabelStyle}"
+                                                   Text="A: 柱中心からの距離:" VerticalAlignment="Center"/>
+                                        <TextBox Grid.Row="0" Grid.Column="1" x:Name="ColumnAInput"
+                                                 Height="26" FontSize="12" Padding="4,2" Text="400"
+                                                 VerticalContentAlignment="Center"/>
+                                        <TextBlock Grid.Row="0" Grid.Column="2" Text=" mm" FontSize="12"
+                                                   VerticalAlignment="Center" Margin="4,0,0,0"/>
+                                        <TextBlock Grid.Row="2" Grid.Column="0" Style="{StaticResource LabelStyle}"
+                                                   Text="B: 外側の幅:" VerticalAlignment="Center"/>
+                                        <TextBox Grid.Row="2" Grid.Column="1" x:Name="ColumnBInput"
+                                                 Height="26" FontSize="12" Padding="4,2" Text="150"
+                                                 VerticalContentAlignment="Center"/>
+                                        <TextBlock Grid.Row="2" Grid.Column="2" Text=" mm" FontSize="12"
+                                                   VerticalAlignment="Center" Margin="4,0,0,0"/>
+                                    </Grid>
+                                    <TextBlock Style="{StaticResource NoteStyle}" Margin="0,6,0,0"
+                                               Text="※ 柱中心からA、そこから外側にB幅"/>
+                                </StackPanel>
 
-                            <!-- A/Bプレビュー図 -->
-                            <Border BorderBrush="#CCC" BorderThickness="1" Margin="0,10,0,0"
-                                    Padding="8" CornerRadius="2" Background="#FAFAFA">
-                                <Canvas Width="180" Height="120">
-                                    <!-- 外側矩形 (A+B) -->
-                                    <Rectangle Canvas.Left="20" Canvas.Top="10" Width="140" Height="100"
-                                               Fill="#B0C4DE" Stroke="#666" StrokeThickness="1" Opacity="0.6"/>
-                                    <!-- 内側矩形 (A) = 穴 -->
-                                    <Rectangle Canvas.Left="50" Canvas.Top="30" Width="80" Height="60"
-                                               Fill="#FAFAFA" Stroke="#666" StrokeThickness="1"/>
-                                    <!-- 柱本体 -->
-                                    <Rectangle Canvas.Left="65" Canvas.Top="42" Width="50" Height="36"
-                                               Fill="White" Stroke="#333" StrokeThickness="1.5" RadiusX="3" RadiusY="3"/>
-                                    <TextBlock Canvas.Left="75" Canvas.Top="53" Text="柱" FontSize="10"
-                                               Foreground="#333"/>
-                                    <!-- A寸法線 -->
-                                    <Line X1="90" Y1="60" X2="90" Y2="30" Stroke="#CC0000" StrokeThickness="1"/>
-                                    <TextBlock Canvas.Left="93" Canvas.Top="38" Text="A" FontSize="10"
-                                               Foreground="#CC0000" FontWeight="Bold"/>
-                                    <!-- B寸法線 -->
-                                    <Line X1="90" Y1="30" X2="90" Y2="10" Stroke="#0000CC" StrokeThickness="1"/>
-                                    <TextBlock Canvas.Left="93" Canvas.Top="13" Text="B" FontSize="10"
-                                               Foreground="#0000CC" FontWeight="Bold"/>
-                                </Canvas>
-                            </Border>
+                                <!-- 右: プレビュー図 -->
+                                <Border BorderBrush="#CCC" BorderThickness="1"
+                                        Padding="6" CornerRadius="2" Background="#FAFAFA">
+                                    <Canvas Width="130" Height="100">
+                                        <Rectangle Canvas.Left="10" Canvas.Top="5" Width="110" Height="90"
+                                                   Fill="#B0C4DE" Stroke="#666" StrokeThickness="1" Opacity="0.6"/>
+                                        <Rectangle Canvas.Left="30" Canvas.Top="22" Width="70" Height="56"
+                                                   Fill="#FAFAFA" Stroke="#666" StrokeThickness="1"/>
+                                        <Rectangle Canvas.Left="42" Canvas.Top="32" Width="46" Height="36"
+                                                   Fill="White" Stroke="#333" StrokeThickness="1.5" RadiusX="2" RadiusY="2"/>
+                                        <TextBlock Canvas.Left="52" Canvas.Top="43" Text="柱" FontSize="9" Foreground="#333"/>
+                                        <Line X1="65" Y1="50" X2="65" Y2="22" Stroke="#CC0000" StrokeThickness="1"/>
+                                        <TextBlock Canvas.Left="68" Canvas.Top="30" Text="A" FontSize="9"
+                                                   Foreground="#CC0000" FontWeight="Bold"/>
+                                        <Line X1="65" Y1="22" X2="65" Y2="5" Stroke="#0000CC" StrokeThickness="1"/>
+                                        <TextBlock Canvas.Left="68" Canvas.Top="8" Text="B" FontSize="9"
+                                                   Foreground="#0000CC" FontWeight="Bold"/>
+                                    </Canvas>
+                                </Border>
+                            </StackPanel>
                         </StackPanel>
                     </Border>
 
