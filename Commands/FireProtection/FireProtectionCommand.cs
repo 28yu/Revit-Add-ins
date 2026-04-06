@@ -306,38 +306,61 @@ namespace Tools28.Commands.FireProtection
                             settings.ColumnA_mm / 304.8,
                             settings.ColumnB_mm / 304.8);
 
-                        // シートビューの場合、凡例をシートの枠内右下に自動配置
+                        // 凡例のシート自動配置
+                        try
+                        {
+                            System.IO.File.AppendAllText(
+                                @"C:\temp\FireProtection_debug.txt",
+                                $"\n凡例配置: isSheet={isSheet} legendViewId={legendViewId} activeViewType={activeView.ViewType}\n");
+                        }
+                        catch { }
+
                         if (isSheet && legendViewId != null)
                         {
                             try
                             {
                                 var sheet = activeView as ViewSheet;
-                                var titleBlocks = new FilteredElementCollector(doc, sheet.Id)
-                                    .OfCategory(BuiltInCategory.OST_TitleBlocks)
-                                    .WhereElementIsNotElementType()
+
+                                // 既にこのビューがシート上にあるか確認
+                                var existingVPs = new FilteredElementCollector(doc, sheet.Id)
+                                    .OfClass(typeof(Viewport))
+                                    .Cast<Viewport>()
+                                    .Where(vp => vp.ViewId == legendViewId)
                                     .ToList();
 
-                                BoundingBoxXYZ sheetBB = null;
-                                if (titleBlocks.Count > 0)
+                                if (existingVPs.Count == 0)
                                 {
-                                    // ビュー指定なしでBBox取得
-                                    sheetBB = titleBlocks[0].get_BoundingBox(null);
-                                }
+                                    var titleBlocks = new FilteredElementCollector(doc, sheet.Id)
+                                        .OfCategory(BuiltInCategory.OST_TitleBlocks)
+                                        .WhereElementIsNotElementType()
+                                        .ToList();
 
-                                if (sheetBB != null)
-                                {
-                                    double margin = 20.0 / 304.8;
-                                    XYZ position = new XYZ(
-                                        sheetBB.Max.X - margin,
-                                        sheetBB.Min.Y + margin, 0);
+                                    BoundingBoxXYZ sheetBB = null;
+                                    if (titleBlocks.Count > 0)
+                                        sheetBB = titleBlocks[0].get_BoundingBox(null);
+
+                                    XYZ position;
+                                    if (sheetBB != null)
+                                    {
+                                        double margin = 20.0 / 304.8;
+                                        position = new XYZ(
+                                            sheetBB.Max.X - margin,
+                                            sheetBB.Min.Y + margin, 0);
+                                    }
+                                    else
+                                    {
+                                        position = new XYZ(0.5, 0.5, 0);
+                                    }
 
                                     Viewport.Create(doc, sheet.Id, legendViewId, position);
-                                }
-                                else
-                                {
-                                    // 図枠なし: シート中央に配置
-                                    Viewport.Create(doc, sheet.Id, legendViewId,
-                                        new XYZ(0.5, 0.5, 0));
+
+                                    try
+                                    {
+                                        System.IO.File.AppendAllText(
+                                            @"C:\temp\FireProtection_debug.txt",
+                                            $"  凡例配置成功: pos=({position.X * 304.8:F0},{position.Y * 304.8:F0})\n");
+                                    }
+                                    catch { }
                                 }
                             }
                             catch (Exception vpEx)
@@ -346,20 +369,10 @@ namespace Tools28.Commands.FireProtection
                                 {
                                     System.IO.File.AppendAllText(
                                         @"C:\temp\FireProtection_debug.txt",
-                                        $"\n凡例配置エラー: {vpEx.Message}\n");
+                                        $"  凡例配置エラー: {vpEx.Message}\n{vpEx.StackTrace}\n");
                                 }
                                 catch { }
                             }
-                        }
-                        else if (isSheet && legendViewId == null)
-                        {
-                            try
-                            {
-                                System.IO.File.AppendAllText(
-                                    @"C:\temp\FireProtection_debug.txt",
-                                    $"\n凡例配置スキップ: legendViewId=null\n");
-                            }
-                            catch { }
                         }
 
                         trans.Commit();
