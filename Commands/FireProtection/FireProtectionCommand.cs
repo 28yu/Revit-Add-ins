@@ -247,10 +247,9 @@ namespace Tools28.Commands.FireProtection
                                 .Cast<Element>().ToList();
 
                             var viewTargets = new List<Element>();
-                            if (settings.IncludeBeams) viewTargets.AddRange(viewBeams);
+                            viewTargets.AddRange(viewBeams);
                             // 柱カテゴリは断面ビューのみ梁オフセット処理に含める
-                            // 平面/天伏では柱断面の枠型塗潰領域で別途処理
-                            if (settings.IncludeColumns && view.ViewType == ViewType.Section)
+                            if (view.ViewType == ViewType.Section)
                                 viewTargets.AddRange(viewColumns);
 
                             // 要素をパラメータ値でグループ化
