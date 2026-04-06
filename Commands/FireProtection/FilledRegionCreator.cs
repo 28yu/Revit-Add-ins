@@ -193,13 +193,13 @@ namespace Tools28.Commands.FireProtection
                 if (lp == null) continue;
                 XYZ center = new XYZ(lp.Point.X, lp.Point.Y, 0);
 
-                // FilledRegionType（既存を再利用）
-                string regionTypeName = TypePrefix + value;
-                var existingType = new FilteredElementCollector(doc)
-                    .OfClass(typeof(FilledRegionType))
-                    .Cast<FilledRegionType>()
-                    .FirstOrDefault(t => t.Name == regionTypeName);
-                if (existingType == null) continue;
+                // 柱専用FilledRegionType
+                string colTypeName = TypePrefix + "柱_" + value;
+                Color colColor = new Color(typeEntry.ColColorR, typeEntry.ColColorG, typeEntry.ColColorB);
+                ElementId colTypeId = GetOrCreateFilledRegionType(
+                    doc, colTypeName, fillPatternId, colColor,
+                    typeEntry.ColForegroundVisible);
+                if (colTypeId == null) continue;
 
                 // 外側矩形: center ± (A + B)
                 double outer = aFeet + bFeet;
@@ -212,7 +212,7 @@ namespace Tools28.Commands.FireProtection
 
                 try
                 {
-                    var region = FilledRegion.Create(doc, existingType.Id,
+                    var region = FilledRegion.Create(doc, colTypeId,
                         activeView.Id, new List<CurveLoop> { outerLoop, innerLoop });
                     if (lineStyleId != null && lineStyleId != ElementId.InvalidElementId)
                         region.SetLineStyleId(lineStyleId);

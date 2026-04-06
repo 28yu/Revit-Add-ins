@@ -102,11 +102,14 @@ namespace Tools28.Commands.FireProtection
 
                         double rowY = colStartY - rowPitch * i;
 
-                        string viewTypeName = FilledRegionCreator.TypePrefix + entry.Name;
+                        string colTypeName = FilledRegionCreator.TypePrefix + "柱_" + entry.Name;
                         double outerSize = rectHeight * 0.9;
-                        double innerSize = outerSize * (columnA_feet / (columnA_feet + columnB_feet));
+                        // 内側を小さくして枠を太くする（A/B比率ベース、最小30%）
+                        double ratio = columnA_feet / (columnA_feet + columnB_feet);
+                        double innerSize = outerSize * Math.Max(ratio * 0.6, 0.25);
+                        Color colColor = new Color(entry.ColColorR, entry.ColColorG, entry.ColColorB);
                         CreateFrameRectangle(doc, draftingView.Id,
-                            solidFillPatternId, color, viewTypeName,
+                            solidFillPatternId, colColor, colTypeName,
                             rectWidth / 2.0, rowY + rectHeight / 2.0,
                             outerSize / 2.0, innerSize / 2.0);
 

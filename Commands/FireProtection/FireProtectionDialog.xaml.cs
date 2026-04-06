@@ -181,7 +181,10 @@ namespace Tools28.Commands.FireProtection
                     OffsetMm = ParseDouble(CommonOffsetInput.Text, 50),
                     ColorR = colors[i].Red,
                     ColorG = colors[i].Green,
-                    ColorB = colors[i].Blue
+                    ColorB = colors[i].Blue,
+                    ColColorR = colors[i].Red,
+                    ColColorG = colors[i].Green,
+                    ColColorB = colors[i].Blue
                 });
             }
 
@@ -285,6 +288,31 @@ namespace Tools28.Commands.FireProtection
                 };
                 bgRect.MouseLeftButtonDown += (s, ev) => { ShowBgColorPicker(bgIdx); };
                 rowPanel.Children.Add(bgRect);
+
+                // 柱色（平面/天伏ビューのみ）
+                if (!_data.IsSectionView)
+                {
+                    int colIdx = idx;
+                    rowPanel.Children.Add(new TextBlock
+                    {
+                        Text = "柱",
+                        FontSize = 11,
+                        VerticalAlignment = VerticalAlignment.Center,
+                        Margin = new Thickness(16, 0, 4, 0)
+                    });
+                    var colRect = new WpfRectangle
+                    {
+                        Width = 32, Height = 20,
+                        Fill = new SolidColorBrush(System.Windows.Media.Color.FromRgb(
+                            entry.ColColorR, entry.ColColorG, entry.ColColorB)),
+                        Stroke = new SolidColorBrush(
+                            System.Windows.Media.Color.FromRgb(0x66, 0x66, 0x66)),
+                        StrokeThickness = 1,
+                        Cursor = Cursors.Hand
+                    };
+                    colRect.MouseLeftButtonDown += (s, ev) => { ShowColColorPicker(colIdx); };
+                    rowPanel.Children.Add(colRect);
+                }
 
                 DetectedTypesPanel.Children.Add(rowPanel);
             }
@@ -419,6 +447,27 @@ namespace Tools28.Commands.FireProtection
                 entry.BgColorR = colorDialog.Color.R;
                 entry.BgColorG = colorDialog.Color.G;
                 entry.BgColorB = colorDialog.Color.B;
+                RefreshDetectedTypesUI();
+            }
+        }
+
+        private void ShowColColorPicker(int typeIndex)
+        {
+            if (typeIndex < 0 || typeIndex >= _typeEntries.Count) return;
+
+            var entry = _typeEntries[typeIndex];
+            var colorDialog = new WinForms.ColorDialog
+            {
+                FullOpen = true,
+                Color = System.Drawing.Color.FromArgb(
+                    entry.ColColorR, entry.ColColorG, entry.ColColorB)
+            };
+
+            if (colorDialog.ShowDialog() == WinForms.DialogResult.OK)
+            {
+                entry.ColColorR = colorDialog.Color.R;
+                entry.ColColorG = colorDialog.Color.G;
+                entry.ColColorB = colorDialog.Color.B;
                 RefreshDetectedTypesUI();
             }
         }

@@ -52,6 +52,11 @@ namespace Tools28.Commands.FireProtection
         public byte BgColorG { get; set; } = 255;
         public byte BgColorB { get; set; } = 255;
         public bool BackgroundVisible { get; set; }
+        // 柱の色設定（平面/天伏用）
+        public byte ColColorR { get; set; }
+        public byte ColColorG { get; set; }
+        public byte ColColorB { get; set; }
+        public bool ColForegroundVisible { get; set; } = true;
     }
 
     public class FireProtectionDialogData
@@ -85,6 +90,8 @@ namespace Tools28.Commands.FireProtection
         // 柱設定（平面/天伏ビュー用）
         public double ColumnA_mm { get; set; } = 400;
         public double ColumnB_mm { get; set; } = 150;
+        // 柱の色は梁と共通（FireProtectionTypeEntryの色を使用）
+        // 柱専用色が必要な場合はここに追加
     }
 
     public class MergeResult
