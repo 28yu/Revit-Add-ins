@@ -440,9 +440,13 @@ namespace Tools28.Commands.FireProtection
                 LineStyleComboBox.ItemsSource = _data.LineStyles;
                 if (_data.LineStyles.Count > 0)
                 {
-                    var thinLines = _data.LineStyles.FirstOrDefault(
-                        ls => ls.Name.Contains("Thin") || ls.Name.Contains("細線"));
-                    LineStyleComboBox.SelectedItem = thinLines ?? _data.LineStyles[0];
+                    // デフォルト: <非表示>
+                    var defaultLine = _data.LineStyles.FirstOrDefault(
+                        ls => ls.Name.Contains("非表示") || ls.Name.Contains("Invisible"));
+                    if (defaultLine == null)
+                        defaultLine = _data.LineStyles.FirstOrDefault(
+                            ls => ls.Name.Contains("Thin") || ls.Name.Contains("細線"));
+                    LineStyleComboBox.SelectedItem = defaultLine ?? _data.LineStyles[0];
                 }
             }
 

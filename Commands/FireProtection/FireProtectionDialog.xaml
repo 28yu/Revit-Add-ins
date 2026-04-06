@@ -241,6 +241,32 @@
                                 <TextBlock Grid.Row="2" Grid.Column="2" Text=" mm" FontSize="12"
                                            VerticalAlignment="Center" Margin="4,0,0,0"/>
                             </Grid>
+
+                            <!-- A/Bプレビュー図 -->
+                            <Border BorderBrush="#CCC" BorderThickness="1" Margin="0,10,0,0"
+                                    Padding="8" CornerRadius="2" Background="#FAFAFA">
+                                <Canvas Width="180" Height="120">
+                                    <!-- 外側矩形 (A+B) -->
+                                    <Rectangle Canvas.Left="20" Canvas.Top="10" Width="140" Height="100"
+                                               Fill="#B0C4DE" Stroke="#666" StrokeThickness="1" Opacity="0.6"/>
+                                    <!-- 内側矩形 (A) = 穴 -->
+                                    <Rectangle Canvas.Left="50" Canvas.Top="30" Width="80" Height="60"
+                                               Fill="#FAFAFA" Stroke="#666" StrokeThickness="1"/>
+                                    <!-- 柱本体 -->
+                                    <Rectangle Canvas.Left="65" Canvas.Top="42" Width="50" Height="36"
+                                               Fill="White" Stroke="#333" StrokeThickness="1.5" RadiusX="3" RadiusY="3"/>
+                                    <TextBlock Canvas.Left="75" Canvas.Top="53" Text="柱" FontSize="10"
+                                               Foreground="#333"/>
+                                    <!-- A寸法線 -->
+                                    <Line X1="90" Y1="60" X2="90" Y2="30" Stroke="#CC0000" StrokeThickness="1"/>
+                                    <TextBlock Canvas.Left="93" Canvas.Top="38" Text="A" FontSize="10"
+                                               Foreground="#CC0000" FontWeight="Bold"/>
+                                    <!-- B寸法線 -->
+                                    <Line X1="90" Y1="30" X2="90" Y2="10" Stroke="#0000CC" StrokeThickness="1"/>
+                                    <TextBlock Canvas.Left="93" Canvas.Top="13" Text="B" FontSize="10"
+                                               Foreground="#0000CC" FontWeight="Bold"/>
+                                </Canvas>
+                            </Border>
                         </StackPanel>
                     </Border>
 

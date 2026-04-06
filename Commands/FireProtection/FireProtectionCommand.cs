@@ -248,7 +248,10 @@ namespace Tools28.Commands.FireProtection
 
                             var viewTargets = new List<Element>();
                             if (settings.IncludeBeams) viewTargets.AddRange(viewBeams);
-                            if (settings.IncludeColumns) viewTargets.AddRange(viewColumns);
+                            // 柱カテゴリは断面ビューのみ梁オフセット処理に含める
+                            // 平面/天伏では柱断面の枠型塗潰領域で別途処理
+                            if (settings.IncludeColumns && view.ViewType == ViewType.Section)
+                                viewTargets.AddRange(viewColumns);
 
                             // 要素をパラメータ値でグループ化
                             var elementsByType = new Dictionary<string, List<Element>>();
@@ -273,14 +276,20 @@ namespace Tools28.Commands.FireProtection
                                 settings.FillPatternId, settings.LineStyleId,
                                 settings.Types, settings.OverwriteExisting);
 
-                            // 柱枠型塗潰領域（平面/天伏のみ）
+                            // 柱枠型塗潰領域（平面/天伏/構造伏のみ）
+                            // 天伏ではviewColumnsが空の場合があるため、ドキュメント全体の柱も参照
+                            var colsForFrame = viewColumns.Count > 0 ? viewColumns
+                                : new FilteredElementCollector(doc)
+                                    .OfCategory(BuiltInCategory.OST_StructuralColumns)
+                                    .WhereElementIsNotElementType()
+                                    .Cast<Element>().ToList();
                             if (view.ViewType != ViewType.Section &&
-                                viewColumns.Count > 0 && paramName != null)
+                                colsForFrame.Count > 0 && paramName != null)
                             {
                                 double aFeet = settings.ColumnA_mm / 304.8;
                                 double bFeet = settings.ColumnB_mm / 304.8;
                                 regionCount += FilledRegionCreator.CreateColumnFrameRegions(
-                                    doc, view, viewColumns, paramName,
+                                    doc, view, colsForFrame, paramName,
                                     aFeet, bFeet,
                                     settings.FillPatternId, settings.LineStyleId,
                                     settings.Types, settings.OverwriteExisting);
