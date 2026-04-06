@@ -7,7 +7,6 @@ using System.Windows.Input;
 using System.Windows.Media;
 using WpfRectangle = System.Windows.Shapes.Rectangle;
 using Autodesk.Revit.DB;
-using WinForms = System.Windows.Forms;
 using WpfGrid = System.Windows.Controls.Grid;
 
 namespace Tools28.Commands.FireProtection
@@ -468,20 +467,14 @@ namespace Tools28.Commands.FireProtection
         private void ShowColorPicker(int typeIndex)
         {
             if (typeIndex < 0 || typeIndex >= _typeEntries.Count) return;
-
             var entry = _typeEntries[typeIndex];
-            var colorDialog = new WinForms.ColorDialog
+            var initial = System.Windows.Media.Color.FromRgb(entry.ColorR, entry.ColorG, entry.ColorB);
+            var dlg = new ColorPickerDialog(initial);
+            if (dlg.ShowDialog() == true)
             {
-                FullOpen = true,
-                Color = System.Drawing.Color.FromArgb(
-                    entry.ColorR, entry.ColorG, entry.ColorB)
-            };
-
-            if (colorDialog.ShowDialog() == WinForms.DialogResult.OK)
-            {
-                entry.ColorR = colorDialog.Color.R;
-                entry.ColorG = colorDialog.Color.G;
-                entry.ColorB = colorDialog.Color.B;
+                entry.ColorR = dlg.SelectedColor.R;
+                entry.ColorG = dlg.SelectedColor.G;
+                entry.ColorB = dlg.SelectedColor.B;
                 RefreshDetectedTypesUI();
             }
         }
@@ -489,20 +482,14 @@ namespace Tools28.Commands.FireProtection
         private void ShowBgColorPicker(int typeIndex)
         {
             if (typeIndex < 0 || typeIndex >= _typeEntries.Count) return;
-
             var entry = _typeEntries[typeIndex];
-            var colorDialog = new WinForms.ColorDialog
+            var initial = System.Windows.Media.Color.FromRgb(entry.BgColorR, entry.BgColorG, entry.BgColorB);
+            var dlg = new ColorPickerDialog(initial);
+            if (dlg.ShowDialog() == true)
             {
-                FullOpen = true,
-                Color = System.Drawing.Color.FromArgb(
-                    entry.BgColorR, entry.BgColorG, entry.BgColorB)
-            };
-
-            if (colorDialog.ShowDialog() == WinForms.DialogResult.OK)
-            {
-                entry.BgColorR = colorDialog.Color.R;
-                entry.BgColorG = colorDialog.Color.G;
-                entry.BgColorB = colorDialog.Color.B;
+                entry.BgColorR = dlg.SelectedColor.R;
+                entry.BgColorG = dlg.SelectedColor.G;
+                entry.BgColorB = dlg.SelectedColor.B;
                 RefreshDetectedTypesUI();
             }
         }
@@ -510,20 +497,14 @@ namespace Tools28.Commands.FireProtection
         private void ShowColColorPicker(int typeIndex)
         {
             if (typeIndex < 0 || typeIndex >= _typeEntries.Count) return;
-
             var entry = _typeEntries[typeIndex];
-            var colorDialog = new WinForms.ColorDialog
+            var initial = System.Windows.Media.Color.FromRgb(entry.ColColorR, entry.ColColorG, entry.ColColorB);
+            var dlg = new ColorPickerDialog(initial);
+            if (dlg.ShowDialog() == true)
             {
-                FullOpen = true,
-                Color = System.Drawing.Color.FromArgb(
-                    entry.ColColorR, entry.ColColorG, entry.ColColorB)
-            };
-
-            if (colorDialog.ShowDialog() == WinForms.DialogResult.OK)
-            {
-                entry.ColColorR = colorDialog.Color.R;
-                entry.ColColorG = colorDialog.Color.G;
-                entry.ColColorB = colorDialog.Color.B;
+                entry.ColColorR = dlg.SelectedColor.R;
+                entry.ColColorG = dlg.SelectedColor.G;
+                entry.ColColorB = dlg.SelectedColor.B;
                 RefreshDetectedTypesUI();
             }
         }
@@ -531,20 +512,14 @@ namespace Tools28.Commands.FireProtection
         private void ShowColBgColorPicker(int typeIndex)
         {
             if (typeIndex < 0 || typeIndex >= _typeEntries.Count) return;
-
             var entry = _typeEntries[typeIndex];
-            var colorDialog = new WinForms.ColorDialog
+            var initial = System.Windows.Media.Color.FromRgb(entry.ColBgColorR, entry.ColBgColorG, entry.ColBgColorB);
+            var dlg = new ColorPickerDialog(initial);
+            if (dlg.ShowDialog() == true)
             {
-                FullOpen = true,
-                Color = System.Drawing.Color.FromArgb(
-                    entry.ColBgColorR, entry.ColBgColorG, entry.ColBgColorB)
-            };
-
-            if (colorDialog.ShowDialog() == WinForms.DialogResult.OK)
-            {
-                entry.ColBgColorR = colorDialog.Color.R;
-                entry.ColBgColorG = colorDialog.Color.G;
-                entry.ColBgColorB = colorDialog.Color.B;
+                entry.ColBgColorR = dlg.SelectedColor.R;
+                entry.ColBgColorG = dlg.SelectedColor.G;
+                entry.ColBgColorB = dlg.SelectedColor.B;
                 RefreshDetectedTypesUI();
             }
         }
