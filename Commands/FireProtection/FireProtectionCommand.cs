@@ -312,25 +312,52 @@ namespace Tools28.Commands.FireProtection
                             try
                             {
                                 var sheet = activeView as ViewSheet;
-                                // シートの図枠(TitleBlock)のBoundingBoxから枠内範囲を取得
-                                BoundingBoxXYZ sheetBB = null;
                                 var titleBlocks = new FilteredElementCollector(doc, sheet.Id)
                                     .OfCategory(BuiltInCategory.OST_TitleBlocks)
                                     .WhereElementIsNotElementType()
                                     .ToList();
+
+                                BoundingBoxXYZ sheetBB = null;
                                 if (titleBlocks.Count > 0)
-                                    sheetBB = titleBlocks[0].get_BoundingBox(activeView);
+                                {
+                                    // ビュー指定なしでBBox取得
+                                    sheetBB = titleBlocks[0].get_BoundingBox(null);
+                                }
 
                                 if (sheetBB != null)
                                 {
-                                    // 枠の右下付近に配置（少し内側にマージン）
-                                    double margin = 20.0 / 304.8; // 20mm
+                                    double margin = 20.0 / 304.8;
                                     XYZ position = new XYZ(
                                         sheetBB.Max.X - margin,
                                         sheetBB.Min.Y + margin, 0);
 
                                     Viewport.Create(doc, sheet.Id, legendViewId, position);
                                 }
+                                else
+                                {
+                                    // 図枠なし: シート中央に配置
+                                    Viewport.Create(doc, sheet.Id, legendViewId,
+                                        new XYZ(0.5, 0.5, 0));
+                                }
+                            }
+                            catch (Exception vpEx)
+                            {
+                                try
+                                {
+                                    System.IO.File.AppendAllText(
+                                        @"C:\temp\FireProtection_debug.txt",
+                                        $"\n凡例配置エラー: {vpEx.Message}\n");
+                                }
+                                catch { }
+                            }
+                        }
+                        else if (isSheet && legendViewId == null)
+                        {
+                            try
+                            {
+                                System.IO.File.AppendAllText(
+                                    @"C:\temp\FireProtection_debug.txt",
+                                    $"\n凡例配置スキップ: legendViewId=null\n");
                             }
                             catch { }
                         }
