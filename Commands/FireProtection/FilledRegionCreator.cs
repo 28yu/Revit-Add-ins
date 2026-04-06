@@ -171,12 +171,25 @@ namespace Tools28.Commands.FireProtection
         {
             int created = 0;
 
+            // タイプごとにFilledRegionTypeを事前作成（1回だけ）
+            var colTypeIds = new Dictionary<string, ElementId>();
+            foreach (var typeEntry in orderedTypes)
+            {
+                string colTypeName = TypePrefix + "柱_" + typeEntry.Name;
+                Color colFgColor = new Color(typeEntry.ColColorR, typeEntry.ColColorG, typeEntry.ColColorB);
+                Color colBgColor = new Color(typeEntry.ColBgColorR, typeEntry.ColBgColorG, typeEntry.ColBgColorB);
+                ElementId colTypeId = GetOrCreateFilledRegionType(
+                    doc, colTypeName, fillPatternId, colFgColor,
+                    typeEntry.ColForegroundVisible, colBgColor, typeEntry.ColBackgroundVisible);
+                if (colTypeId != null)
+                    colTypeIds[typeEntry.Name] = colTypeId;
+            }
+
             foreach (var col in allColumns)
             {
                 var fi = col as FamilyInstance;
                 if (fi == null) continue;
 
-                // パラメータ値を取得
                 Parameter p = col.LookupParameter(paramName);
                 if (p == null) continue;
                 string value = p.StorageType == StorageType.String
@@ -184,28 +197,12 @@ namespace Tools28.Commands.FireProtection
                 if (string.IsNullOrEmpty(value) || value.Trim().Length == 0) continue;
                 value = value.Trim();
 
-                // 該当する種類を検索
-                var typeEntry = orderedTypes.FirstOrDefault(t => t.Name == value);
-                if (typeEntry == null) continue;
+                if (!colTypeIds.ContainsKey(value)) continue;
+                ElementId colTypeId = colTypeIds[value];
 
-                // 柱中心を取得
                 LocationPoint lp = fi.Location as LocationPoint;
                 if (lp == null) continue;
                 XYZ center = new XYZ(lp.Point.X, lp.Point.Y, 0);
-
-                // 柱専用FilledRegionType
-                string colTypeName = TypePrefix + "柱_" + value;
-                Color colFgColor = new Color(typeEntry.ColColorR, typeEntry.ColColorG, typeEntry.ColColorB);
-                Color colBgColor = new Color(typeEntry.ColBgColorR, typeEntry.ColBgColorG, typeEntry.ColBgColorB);
-                ElementId colTypeId = GetOrCreateFilledRegionType(
-                    doc, colTypeName, fillPatternId, colFgColor,
-                    typeEntry.ColForegroundVisible, colBgColor, typeEntry.ColBackgroundVisible);
-                if (colTypeId == null)
-                {
-                    try { System.IO.File.AppendAllText(@"C:\temp\FireProtection_debug.txt",
-                        $"  柱タイプ作成失敗: {colTypeName}\n"); } catch { }
-                    continue;
-                }
 
                 try { System.IO.File.AppendAllText(@"C:\temp\FireProtection_debug.txt",
                     $"  柱枠作成: {value} center=({center.X * 304.8:F0},{center.Y * 304.8:F0}) A={aFeet * 304.8:F0} B={bFeet * 304.8:F0}\n"); } catch { }
