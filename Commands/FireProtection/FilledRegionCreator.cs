@@ -366,7 +366,6 @@ namespace Tools28.Commands.FireProtection
                 try { doc.Delete(id); } catch { }
             }
         }
-        }
 
         /// <summary>
         /// 梁用の色生成（薄めの色合い）
