@@ -306,6 +306,35 @@ namespace Tools28.Commands.FireProtection
                             settings.ColumnA_mm / 304.8,
                             settings.ColumnB_mm / 304.8);
 
+                        // シートビューの場合、凡例をシートの枠内右下に自動配置
+                        if (isSheet && legendViewId != null)
+                        {
+                            try
+                            {
+                                var sheet = activeView as ViewSheet;
+                                // シートの図枠(TitleBlock)のBoundingBoxから枠内範囲を取得
+                                BoundingBoxXYZ sheetBB = null;
+                                var titleBlocks = new FilteredElementCollector(doc, sheet.Id)
+                                    .OfCategory(BuiltInCategory.OST_TitleBlocks)
+                                    .WhereElementIsNotElementType()
+                                    .ToList();
+                                if (titleBlocks.Count > 0)
+                                    sheetBB = titleBlocks[0].get_BoundingBox(activeView);
+
+                                if (sheetBB != null)
+                                {
+                                    // 枠の右下付近に配置（少し内側にマージン）
+                                    double margin = 20.0 / 304.8; // 20mm
+                                    XYZ position = new XYZ(
+                                        sheetBB.Max.X - margin,
+                                        sheetBB.Min.Y + margin, 0);
+
+                                    Viewport.Create(doc, sheet.Id, legendViewId, position);
+                                }
+                            }
+                            catch { }
+                        }
+
                         trans.Commit();
                     }
                     catch (Exception ex)
