@@ -170,7 +170,8 @@ namespace Tools28.Commands.FireProtection
             var selected = ParameterComboBox.SelectedItem as FireProtectionParameterInfo;
             if (selected == null) return;
 
-            var colors = FilledRegionCreator.GenerateColors(selected.UniqueValues.Count);
+            var beamColors = FilledRegionCreator.GenerateBeamColors(selected.UniqueValues.Count);
+            var colColors = FilledRegionCreator.GenerateColumnColors(selected.UniqueValues.Count);
             _typeEntries = new List<FireProtectionTypeEntry>();
 
             for (int i = 0; i < selected.UniqueValues.Count; i++)
@@ -179,12 +180,12 @@ namespace Tools28.Commands.FireProtection
                 {
                     Name = selected.UniqueValues[i],
                     OffsetMm = ParseDouble(CommonOffsetInput.Text, 50),
-                    ColorR = colors[i].Red,
-                    ColorG = colors[i].Green,
-                    ColorB = colors[i].Blue,
-                    ColColorR = colors[i].Red,
-                    ColColorG = colors[i].Green,
-                    ColColorB = colors[i].Blue,
+                    ColorR = beamColors[i].Red,
+                    ColorG = beamColors[i].Green,
+                    ColorB = beamColors[i].Blue,
+                    ColColorR = colColors[i].Red,
+                    ColColorG = colColors[i].Green,
+                    ColColorB = colColors[i].Blue,
                     ColBgColorR = 255,
                     ColBgColorG = 255,
                     ColBgColorB = 255

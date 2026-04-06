@@ -359,40 +359,65 @@ namespace Tools28.Commands.FireProtection
             }
         }
 
-        internal static List<Color> GenerateColors(int count)
+        /// <summary>
+        /// 梁用の色生成（薄めの色合い）
+        /// </summary>
+        internal static List<Color> GenerateBeamColors(int count)
         {
             var baseColors = new[]
             {
-                new { R = 144, G = 175, B = 197 },
-                new { R = 165, G = 196, B = 152 },
-                new { R = 210, G = 165, B = 120 },
-                new { R = 180, G = 150, B = 180 },
-                new { R = 120, G = 180, B = 190 },
-                new { R = 200, G = 160, B = 150 },
-                new { R = 160, G = 185, B = 130 },
-                new { R = 185, G = 170, B = 140 },
-                new { R = 150, G = 170, B = 200 },
-                new { R = 200, G = 185, B = 150 },
+                new { R = 255, G = 153, B = 104 }, // 薄赤
+                new { R = 128, G = 191, B = 255 }, // 薄青
+                new { R = 100, G = 255, B = 100 }, // 薄緑
             };
+            return GenerateFromBase(baseColors, count, 0.85f);
+        }
 
+        /// <summary>
+        /// 柱用の色生成（濃いめの色合い）
+        /// </summary>
+        internal static List<Color> GenerateColumnColors(int count)
+        {
+            var baseColors = new[]
+            {
+                new { R = 255, G = 0, B = 0 },   // 濃赤
+                new { R = 0, G = 0, B = 255 },   // 濃青
+                new { R = 0, G = 128, B = 0 },   // 濃緑
+            };
+            return GenerateFromBase(baseColors, count, 0.7f);
+        }
+
+        /// <summary>
+        /// 互換用（既存呼び出し）
+        /// </summary>
+        internal static List<Color> GenerateColors(int count)
+        {
+            return GenerateBeamColors(count);
+        }
+
+        private static List<Color> GenerateFromBase(
+            dynamic[] baseColors, int count, float shiftFactor)
+        {
             var colors = new List<Color>();
             for (int i = 0; i < count; i++)
             {
-                var bc = baseColors[i % baseColors.Length];
-                int r = bc.R, g = bc.G, b = bc.B;
+                int idx = i % baseColors.Length;
+                int r = (int)baseColors[idx].R;
+                int g = (int)baseColors[idx].G;
+                int b = (int)baseColors[idx].B;
 
                 if (i >= baseColors.Length)
                 {
-                    float brightness = 0.8f + (float)(i % baseColors.Length)
-                        / baseColors.Length * 0.4f;
-                    r = Math.Min((int)(r * brightness), 255);
-                    g = Math.Min((int)(g * brightness), 255);
-                    b = Math.Min((int)(b * brightness), 255);
+                    // 4色目以降: 色相をシフトして自動生成
+                    int cycle = i / baseColors.Length;
+                    float factor = shiftFactor + (cycle % 3) * 0.1f;
+                    r = Math.Min((int)(r * factor + (1 - factor) * 128), 255);
+                    g = Math.Min((int)(g * factor + (1 - factor) * 128), 255);
+                    b = Math.Min((int)(b * factor + (1 - factor) * 128), 255);
                 }
 
                 colors.Add(new Color((byte)r, (byte)g, (byte)b));
             }
-
             return colors;
         }
     }
