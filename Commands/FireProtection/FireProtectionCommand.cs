@@ -330,31 +330,47 @@ namespace Tools28.Commands.FireProtection
 
                                 if (existingVPs.Count == 0)
                                 {
-                                    // シートのOutlineから配置位置を計算
+                                    // 配置可能か確認
+                                    bool canAdd = Viewport.CanAddViewToSheet(
+                                        doc, sheet.Id, legendViewId);
+
                                     BoundingBoxUV outline = sheet.Outline;
-
-                                    try
-                                    {
-                                        System.IO.File.AppendAllText(
-                                            @"C:\temp\FireProtection_debug.txt",
-                                            $"  Outline: Min=({outline.Min.U * 304.8:F0},{outline.Min.V * 304.8:F0}) Max=({outline.Max.U * 304.8:F0},{outline.Max.V * 304.8:F0})\n");
-                                    }
-                                    catch { }
-
-                                    double margin = 50.0 / 304.8; // 50mm
+                                    double margin = 50.0 / 304.8;
                                     XYZ position = new XYZ(
                                         outline.Max.U - margin,
                                         outline.Min.V + margin, 0);
 
-                                    var vp = Viewport.Create(doc, sheet.Id, legendViewId, position);
-
                                     try
                                     {
                                         System.IO.File.AppendAllText(
                                             @"C:\temp\FireProtection_debug.txt",
-                                            $"  凡例配置: VP.Id={vp?.Id} pos=({position.X * 304.8:F0},{position.Y * 304.8:F0})\n");
+                                            $"  CanAdd={canAdd} Outline: Min=({outline.Min.U * 304.8:F0},{outline.Min.V * 304.8:F0}) Max=({outline.Max.U * 304.8:F0},{outline.Max.V * 304.8:F0})\n");
                                     }
                                     catch { }
+
+                                    if (canAdd)
+                                    {
+                                        var vp = Viewport.Create(
+                                            doc, sheet.Id, legendViewId, position);
+
+                                        try
+                                        {
+                                            System.IO.File.AppendAllText(
+                                                @"C:\temp\FireProtection_debug.txt",
+                                                $"  凡例配置完了: VP={vp?.Id?.IntegerValue} pos=({position.X * 304.8:F0},{position.Y * 304.8:F0})\n");
+                                        }
+                                        catch { }
+                                    }
+                                    else
+                                    {
+                                        try
+                                        {
+                                            System.IO.File.AppendAllText(
+                                                @"C:\temp\FireProtection_debug.txt",
+                                                $"  CanAddViewToSheet=false (既に他のシートに配置済みの可能性)\n");
+                                        }
+                                        catch { }
+                                    }
                                 }
                             }
                             catch (Exception vpEx)
