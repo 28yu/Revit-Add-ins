@@ -94,7 +94,21 @@ namespace Tools28.Commands.FireProtection
             }
             else
             {
-                // 梁: X方向はoffsetなし（BBox同士が柱位置で重なり統合）
+                // 梁: LocationCurve端点でX範囲を上書き（BBoxは柱を貫通するため）
+                var fi = element as FamilyInstance;
+                if (fi != null)
+                {
+                    LocationCurve lc = fi.Location as LocationCurve;
+                    if (lc?.Curve != null)
+                    {
+                        XYZ s = lc.Curve.GetEndPoint(0);
+                        XYZ e = lc.Curve.GetEndPoint(1);
+                        XYZ vs = inverse.OfPoint(s);
+                        XYZ ve = inverse.OfPoint(e);
+                        minX = Math.Min(vs.X, ve.X);
+                        maxX = Math.Max(vs.X, ve.X);
+                    }
+                }
                 // Y方向のみoffset適用
                 minY -= offsetFeet;
                 maxY += offsetFeet;
