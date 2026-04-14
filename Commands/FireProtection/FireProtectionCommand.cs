@@ -313,58 +313,18 @@ namespace Tools28.Commands.FireProtection
                                 elementsByType[value].Add(elem);
                             }
 
-                            // 柱リスト: viewColumnsが空ならドキュメント全柱
+                            // 柱リスト（柱枠型・断面柱用）
                             var colsForClip = viewColumns.Count > 0 ? viewColumns
                                 : new FilteredElementCollector(doc)
                                     .OfCategory(BuiltInCategory.OST_StructuralColumns)
                                     .WhereElementIsNotElementType()
                                     .Cast<Element>().ToList();
 
-                            // 断面ビュー: 柱位置でフレーム境界を計算
-                            double sClipMin = double.NaN, sClipMax = double.NaN;
-                            if (view.ViewType == ViewType.Section && colsForClip.Count > 0)
-                            {
-                                try
-                                {
-                                    Transform vInv = view.CropBox.Transform.Inverse;
-                                    double cMinVX = double.MaxValue, cMaxVX = double.MinValue;
-
-                                    foreach (var col in colsForClip)
-                                    {
-                                        BoundingBoxXYZ cbb = col.get_BoundingBox(view)
-                                            ?? col.get_BoundingBox(null);
-                                        if (cbb == null) continue;
-
-                                        for (int ix = 0; ix <= 1; ix++)
-                                        for (int iy = 0; iy <= 1; iy++)
-                                        for (int iz = 0; iz <= 1; iz++)
-                                        {
-                                            XYZ c = new XYZ(
-                                                ix == 0 ? cbb.Min.X : cbb.Max.X,
-                                                iy == 0 ? cbb.Min.Y : cbb.Max.Y,
-                                                iz == 0 ? cbb.Min.Z : cbb.Max.Z);
-                                            double cx = vInv.OfPoint(c).X;
-                                            if (cx < cMinVX) cMinVX = cx;
-                                            if (cx > cMaxVX) cMaxVX = cx;
-                                        }
-                                    }
-
-                                    if (cMinVX < double.MaxValue)
-                                    {
-                                        double commonOff = offsetByType.Values.FirstOrDefault();
-                                        sClipMin = cMinVX - commonOff;
-                                        sClipMax = cMaxVX + commonOff;
-                                    }
-                                }
-                                catch { }
-                            }
-
                             // 梁塗潰領域
                             regionCount += FilledRegionCreator.CreateFilledRegions(
                                 doc, view, elementsByType, offsetByType,
                                 settings.FillPatternId, settings.LineStyleId,
-                                settings.Types, settings.OverwriteExisting,
-                                sClipMin, sClipMax);
+                                settings.Types, settings.OverwriteExisting);
 
                             // 断面ビュー: 柱を梁オフセット端でクリップして配置
                             if (view.ViewType == ViewType.Section &&
