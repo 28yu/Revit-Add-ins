@@ -94,9 +94,9 @@ namespace Tools28.Commands.FireProtection
             }
             else
             {
-                // 梁: 全方向にoffset適用（隣接梁と柱位置で重なりboolean unionで統合）
-                minX -= offsetFeet;
-                maxX += offsetFeet;
+                // 梁: X方向に1.5*offset適用（柱塗潰外端と一致させる）
+                minX -= 1.5 * offsetFeet;
+                maxX += 1.5 * offsetFeet;
                 minY -= offsetFeet;
                 maxY += offsetFeet;
             }
