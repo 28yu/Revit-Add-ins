@@ -179,7 +179,21 @@ namespace Tools28.Commands.FireProtection
                     .OfClass(typeof(FilledRegionType))
                     .Cast<FilledRegionType>()
                     .FirstOrDefault(t => t.Name == regionTypeName);
-                if (existingType == null) continue;
+
+                // タイプがなければ作成（この種類に梁がないビューの場合）
+                ElementId typeId;
+                if (existingType != null)
+                {
+                    typeId = existingType.Id;
+                }
+                else
+                {
+                    Color fgColor = new Color(typeEntry.ColorR, typeEntry.ColorG, typeEntry.ColorB);
+                    typeId = GetOrCreateFilledRegionType(
+                        doc, regionTypeName, fillPatternId, fgColor,
+                        typeEntry.ForegroundVisible);
+                    if (typeId == null) continue;
+                }
 
                 foreach (var col in columns)
                 {
@@ -189,7 +203,7 @@ namespace Tools28.Commands.FireProtection
 
                     try
                     {
-                        var region = FilledRegion.Create(doc, existingType.Id,
+                        var region = FilledRegion.Create(doc, typeId,
                             view.Id, new List<CurveLoop> { outline });
                         if (lineStyleId != null && lineStyleId != ElementId.InvalidElementId)
                             region.SetLineStyleId(lineStyleId);
