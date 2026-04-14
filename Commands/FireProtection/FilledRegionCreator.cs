@@ -24,9 +24,7 @@ namespace Tools28.Commands.FireProtection
             ElementId fillPatternId,
             ElementId lineStyleId,
             List<FireProtectionTypeEntry> orderedTypes,
-            bool overwriteExisting,
-            double sectionClipMinX = double.NaN,
-            double sectionClipMaxX = double.NaN)
+            bool overwriteExisting)
         {
             if (overwriteExisting)
             {
@@ -58,8 +56,7 @@ namespace Tools28.Commands.FireProtection
                 foreach (var elem in elements)
                 {
                     var outline = BeamGeometryHelper.GetElementOffsetOutline(
-                        elem, activeView, offsetFeet, -1, -1,
-                        sectionClipMinX, sectionClipMaxX);
+                        elem, activeView, offsetFeet);
                     if (outline != null)
                         outlines.Add(outline);
                 }
