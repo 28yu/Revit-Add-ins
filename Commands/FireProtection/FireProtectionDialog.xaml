@@ -170,7 +170,7 @@
                                              VerticalAlignment="Center" Margin="0,0,15,0"
                                              Checked="OffsetMode_Changed"/>
                                 <TextBox x:Name="CommonOffsetInput" Width="80" Height="26"
-                                         FontSize="12" Padding="4,2" Text="50"
+                                         FontSize="12" Padding="4,2" Text="200"
                                          VerticalContentAlignment="Center"/>
                                 <TextBlock Text=" mm" FontSize="12"
                                            VerticalAlignment="Center" Margin="4,0,0,0"/>
@@ -274,7 +274,7 @@
                                 <ComboBox Grid.Row="0" Grid.Column="1" x:Name="LineStyleComboBox"
                                           Style="{StaticResource ComboBoxStyle}"/>
                                 <TextBlock Grid.Row="2" Grid.Column="0" Style="{StaticResource LabelStyle}"
-                                           Text="塗りパターン:" VerticalAlignment="Center"/>
+                                           Text="塗り潰し領域パターン:" VerticalAlignment="Center"/>
                                 <ComboBox Grid.Row="2" Grid.Column="1" x:Name="FillPatternComboBox"
                                           Style="{StaticResource ComboBoxStyle}"/>
                                 <TextBlock Grid.Row="4" Grid.Column="0" Style="{StaticResource LabelStyle}"
