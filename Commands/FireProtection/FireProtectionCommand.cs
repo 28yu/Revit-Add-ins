@@ -315,7 +315,12 @@ namespace Tools28.Commands.FireProtection
 
                             // 断面ビュー: 柱のX範囲から梁クリップ境界を計算
                             double sClipMinX = double.NaN, sClipMaxX = double.NaN;
-                            if (view.ViewType == ViewType.Section && viewColumns.Count > 0)
+                            // 全柱を使ってフレーム境界を計算（viewColumnsが空でも対応）
+                            var allDocColumns = new FilteredElementCollector(doc)
+                                .OfCategory(BuiltInCategory.OST_StructuralColumns)
+                                .WhereElementIsNotElementType()
+                                .Cast<Element>().ToList();
+                            if (view.ViewType == ViewType.Section && allDocColumns.Count > 0)
                             {
                                 try
                                 {
@@ -325,10 +330,9 @@ namespace Tools28.Commands.FireProtection
                                         ? settings.CommonOffsetMm / 304.8
                                         : offsetByType.Values.FirstOrDefault();
 
-                                    foreach (var col in viewColumns)
+                                    foreach (var col in allDocColumns)
                                     {
-                                        BoundingBoxXYZ cbb = col.get_BoundingBox(view)
-                                            ?? col.get_BoundingBox(null);
+                                        BoundingBoxXYZ cbb = col.get_BoundingBox(null);
                                         if (cbb == null) continue;
 
                                         for (int ix = 0; ix <= 1; ix++)
