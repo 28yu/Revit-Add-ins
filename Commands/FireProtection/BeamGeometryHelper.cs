@@ -20,26 +20,10 @@ namespace Tools28.Commands.FireProtection
         {
             if (view.ViewType == ViewType.Section)
             {
-                // 梁: 梁高さ/2+offset分だけ水平延長（柱を跨いで連続させる最小量）
+                // 梁: offset分だけ水平延長（柱gapをカバー、端部の飛び出しを最小化）
                 bool isBeam = element.Category.Id.IntegerValue ==
                     (int)BuiltInCategory.OST_StructuralFraming;
-                double hExt = 0;
-                if (isBeam)
-                {
-                    BoundingBoxXYZ bbb = element.get_BoundingBox(view)
-                                        ?? element.get_BoundingBox(null);
-                    if (bbb != null)
-                    {
-                        // 断面ビューでの梁の「高さ」をY方向の範囲から推定
-                        double beamH = bbb.Max.Z - bbb.Min.Z;
-                        if (beamH < 0.01) beamH = bbb.Max.Y - bbb.Min.Y;
-                        hExt = beamH / 2.0 + offsetFeet;
-                    }
-                    else
-                    {
-                        hExt = offsetFeet * 2;
-                    }
-                }
+                double hExt = isBeam ? offsetFeet : 0;
                 return GetOutlineForSectionView(element, view, offsetFeet, hExt);
             }
 
@@ -216,11 +200,10 @@ namespace Tools28.Commands.FireProtection
             // 柱の中心Y座標
             double colCenterY = (colMinY + colMaxY) / 2.0;
 
-            // 柱と重なる梁を収集し、上側・下側の最も近い梁を特定
-            // 上側: 梁の中心Y > 柱の中心Y → clipMaxY = 梁offset下端
-            // 下側: 梁の中心Y < 柱の中心Y → clipMinY = 梁offset上端
-            double clipMinY = colMinY;
+            // 初期値: 柱BBox + offset（クリップなし時のデフォルト）
+            double clipMinY = colMinY - offsetFeet;
             double clipMaxY = colMaxY + offsetFeet;
+            bool hasUpperBeam = false, hasLowerBeam = false;
 
             foreach (var bbb in beamBBoxes)
             {
@@ -252,12 +235,20 @@ namespace Tools28.Commands.FireProtection
                 if (beamCenterY > colCenterY)
                 {
                     // 上側の梁: 柱上端を梁offset下端でクリップ
-                    clipMaxY = Math.Min(clipMaxY, beamOffsetBottom);
+                    if (!hasUpperBeam || beamOffsetBottom < clipMaxY)
+                    {
+                        clipMaxY = beamOffsetBottom;
+                        hasUpperBeam = true;
+                    }
                 }
                 else
                 {
                     // 下側の梁: 柱下端を梁offset上端でクリップ
-                    clipMinY = Math.Max(clipMinY, beamOffsetTop);
+                    if (!hasLowerBeam || beamOffsetTop > clipMinY)
+                    {
+                        clipMinY = beamOffsetTop;
+                        hasLowerBeam = true;
+                    }
                 }
             }
 
