@@ -101,9 +101,45 @@ namespace Tools28.Commands.FireProtection
                 minY -= offsetFeet;
                 maxY += offsetFeet;
 
-                // X方向クリップ（柱の塗潰端に合わせる）
-                if (!double.IsNaN(clipMinX)) minX = Math.Max(minX, clipMinX);
-                if (!double.IsNaN(clipMaxX)) maxX = Math.Min(maxX, clipMaxX);
+                // 梁X: ドキュメント全柱からフレーム境界を計算してクリップ
+                try
+                {
+                    var allCols = new FilteredElementCollector(element.Document)
+                        .OfCategory(BuiltInCategory.OST_StructuralColumns)
+                        .WhereElementIsNotElementType()
+                        .ToList();
+
+                    if (allCols.Count > 0)
+                    {
+                        double cMinVX = double.MaxValue, cMaxVX = double.MinValue;
+                        foreach (var col in allCols)
+                        {
+                            BoundingBoxXYZ cbb = col.get_BoundingBox(null);
+                            if (cbb == null) continue;
+                            for (int a = 0; a <= 1; a++)
+                            for (int b2 = 0; b2 <= 1; b2++)
+                            for (int c2 = 0; c2 <= 1; c2++)
+                            {
+                                XYZ cc = new XYZ(
+                                    a == 0 ? cbb.Min.X : cbb.Max.X,
+                                    b2 == 0 ? cbb.Min.Y : cbb.Max.Y,
+                                    c2 == 0 ? cbb.Min.Z : cbb.Max.Z);
+                                double cx = inverse.OfPoint(cc).X;
+                                if (cx < cMinVX) cMinVX = cx;
+                                if (cx > cMaxVX) cMaxVX = cx;
+                            }
+                        }
+
+                        if (cMinVX < double.MaxValue)
+                        {
+                            double frameMin = cMinVX - offsetFeet;
+                            double frameMax = cMaxVX + offsetFeet;
+                            minX = Math.Max(minX, frameMin);
+                            maxX = Math.Min(maxX, frameMax);
+                        }
+                    }
+                }
+                catch { }
             }
 
             if (maxX - minX < 0.001 || maxY - minY < 0.001)
