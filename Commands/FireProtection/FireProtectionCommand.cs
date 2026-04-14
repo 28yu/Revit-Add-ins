@@ -320,11 +320,28 @@ namespace Tools28.Commands.FireProtection
                                     .WhereElementIsNotElementType()
                                     .Cast<Element>().ToList();
 
+                            // 断面ビュー用: 柱半幅を計算
+                            double maxColHalfW = 0;
+                            if (view.ViewType == ViewType.Section)
+                            {
+                                foreach (var col in colsForClip)
+                                {
+                                    BoundingBoxXYZ cbb = col.get_BoundingBox(null);
+                                    if (cbb == null) continue;
+                                    double w = Math.Min(
+                                        cbb.Max.X - cbb.Min.X,
+                                        cbb.Max.Y - cbb.Min.Y);
+                                    if (w / 2.0 > maxColHalfW)
+                                        maxColHalfW = w / 2.0;
+                                }
+                            }
+
                             // 梁塗潰領域
                             regionCount += FilledRegionCreator.CreateFilledRegions(
                                 doc, view, elementsByType, offsetByType,
                                 settings.FillPatternId, settings.LineStyleId,
-                                settings.Types, settings.OverwriteExisting);
+                                settings.Types, settings.OverwriteExisting,
+                                maxColHalfW);
 
                             // 断面ビュー: 柱を梁オフセット端でクリップして配置
                             if (view.ViewType == ViewType.Section &&

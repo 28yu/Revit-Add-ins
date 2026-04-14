@@ -16,10 +16,11 @@ namespace Tools28.Commands.FireProtection
         /// </summary>
         public static CurveLoop GetElementOffsetOutline(
             Element element, View view, double offsetFeet,
-            double startExt = -1, double endExt = -1)
+            double startExt = -1, double endExt = -1,
+            double sectionColHalfWidth = 0)
         {
             if (view.ViewType == ViewType.Section)
-                return GetOutlineForSectionView(element, view, offsetFeet);
+                return GetOutlineForSectionView(element, view, offsetFeet, sectionColHalfWidth);
 
             var fi = element as FamilyInstance;
             if (fi == null) return null;
@@ -41,7 +42,8 @@ namespace Tools28.Commands.FireProtection
         /// 断面ビュー用: BoundingBoxをビュー座標系に投影して矩形を生成
         /// </summary>
         private static CurveLoop GetOutlineForSectionView(
-            Element element, View view, double offsetFeet)
+            Element element, View view, double offsetFeet,
+            double sectionColHalfWidth = 0)
         {
             BoundingBoxXYZ bb = element.get_BoundingBox(view);
             if (bb == null)
@@ -94,9 +96,10 @@ namespace Tools28.Commands.FireProtection
             }
             else
             {
-                // 梁: X方向に1.5*offset適用（柱塗潰外端と一致させる）
-                minX -= 1.5 * offsetFeet;
-                maxX += 1.5 * offsetFeet;
+                // 梁: X方向は offset + 柱半幅（柱塗潰外端と一致させる）
+                double xExt = offsetFeet + sectionColHalfWidth;
+                minX -= xExt;
+                maxX += xExt;
                 minY -= offsetFeet;
                 maxY += offsetFeet;
             }
