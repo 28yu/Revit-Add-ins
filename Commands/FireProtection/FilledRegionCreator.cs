@@ -156,6 +156,53 @@ namespace Tools28.Commands.FireProtection
         }
 
         /// <summary>
+        /// 断面ビュー: 柱の塗潰領域を梁オフセット端でクリップして作成
+        /// </summary>
+        public static int CreateSectionColumnRegions(
+            Document doc, View view,
+            Dictionary<string, List<Element>> colsByType,
+            List<BoundingBoxXYZ> beamBBoxes,
+            double beamOffset,
+            ElementId fillPatternId, ElementId lineStyleId,
+            List<FireProtectionTypeEntry> orderedTypes,
+            bool overwriteExisting)
+        {
+            int created = 0;
+
+            foreach (var typeEntry in orderedTypes)
+            {
+                if (!colsByType.ContainsKey(typeEntry.Name)) continue;
+                var columns = colsByType[typeEntry.Name];
+
+                string regionTypeName = TypePrefix + typeEntry.Name;
+                var existingType = new FilteredElementCollector(doc)
+                    .OfClass(typeof(FilledRegionType))
+                    .Cast<FilledRegionType>()
+                    .FirstOrDefault(t => t.Name == regionTypeName);
+                if (existingType == null) continue;
+
+                foreach (var col in columns)
+                {
+                    var outline = BeamGeometryHelper.GetColumnOutlineClippedByBeams(
+                        col, view, beamOffset, beamBBoxes, beamOffset);
+                    if (outline == null) continue;
+
+                    try
+                    {
+                        var region = FilledRegion.Create(doc, existingType.Id,
+                            view.Id, new List<CurveLoop> { outline });
+                        if (lineStyleId != null && lineStyleId != ElementId.InvalidElementId)
+                            region.SetLineStyleId(lineStyleId);
+                        created++;
+                    }
+                    catch { }
+                }
+            }
+
+            return created;
+        }
+
+        /// <summary>
         /// 柱の枠型（ドーナツ型）塗潰領域を作成
         /// </summary>
         public static int CreateColumnFrameRegions(

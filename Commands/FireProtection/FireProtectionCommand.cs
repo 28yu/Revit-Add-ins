@@ -246,11 +246,9 @@ namespace Tools28.Commands.FireProtection
                                 .WhereElementIsNotElementType()
                                 .Cast<Element>().ToList();
 
+                            // 梁は常に対象。柱は断面ビューでは別途クリップ処理
                             var viewTargets = new List<Element>();
                             viewTargets.AddRange(viewBeams);
-                            // 柱カテゴリは断面ビューのみ梁オフセット処理に含める
-                            if (view.ViewType == ViewType.Section)
-                                viewTargets.AddRange(viewColumns);
 
                             // 要素をパラメータ値でグループ化
                             var elementsByType = new Dictionary<string, List<Element>>();
@@ -274,6 +272,45 @@ namespace Tools28.Commands.FireProtection
                                 doc, view, elementsByType, offsetByType,
                                 settings.FillPatternId, settings.LineStyleId,
                                 settings.Types, settings.OverwriteExisting);
+
+                            // 断面ビュー: 柱を梁オフセット端でクリップして配置
+                            if (view.ViewType == ViewType.Section &&
+                                viewColumns.Count > 0 && paramName != null)
+                            {
+                                // 梁のBBoxリストを収集（柱クリップ用）
+                                var beamBBoxes = new List<BoundingBoxXYZ>();
+                                foreach (var b in viewBeams)
+                                {
+                                    var bbb = b.get_BoundingBox(view)
+                                              ?? b.get_BoundingBox(null);
+                                    if (bbb != null) beamBBoxes.Add(bbb);
+                                }
+
+                                // 柱をパラメータ値でグループ化
+                                var colsByType = new Dictionary<string, List<Element>>();
+                                foreach (var col in viewColumns)
+                                {
+                                    Parameter p = col.LookupParameter(paramName);
+                                    if (p == null) continue;
+                                    string value = p.StorageType == StorageType.String
+                                        ? p.AsString() : p.AsValueString();
+                                    if (string.IsNullOrEmpty(value)) continue;
+                                    value = value.Trim();
+                                    if (!colsByType.ContainsKey(value))
+                                        colsByType[value] = new List<Element>();
+                                    colsByType[value].Add(col);
+                                }
+
+                                // 共通オフセット取得
+                                double commonOffset = settings.UseCommonOffset
+                                    ? settings.CommonOffsetMm / 304.8 : 0;
+
+                                regionCount += FilledRegionCreator.CreateSectionColumnRegions(
+                                    doc, view, colsByType, beamBBoxes,
+                                    commonOffset > 0 ? commonOffset : offsetByType.Values.FirstOrDefault(),
+                                    settings.FillPatternId, settings.LineStyleId,
+                                    settings.Types, settings.OverwriteExisting);
+                            }
 
                             // 柱枠型塗潰領域（平面/天伏/構造伏のみ）
                             // 天伏ではviewColumnsが空の場合があるため、ドキュメント全体の柱も参照

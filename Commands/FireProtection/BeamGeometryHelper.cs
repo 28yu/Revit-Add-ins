@@ -19,7 +19,13 @@ namespace Tools28.Commands.FireProtection
             double startExt = -1, double endExt = -1)
         {
             if (view.ViewType == ViewType.Section)
-                return GetOutlineForSectionView(element, view, offsetFeet);
+            {
+                // 梁: 水平方向に1000mm延長（柱を跨いで連続させる）
+                bool isBeam = element.Category.Id.IntegerValue ==
+                    (int)BuiltInCategory.OST_StructuralFraming;
+                double hExt = isBeam ? 1000.0 / 304.8 : 0;
+                return GetOutlineForSectionView(element, view, offsetFeet, hExt);
+            }
 
             var fi = element as FamilyInstance;
             if (fi == null) return null;
@@ -40,8 +46,10 @@ namespace Tools28.Commands.FireProtection
         /// <summary>
         /// 断面ビュー用: BoundingBoxをビュー座標系に投影して矩形を生成
         /// </summary>
+        /// <param name="hExtension">水平方向の追加延長（feet）。梁の断面ビュー用</param>
         private static CurveLoop GetOutlineForSectionView(
-            Element element, View view, double offsetFeet)
+            Element element, View view, double offsetFeet,
+            double hExtension = 0)
         {
             BoundingBoxXYZ bb = element.get_BoundingBox(view);
             if (bb == null)
@@ -84,9 +92,9 @@ namespace Tools28.Commands.FireProtection
 
             bool isCol = element.Category.Id.IntegerValue ==
                 (int)BuiltInCategory.OST_StructuralColumns;
-            minX -= offsetFeet;
+            minX -= offsetFeet + hExtension; // 梁は水平方向に追加延長
             minY -= isCol ? 0 : offsetFeet; // 柱の下部はオフセットなし
-            maxX += offsetFeet;
+            maxX += offsetFeet + hExtension;
             maxY += offsetFeet;
 
             if (maxX - minX < 0.001 || maxY - minY < 0.001)
@@ -140,6 +148,107 @@ namespace Tools28.Commands.FireProtection
             XYZ p1 = extEnd - perp * halfExtent;
             XYZ p2 = extEnd + perp * halfExtent;
             XYZ p3 = extStart + perp * halfExtent;
+
+            CurveLoop loop = new CurveLoop();
+            loop.Append(Line.CreateBound(p0, p1));
+            loop.Append(Line.CreateBound(p1, p2));
+            loop.Append(Line.CreateBound(p2, p3));
+            loop.Append(Line.CreateBound(p3, p0));
+
+            return loop;
+        }
+
+        /// <summary>
+        /// 断面ビューの柱: 梁のオフセット端でY方向をクリップ
+        /// </summary>
+        public static CurveLoop GetColumnOutlineClippedByBeams(
+            Element column, View view, double offsetFeet,
+            List<BoundingBoxXYZ> beamBBoxes, double beamOffset)
+        {
+            BoundingBoxXYZ bb = column.get_BoundingBox(view);
+            if (bb == null) bb = column.get_BoundingBox(null);
+            if (bb == null) return null;
+
+            Transform viewTransform;
+            try { viewTransform = view.CropBox.Transform; }
+            catch { return null; }
+
+            Transform inverse = viewTransform.Inverse;
+            XYZ origin = viewTransform.Origin;
+            XYZ rightDir = viewTransform.BasisX;
+            XYZ upDir = viewTransform.BasisY;
+
+            // 柱のビュー座標範囲
+            double colMinX = double.MaxValue, colMinY = double.MaxValue;
+            double colMaxX = double.MinValue, colMaxY = double.MinValue;
+
+            for (int ix = 0; ix <= 1; ix++)
+            for (int iy = 0; iy <= 1; iy++)
+            for (int iz = 0; iz <= 1; iz++)
+            {
+                XYZ corner = new XYZ(
+                    ix == 0 ? bb.Min.X : bb.Max.X,
+                    iy == 0 ? bb.Min.Y : bb.Max.Y,
+                    iz == 0 ? bb.Min.Z : bb.Max.Z);
+                XYZ vp = inverse.OfPoint(corner);
+                if (vp.X < colMinX) colMinX = vp.X;
+                if (vp.Y < colMinY) colMinY = vp.Y;
+                if (vp.X > colMaxX) colMaxX = vp.X;
+                if (vp.Y > colMaxY) colMaxY = vp.Y;
+            }
+
+            // 梁のビュー座標Y範囲を収集
+            double colCenterX = (colMinX + colMaxX) / 2.0;
+            double clipMinY = colMinY; // デフォルト: クリップなし
+            double clipMaxY = colMaxY;
+
+            foreach (var bbb in beamBBoxes)
+            {
+                double bMinX = double.MaxValue, bMinY = double.MaxValue;
+                double bMaxX = double.MinValue, bMaxY = double.MinValue;
+
+                for (int ix = 0; ix <= 1; ix++)
+                for (int iy = 0; iy <= 1; iy++)
+                for (int iz = 0; iz <= 1; iz++)
+                {
+                    XYZ c = new XYZ(
+                        ix == 0 ? bbb.Min.X : bbb.Max.X,
+                        iy == 0 ? bbb.Min.Y : bbb.Max.Y,
+                        iz == 0 ? bbb.Min.Z : bbb.Max.Z);
+                    XYZ bvp = inverse.OfPoint(c);
+                    if (bvp.X < bMinX) bMinX = bvp.X;
+                    if (bvp.Y < bMinY) bMinY = bvp.Y;
+                    if (bvp.X > bMaxX) bMaxX = bvp.X;
+                    if (bvp.Y > bMaxY) bMaxY = bvp.Y;
+                }
+
+                // 水平方向に柱と重なる梁を検出
+                if (bMaxX < colMinX || bMinX > colMaxX) continue;
+
+                double beamOffsetTop = bMaxY + beamOffset;
+                double beamOffsetBottom = bMinY - beamOffset;
+
+                // 柱の上端を梁のオフセット下端でクリップ
+                if (beamOffsetBottom < clipMaxY && beamOffsetBottom > colCenterX)
+                    clipMaxY = beamOffsetBottom;
+
+                // 柱の下端を梁のオフセット上端でクリップ
+                if (beamOffsetTop > clipMinY && beamOffsetTop < (colMinY + colMaxY) / 2.0)
+                    clipMinY = beamOffsetTop;
+            }
+
+            double finalMinX = colMinX - offsetFeet;
+            double finalMinY = clipMinY;
+            double finalMaxX = colMaxX + offsetFeet;
+            double finalMaxY = clipMaxY;
+
+            if (finalMaxX - finalMinX < 0.001 || finalMaxY - finalMinY < 0.001)
+                return null;
+
+            XYZ p0 = origin + finalMinX * rightDir + finalMinY * upDir;
+            XYZ p1 = origin + finalMaxX * rightDir + finalMinY * upDir;
+            XYZ p2 = origin + finalMaxX * rightDir + finalMaxY * upDir;
+            XYZ p3 = origin + finalMinX * rightDir + finalMaxY * upDir;
 
             CurveLoop loop = new CurveLoop();
             loop.Append(Line.CreateBound(p0, p1));
