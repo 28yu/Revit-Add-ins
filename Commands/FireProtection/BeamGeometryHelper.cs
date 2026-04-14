@@ -20,10 +20,26 @@ namespace Tools28.Commands.FireProtection
         {
             if (view.ViewType == ViewType.Section)
             {
-                // 梁: 水平方向に1000mm延長（柱を跨いで連続させる）
+                // 梁: 梁高さ/2+offset分だけ水平延長（柱を跨いで連続させる最小量）
                 bool isBeam = element.Category.Id.IntegerValue ==
                     (int)BuiltInCategory.OST_StructuralFraming;
-                double hExt = isBeam ? 1000.0 / 304.8 : 0;
+                double hExt = 0;
+                if (isBeam)
+                {
+                    BoundingBoxXYZ bbb = element.get_BoundingBox(view)
+                                        ?? element.get_BoundingBox(null);
+                    if (bbb != null)
+                    {
+                        // 断面ビューでの梁の「高さ」をY方向の範囲から推定
+                        double beamH = bbb.Max.Z - bbb.Min.Z;
+                        if (beamH < 0.01) beamH = bbb.Max.Y - bbb.Min.Y;
+                        hExt = beamH / 2.0 + offsetFeet;
+                    }
+                    else
+                    {
+                        hExt = offsetFeet * 2;
+                    }
+                }
                 return GetOutlineForSectionView(element, view, offsetFeet, hExt);
             }
 
@@ -197,10 +213,14 @@ namespace Tools28.Commands.FireProtection
                 if (vp.Y > colMaxY) colMaxY = vp.Y;
             }
 
-            // 梁のビュー座標Y範囲を収集
-            double colCenterX = (colMinX + colMaxX) / 2.0;
-            double clipMinY = colMinY; // デフォルト: クリップなし
-            double clipMaxY = colMaxY;
+            // 柱の中心Y座標
+            double colCenterY = (colMinY + colMaxY) / 2.0;
+
+            // 柱と重なる梁を収集し、上側・下側の最も近い梁を特定
+            // 上側: 梁の中心Y > 柱の中心Y → clipMaxY = 梁offset下端
+            // 下側: 梁の中心Y < 柱の中心Y → clipMinY = 梁offset上端
+            double clipMinY = colMinY;
+            double clipMaxY = colMaxY + offsetFeet;
 
             foreach (var bbb in beamBBoxes)
             {
@@ -222,19 +242,23 @@ namespace Tools28.Commands.FireProtection
                     if (bvp.Y > bMaxY) bMaxY = bvp.Y;
                 }
 
-                // 水平方向に柱と重なる梁を検出
+                // 水平方向に柱と重なる梁のみ
                 if (bMaxX < colMinX || bMinX > colMaxX) continue;
 
+                double beamCenterY = (bMinY + bMaxY) / 2.0;
                 double beamOffsetTop = bMaxY + beamOffset;
                 double beamOffsetBottom = bMinY - beamOffset;
 
-                // 柱の上端を梁のオフセット下端でクリップ
-                if (beamOffsetBottom < clipMaxY && beamOffsetBottom > colCenterX)
-                    clipMaxY = beamOffsetBottom;
-
-                // 柱の下端を梁のオフセット上端でクリップ
-                if (beamOffsetTop > clipMinY && beamOffsetTop < (colMinY + colMaxY) / 2.0)
-                    clipMinY = beamOffsetTop;
+                if (beamCenterY > colCenterY)
+                {
+                    // 上側の梁: 柱上端を梁offset下端でクリップ
+                    clipMaxY = Math.Min(clipMaxY, beamOffsetBottom);
+                }
+                else
+                {
+                    // 下側の梁: 柱下端を梁offset上端でクリップ
+                    clipMinY = Math.Max(clipMinY, beamOffsetTop);
+                }
             }
 
             double finalMinX = colMinX - offsetFeet;
