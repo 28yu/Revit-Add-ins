@@ -16,12 +16,10 @@ namespace Tools28.Commands.FireProtection
         /// </summary>
         public static CurveLoop GetElementOffsetOutline(
             Element element, View view, double offsetFeet,
-            double startExt = -1, double endExt = -1,
-            double sClipMinX = double.NaN, double sClipMaxX = double.NaN)
+            double startExt = -1, double endExt = -1)
         {
             if (view.ViewType == ViewType.Section)
-                return GetOutlineForSectionView(element, view, offsetFeet,
-                    sClipMinX, sClipMaxX);
+                return GetOutlineForSectionView(element, view, offsetFeet);
 
             var fi = element as FamilyInstance;
             if (fi == null) return null;
@@ -43,8 +41,7 @@ namespace Tools28.Commands.FireProtection
         /// 断面ビュー用: BoundingBoxをビュー座標系に投影して矩形を生成
         /// </summary>
         private static CurveLoop GetOutlineForSectionView(
-            Element element, View view, double offsetFeet,
-            double clipMinX = double.NaN, double clipMaxX = double.NaN)
+            Element element, View view, double offsetFeet)
         {
             BoundingBoxXYZ bb = element.get_BoundingBox(view);
             if (bb == null)
@@ -97,53 +94,12 @@ namespace Tools28.Commands.FireProtection
             }
             else
             {
+                // 梁: X方向を縮小（BBoxが柱を超えて延びる分を補正）
                 // Y方向のみoffset適用
+                minX += offsetFeet;
+                maxX -= offsetFeet;
                 minY -= offsetFeet;
                 maxY += offsetFeet;
-
-                // デバッグ: この行が出力されるか確認
-                try { System.IO.File.AppendAllText(@"C:\temp\FireProtection_debug.txt",
-                    $"  ★梁断面クリップ開始: minX={minX * 304.8:F0} maxX={maxX * 304.8:F0}\n"); } catch { }
-
-                // 梁X: ドキュメント全柱からフレーム境界を計算してクリップ
-                try
-                {
-                    var allCols = new FilteredElementCollector(element.Document)
-                        .OfCategory(BuiltInCategory.OST_StructuralColumns)
-                        .WhereElementIsNotElementType()
-                        .ToList();
-
-                    if (allCols.Count > 0)
-                    {
-                        double cMinVX = double.MaxValue, cMaxVX = double.MinValue;
-                        foreach (var col in allCols)
-                        {
-                            BoundingBoxXYZ cbb = col.get_BoundingBox(null);
-                            if (cbb == null) continue;
-                            for (int a = 0; a <= 1; a++)
-                            for (int b2 = 0; b2 <= 1; b2++)
-                            for (int c2 = 0; c2 <= 1; c2++)
-                            {
-                                XYZ cc = new XYZ(
-                                    a == 0 ? cbb.Min.X : cbb.Max.X,
-                                    b2 == 0 ? cbb.Min.Y : cbb.Max.Y,
-                                    c2 == 0 ? cbb.Min.Z : cbb.Max.Z);
-                                double cx = inverse.OfPoint(cc).X;
-                                if (cx < cMinVX) cMinVX = cx;
-                                if (cx > cMaxVX) cMaxVX = cx;
-                            }
-                        }
-
-                        if (cMinVX < double.MaxValue)
-                        {
-                            double frameMin = cMinVX - offsetFeet;
-                            double frameMax = cMaxVX + offsetFeet;
-                            minX = Math.Max(minX, frameMin);
-                            maxX = Math.Min(maxX, frameMax);
-                        }
-                    }
-                }
-                catch { }
             }
 
             if (maxX - minX < 0.001 || maxY - minY < 0.001)
