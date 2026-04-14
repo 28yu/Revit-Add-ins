@@ -101,6 +101,10 @@ namespace Tools28.Commands.FireProtection
                 minY -= offsetFeet;
                 maxY += offsetFeet;
 
+                // デバッグ: この行が出力されるか確認
+                try { System.IO.File.AppendAllText(@"C:\temp\FireProtection_debug.txt",
+                    $"  ★梁断面クリップ開始: minX={minX * 304.8:F0} maxX={maxX * 304.8:F0}\n"); } catch { }
+
                 // 梁X: ドキュメント全柱からフレーム境界を計算してクリップ
                 try
                 {
