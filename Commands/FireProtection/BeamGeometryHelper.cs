@@ -16,10 +16,12 @@ namespace Tools28.Commands.FireProtection
         /// </summary>
         public static CurveLoop GetElementOffsetOutline(
             Element element, View view, double offsetFeet,
-            double startExt = -1, double endExt = -1)
+            double startExt = -1, double endExt = -1,
+            double sClipMinX = double.NaN, double sClipMaxX = double.NaN)
         {
             if (view.ViewType == ViewType.Section)
-                return GetOutlineForSectionView(element, view, offsetFeet);
+                return GetOutlineForSectionView(element, view, offsetFeet,
+                    sClipMinX, sClipMaxX);
 
             var fi = element as FamilyInstance;
             if (fi == null) return null;
@@ -41,7 +43,8 @@ namespace Tools28.Commands.FireProtection
         /// 断面ビュー用: BoundingBoxをビュー座標系に投影して矩形を生成
         /// </summary>
         private static CurveLoop GetOutlineForSectionView(
-            Element element, View view, double offsetFeet)
+            Element element, View view, double offsetFeet,
+            double clipMinX = double.NaN, double clipMaxX = double.NaN)
         {
             BoundingBoxXYZ bb = element.get_BoundingBox(view);
             if (bb == null)
@@ -94,33 +97,13 @@ namespace Tools28.Commands.FireProtection
             }
             else
             {
-                // 梁: LocationCurve端点でX範囲を上書き（BBoxは柱を貫通するため）
-                double bboxMinX = minX, bboxMaxX = maxX;
-                var fi = element as FamilyInstance;
-                if (fi != null)
-                {
-                    LocationCurve lc = fi.Location as LocationCurve;
-                    if (lc?.Curve != null)
-                    {
-                        XYZ s = lc.Curve.GetEndPoint(0);
-                        XYZ e = lc.Curve.GetEndPoint(1);
-                        XYZ vs = inverse.OfPoint(s);
-                        XYZ ve = inverse.OfPoint(e);
-                        minX = Math.Min(vs.X, ve.X);
-                        maxX = Math.Max(vs.X, ve.X);
-                    }
-                }
-                try
-                {
-                    System.IO.File.AppendAllText(@"C:\temp\FireProtection_debug.txt",
-                        $"  梁X: bbox=({bboxMinX * 304.8:F0},{bboxMaxX * 304.8:F0})" +
-                        $" loc=({minX * 304.8:F0},{maxX * 304.8:F0})" +
-                        $" diff=({(bboxMinX - minX) * 304.8:F0},{(bboxMaxX - maxX) * 304.8:F0})\n");
-                }
-                catch { }
                 // Y方向のみoffset適用
                 minY -= offsetFeet;
                 maxY += offsetFeet;
+
+                // X方向クリップ（柱の塗潰端に合わせる）
+                if (!double.IsNaN(clipMinX)) minX = Math.Max(minX, clipMinX);
+                if (!double.IsNaN(clipMaxX)) maxX = Math.Min(maxX, clipMaxX);
             }
 
             if (maxX - minX < 0.001 || maxY - minY < 0.001)
