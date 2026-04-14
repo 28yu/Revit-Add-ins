@@ -248,7 +248,53 @@ namespace Tools28.Commands.FireProtection
 
                             // 梁は常に対象。柱は断面ビューでは別途クリップ処理
                             var viewTargets = new List<Element>();
-                            viewTargets.AddRange(viewBeams);
+
+                            if (view.ViewType == ViewType.Section)
+                            {
+                                // 断面ビュー: 直交する梁（断面が見える梁）を除外
+                                // ビュー座標でX幅 < Y高さの梁は直交梁
+                                Transform vt = null;
+                                try { vt = view.CropBox.Transform.Inverse; } catch { }
+
+                                foreach (var beam in viewBeams)
+                                {
+                                    if (vt == null) { viewTargets.Add(beam); continue; }
+
+                                    BoundingBoxXYZ bbb = beam.get_BoundingBox(view)
+                                        ?? beam.get_BoundingBox(null);
+                                    if (bbb == null) { viewTargets.Add(beam); continue; }
+
+                                    // ビュー座標に変換してX/Y範囲を比較
+                                    double vMinX = double.MaxValue, vMaxX = double.MinValue;
+                                    double vMinY = double.MaxValue, vMaxY = double.MinValue;
+                                    for (int ix = 0; ix <= 1; ix++)
+                                    for (int iy = 0; iy <= 1; iy++)
+                                    for (int iz = 0; iz <= 1; iz++)
+                                    {
+                                        XYZ c = new XYZ(
+                                            ix == 0 ? bbb.Min.X : bbb.Max.X,
+                                            iy == 0 ? bbb.Min.Y : bbb.Max.Y,
+                                            iz == 0 ? bbb.Min.Z : bbb.Max.Z);
+                                        XYZ vp = vt.OfPoint(c);
+                                        if (vp.X < vMinX) vMinX = vp.X;
+                                        if (vp.X > vMaxX) vMaxX = vp.X;
+                                        if (vp.Y < vMinY) vMinY = vp.Y;
+                                        if (vp.Y > vMaxY) vMaxY = vp.Y;
+                                    }
+
+                                    double xExtent = vMaxX - vMinX;
+                                    double yExtent = vMaxY - vMinY;
+
+                                    // X幅 > Y高さ = 平行梁（対象）
+                                    // X幅 <= Y高さ = 直交梁（除外）
+                                    if (xExtent > yExtent)
+                                        viewTargets.Add(beam);
+                                }
+                            }
+                            else
+                            {
+                                viewTargets.AddRange(viewBeams);
+                            }
 
                             // 要素をパラメータ値でグループ化
                             var elementsByType = new Dictionary<string, List<Element>>();
@@ -277,10 +323,13 @@ namespace Tools28.Commands.FireProtection
                             if (view.ViewType == ViewType.Section &&
                                 viewColumns.Count > 0 && paramName != null)
                             {
-                                // 梁のBBoxリストを収集（柱クリップ用）
+                                // 平行梁のBBoxリストのみ収集（柱クリップ用）
+                                // viewTargetsには直交梁が除外済み
                                 var beamBBoxes = new List<BoundingBoxXYZ>();
-                                foreach (var b in viewBeams)
+                                foreach (var b in viewTargets)
                                 {
+                                    if (b.Category.Id.IntegerValue !=
+                                        (int)BuiltInCategory.OST_StructuralFraming) continue;
                                     var bbb = b.get_BoundingBox(view)
                                               ?? b.get_BoundingBox(null);
                                     if (bbb != null) beamBBoxes.Add(bbb);
