@@ -347,8 +347,9 @@ namespace Tools28.Commands.FireProtection
 
                                     if (cMinX < double.MaxValue)
                                     {
-                                        sClipMinX = cMinX - commonOff;
-                                        sClipMaxX = cMaxX + commonOff;
+                                        // 柱面でクリップ（offsetなし=柱の塗潰端と一致）
+                                        sClipMinX = cMinX;
+                                        sClipMaxX = cMaxX;
                                     }
                                 }
                                 catch { }
