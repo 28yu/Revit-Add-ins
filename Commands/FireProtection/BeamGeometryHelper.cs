@@ -104,8 +104,26 @@ namespace Tools28.Commands.FireProtection
             maxY += offsetFeet;
 
             // X方向クリップ（梁が柱端からはみ出さないように）
-            if (!double.IsNaN(clipMinX)) minX = Math.Max(minX, clipMinX);
-            if (!double.IsNaN(clipMaxX)) maxX = Math.Min(maxX, clipMaxX);
+            if (!double.IsNaN(clipMinX) || !double.IsNaN(clipMaxX))
+            {
+                try
+                {
+                    System.IO.File.AppendAllText(@"C:\temp\FireProtection_debug.txt",
+                        $"  SectionClip: before minX={minX * 304.8:F0} maxX={maxX * 304.8:F0}" +
+                        $" clipMinX={clipMinX * 304.8:F0} clipMaxX={clipMaxX * 304.8:F0}\n");
+                }
+                catch { }
+
+                if (!double.IsNaN(clipMinX)) minX = Math.Max(minX, clipMinX);
+                if (!double.IsNaN(clipMaxX)) maxX = Math.Min(maxX, clipMaxX);
+
+                try
+                {
+                    System.IO.File.AppendAllText(@"C:\temp\FireProtection_debug.txt",
+                        $"  SectionClip: after minX={minX * 304.8:F0} maxX={maxX * 304.8:F0}\n");
+                }
+                catch { }
+            }
 
             if (maxX - minX < 0.001 || maxY - minY < 0.001)
                 return null;
