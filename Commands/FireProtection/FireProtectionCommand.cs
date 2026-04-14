@@ -313,11 +313,53 @@ namespace Tools28.Commands.FireProtection
                                 elementsByType[value].Add(elem);
                             }
 
+                            // 断面ビュー: 柱のX範囲から梁クリップ境界を計算
+                            double sClipMinX = double.NaN, sClipMaxX = double.NaN;
+                            if (view.ViewType == ViewType.Section && viewColumns.Count > 0)
+                            {
+                                try
+                                {
+                                    Transform vInv = view.CropBox.Transform.Inverse;
+                                    double cMinX = double.MaxValue, cMaxX = double.MinValue;
+                                    double commonOff = settings.UseCommonOffset
+                                        ? settings.CommonOffsetMm / 304.8
+                                        : offsetByType.Values.FirstOrDefault();
+
+                                    foreach (var col in viewColumns)
+                                    {
+                                        BoundingBoxXYZ cbb = col.get_BoundingBox(view)
+                                            ?? col.get_BoundingBox(null);
+                                        if (cbb == null) continue;
+
+                                        for (int ix = 0; ix <= 1; ix++)
+                                        for (int iy = 0; iy <= 1; iy++)
+                                        for (int iz = 0; iz <= 1; iz++)
+                                        {
+                                            XYZ cc = new XYZ(
+                                                ix == 0 ? cbb.Min.X : cbb.Max.X,
+                                                iy == 0 ? cbb.Min.Y : cbb.Max.Y,
+                                                iz == 0 ? cbb.Min.Z : cbb.Max.Z);
+                                            XYZ cvp = vInv.OfPoint(cc);
+                                            if (cvp.X < cMinX) cMinX = cvp.X;
+                                            if (cvp.X > cMaxX) cMaxX = cvp.X;
+                                        }
+                                    }
+
+                                    if (cMinX < double.MaxValue)
+                                    {
+                                        sClipMinX = cMinX - commonOff;
+                                        sClipMaxX = cMaxX + commonOff;
+                                    }
+                                }
+                                catch { }
+                            }
+
                             // 梁塗潰領域
                             regionCount += FilledRegionCreator.CreateFilledRegions(
                                 doc, view, elementsByType, offsetByType,
                                 settings.FillPatternId, settings.LineStyleId,
-                                settings.Types, settings.OverwriteExisting);
+                                settings.Types, settings.OverwriteExisting,
+                                sClipMinX, sClipMaxX);
 
                             // 断面ビュー: 柱を梁オフセット端でクリップして配置
                             if (view.ViewType == ViewType.Section &&

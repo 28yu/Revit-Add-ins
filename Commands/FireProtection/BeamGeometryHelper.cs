@@ -14,17 +14,21 @@ namespace Tools28.Commands.FireProtection
         /// 要素のオフセット輪郭を取得
         /// 梁: LocationCurve（方向+幅が正確）、柱: BoundingBox
         /// </summary>
+        /// <param name="sectionClipMinX">断面ビューのX最小クリップ（ビュー座標）</param>
+        /// <param name="sectionClipMaxX">断面ビューのX最大クリップ（ビュー座標）</param>
         public static CurveLoop GetElementOffsetOutline(
             Element element, View view, double offsetFeet,
-            double startExt = -1, double endExt = -1)
+            double startExt = -1, double endExt = -1,
+            double sectionClipMinX = double.NaN,
+            double sectionClipMaxX = double.NaN)
         {
             if (view.ViewType == ViewType.Section)
             {
-                // 梁: 水平延長なし（BBox同士の重なりでboolean unionが統合）
                 bool isBeam = element.Category.Id.IntegerValue ==
                     (int)BuiltInCategory.OST_StructuralFraming;
-                double hExt = 0;
-                return GetOutlineForSectionView(element, view, offsetFeet, hExt);
+                return GetOutlineForSectionView(element, view, offsetFeet, 0,
+                    isBeam ? sectionClipMinX : double.NaN,
+                    isBeam ? sectionClipMaxX : double.NaN);
             }
 
             var fi = element as FamilyInstance;
@@ -46,10 +50,12 @@ namespace Tools28.Commands.FireProtection
         /// <summary>
         /// 断面ビュー用: BoundingBoxをビュー座標系に投影して矩形を生成
         /// </summary>
-        /// <param name="hExtension">水平方向の追加延長（feet）。梁の断面ビュー用</param>
+        /// <param name="clipMinX">ビュー座標のX最小クリップ値（NaNでクリップなし）</param>
+        /// <param name="clipMaxX">ビュー座標のX最大クリップ値（NaNでクリップなし）</param>
         private static CurveLoop GetOutlineForSectionView(
             Element element, View view, double offsetFeet,
-            double hExtension = 0)
+            double hExtension = 0,
+            double clipMinX = double.NaN, double clipMaxX = double.NaN)
         {
             BoundingBoxXYZ bb = element.get_BoundingBox(view);
             if (bb == null)
@@ -92,10 +98,14 @@ namespace Tools28.Commands.FireProtection
 
             bool isCol = element.Category.Id.IntegerValue ==
                 (int)BuiltInCategory.OST_StructuralColumns;
-            minX -= offsetFeet + hExtension; // 梁は水平方向に追加延長
+            minX -= offsetFeet + hExtension;
             minY -= isCol ? 0 : offsetFeet; // 柱の下部はオフセットなし
             maxX += offsetFeet + hExtension;
             maxY += offsetFeet;
+
+            // X方向クリップ（梁が柱端からはみ出さないように）
+            if (!double.IsNaN(clipMinX)) minX = Math.Max(minX, clipMinX);
+            if (!double.IsNaN(clipMaxX)) maxX = Math.Min(maxX, clipMaxX);
 
             if (maxX - minX < 0.001 || maxY - minY < 0.001)
                 return null;
