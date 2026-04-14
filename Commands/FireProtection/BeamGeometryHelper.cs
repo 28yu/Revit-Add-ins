@@ -95,6 +95,7 @@ namespace Tools28.Commands.FireProtection
             else
             {
                 // 梁: LocationCurve端点でX範囲を上書き（BBoxは柱を貫通するため）
+                double bboxMinX = minX, bboxMaxX = maxX;
                 var fi = element as FamilyInstance;
                 if (fi != null)
                 {
@@ -109,6 +110,14 @@ namespace Tools28.Commands.FireProtection
                         maxX = Math.Max(vs.X, ve.X);
                     }
                 }
+                try
+                {
+                    System.IO.File.AppendAllText(@"C:\temp\FireProtection_debug.txt",
+                        $"  梁X: bbox=({bboxMinX * 304.8:F0},{bboxMaxX * 304.8:F0})" +
+                        $" loc=({minX * 304.8:F0},{maxX * 304.8:F0})" +
+                        $" diff=({(bboxMinX - minX) * 304.8:F0},{(bboxMaxX - maxX) * 304.8:F0})\n");
+                }
+                catch { }
                 // Y方向のみoffset適用
                 minY -= offsetFeet;
                 maxY += offsetFeet;
