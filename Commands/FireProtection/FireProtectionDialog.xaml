@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="耐火被覆 色分け"
         Width="640"
-        Height="580"
+        Height="640"
         WindowStartupLocation="CenterScreen"
         Background="#F5F5F5"
         KeyDown="Window_KeyDown">
