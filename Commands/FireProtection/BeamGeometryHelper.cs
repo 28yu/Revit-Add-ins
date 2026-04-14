@@ -94,10 +94,9 @@ namespace Tools28.Commands.FireProtection
             }
             else
             {
-                // 梁: X方向を2*offset縮小（BBoxが柱面+αを超えて延びる分を補正）
-                // Y方向のみoffset適用
-                minX += 2 * offsetFeet;
-                maxX -= 2 * offsetFeet;
+                // 梁: 全方向にoffset適用（隣接梁と柱位置で重なりboolean unionで統合）
+                minX -= offsetFeet;
+                maxX += offsetFeet;
                 minY -= offsetFeet;
                 maxY += offsetFeet;
             }
