@@ -350,14 +350,25 @@ namespace Tools28.Commands.FireProtection
 
                                     if (canAdd)
                                     {
-                                        var vp = Viewport.Create(
+                                        // 凡例ビューの存在確認
+                                        var legendView = doc.GetElement(legendViewId);
+                                        int vpCountBefore = new FilteredElementCollector(doc, sheet.Id)
+                                            .OfClass(typeof(Viewport)).GetElementCount();
+
+                                        Viewport vp = Viewport.Create(
                                             doc, sheet.Id, legendViewId, position);
+
+                                        int vpCountAfter = new FilteredElementCollector(doc, sheet.Id)
+                                            .OfClass(typeof(Viewport)).GetElementCount();
 
                                         try
                                         {
+                                            string vpInfo = vp != null
+                                                ? $"Id={vp.Id.IntegerValue}"
+                                                : "NULL";
                                             System.IO.File.AppendAllText(
                                                 @"C:\temp\FireProtection_debug.txt",
-                                                $"  凡例配置完了: VP={vp?.Id?.IntegerValue} pos=({position.X * 304.8:F0},{position.Y * 304.8:F0})\n");
+                                                $"  VP={vpInfo} viewExists={legendView != null} vpBefore={vpCountBefore} vpAfter={vpCountAfter}\n");
                                         }
                                         catch { }
                                     }
