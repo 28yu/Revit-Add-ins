@@ -20,10 +20,10 @@ namespace Tools28.Commands.FireProtection
         {
             if (view.ViewType == ViewType.Section)
             {
-                // 梁: offset分だけ水平延長（柱gapをカバー、端部の飛び出しを最小化）
+                // 梁: 水平延長なし（BBox同士の重なりでboolean unionが統合）
                 bool isBeam = element.Category.Id.IntegerValue ==
                     (int)BuiltInCategory.OST_StructuralFraming;
-                double hExt = isBeam ? offsetFeet : 0;
+                double hExt = 0;
                 return GetOutlineForSectionView(element, view, offsetFeet, hExt);
             }
 
