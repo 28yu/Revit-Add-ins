@@ -313,18 +313,24 @@ namespace Tools28.Commands.FireProtection
                                 elementsByType[value].Add(elem);
                             }
 
+                            // 柱リスト: viewColumnsが空ならドキュメント全柱
+                            var colsForClip = viewColumns.Count > 0 ? viewColumns
+                                : new FilteredElementCollector(doc)
+                                    .OfCategory(BuiltInCategory.OST_StructuralColumns)
+                                    .WhereElementIsNotElementType()
+                                    .Cast<Element>().ToList();
+
                             // 断面ビュー: 柱位置でフレーム境界を計算
                             double sClipMin = double.NaN, sClipMax = double.NaN;
-                            if (view.ViewType == ViewType.Section && viewColumns.Count > 0)
+                            if (view.ViewType == ViewType.Section && colsForClip.Count > 0)
                             {
                                 try
                                 {
                                     Transform vInv = view.CropBox.Transform.Inverse;
                                     double cMinVX = double.MaxValue, cMaxVX = double.MinValue;
 
-                                    foreach (var col in viewColumns)
+                                    foreach (var col in colsForClip)
                                     {
-                                        // 柱BBox全頂点をビュー座標に変換してX範囲取得
                                         BoundingBoxXYZ cbb = col.get_BoundingBox(view)
                                             ?? col.get_BoundingBox(null);
                                         if (cbb == null) continue;
@@ -362,7 +368,7 @@ namespace Tools28.Commands.FireProtection
 
                             // 断面ビュー: 柱を梁オフセット端でクリップして配置
                             if (view.ViewType == ViewType.Section &&
-                                viewColumns.Count > 0 && paramName != null)
+                                colsForClip.Count > 0 && paramName != null)
                             {
                                 // 平行梁のBBoxリストのみ収集（柱クリップ用）
                                 // viewTargetsには直交梁が除外済み
@@ -403,19 +409,13 @@ namespace Tools28.Commands.FireProtection
                             }
 
                             // 柱枠型塗潰領域（平面/天伏/構造伏のみ）
-                            // 天伏ではviewColumnsが空の場合があるため、ドキュメント全体の柱も参照
-                            var colsForFrame = viewColumns.Count > 0 ? viewColumns
-                                : new FilteredElementCollector(doc)
-                                    .OfCategory(BuiltInCategory.OST_StructuralColumns)
-                                    .WhereElementIsNotElementType()
-                                    .Cast<Element>().ToList();
                             if (view.ViewType != ViewType.Section &&
-                                colsForFrame.Count > 0 && paramName != null)
+                                colsForClip.Count > 0 && paramName != null)
                             {
                                 double aFeet = settings.ColumnA_mm / 304.8;
                                 double bFeet = settings.ColumnB_mm / 304.8;
                                 regionCount += FilledRegionCreator.CreateColumnFrameRegions(
-                                    doc, view, colsForFrame, paramName,
+                                    doc, view, colsForClip, paramName,
                                     aFeet, bFeet,
                                     settings.FillPatternId, settings.LineStyleId,
                                     settings.Types, settings.OverwriteExisting);
