@@ -57,16 +57,16 @@ namespace Tools28.Commands.FireProtection
                 if (textNoteTypeId == null) return draftingView.Id;
 
                 double textHeight = GetTextHeight(doc, textNoteTypeId);
-                double rectW = textHeight * 2.8;  // 横長
-                double rectH = textHeight * 1.4;  // 縦
+                double rectW = textHeight * 2.8;
+                double rectH = textHeight * 1.4;
                 double textOffsetX = rectW + textHeight * 0.6;
-                double rowSpacing = textHeight * 0.3;
-                double titleGap = textHeight * 2.0;
+                double rowSpacing = textHeight * 0.15;
+                double titleGap = textHeight * 2.5;
                 double textYOffset = (rectH + textHeight) / 2 + textHeight * 0.15;
                 double rowPitch = rectH + rowSpacing;
-                double framePadX = textHeight * 0.3;  // 囲い線パディング
-                double framePadY = textHeight * 0.2;
-                double frameWidth = textHeight * 18;  // 囲い線の幅
+                double framePadX = textHeight * 0.3;
+                double framePadY = textHeight * 0.15;
+                double frameWidth = textHeight * 18;
 
                 double curY = 0;
 
@@ -75,13 +75,17 @@ namespace Tools28.Commands.FireProtection
                     "\u25ce\u8010\u706b\u88ab\u8986\u4ed5\u69d8\u51e1\u4f8b", textNoteTypeId);
                 curY -= (textHeight + titleGap);
 
-                // 梁の行（囲い線付き）
-                double beamSectionTop = curY + framePadY;
+                // 梁の行（各行に囲い線）
                 for (int i = 0; i < types.Count; i++)
                 {
                     var entry = types[i];
                     Color color = new Color(entry.ColorR, entry.ColorG, entry.ColorB);
                     double rowY = curY - rowPitch * i;
+
+                    // 行ごとの囲い線
+                    CreateBorderLines(doc, draftingView.Id,
+                        -framePadX, rowY - framePadY,
+                        frameWidth, rowY + rectH + framePadY);
 
                     string viewTypeName = FilledRegionCreator.TypePrefix + entry.Name;
                     CreateColoredRectangle(doc, draftingView.Id,
@@ -92,20 +96,20 @@ namespace Tools28.Commands.FireProtection
                         new XYZ(framePadX + textOffsetX, rowY + textYOffset, 0),
                         entry.Name, textNoteTypeId);
                 }
-                double beamSectionBottom = curY - rowPitch * (types.Count - 1) - framePadY;
-                // 梁セクション囲い線
-                CreateBorderLines(doc, draftingView.Id,
-                    -framePadX, beamSectionBottom, frameWidth, beamSectionTop);
-                curY = beamSectionBottom - rowSpacing * 2;
+                curY -= rowPitch * types.Count + rowSpacing;
 
-                // 柱枠型の行（囲い線付き）
+                // 柱枠型の行（各行に囲い線）
                 if (includeColumnFrame && columnA_feet > 0 && columnB_feet > 0)
                 {
-                    double colSectionTop = curY + framePadY;
                     for (int i = 0; i < types.Count; i++)
                     {
                         var entry = types[i];
                         double rowY = curY - rowPitch * i;
+
+                        // 行ごとの囲い線
+                        CreateBorderLines(doc, draftingView.Id,
+                            -framePadX, rowY - framePadY,
+                            frameWidth, rowY + rectH + framePadY);
 
                         string colTypeName = FilledRegionCreator.TypePrefix + "柱_" + entry.Name;
                         double outerHalf = rectH / 2.0;
@@ -120,10 +124,7 @@ namespace Tools28.Commands.FireProtection
                             new XYZ(framePadX + textOffsetX, rowY + textYOffset, 0),
                             $"\u67f1\uff1a{entry.Name}", textNoteTypeId);
                     }
-                    double colSectionBottom = curY - rowPitch * (types.Count - 1) - framePadY;
-                    CreateBorderLines(doc, draftingView.Id,
-                        -framePadX, colSectionBottom, frameWidth, colSectionTop);
-                    curY = colSectionBottom;
+                    curY -= rowPitch * types.Count;
                 }
 
                 // 注記セクション
