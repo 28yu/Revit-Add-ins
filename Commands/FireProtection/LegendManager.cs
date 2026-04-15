@@ -57,15 +57,17 @@ namespace Tools28.Commands.FireProtection
                 if (textNoteTypeId == null) return draftingView.Id;
 
                 double textHeight = GetTextHeight(doc, textNoteTypeId);
-                double rectW = textHeight * 5.0;
-                double rectH = textHeight * 1.8;
-                double pad = textHeight * 0.35;       // 四周均等余白
-                double colDivX = rectW + pad * 2;     // 列区切り縦線
+                double mmToFt = 1.0 / 304.8;
+                double colDivX = 20.0 * mmToFt;          // 左端から20mm = 列区切り縦線
+                double frameWidth = colDivX + 75.0 * mmToFt; // 列区切りから75mm = 右端
+                double rowH = 10.0 * mmToFt;              // 各行の高さ10mm
+                double pad = (rowH - textHeight * 1.2) / 2; // 上下余白
+                if (pad < 0.5 * mmToFt) pad = 0.5 * mmToFt;
+                double rectW = colDivX - pad * 2;         // 色四角幅
+                double rectH = rowH - pad * 2;            // 色四角高さ
                 double textOffsetX = colDivX + pad;
-                double rowH = rectH + pad * 2;        // 行高さ = 四角 + 上下余白
                 double titleGap = textHeight * 1.2;
-                double textYOffset = rowH / 2.0 + textHeight * 0.5; // 行の上下中央
-                double frameWidth = textHeight * 24;
+                double textYOffset = rowH / 2.0 + textHeight / 2.0;
 
                 double curY = 0;
 
@@ -99,9 +101,10 @@ namespace Tools28.Commands.FireProtection
                         solidFillPatternId, color, viewTypeName,
                         pad, rowBottom + pad, rectW, rectH);
 
-                    TextNote.Create(doc, draftingView.Id,
-                        new XYZ(textOffsetX, rowBottom + textYOffset, 0),
+                    var tn = TextNote.Create(doc, draftingView.Id,
+                        new XYZ(textOffsetX, rowBottom + rowH / 2.0, 0),
                         entry.Name, textNoteTypeId);
+                    tn.VerticalAlignment = VerticalTextAlignment.Middle;
 
                     curY = rowBottom;
                 }
@@ -124,9 +127,10 @@ namespace Tools28.Commands.FireProtection
                             pad + rectW / 2.0, rowBottom + pad + rectH / 2.0,
                             outerHalf, innerHalf);
 
-                        TextNote.Create(doc, draftingView.Id,
-                            new XYZ(textOffsetX, rowBottom + textYOffset, 0),
+                        var ctn = TextNote.Create(doc, draftingView.Id,
+                            new XYZ(textOffsetX, rowBottom + rowH / 2.0, 0),
                             $"\u67f1\uff1a{entry.Name}", textNoteTypeId);
+                        ctn.VerticalAlignment = VerticalTextAlignment.Middle;
 
                         curY = rowBottom;
                     }
