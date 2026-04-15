@@ -59,14 +59,13 @@ namespace Tools28.Commands.FireProtection
                 double textHeight = GetTextHeight(doc, textNoteTypeId);
                 double rectW = textHeight * 2.8;
                 double rectH = textHeight * 1.4;
-                double textOffsetX = rectW + textHeight * 0.6;
-                double rowSpacing = textHeight * 0.15;
-                double titleGap = textHeight * 2.5;
-                double textYOffset = (rectH + textHeight) / 2 + textHeight * 0.15;
-                double rowPitch = rectH + rowSpacing;
-                double framePadX = textHeight * 0.3;
-                double framePadY = textHeight * 0.15;
-                double frameWidth = textHeight * 18;
+                double cellPad = textHeight * 0.4;   // 四角と囲い線の間隔
+                double colDivX = rectW + cellPad * 2; // 色四角列の右端（縦線位置）
+                double textOffsetX = colDivX + cellPad;
+                double rowH = rectH + cellPad * 2;    // 行の高さ（四角+上下パディング）
+                double titleGap = textHeight * 3.0;
+                double textYOffset = cellPad + (rectH + textHeight) / 2 + textHeight * 0.15;
+                double frameWidth = textHeight * 20;
 
                 double curY = 0;
 
@@ -75,41 +74,46 @@ namespace Tools28.Commands.FireProtection
                     "\u25ce\u8010\u706b\u88ab\u8986\u4ed5\u69d8\u51e1\u4f8b", textNoteTypeId);
                 curY -= (textHeight + titleGap);
 
-                // 梁の行（各行に囲い線）
+                // 全行数を計算
+                int totalRows = types.Count;
+                if (includeColumnFrame && columnA_feet > 0 && columnB_feet > 0)
+                    totalRows += types.Count;
+
+                double tableTop = curY;
+                double tableLeft = 0;
+                double tableRight = frameWidth;
+
+                // 表の外枠（上線）
+                var vw = doc.GetElement(draftingView.Id) as View;
+
+                // 梁の行
                 for (int i = 0; i < types.Count; i++)
                 {
                     var entry = types[i];
                     Color color = new Color(entry.ColorR, entry.ColorG, entry.ColorB);
-                    double rowY = curY - rowPitch * i;
-
-                    // 行ごとの囲い線
-                    CreateBorderLines(doc, draftingView.Id,
-                        -framePadX, rowY - framePadY,
-                        frameWidth, rowY + rectH + framePadY);
+                    double rowTop = curY;
+                    double rowBottom = curY - rowH;
 
                     string viewTypeName = FilledRegionCreator.TypePrefix + entry.Name;
                     CreateColoredRectangle(doc, draftingView.Id,
                         solidFillPatternId, color, viewTypeName,
-                        framePadX, rowY, rectW, rectH);
+                        cellPad, rowBottom + cellPad, rectW, rectH);
 
                     TextNote.Create(doc, draftingView.Id,
-                        new XYZ(framePadX + textOffsetX, rowY + textYOffset, 0),
+                        new XYZ(textOffsetX, rowBottom + textYOffset, 0),
                         entry.Name, textNoteTypeId);
-                }
-                curY -= rowPitch * types.Count + rowSpacing;
 
-                // 柱枠型の行（各行に囲い線）
+                    curY = rowBottom;
+                }
+
+                // 柱枠型の行
                 if (includeColumnFrame && columnA_feet > 0 && columnB_feet > 0)
                 {
                     for (int i = 0; i < types.Count; i++)
                     {
                         var entry = types[i];
-                        double rowY = curY - rowPitch * i;
-
-                        // 行ごとの囲い線
-                        CreateBorderLines(doc, draftingView.Id,
-                            -framePadX, rowY - framePadY,
-                            frameWidth, rowY + rectH + framePadY);
+                        double rowTop = curY;
+                        double rowBottom = curY - rowH;
 
                         string colTypeName = FilledRegionCreator.TypePrefix + "柱_" + entry.Name;
                         double outerHalf = rectH / 2.0;
@@ -117,14 +121,46 @@ namespace Tools28.Commands.FireProtection
                         Color colColor = new Color(entry.ColColorR, entry.ColColorG, entry.ColColorB);
                         CreateFrameRectangle(doc, draftingView.Id,
                             solidFillPatternId, colColor, colTypeName,
-                            framePadX + rectW / 2.0, rowY + rectH / 2.0,
+                            cellPad + rectW / 2.0, rowBottom + cellPad + rectH / 2.0,
                             outerHalf, innerHalf);
 
                         TextNote.Create(doc, draftingView.Id,
-                            new XYZ(framePadX + textOffsetX, rowY + textYOffset, 0),
+                            new XYZ(textOffsetX, rowBottom + textYOffset, 0),
                             $"\u67f1\uff1a{entry.Name}", textNoteTypeId);
+
+                        curY = rowBottom;
                     }
-                    curY -= rowPitch * types.Count;
+                }
+
+                double tableBottom = curY;
+
+                // 表のグリッド線（Excelセル表形式）
+                if (vw != null)
+                {
+                    try
+                    {
+                        // 横線（各行の境界 + 上端 + 下端）
+                        double y = tableTop;
+                        for (int i = 0; i <= totalRows; i++)
+                        {
+                            doc.Create.NewDetailCurve(vw, Line.CreateBound(
+                                new XYZ(tableLeft, y, 0),
+                                new XYZ(tableRight, y, 0)));
+                            y -= rowH;
+                        }
+
+                        // 縦線（左端、色四角列右端、右端）
+                        doc.Create.NewDetailCurve(vw, Line.CreateBound(
+                            new XYZ(tableLeft, tableTop, 0),
+                            new XYZ(tableLeft, tableBottom, 0)));
+                        doc.Create.NewDetailCurve(vw, Line.CreateBound(
+                            new XYZ(colDivX, tableTop, 0),
+                            new XYZ(colDivX, tableBottom, 0)));
+                        doc.Create.NewDetailCurve(vw, Line.CreateBound(
+                            new XYZ(tableRight, tableTop, 0),
+                            new XYZ(tableRight, tableBottom, 0)));
+                    }
+                    catch { }
                 }
 
                 // 注記セクション
@@ -166,32 +202,6 @@ namespace Tools28.Commands.FireProtection
             {
                 return null;
             }
-        }
-
-        /// <summary>
-        /// 囲い線（枠線）を作成
-        /// </summary>
-        private static void CreateBorderLines(
-            Document doc, ElementId viewId,
-            double left, double bottom, double right, double top)
-        {
-            try
-            {
-                XYZ p0 = new XYZ(left, bottom, 0);
-                XYZ p1 = new XYZ(right, bottom, 0);
-                XYZ p2 = new XYZ(right, top, 0);
-                XYZ p3 = new XYZ(left, top, 0);
-
-                var view = doc.GetElement(viewId) as View;
-                if (view != null)
-                {
-                    doc.Create.NewDetailCurve(view, Line.CreateBound(p0, p1));
-                    doc.Create.NewDetailCurve(view, Line.CreateBound(p1, p2));
-                    doc.Create.NewDetailCurve(view, Line.CreateBound(p2, p3));
-                    doc.Create.NewDetailCurve(view, Line.CreateBound(p3, p0));
-                }
-            }
-            catch { }
         }
 
         private static void CreateColoredRectangle(
