@@ -57,12 +57,16 @@ namespace Tools28.Commands.FireProtection
                 if (textNoteTypeId == null) return draftingView.Id;
 
                 double textHeight = GetTextHeight(doc, textNoteTypeId);
-                double rectSize = textHeight * 1.5;
-                double textOffsetX = rectSize + textHeight * 0.5;
-                double rowSpacing = textHeight * 0.4;
-                double titleGap = textHeight * 1.2;
-                double textYOffset = (rectSize + textHeight) / 2 + textHeight * 0.15;
-                double rowPitch = rectSize + rowSpacing;
+                double rectW = textHeight * 2.8;  // 横長
+                double rectH = textHeight * 1.4;  // 縦
+                double textOffsetX = rectW + textHeight * 0.6;
+                double rowSpacing = textHeight * 0.3;
+                double titleGap = textHeight * 2.0;
+                double textYOffset = (rectH + textHeight) / 2 + textHeight * 0.15;
+                double rowPitch = rectH + rowSpacing;
+                double framePadX = textHeight * 0.3;  // 囲い線パディング
+                double framePadY = textHeight * 0.2;
+                double frameWidth = textHeight * 18;  // 囲い線の幅
 
                 double curY = 0;
 
@@ -71,7 +75,8 @@ namespace Tools28.Commands.FireProtection
                     "\u25ce\u8010\u706b\u88ab\u8986\u4ed5\u69d8\u51e1\u4f8b", textNoteTypeId);
                 curY -= (textHeight + titleGap);
 
-                // 梁の行
+                // 梁の行（囲い線付き）
+                double beamSectionTop = curY + framePadY;
                 for (int i = 0; i < types.Count; i++)
                 {
                     var entry = types[i];
@@ -81,36 +86,44 @@ namespace Tools28.Commands.FireProtection
                     string viewTypeName = FilledRegionCreator.TypePrefix + entry.Name;
                     CreateColoredRectangle(doc, draftingView.Id,
                         solidFillPatternId, color, viewTypeName,
-                        0, rowY, rectSize, rectSize);
+                        framePadX, rowY, rectW, rectH);
 
                     TextNote.Create(doc, draftingView.Id,
-                        new XYZ(textOffsetX, rowY + textYOffset, 0),
+                        new XYZ(framePadX + textOffsetX, rowY + textYOffset, 0),
                         entry.Name, textNoteTypeId);
                 }
-                curY -= rowPitch * types.Count + rowSpacing;
+                double beamSectionBottom = curY - rowPitch * (types.Count - 1) - framePadY;
+                // 梁セクション囲い線
+                CreateBorderLines(doc, draftingView.Id,
+                    -framePadX, beamSectionBottom, frameWidth, beamSectionTop);
+                curY = beamSectionBottom - rowSpacing * 2;
 
-                // 柱枠型の行
+                // 柱枠型の行（囲い線付き）
                 if (includeColumnFrame && columnA_feet > 0 && columnB_feet > 0)
                 {
+                    double colSectionTop = curY + framePadY;
                     for (int i = 0; i < types.Count; i++)
                     {
                         var entry = types[i];
                         double rowY = curY - rowPitch * i;
 
                         string colTypeName = FilledRegionCreator.TypePrefix + "柱_" + entry.Name;
-                        double outerHalf = rectSize / 2.0;
+                        double outerHalf = rectH / 2.0;
                         double innerHalf = outerHalf * 0.55;
                         Color colColor = new Color(entry.ColColorR, entry.ColColorG, entry.ColColorB);
                         CreateFrameRectangle(doc, draftingView.Id,
                             solidFillPatternId, colColor, colTypeName,
-                            rectSize / 2.0, rowY + rectSize / 2.0,
+                            framePadX + rectW / 2.0, rowY + rectH / 2.0,
                             outerHalf, innerHalf);
 
                         TextNote.Create(doc, draftingView.Id,
-                            new XYZ(textOffsetX, rowY + textYOffset, 0),
+                            new XYZ(framePadX + textOffsetX, rowY + textYOffset, 0),
                             $"\u67f1\uff1a{entry.Name}", textNoteTypeId);
                     }
-                    curY -= rowPitch * types.Count;
+                    double colSectionBottom = curY - rowPitch * (types.Count - 1) - framePadY;
+                    CreateBorderLines(doc, draftingView.Id,
+                        -framePadX, colSectionBottom, frameWidth, colSectionTop);
+                    curY = colSectionBottom;
                 }
 
                 // 注記セクション
@@ -152,6 +165,32 @@ namespace Tools28.Commands.FireProtection
             {
                 return null;
             }
+        }
+
+        /// <summary>
+        /// 囲い線（枠線）を作成
+        /// </summary>
+        private static void CreateBorderLines(
+            Document doc, ElementId viewId,
+            double left, double bottom, double right, double top)
+        {
+            try
+            {
+                XYZ p0 = new XYZ(left, bottom, 0);
+                XYZ p1 = new XYZ(right, bottom, 0);
+                XYZ p2 = new XYZ(right, top, 0);
+                XYZ p3 = new XYZ(left, top, 0);
+
+                var view = doc.GetElement(viewId) as View;
+                if (view != null)
+                {
+                    doc.Create.NewDetailCurve(view, Line.CreateBound(p0, p1));
+                    doc.Create.NewDetailCurve(view, Line.CreateBound(p1, p2));
+                    doc.Create.NewDetailCurve(view, Line.CreateBound(p2, p3));
+                    doc.Create.NewDetailCurve(view, Line.CreateBound(p3, p0));
+                }
+            }
+            catch { }
         }
 
         private static void CreateColoredRectangle(
