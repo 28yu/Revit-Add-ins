@@ -57,15 +57,15 @@ namespace Tools28.Commands.FireProtection
                 if (textNoteTypeId == null) return draftingView.Id;
 
                 double textHeight = GetTextHeight(doc, textNoteTypeId);
-                double rectW = textHeight * 2.8;
-                double rectH = textHeight * 1.4;
-                double cellPad = textHeight * 0.4;   // 四角と囲い線の間隔
+                double rectW = textHeight * 4.0;     // 色四角幅（大きく）
+                double rectH = textHeight * 2.0;     // 色四角高さ（大きく）
+                double cellPad = textHeight * 0.6;   // 四角と囲い線の間隔（広く）
                 double colDivX = rectW + cellPad * 2; // 色四角列の右端（縦線位置）
                 double textOffsetX = colDivX + cellPad;
                 double rowH = rectH + cellPad * 2;    // 行の高さ（四角+上下パディング）
-                double titleGap = textHeight * 3.0;
+                double titleGap = textHeight * 5.0;   // タイトルと表の間隔（広く）
                 double textYOffset = cellPad + (rectH + textHeight) / 2 + textHeight * 0.15;
-                double frameWidth = textHeight * 20;
+                double frameWidth = textHeight * 22;
 
                 double curY = 0;
 
