@@ -57,14 +57,15 @@ namespace Tools28.Commands.FireProtection
                 if (textNoteTypeId == null) return draftingView.Id;
 
                 double textHeight = GetTextHeight(doc, textNoteTypeId);
-                double rectW = textHeight * 5.0;     // 色四角幅（大きく）
-                double rectH = textHeight * 1.8;     // 色四角高さ
-                double cellPad = textHeight * 0.25;  // 四角と囲い線の余白（小さく）
-                double colDivX = rectW + cellPad * 2; // 列区切り縦線位置
+                double rectW = textHeight * 5.0;
+                double rectH = textHeight * 1.8;
+                double cellPad = textHeight * 0.25;
+                double colDivX = rectW + cellPad * 2;
                 double textOffsetX = colDivX + cellPad * 1.5;
-                double rowH = rectH + cellPad * 2;
-                double titleGap = textHeight * 2.0;   // タイトルと表の間隔（小さく）
-                double textYOffset = cellPad + (rectH + textHeight) / 2 + textHeight * 0.15;
+                double rowH = rectH + cellPad * 5;
+                double titleGap = textHeight * 1.2;
+                double rectPadY = (rowH - rectH) / 2;
+                double textYOffset = rectPadY + (rectH + textHeight) / 2 + textHeight * 0.15;
                 double frameWidth = textHeight * 24;
 
                 double curY = 0;
@@ -97,7 +98,7 @@ namespace Tools28.Commands.FireProtection
                     string viewTypeName = FilledRegionCreator.TypePrefix + entry.Name;
                     CreateColoredRectangle(doc, draftingView.Id,
                         solidFillPatternId, color, viewTypeName,
-                        cellPad, rowBottom + cellPad, rectW, rectH);
+                        cellPad, rowBottom + rectPadY, rectW, rectH);
 
                     TextNote.Create(doc, draftingView.Id,
                         new XYZ(textOffsetX, rowBottom + textYOffset, 0),
@@ -121,7 +122,7 @@ namespace Tools28.Commands.FireProtection
                         Color colColor = new Color(entry.ColColorR, entry.ColColorG, entry.ColColorB);
                         CreateFrameRectangle(doc, draftingView.Id,
                             solidFillPatternId, colColor, colTypeName,
-                            cellPad + rectW / 2.0, rowBottom + cellPad + rectH / 2.0,
+                            cellPad + rectW / 2.0, rowBottom + rectPadY + rectH / 2.0,
                             outerHalf, innerHalf);
 
                         TextNote.Create(doc, draftingView.Id,
@@ -178,7 +179,7 @@ namespace Tools28.Commands.FireProtection
                     TextNote.Create(doc, draftingView.Id,
                         new XYZ(0, curY, 0), block, textNoteTypeId);
                     int lineCount = block.Split('\n').Length;
-                    curY -= textHeight * 1.4 * lineCount + textHeight * 0.5;
+                    curY -= textHeight * 1.5 * lineCount + textHeight * 1.0;
                 }
 
                 return draftingView.Id;
@@ -248,8 +249,22 @@ namespace Tools28.Commands.FireProtection
             inner.Append(Line.CreateBound(i3, i0));
             inner.Flip();
 
-            FilledRegion.Create(doc, regionTypeId, viewId,
+            var fr = FilledRegion.Create(doc, regionTypeId, viewId,
                 new List<CurveLoop> { outer, inner });
+
+            // 柱枠の境界線を非表示に
+            try
+            {
+                var invisStyle = new FilteredElementCollector(doc)
+                    .OfClass(typeof(GraphicsStyle))
+                    .Cast<GraphicsStyle>()
+                    .FirstOrDefault(gs =>
+                        gs.GraphicsStyleType == GraphicsStyleType.Projection &&
+                        (gs.Name.Contains("非表示") || gs.Name.Contains("Invisible")));
+                if (invisStyle != null)
+                    fr.SetLineStyleId(invisStyle.Id);
+            }
+            catch { }
         }
 
         private static ElementId GetOrCreateFilledRegionType(
