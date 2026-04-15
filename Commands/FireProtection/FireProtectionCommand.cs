@@ -460,7 +460,7 @@ namespace Tools28.Commands.FireProtection
 
                                             // 右上固定: VP右端=シート右端-margin, VP上端=シート上端-margin
                                             double targetRight = outline.Max.U - margin;
-                                            double targetTop = outline.Max.V - margin + 15.0 / 304.8;
+                                            double targetTop = outline.Max.V - margin + 45.0 / 304.8;
 
                                             double newCX = targetRight - vpW / 2.0;
                                             double newCY = targetTop - vpH / 2.0;
