@@ -58,16 +58,15 @@ namespace Tools28.Commands.FireProtection
 
                 double textHeight = GetTextHeight(doc, textNoteTypeId);
                 double mmToFt = 1.0 / 304.8;
-                double colDivX = 20.0 * mmToFt;          // 左端から20mm = 列区切り縦線
-                double frameWidth = colDivX + 75.0 * mmToFt; // 列区切りから75mm = 右端
-                double rowH = 10.0 * mmToFt;              // 各行の高さ10mm
-                double pad = (rowH - textHeight * 1.2) / 2; // 上下余白
-                if (pad < 0.5 * mmToFt) pad = 0.5 * mmToFt;
-                double rectW = colDivX - pad * 2;         // 色四角幅
-                double rectH = rowH - pad * 2;            // 色四角高さ
+                double colDivX = 20.0 * mmToFt;
+                double frameWidth = colDivX + 75.0 * mmToFt;
+                double rowH = 10.0 * mmToFt;
+                double pad = 1.0 * mmToFt;                // 四周1mm余白
+                double rectW = colDivX - pad * 2;          // 色四角幅 = 20mm - 2mm = 18mm
+                double rectH = rowH - pad * 2;             // 色四角高さ = 10mm - 2mm = 8mm
                 double textOffsetX = colDivX + pad;
                 double titleGap = textHeight * 1.2;
-                double textYOffset = rowH / 2.0 + textHeight / 2.0;
+                double colFrameThick = 2.0 * mmToFt;      // 柱塗り潰し厚み2mm
 
                 double curY = 0;
 
@@ -120,7 +119,7 @@ namespace Tools28.Commands.FireProtection
 
                         string colTypeName = FilledRegionCreator.TypePrefix + "柱_" + entry.Name;
                         double outerHalf = rectH / 2.0;
-                        double innerHalf = outerHalf * 0.55;
+                        double innerHalf = outerHalf - colFrameThick; // 厚み2mm
                         Color colColor = new Color(entry.ColColorR, entry.ColColorG, entry.ColColorB);
                         CreateFrameRectangle(doc, draftingView.Id,
                             solidFillPatternId, colColor, colTypeName,
@@ -168,7 +167,7 @@ namespace Tools28.Commands.FireProtection
                 }
 
                 // 注記セクション（※毎に1つのTextNote）
-                curY -= pad * 4;
+                curY -= textHeight * 0.5; // 囲い線と定型文の間隔
 
                 var noteBlocks = new[]
                 {
@@ -182,7 +181,7 @@ namespace Tools28.Commands.FireProtection
                     TextNote.Create(doc, draftingView.Id,
                         new XYZ(0, curY, 0), block, textNoteTypeId);
                     int lineCount = block.Split('\n').Length;
-                    curY -= textHeight * 1.6 * lineCount + textHeight * 1.5;
+                    curY -= textHeight * 1.6 * lineCount + textHeight * 1.8;
                 }
 
                 return draftingView.Id;
