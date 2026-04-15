@@ -161,7 +161,7 @@
                     <Border Background="White" BorderBrush="#D3D3D3"
                             BorderThickness="1" CornerRadius="3" Padding="15,12" Margin="0,0,0,10">
                         <StackPanel>
-                            <TextBlock Style="{StaticResource SectionHeader}" Text="オフセット設定"/>
+                            <TextBlock Style="{StaticResource SectionHeader}" Text="塗り潰し領域のオフセット設定"/>
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                 <RadioButton x:Name="CommonOffsetRadio" Content="共通オフセット"
                                              GroupName="OffsetMode"
@@ -197,7 +197,7 @@
                             <TextBlock Style="{StaticResource SectionHeader}" Text="柱 耐火被覆設定"/>
                             <StackPanel Orientation="Horizontal">
                                 <!-- 左: 入力欄 -->
-                                <StackPanel Margin="0,0,40,0">
+                                <StackPanel Margin="0,0,60,0">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="140"/>
