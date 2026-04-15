@@ -440,7 +440,7 @@ namespace Tools28.Commands.FireProtection
                                 double margin = 50.0 / 304.8;
                                 XYZ position = new XYZ(
                                     outline.Max.U - margin,
-                                    outline.Min.V + margin + 30.0 / 304.8, 0);
+                                    outline.Max.V - margin, 0);
 
                                 Viewport vp = Viewport.Create(
                                     doc, sheet.Id, legendViewId, position);

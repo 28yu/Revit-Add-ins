@@ -59,7 +59,7 @@ namespace Tools28.Commands.FireProtection
                 double textHeight = GetTextHeight(doc, textNoteTypeId);
                 double mmToFt = 1.0 / 304.8;
                 double colDivX = 20.0 * mmToFt;
-                double frameWidth = colDivX + 75.0 * mmToFt;
+                double frameWidth = colDivX + 65.0 * mmToFt;
                 double rowH = 10.0 * mmToFt;
                 double pad = 1.0 * mmToFt;                // 四周1mm余白
                 double rectW = colDivX - pad * 2;          // 色四角幅 = 20mm - 2mm = 18mm
@@ -181,7 +181,7 @@ namespace Tools28.Commands.FireProtection
                     TextNote.Create(doc, draftingView.Id,
                         new XYZ(0, curY, 0), block, textNoteTypeId);
                     int lineCount = block.Split('\n').Length;
-                    curY -= textHeight * 1.6 * lineCount + textHeight * 1.8;
+                    curY -= textHeight * 1.6 * lineCount + textHeight * 2.2;
                 }
 
                 return draftingView.Id;
