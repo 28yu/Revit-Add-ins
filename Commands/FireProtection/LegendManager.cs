@@ -10,7 +10,7 @@ namespace Tools28.Commands.FireProtection
     /// </summary>
     public static class LegendManager
     {
-        private const string LegendViewName = "耐火被覆色分け凡例";
+        private const string LegendViewName = "耐火被覆色分け凡例"; // 凡例ビュー名
 
         public static ElementId CreateLegendDraftingView(
             Document doc,
