@@ -458,7 +458,7 @@ namespace Tools28.Commands.FireProtection
                                             double vpW = vpBB.Max.X - vpBB.Min.X;
                                             double vpH = vpBB.Max.Y - vpBB.Min.Y;
 
-                                            // 右上固定: VP右端=シート右端-margin, VP上端=シート上端-margin
+                                            // 右上固定: VP右端=シート右端-margin, VP上端=シート上端-margin+45mm
                                             double targetRight = outline.Max.U - margin;
                                             double targetTop = outline.Max.V - margin + 45.0 / 304.8;
 
