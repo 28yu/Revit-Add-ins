@@ -462,7 +462,7 @@ namespace Tools28.Commands.FireProtection
                                 {
                                     System.IO.File.AppendAllText(
                                         @"C:\temp\FireProtection_debug.txt",
-                                        $"\n凡例配置: VP={vp?.Id?.IntegerValue} pos=({position.X * 304.8:F0},{position.Y * 304.8:F0})\n");
+                                        $"\n凡例配置: VP={vp?.Id?.IntegerValue} pos=({vpCX * 304.8:F0},{vpCY * 304.8:F0})\n");
                                 }
                                 catch { }
                             }
