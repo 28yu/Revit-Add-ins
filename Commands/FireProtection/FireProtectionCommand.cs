@@ -439,7 +439,7 @@ namespace Tools28.Commands.FireProtection
                                 BoundingBoxUV outline = sheet.Outline;
                                 double margin = 50.0 / 304.8;
                                 XYZ position = new XYZ(
-                                    outline.Max.U - margin - 30.0 / 304.8,
+                                    outline.Max.U - margin - 10.0 / 304.8,
                                     outline.Max.V - margin - 30.0 / 304.8, 0);
 
                                 Viewport vp = Viewport.Create(
