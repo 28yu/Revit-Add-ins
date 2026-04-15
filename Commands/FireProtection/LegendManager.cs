@@ -164,7 +164,7 @@ namespace Tools28.Commands.FireProtection
                 }
 
                 // 注記セクション
-                curY -= rowSpacing * 3;
+                curY -= cellPad * 3;
                 double noteH = textHeight * 1.4;
 
                 var noteLines = new[]
