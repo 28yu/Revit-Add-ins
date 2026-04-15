@@ -439,32 +439,33 @@ namespace Tools28.Commands.FireProtection
                                 BoundingBoxUV outline = sheet.Outline;
                                 double margin = 50.0 / 304.8;
 
-                                // まず右上に仮配置
-                                XYZ position = new XYZ(
-                                    outline.Max.U - margin - 10.0 / 304.8,
-                                    outline.Max.V - margin - 30.0 / 304.8, 0);
-
+                                // 凡例を右上固定で配置（右上角を基準に）
+                                // まず仮配置してBBoxサイズを取得
+                                XYZ tempPos = new XYZ(0, 0, 0);
                                 Viewport vp = Viewport.Create(
-                                    doc, sheet.Id, legendViewId, position);
+                                    doc, sheet.Id, legendViewId, tempPos);
 
-                                // VP配置後、上端がシートからはみ出す場合は下にずらす
                                 if (vp != null)
                                 {
                                     try
                                     {
                                         doc.Regenerate();
                                         BoundingBoxXYZ vpBB = vp.get_BoundingBox(activeView);
+                                        XYZ center = vp.GetBoxCenter();
+
                                         if (vpBB != null)
                                         {
-                                            double sheetTop = outline.Max.V - margin;
-                                            double vpTop = vpBB.Max.Y;
-                                            if (vpTop > sheetTop)
-                                            {
-                                                double shift = vpTop - sheetTop;
-                                                XYZ newCenter = vp.GetBoxCenter();
-                                                vp.SetBoxCenter(new XYZ(
-                                                    newCenter.X, newCenter.Y - shift, 0));
-                                            }
+                                            double vpW = vpBB.Max.X - vpBB.Min.X;
+                                            double vpH = vpBB.Max.Y - vpBB.Min.Y;
+
+                                            // 右上固定: VP右端=シート右端-margin, VP上端=シート上端-margin
+                                            double targetRight = outline.Max.U - margin;
+                                            double targetTop = outline.Max.V - margin;
+
+                                            double newCX = targetRight - vpW / 2.0;
+                                            double newCY = targetTop - vpH / 2.0;
+
+                                            vp.SetBoxCenter(new XYZ(newCX, newCY, 0));
                                         }
                                     }
                                     catch { }
