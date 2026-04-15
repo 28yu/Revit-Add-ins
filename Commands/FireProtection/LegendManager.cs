@@ -59,13 +59,12 @@ namespace Tools28.Commands.FireProtection
                 double textHeight = GetTextHeight(doc, textNoteTypeId);
                 double rectW = textHeight * 5.0;
                 double rectH = textHeight * 1.8;
-                double cellPad = textHeight * 0.25;
-                double colDivX = rectW + cellPad * 2;
-                double textOffsetX = colDivX + cellPad * 1.5;
-                double rowH = rectH + cellPad * 5;
+                double pad = textHeight * 0.35;       // 四周均等余白
+                double colDivX = rectW + pad * 2;     // 列区切り縦線
+                double textOffsetX = colDivX + pad;
+                double rowH = rectH + pad * 2;        // 行高さ = 四角 + 上下余白
                 double titleGap = textHeight * 1.2;
-                double rectPadY = (rowH - rectH) / 2;
-                double textYOffset = rectPadY + (rectH + textHeight) / 2 + textHeight * 0.15;
+                double textYOffset = rowH / 2.0 + textHeight * 0.5; // 行の上下中央
                 double frameWidth = textHeight * 24;
 
                 double curY = 0;
@@ -98,7 +97,7 @@ namespace Tools28.Commands.FireProtection
                     string viewTypeName = FilledRegionCreator.TypePrefix + entry.Name;
                     CreateColoredRectangle(doc, draftingView.Id,
                         solidFillPatternId, color, viewTypeName,
-                        cellPad, rowBottom + rectPadY, rectW, rectH);
+                        pad, rowBottom + pad, rectW, rectH);
 
                     TextNote.Create(doc, draftingView.Id,
                         new XYZ(textOffsetX, rowBottom + textYOffset, 0),
@@ -122,7 +121,7 @@ namespace Tools28.Commands.FireProtection
                         Color colColor = new Color(entry.ColColorR, entry.ColColorG, entry.ColColorB);
                         CreateFrameRectangle(doc, draftingView.Id,
                             solidFillPatternId, colColor, colTypeName,
-                            cellPad + rectW / 2.0, rowBottom + rectPadY + rectH / 2.0,
+                            pad + rectW / 2.0, rowBottom + pad + rectH / 2.0,
                             outerHalf, innerHalf);
 
                         TextNote.Create(doc, draftingView.Id,
@@ -165,7 +164,7 @@ namespace Tools28.Commands.FireProtection
                 }
 
                 // 注記セクション（※毎に1つのTextNote）
-                curY -= cellPad * 4;
+                curY -= pad * 4;
 
                 var noteBlocks = new[]
                 {
@@ -179,7 +178,7 @@ namespace Tools28.Commands.FireProtection
                     TextNote.Create(doc, draftingView.Id,
                         new XYZ(0, curY, 0), block, textNoteTypeId);
                     int lineCount = block.Split('\n').Length;
-                    curY -= textHeight * 1.5 * lineCount + textHeight * 1.0;
+                    curY -= textHeight * 1.6 * lineCount + textHeight * 1.5;
                 }
 
                 return draftingView.Id;
