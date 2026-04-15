@@ -181,7 +181,7 @@ namespace Tools28.Commands.FireProtection
                     TextNote.Create(doc, draftingView.Id,
                         new XYZ(0, curY, 0), block, textNoteTypeId);
                     int lineCount = block.Split('\n').Length;
-                    curY -= textHeight * 1.6 * lineCount + textHeight * 2.2;
+                    curY -= textHeight * 1.6 * lineCount + textHeight * 2.5;
                 }
 
                 return draftingView.Id;
