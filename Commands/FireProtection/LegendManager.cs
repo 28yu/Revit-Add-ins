@@ -57,15 +57,15 @@ namespace Tools28.Commands.FireProtection
                 if (textNoteTypeId == null) return draftingView.Id;
 
                 double textHeight = GetTextHeight(doc, textNoteTypeId);
-                double rectW = textHeight * 4.0;     // 色四角幅（大きく）
-                double rectH = textHeight * 2.0;     // 色四角高さ（大きく）
-                double cellPad = textHeight * 0.6;   // 四角と囲い線の間隔（広く）
-                double colDivX = rectW + cellPad * 2; // 色四角列の右端（縦線位置）
-                double textOffsetX = colDivX + cellPad;
-                double rowH = rectH + cellPad * 2;    // 行の高さ（四角+上下パディング）
-                double titleGap = textHeight * 5.0;   // タイトルと表の間隔（広く）
+                double rectW = textHeight * 5.0;     // 色四角幅（大きく）
+                double rectH = textHeight * 1.8;     // 色四角高さ
+                double cellPad = textHeight * 0.25;  // 四角と囲い線の余白（小さく）
+                double colDivX = rectW + cellPad * 2; // 列区切り縦線位置
+                double textOffsetX = colDivX + cellPad * 1.5;
+                double rowH = rectH + cellPad * 2;
+                double titleGap = textHeight * 2.0;   // タイトルと表の間隔（小さく）
                 double textYOffset = cellPad + (rectH + textHeight) / 2 + textHeight * 0.15;
-                double frameWidth = textHeight * 22;
+                double frameWidth = textHeight * 24;
 
                 double curY = 0;
 
@@ -163,37 +163,22 @@ namespace Tools28.Commands.FireProtection
                     catch { }
                 }
 
-                // 注記セクション
-                curY -= cellPad * 3;
-                double noteH = textHeight * 1.4;
+                // 注記セクション（※毎に1つのTextNote）
+                curY -= cellPad * 4;
 
-                var noteLines = new[]
+                var noteBlocks = new[]
                 {
-                    "\u203b\u8010\u706b\u88ab\u8986\u4e0d\u8981\u7bc4\u56f2",
-                    "\u3000\u30fb\u8010\u98a8\u6881\u3001ALC\u30fbECP\u958b\u53e3\u88dc\u5f37",
-                    "\u3000\u30fb\u5e8a\u3092\u53d7\u3051\u306a\u3044EV\u6881\u30fb\u9593\u67f1",
-                    "\u3000\u30fb\u968e\u6bb5\u53d7\u3051\u6881\u30fb\u67f1",
-                    "\u3000\u30fb\u6c34\u5e73\u30d6\u30ec\u30fc\u30b9",
-                    "",
-                    "\u203b\u534a\u6e7f\u5f0f\u5439\u4ed8\u30ed\u30c3\u30af\u30a6\u30fc\u30eb\u5de5\u6cd5\u306b\u5bfe\u3059\u308b\u30bb\u30e1\u30f3\u30c8\u30b9\u30e9\u30ea\u30fc\u5439\u4ed8",
-                    "\u3000\u306b\u3088\u308b\u8868\u9762\u786c\u5316\u51e6\u7406\u306f\u7bc4\u56f2",
-                    "\u3000\u30fbEV\u30b7\u30e3\u30d5\u30c8\u5185",
-                    "\u3000\u30fbEV\u6a5f\u68b0\u5ba4",
-                    "\u3000\u30fb\u96fb\u6c17\u5ba4",
-                    "\u3000\u30fb\u30b5\u30fc\u30d0\u30fc\u5ba4\u7b49",
-                    "\u3000\u30fb\u76f4\u5929\u4e95\u5ba4\u5185\u5916\u90e8\uff08\u30d4\u30ed\u30c6\u30a3\uff09",
-                    "",
+                    "\u203b\u8010\u706b\u88ab\u8986\u4e0d\u8981\u7bc4\u56f2\n\u3000\u30fb\u8010\u98a8\u6881\u3001ALC\u30fbECP\u958b\u53e3\u88dc\u5f37\n\u3000\u30fb\u5e8a\u3092\u53d7\u3051\u306a\u3044EV\u6881\u30fb\u9593\u67f1\n\u3000\u30fb\u968e\u6bb5\u53d7\u3051\u6881\u30fb\u67f1\n\u3000\u30fb\u6c34\u5e73\u30d6\u30ec\u30fc\u30b9",
+                    "\u203b\u534a\u6e7f\u5f0f\u5439\u4ed8\u30ed\u30c3\u30af\u30a6\u30fc\u30eb\u5de5\u6cd5\u306b\u5bfe\u3059\u308b\u30bb\u30e1\u30f3\u30c8\u30b9\u30e9\u30ea\u30fc\u5439\u4ed8\n\u3000\u306b\u3088\u308b\u8868\u9762\u786c\u5316\u51e6\u7406\u306f\u7bc4\u56f2\n\u3000\u30fbEV\u30b7\u30e3\u30d5\u30c8\u5185\n\u3000\u30fbEV\u6a5f\u68b0\u5ba4\n\u3000\u30fb\u96fb\u6c17\u5ba4\n\u3000\u30fb\u30b5\u30fc\u30d0\u30fc\u5ba4\u7b49\n\u3000\u30fb\u76f4\u5929\u4e95\u5ba4\u5185\u5916\u90e8\uff08\u30d4\u30ed\u30c6\u30a3\uff09",
                     "\u203b\u30b5\u30d3\u6b62\u3081\u7bc4\u56f2\u8a73\u7d30\u306f\u3001\u5225\u9014\u300c**\u9244\u5de5\u3000\u5857\u88c5\u7bc4\u56f2\u56f3\u300d\u53c2\u7167",
                 };
 
-                foreach (var line in noteLines)
+                foreach (var block in noteBlocks)
                 {
-                    if (line.Length > 0)
-                    {
-                        TextNote.Create(doc, draftingView.Id,
-                            new XYZ(0, curY, 0), line, textNoteTypeId);
-                    }
-                    curY -= noteH;
+                    TextNote.Create(doc, draftingView.Id,
+                        new XYZ(0, curY, 0), block, textNoteTypeId);
+                    int lineCount = block.Split('\n').Length;
+                    curY -= textHeight * 1.4 * lineCount + textHeight * 0.5;
                 }
 
                 return draftingView.Id;
