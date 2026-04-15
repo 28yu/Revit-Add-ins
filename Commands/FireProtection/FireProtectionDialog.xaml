@@ -231,35 +231,35 @@
                                 <!-- 右: プレビュー図 -->
                                 <Border BorderBrush="#CCC" BorderThickness="1"
                                         Padding="4" CornerRadius="2" Background="#FAFAFA">
-                                    <Canvas Width="140" Height="130">
-                                        <!-- 外側矩形 (A+B範囲) = 青塗り -->
-                                        <Rectangle Canvas.Left="10" Canvas.Top="25" Width="120" Height="100"
+                                    <Canvas Width="140" Height="140">
+                                        <!-- 外側矩形 (A+B範囲) = 青塗り 正方形 -->
+                                        <Rectangle Canvas.Left="10" Canvas.Top="25" Width="115" Height="115"
                                                    Fill="#2196F3" Stroke="#1976D2" StrokeThickness="1"/>
-                                        <!-- 内側矩形 (A範囲) = 白抜き -->
-                                        <Rectangle Canvas.Left="30" Canvas.Top="45" Width="80" Height="60"
+                                        <!-- 内側矩形 (A範囲) = 白抜き 正方形 -->
+                                        <Rectangle Canvas.Left="25" Canvas.Top="40" Width="85" Height="85"
                                                    Fill="White" Stroke="#1976D2" StrokeThickness="1"/>
-                                        <!-- 柱本体 -->
-                                        <Rectangle Canvas.Left="45" Canvas.Top="58" Width="50" Height="34"
+                                        <!-- 柱本体 正方形 -->
+                                        <Rectangle Canvas.Left="40" Canvas.Top="55" Width="55" Height="55"
                                                    Fill="White" Stroke="#333" StrokeThickness="3" RadiusX="4" RadiusY="4"/>
-                                        <TextBlock Canvas.Left="57" Canvas.Top="66" Text="柱" FontSize="12"
+                                        <TextBlock Canvas.Left="54" Canvas.Top="72" Text="柱" FontSize="12"
                                                    Foreground="#333" FontWeight="Bold"/>
                                         <!-- 柱中心線（縦） -->
-                                        <Line X1="70" Y1="20" X2="70" Y2="58" Stroke="#999" StrokeThickness="0.5"/>
+                                        <Line X1="67" Y1="20" X2="67" Y2="55" Stroke="#999" StrokeThickness="0.5"/>
                                         <!-- A寸法線（柱中心→内側矩形端） -->
-                                        <Line X1="70" Y1="12" X2="110" Y2="12" Stroke="#CC0000" StrokeThickness="1"/>
-                                        <Ellipse Canvas.Left="68" Canvas.Top="10" Width="4" Height="4" Fill="#CC0000"/>
+                                        <Line X1="67" Y1="12" X2="110" Y2="12" Stroke="#CC0000" StrokeThickness="1"/>
+                                        <Ellipse Canvas.Left="65" Canvas.Top="10" Width="4" Height="4" Fill="#CC0000"/>
                                         <Ellipse Canvas.Left="108" Canvas.Top="10" Width="4" Height="4" Fill="#CC0000"/>
-                                        <Line X1="110" Y1="12" X2="110" Y2="45" Stroke="#CC0000" StrokeThickness="0.5"
+                                        <Line X1="110" Y1="12" X2="110" Y2="40" Stroke="#CC0000" StrokeThickness="0.5"
                                               StrokeDashArray="2 2"/>
-                                        <TextBlock Canvas.Left="83" Canvas.Top="0" Text="A" FontSize="11"
+                                        <TextBlock Canvas.Left="82" Canvas.Top="0" Text="A" FontSize="11"
                                                    Foreground="#CC0000" FontWeight="Bold"/>
                                         <!-- B寸法線（内側端→外側端） -->
-                                        <Line X1="110" Y1="12" X2="130" Y2="12" Stroke="#0000CC" StrokeThickness="1"/>
+                                        <Line X1="110" Y1="12" X2="125" Y2="12" Stroke="#0000CC" StrokeThickness="1"/>
                                         <Ellipse Canvas.Left="108" Canvas.Top="10" Width="4" Height="4" Fill="#0000CC"/>
-                                        <Ellipse Canvas.Left="128" Canvas.Top="10" Width="4" Height="4" Fill="#0000CC"/>
-                                        <Line X1="130" Y1="12" X2="130" Y2="25" Stroke="#0000CC" StrokeThickness="0.5"
+                                        <Ellipse Canvas.Left="123" Canvas.Top="10" Width="4" Height="4" Fill="#0000CC"/>
+                                        <Line X1="125" Y1="12" X2="125" Y2="25" Stroke="#0000CC" StrokeThickness="0.5"
                                               StrokeDashArray="2 2"/>
-                                        <TextBlock Canvas.Left="115" Canvas.Top="0" Text="B" FontSize="11"
+                                        <TextBlock Canvas.Left="113" Canvas.Top="0" Text="B" FontSize="11"
                                                    Foreground="#0000CC" FontWeight="Bold"/>
                                     </Canvas>
                                 </Border>
