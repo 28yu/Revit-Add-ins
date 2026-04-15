@@ -57,90 +57,93 @@ namespace Tools28.Commands.FireProtection
                 if (textNoteTypeId == null) return draftingView.Id;
 
                 double textHeight = GetTextHeight(doc, textNoteTypeId);
-                double rectHeight = textHeight * 2.2;
-                double rectWidth = textHeight * 3.5;
-                double textOffsetX = rectWidth + textHeight * 1.0;
-                double rowSpacing = textHeight * 0.6;
-                double titleGap = textHeight * 1.5;
-                double textYOffset = (rectHeight + textHeight) / 2 + textHeight * 0.2;
-                double rowPitch = rectHeight + rowSpacing;
+                double rectSize = textHeight * 1.5;
+                double textOffsetX = rectSize + textHeight * 0.5;
+                double rowSpacing = textHeight * 0.4;
+                double titleGap = textHeight * 1.2;
+                double textYOffset = (rectSize + textHeight) / 2 + textHeight * 0.15;
+                double rowPitch = rectSize + rowSpacing;
 
-                double startY = 0;
+                double curY = 0;
 
                 // タイトル: ◎耐火被覆仕様凡例
-                XYZ titlePos = new XYZ(0, startY, 0);
-                TextNote.Create(doc, draftingView.Id, titlePos,
+                TextNote.Create(doc, draftingView.Id, new XYZ(0, curY, 0),
                     "\u25ce\u8010\u706b\u88ab\u8986\u4ed5\u69d8\u51e1\u4f8b", textNoteTypeId);
-                startY -= (textHeight + titleGap);
+                curY -= (textHeight + titleGap);
 
                 // 梁の行
                 for (int i = 0; i < types.Count; i++)
                 {
                     var entry = types[i];
                     Color color = new Color(entry.ColorR, entry.ColorG, entry.ColorB);
-
-                    double rowY = startY - rowPitch * i;
+                    double rowY = curY - rowPitch * i;
 
                     string viewTypeName = FilledRegionCreator.TypePrefix + entry.Name;
                     CreateColoredRectangle(doc, draftingView.Id,
                         solidFillPatternId, color, viewTypeName,
-                        0, rowY, rectWidth, rectHeight);
+                        0, rowY, rectSize, rectSize);
 
-                    XYZ textPos = new XYZ(textOffsetX, rowY + textYOffset, 0);
-                    TextNote.Create(doc, draftingView.Id, textPos,
+                    TextNote.Create(doc, draftingView.Id,
+                        new XYZ(textOffsetX, rowY + textYOffset, 0),
                         entry.Name, textNoteTypeId);
                 }
+                curY -= rowPitch * types.Count + rowSpacing;
 
                 // 柱枠型の行
                 if (includeColumnFrame && columnA_feet > 0 && columnB_feet > 0)
                 {
-                    double colStartY = startY - rowPitch * types.Count - rowSpacing;
-
                     for (int i = 0; i < types.Count; i++)
                     {
                         var entry = types[i];
-                        double rowY = colStartY - rowPitch * i;
+                        double rowY = curY - rowPitch * i;
 
                         string colTypeName = FilledRegionCreator.TypePrefix + "柱_" + entry.Name;
-                        double outerSize = rectHeight * 0.9;
-                        double ratio = columnA_feet / (columnA_feet + columnB_feet);
-                        double innerSize = outerSize * Math.Max(ratio * 0.6, 0.25);
+                        double outerHalf = rectSize / 2.0;
+                        double innerHalf = outerHalf * 0.55;
                         Color colColor = new Color(entry.ColColorR, entry.ColColorG, entry.ColColorB);
                         CreateFrameRectangle(doc, draftingView.Id,
                             solidFillPatternId, colColor, colTypeName,
-                            rectWidth / 2.0, rowY + rectHeight / 2.0,
-                            outerSize / 2.0, innerSize / 2.0);
+                            rectSize / 2.0, rowY + rectSize / 2.0,
+                            outerHalf, innerHalf);
 
-                        XYZ textPos = new XYZ(textOffsetX, rowY + textYOffset, 0);
-                        TextNote.Create(doc, draftingView.Id, textPos,
+                        TextNote.Create(doc, draftingView.Id,
+                            new XYZ(textOffsetX, rowY + textYOffset, 0),
                             $"\u67f1\uff1a{entry.Name}", textNoteTypeId);
                     }
-
-                    startY = colStartY - rowPitch * types.Count;
-                }
-                else
-                {
-                    startY = startY - rowPitch * types.Count;
+                    curY -= rowPitch * types.Count;
                 }
 
                 // 注記セクション
-                double noteY = startY - rowSpacing * 2;
-                double noteLineH = textHeight * 1.6;
+                curY -= rowSpacing * 3;
+                double noteH = textHeight * 1.4;
 
-                string[] notes = new[]
+                var noteLines = new[]
                 {
                     "\u203b\u8010\u706b\u88ab\u8986\u4e0d\u8981\u7bc4\u56f2",
                     "\u3000\u30fb\u8010\u98a8\u6881\u3001ALC\u30fbECP\u958b\u53e3\u88dc\u5f37",
                     "\u3000\u30fb\u5e8a\u3092\u53d7\u3051\u306a\u3044EV\u6881\u30fb\u9593\u67f1",
                     "\u3000\u30fb\u968e\u6bb5\u53d7\u3051\u6881\u30fb\u67f1",
                     "\u3000\u30fb\u6c34\u5e73\u30d6\u30ec\u30fc\u30b9",
+                    "",
+                    "\u203b\u534a\u6e7f\u5f0f\u5439\u4ed8\u30ed\u30c3\u30af\u30a6\u30fc\u30eb\u5de5\u6cd5\u306b\u5bfe\u3059\u308b\u30bb\u30e1\u30f3\u30c8\u30b9\u30e9\u30ea\u30fc\u5439\u4ed8",
+                    "\u3000\u306b\u3088\u308b\u8868\u9762\u786c\u5316\u51e6\u7406\u306f\u7bc4\u56f2",
+                    "\u3000\u30fbEV\u30b7\u30e3\u30d5\u30c8\u5185",
+                    "\u3000\u30fbEV\u6a5f\u68b0\u5ba4",
+                    "\u3000\u30fb\u96fb\u6c17\u5ba4",
+                    "\u3000\u30fb\u30b5\u30fc\u30d0\u30fc\u5ba4\u7b49",
+                    "\u3000\u30fb\u76f4\u5929\u4e95\u5ba4\u5185\u5916\u90e8\uff08\u30d4\u30ed\u30c6\u30a3\uff09",
+                    "",
+                    "\u203b\u30b5\u30d3\u6b62\u3081\u7bc4\u56f2\u8a73\u7d30\u306f\u3001\u5225\u9014\u300c**\u9244\u5de5\u3000\u5857\u88c5\u7bc4\u56f2\u56f3\u300d\u53c2\u7167",
                 };
 
-                foreach (var note in notes)
+                foreach (var line in noteLines)
                 {
-                    XYZ notePos = new XYZ(0, noteY, 0);
-                    TextNote.Create(doc, draftingView.Id, notePos, note, textNoteTypeId);
-                    noteY -= noteLineH;
+                    if (line.Length > 0)
+                    {
+                        TextNote.Create(doc, draftingView.Id,
+                            new XYZ(0, curY, 0), line, textNoteTypeId);
+                    }
+                    curY -= noteH;
                 }
 
                 return draftingView.Id;
