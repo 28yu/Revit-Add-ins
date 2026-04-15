@@ -439,34 +439,32 @@ namespace Tools28.Commands.FireProtection
                                 BoundingBoxUV outline = sheet.Outline;
                                 double margin = 50.0 / 304.8;
 
-                                // 凡例を右上固定で配置（右上角を基準に）
-                                // まず仮配置してBBoxサイズを取得
-                                XYZ tempPos = new XYZ(0, 0, 0);
+                                // 仮配置
                                 Viewport vp = Viewport.Create(
-                                    doc, sheet.Id, legendViewId, tempPos);
+                                    doc, sheet.Id, legendViewId, new XYZ(0, 0, 0));
 
                                 if (vp != null)
                                 {
+                                    doc.Regenerate();
+
+                                    // VP中心とOutlineからサイズを逆算
+                                    XYZ center = vp.GetBoxCenter();
+                                    Outline vpOutline = vp.GetBoxOutline();
+
+                                    double vpW = vpOutline.MaximumPoint.X - vpOutline.MinimumPoint.X;
+                                    double vpH = vpOutline.MaximumPoint.Y - vpOutline.MinimumPoint.Y;
+
+                                    // 右上固定: VP右端=シート右端-margin, VP上端=シート上端-margin
+                                    double newCX = outline.Max.U - margin - vpW / 2.0;
+                                    double newCY = outline.Max.V - margin - vpH / 2.0;
+
+                                    vp.SetBoxCenter(new XYZ(newCX, newCY, 0));
+
                                     try
                                     {
-                                        doc.Regenerate();
-                                        BoundingBoxXYZ vpBB = vp.get_BoundingBox(activeView);
-                                        XYZ center = vp.GetBoxCenter();
-
-                                        if (vpBB != null)
-                                        {
-                                            double vpW = vpBB.Max.X - vpBB.Min.X;
-                                            double vpH = vpBB.Max.Y - vpBB.Min.Y;
-
-                                            // 右上固定: VP右端=シート右端-margin, VP上端=シート上端-margin+45mm
-                                            double targetRight = outline.Max.U - margin;
-                                            double targetTop = outline.Max.V - margin + 45.0 / 304.8;
-
-                                            double newCX = targetRight - vpW / 2.0;
-                                            double newCY = targetTop - vpH / 2.0;
-
-                                            vp.SetBoxCenter(new XYZ(newCX, newCY, 0));
-                                        }
+                                        System.IO.File.AppendAllText(@"C:\temp\FireProtection_debug.txt",
+                                            $"\n凡例VP: vpW={vpW * 304.8:F0} vpH={vpH * 304.8:F0}" +
+                                            $" center=({newCX * 304.8:F0},{newCY * 304.8:F0})\n");
                                     }
                                     catch { }
                                 }
