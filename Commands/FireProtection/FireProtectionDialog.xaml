@@ -182,36 +182,33 @@
                             <TextBlock Style="{StaticResource NoteStyle}"
                                        Text="※ 梁のエッジからの距離（mm）"/>
 
-                            <!-- 梁オフセットプレビュー図 -->
+                            <!-- 梁オフセットプレビュー図（平面図） -->
                             <Border BorderBrush="#CCC" BorderThickness="1" Margin="0,8,0,0"
                                     Padding="4" CornerRadius="2" Background="#FAFAFA"
                                     HorizontalAlignment="Center">
-                                <Canvas Width="200" Height="110">
-                                    <!-- 青塗り（オフセット領域） -->
-                                    <Rectangle Canvas.Left="5" Canvas.Top="0" Width="190" Height="110"
+                                <Canvas Width="200" Height="120">
+                                    <!-- 青塗り（オフセット領域全体） -->
+                                    <Rectangle Canvas.Left="15" Canvas.Top="5" Width="170" Height="110"
                                                Fill="#64B5F6"/>
-                                    <!-- 梁本体（白地+黒枠線） -->
-                                    <Rectangle Canvas.Left="5" Canvas.Top="18" Width="190" Height="74"
-                                               Fill="White" Stroke="#333" StrokeThickness="1.5"/>
-                                    <!-- 梁フランジ上 -->
-                                    <Line X1="5" Y1="28" X2="195" Y2="28" Stroke="#333" StrokeThickness="1"/>
-                                    <!-- 梁フランジ下 -->
-                                    <Line X1="5" Y1="82" X2="195" Y2="82" Stroke="#333" StrokeThickness="1"/>
-                                    <!-- 梁ウェブ（破線） -->
-                                    <Line X1="5" Y1="55" X2="195" Y2="55" Stroke="#333" StrokeThickness="1"
-                                          StrokeDashArray="4 3"/>
-                                    <!-- I型断面マーク -->
-                                    <Line X1="100" Y1="28" X2="100" Y2="82" Stroke="#333" StrokeThickness="1.5"/>
-                                    <Line X1="92" Y1="28" X2="108" Y2="28" Stroke="#333" StrokeThickness="2"/>
-                                    <Line X1="92" Y1="82" X2="108" Y2="82" Stroke="#333" StrokeThickness="2"/>
+                                    <!-- 梁上面線 -->
+                                    <Line X1="15" Y1="20" X2="185" Y2="20" Stroke="#333" StrokeThickness="1.5"/>
+                                    <!-- 梁下面線 -->
+                                    <Line X1="15" Y1="95" X2="185" Y2="95" Stroke="#333" StrokeThickness="1.5"/>
+                                    <!-- 梁中心線（一点鎖線） -->
+                                    <Line X1="0" Y1="57" X2="200" Y2="57" Stroke="#333" StrokeThickness="1"
+                                          StrokeDashArray="8 3 2 3"/>
                                     <!-- ▽梁面テキスト -->
-                                    <TextBlock Canvas.Left="20" Canvas.Top="32" Text="▽ 梁面" FontSize="11"
-                                               Foreground="#333"/>
-                                    <!-- A寸法線（梁面→オフセット端） -->
-                                    <Line X1="130" Y1="18" X2="130" Y2="0" Stroke="#CC0000" StrokeThickness="1"/>
-                                    <Ellipse Canvas.Left="128" Canvas.Top="16" Width="4" Height="4" Fill="#CC0000"/>
-                                    <Ellipse Canvas.Left="128" Canvas.Top="-2" Width="4" Height="4" Fill="#CC0000"/>
-                                    <TextBlock Canvas.Left="120" Canvas.Top="4" Text="A" FontSize="11"
+                                    <TextBlock Canvas.Left="30" Canvas.Top="24" Text="▽ 梁面" FontSize="12"
+                                               Foreground="#333" FontWeight="Bold"/>
+                                    <!-- A寸法線（梁面→オフセット上端）縦線 -->
+                                    <Line X1="135" Y1="20" X2="135" Y2="5" Stroke="#CC0000" StrokeThickness="1"/>
+                                    <Ellipse Canvas.Left="133" Canvas.Top="3" Width="4" Height="4" Fill="#CC0000"/>
+                                    <Ellipse Canvas.Left="133" Canvas.Top="18" Width="4" Height="4" Fill="#CC0000"/>
+                                    <!-- A寸法線 横引出線 -->
+                                    <Line X1="135" Y1="5" X2="145" Y2="5" Stroke="#333" StrokeThickness="0.5"/>
+                                    <Line X1="135" Y1="20" X2="145" Y2="20" Stroke="#333" StrokeThickness="0.5"/>
+                                    <!-- Aテキスト -->
+                                    <TextBlock Canvas.Left="125" Canvas.Top="6" Text="A" FontSize="12"
                                                Foreground="#CC0000" FontWeight="Bold"/>
                                 </Canvas>
                             </Border>
