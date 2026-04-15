@@ -438,36 +438,25 @@ namespace Tools28.Commands.FireProtection
                             {
                                 BoundingBoxUV outline = sheet.Outline;
                                 double margin = 50.0 / 304.8;
+                                double mm = 1.0 / 304.8;
 
-                                // 仮配置
+                                // 凡例サイズを項目数から推定
+                                int beamRows = settings.Types.Count;
+                                int colRows = hasColumnFrame ? settings.Types.Count : 0;
+                                int totalRows = beamRows + colRows;
+                                double rowH = 10.0 * mm;
+                                double noteH = 45.0 * mm; // 注記セクション概算高さ
+                                double titleH = 8.0 * mm;
+                                double estH = titleH + totalRows * rowH + noteH;
+                                double estW = 85.0 * mm; // 20mm(色四角列) + 65mm(テキスト列)
+
+                                // 右上固定: VP右端=シート右端-margin, VP上端=シート上端-margin
+                                double vpCX = outline.Max.U - margin - estW / 2.0;
+                                double vpCY = outline.Max.V - margin - estH / 2.0;
+
                                 Viewport vp = Viewport.Create(
-                                    doc, sheet.Id, legendViewId, new XYZ(0, 0, 0));
-
-                                if (vp != null)
-                                {
-                                    doc.Regenerate();
-
-                                    // VP中心とOutlineからサイズを逆算
-                                    XYZ center = vp.GetBoxCenter();
-                                    Outline vpOutline = vp.GetBoxOutline();
-
-                                    double vpW = vpOutline.MaximumPoint.X - vpOutline.MinimumPoint.X;
-                                    double vpH = vpOutline.MaximumPoint.Y - vpOutline.MinimumPoint.Y;
-
-                                    // 右上固定: VP右端=シート右端-margin, VP上端=シート上端-margin
-                                    double newCX = outline.Max.U - margin - vpW / 2.0;
-                                    double newCY = outline.Max.V - margin - vpH / 2.0;
-
-                                    vp.SetBoxCenter(new XYZ(newCX, newCY, 0));
-
-                                    try
-                                    {
-                                        System.IO.File.AppendAllText(@"C:\temp\FireProtection_debug.txt",
-                                            $"\n凡例VP: vpW={vpW * 304.8:F0} vpH={vpH * 304.8:F0}" +
-                                            $" center=({newCX * 304.8:F0},{newCY * 304.8:F0})\n");
-                                    }
-                                    catch { }
-                                }
+                                    doc, sheet.Id, legendViewId,
+                                    new XYZ(vpCX, vpCY, 0));
 
                                 try
                                 {
