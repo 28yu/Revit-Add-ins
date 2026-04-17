@@ -453,7 +453,7 @@ namespace Tools28.Commands.FireProtection
 
                                 // 右上固定: VP右端=シート右端-margin, VP上端=シート上端-margin
                                 double upOffset = 25.0 * mm;    // 上方向への微調整
-                                double rightOffset = 20.0 * mm; // 右方向への微調整
+                                double rightOffset = 30.0 * mm; // 右方向への微調整
                                 double vpCX = outline.Max.U - margin - estW / 2.0 + rightOffset;
                                 double vpCY = outline.Max.V - margin - estH / 2.0 + upOffset;
 
