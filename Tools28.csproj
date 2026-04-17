@@ -73,6 +73,8 @@
     <Resource Include="Resources\Icons\flag_cn_32.png" />
     <Resource Include="Resources\Icons\ver_16.png" />
     <Resource Include="Resources\Icons\ver_32.png" />
+    <Resource Include="Resources\Icons\manual_16.png" />
+    <Resource Include="Resources\Icons\manual_32.png" />
   </ItemGroup>
 
 

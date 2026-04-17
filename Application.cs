@@ -340,7 +340,7 @@ namespace Tools28
 
 
         /// <summary>
-        /// 設定パネルを作成（リボン最右端、小ボタン2段スタック）
+        /// 設定パネルを作成（リボン最右端、小ボタン3段スタック）
         /// </summary>
         private void CreateSettingsPanel(UIControlledApplication application, string tabName, string assemblyPath)
         {
@@ -361,12 +361,20 @@ namespace Tools28
                 "Tools28.Commands.LanguageSwitch.AboutCommand");
             aboutButtonData.ToolTip = "28 Tools のバージョン情報を表示します";
             aboutButtonData.Image = LoadImage("ver_16.png");
-            aboutButtonData.LargeImage = LoadImage("ver_32.png");
 
-            // 2段スタックで小ボタン化
-            var stackedItems = panel.AddStackedItems(languagePulldownData, aboutButtonData);
+            // マニュアルボタン
+            PushButtonData manualButtonData = new PushButtonData(
+                "Manual",
+                "マニュアル",
+                assemblyPath,
+                "Tools28.Commands.LanguageSwitch.ManualCommand");
+            manualButtonData.ToolTip = "28 Tools のマニュアルをブラウザで開きます";
+            manualButtonData.Image = LoadImage("manual_16.png");
 
-            // プルダウンメニューに言語選択肢を追加（Image のみ設定で行高さを抑える）
+            // 3段スタックで小ボタン化
+            var stackedItems = panel.AddStackedItems(languagePulldownData, aboutButtonData, manualButtonData);
+
+            // プルダウンメニューに言語選択肢を追加
             LanguagePulldown = stackedItems[0] as PulldownButton;
             if (LanguagePulldown != null)
             {
@@ -375,6 +383,7 @@ namespace Tools28
                     assemblyPath,
                     "Tools28.Commands.LanguageSwitch.SwitchToJapaneseCommand");
                 jpData.Image = LoadImage("flag_jp_16.png");
+                jpData.LargeImage = LoadImage("flag_jp_32.png");
                 jpData.ToolTip = "日本語に切り替えます";
                 LanguagePulldown.AddPushButton(jpData);
 
@@ -383,6 +392,7 @@ namespace Tools28
                     assemblyPath,
                     "Tools28.Commands.LanguageSwitch.SwitchToEnglishCommand");
                 enData.Image = LoadImage("flag_us_16.png");
+                enData.LargeImage = LoadImage("flag_us_32.png");
                 enData.ToolTip = "Switch to English";
                 LanguagePulldown.AddPushButton(enData);
 
@@ -391,6 +401,7 @@ namespace Tools28
                     assemblyPath,
                     "Tools28.Commands.LanguageSwitch.SwitchToChineseCommand");
                 cnData.Image = LoadImage("flag_cn_16.png");
+                cnData.LargeImage = LoadImage("flag_cn_32.png");
                 cnData.ToolTip = "切换为中文";
                 LanguagePulldown.AddPushButton(cnData);
             }
