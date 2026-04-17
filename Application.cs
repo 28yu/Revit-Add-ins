@@ -8,6 +8,8 @@ namespace Tools28
 {
     public class Application : IExternalApplication
     {
+        internal static PulldownButton LanguagePulldown { get; private set; }
+
         public Result OnStartup(UIControlledApplication application)
         {
             // 依存DLLの解決ハンドラを登録（ClosedXML等の依存先をアドインフォルダから読み込む）
@@ -347,10 +349,9 @@ namespace Tools28
             // 言語切替プルダウン（▼付きドロップダウン）
             PulldownButtonData languagePulldownData = new PulldownButtonData(
                 "LanguageSwitch",
-                "言語 ▼");
-            languagePulldownData.ToolTip = "UIの表示言語を切り替えます (日本語 / English / 中文)";
-            languagePulldownData.Image = LoadImage("language_16.png");
-            languagePulldownData.LargeImage = LoadImage("language_32.png");
+                "JP");
+            languagePulldownData.ToolTip = "UIの表示言語を切り替えます (JP / US / CN)";
+            languagePulldownData.Image = LoadImage("flag_jp_16.png");
 
             // バージョン情報ボタン
             PushButtonData aboutButtonData = new PushButtonData(
@@ -365,36 +366,33 @@ namespace Tools28
             // 2段スタックで小ボタン化
             var stackedItems = panel.AddStackedItems(languagePulldownData, aboutButtonData);
 
-            // プルダウンメニューに言語選択肢を追加
-            PulldownButton languagePulldown = stackedItems[0] as PulldownButton;
-            if (languagePulldown != null)
+            // プルダウンメニューに言語選択肢を追加（Image のみ設定で行高さを抑える）
+            LanguagePulldown = stackedItems[0] as PulldownButton;
+            if (LanguagePulldown != null)
             {
                 PushButtonData jpData = new PushButtonData(
-                    "LangJP", "JP　日本語",
+                    "LangJP", "JP",
                     assemblyPath,
                     "Tools28.Commands.LanguageSwitch.SwitchToJapaneseCommand");
                 jpData.Image = LoadImage("flag_jp_16.png");
-                jpData.LargeImage = LoadImage("flag_jp_32.png");
                 jpData.ToolTip = "日本語に切り替えます";
-                languagePulldown.AddPushButton(jpData);
+                LanguagePulldown.AddPushButton(jpData);
 
                 PushButtonData enData = new PushButtonData(
-                    "LangUS", "US　English",
+                    "LangUS", "US",
                     assemblyPath,
                     "Tools28.Commands.LanguageSwitch.SwitchToEnglishCommand");
                 enData.Image = LoadImage("flag_us_16.png");
-                enData.LargeImage = LoadImage("flag_us_32.png");
                 enData.ToolTip = "Switch to English";
-                languagePulldown.AddPushButton(enData);
+                LanguagePulldown.AddPushButton(enData);
 
                 PushButtonData cnData = new PushButtonData(
-                    "LangCN", "CN　中文",
+                    "LangCN", "CN",
                     assemblyPath,
                     "Tools28.Commands.LanguageSwitch.SwitchToChineseCommand");
                 cnData.Image = LoadImage("flag_cn_16.png");
-                cnData.LargeImage = LoadImage("flag_cn_32.png");
                 cnData.ToolTip = "切换为中文";
-                languagePulldown.AddPushButton(cnData);
+                LanguagePulldown.AddPushButton(cnData);
             }
         }
 
