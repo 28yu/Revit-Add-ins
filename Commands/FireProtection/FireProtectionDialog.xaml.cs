@@ -9,6 +9,7 @@ using WpfRectangle = System.Windows.Shapes.Rectangle;
 using Autodesk.Revit.DB;
 using WinForms = System.Windows.Forms;
 using WpfGrid = System.Windows.Controls.Grid;
+using Tools28.Localization;
 
 namespace Tools28.Commands.FireProtection
 {
@@ -25,8 +26,44 @@ namespace Tools28.Commands.FireProtection
         public FireProtectionDialog(FireProtectionDialogData data)
         {
             InitializeComponent();
+            ApplyLocalization();
             _data = data;
             InitializeStep1();
+        }
+
+        private void ApplyLocalization()
+        {
+            this.Title = Loc.S("Fire.Title");
+            StepIndicator.Text = Loc.S("Fire.Step1");
+            txtParamLabel.Text = Loc.S("Fire.ParamLabel");
+            ParameterNoteText.Text = Loc.S("Fire.ParamHint");
+            txtDetectedTypes.Text = Loc.S("Fire.DetectedTypes");
+            txtColorHint.Text = Loc.S("Fire.ColorHint");
+            txtOffsetSetting.Text = Loc.S("Fire.OffsetSetting");
+            CommonOffsetRadio.Content = Loc.S("Fire.CommonOffset");
+            PerTypeOffsetRadio.Content = Loc.S("Fire.IndividualOffset");
+            txtMm.Text = Loc.S("Fire.Mm");
+            txtOffsetHint.Text = Loc.S("Fire.OffsetHint");
+            txtBeamFace.Text = Loc.S("Fire.BeamFace");
+            txtColumnSetting.Text = Loc.S("Fire.ColumnSetting");
+            txtColumnDistA.Text = Loc.S("Fire.ColumnDistA");
+            txtColumnWidthB.Text = Loc.S("Fire.ColumnWidthB");
+            txtColumnHint.Text = Loc.S("Fire.ColumnHint");
+            txtColumn.Text = Loc.S("Fire.Column");
+            txtDisplaySetting.Text = Loc.S("Fire.DisplaySetting");
+            txtLineStyle.Text = Loc.S("Fire.LineStyle");
+            txtFillPattern.Text = Loc.S("Fire.FillPattern");
+            txtLegendTextType.Text = Loc.S("Fire.LegendTextType");
+            txtSummary.Text = Loc.S("Fire.Summary");
+            txtProcessContent.Text = Loc.S("Fire.ProcessContent");
+            chkCreateTypes.Content = Loc.S("Fire.CreateTypes");
+            chkAutoPlace.Content = Loc.S("Fire.AutoPlace");
+            chkCreateLegend.Content = Loc.S("Fire.CreateLegend");
+            txtExistingLabel.Text = Loc.S("Fire.ExistingLabel");
+            OverwriteCheckBox.Content = Loc.S("Fire.Overwrite");
+            BackButton.Content = Loc.S("Common.Back");
+            NextButton.Content = Loc.S("Common.Next");
+            CancelButton.Content = Loc.S("Common.Cancel");
         }
 
         public FireProtectionResult GetResult()

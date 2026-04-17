@@ -342,23 +342,23 @@
                     <Border Background="White" BorderBrush="#D3D3D3"
                             BorderThickness="1" CornerRadius="3" Padding="15,12" Margin="0,0,0,10">
                         <StackPanel>
-                            <TextBlock Style="{StaticResource SectionHeader}" Text="処理概要"/>
+                            <TextBlock x:Name="txtSummary" Style="{StaticResource SectionHeader}" Text="処理概要"/>
                             <TextBlock x:Name="SummaryText" Style="{StaticResource LabelStyle}" TextWrapping="Wrap"/>
                         </StackPanel>
                     </Border>
                     <Border Background="White" BorderBrush="#D3D3D3"
                             BorderThickness="1" CornerRadius="3" Padding="15,12" Margin="0,0,0,10">
                         <StackPanel>
-                            <TextBlock Style="{StaticResource SectionHeader}" Text="処理内容"/>
-                            <CheckBox Content="耐火被覆種類ごとの塗潰領域タイプ作成" IsChecked="True" IsEnabled="False" Margin="0,3"/>
-                            <CheckBox Content="要素周囲に塗潰領域を自動配置（重なり部分は統合）" IsChecked="True" IsEnabled="False" Margin="0,3"/>
-                            <CheckBox Content="凡例の製図ビュー作成" IsChecked="True" IsEnabled="False" Margin="0,3"/>
+                            <TextBlock x:Name="txtProcessContent" Style="{StaticResource SectionHeader}" Text="処理内容"/>
+                            <CheckBox x:Name="chkCreateTypes" Content="耐火被覆種類ごとの塗潰領域タイプ作成" IsChecked="True" IsEnabled="False" Margin="0,3"/>
+                            <CheckBox x:Name="chkAutoPlace" Content="要素周囲に塗潰領域を自動配置（重なり部分は統合）" IsChecked="True" IsEnabled="False" Margin="0,3"/>
+                            <CheckBox x:Name="chkCreateLegend" Content="凡例の製図ビュー作成" IsChecked="True" IsEnabled="False" Margin="0,3"/>
                         </StackPanel>
                     </Border>
                     <Border Background="#FFF8E1" BorderBrush="#FFD54F"
                             BorderThickness="1" CornerRadius="3" Padding="15,12">
                         <StackPanel>
-                            <TextBlock FontSize="12" FontWeight="Bold" Foreground="#F57F17"
+                            <TextBlock x:Name="txtExistingLabel" FontSize="12" FontWeight="Bold" Foreground="#F57F17"
                                        Text="既存の耐火被覆について" Margin="0,0,0,5"/>
                             <CheckBox x:Name="OverwriteCheckBox" IsChecked="True"
                                       Content="既存の「耐火被覆_」塗潰領域・凡例を上書きする" FontSize="11" Margin="0,3"/>
@@ -378,7 +378,7 @@
                 <Button x:Name="NextButton" Content="次へ"
                         Style="{StaticResource PrimaryButtonStyle}"
                         Click="NextButton_Click"/>
-                <Button Content="キャンセル"
+                <Button x:Name="CancelButton" Content="キャンセル"
                         Style="{StaticResource SecondaryButtonStyle}"
                         Click="CancelButton_Click"/>
             </StackPanel>
