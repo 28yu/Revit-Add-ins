@@ -43,6 +43,7 @@ namespace Tools28
                 CreateAnnotationPanel(application, tabName, assemblyPath);
                 CreateStructuralPanel(application, tabName, assemblyPath);
                 CreateExcelPanel(application, tabName, assemblyPath);
+                CreateSettingsPanel(application, tabName, assemblyPath);
 
                 return Result.Succeeded;
             }
@@ -335,6 +336,38 @@ namespace Tools28
             panel.AddItem(importButtonData);
         }
 
+
+        /// <summary>
+        /// 設定パネルを作成（リボン最右端、小ボタン）
+        /// Revit API では単独ボタンは常に大サイズになるため、AddStackedItems で小サイズに配置する
+        /// </summary>
+        private void CreateSettingsPanel(UIControlledApplication application, string tabName, string assemblyPath)
+        {
+            RibbonPanel panel = application.CreateRibbonPanel(tabName, "設定");
+
+            // 言語切替ボタン
+            PushButtonData languageButtonData = new PushButtonData(
+                "LanguageSwitch",
+                "言語 / Lang",
+                assemblyPath,
+                "Tools28.Commands.LanguageSwitch.LanguageSwitchCommand");
+            languageButtonData.ToolTip = "UIの表示言語を切り替えます (日本語 / English / 中文)";
+            languageButtonData.Image = LoadImage("language_16.png");
+            languageButtonData.LargeImage = LoadImage("language_32.png");
+
+            // バージョン情報ボタン（スタック表示用の2つ目のアイテム）
+            PushButtonData aboutButtonData = new PushButtonData(
+                "About",
+                "情報",
+                assemblyPath,
+                "Tools28.Commands.LanguageSwitch.AboutCommand");
+            aboutButtonData.ToolTip = "28 Tools のバージョン情報を表示します";
+            aboutButtonData.Image = LoadImage("language_16.png");
+            aboutButtonData.LargeImage = LoadImage("language_32.png");
+
+            // 2段スタックで小ボタン化
+            panel.AddStackedItems(languageButtonData, aboutButtonData);
+        }
 
         /// <summary>
         /// 画像を読み込み（ハイブリッド方式）

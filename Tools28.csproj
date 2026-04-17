@@ -63,6 +63,8 @@
     <Resource Include="Resources\Icons\room_tag_96.png" />
     <Resource Include="Resources\Icons\excel_export_96.png" />
     <Resource Include="Resources\Icons\excel_import_96.png" />
+    <Resource Include="Resources\Icons\language_16.png" />
+    <Resource Include="Resources\Icons\language_32.png" />
   </ItemGroup>
 
 
