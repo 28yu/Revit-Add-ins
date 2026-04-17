@@ -29,7 +29,13 @@ Revit-Add-ins/
 │   ├── SectionBoxCopy/         # セクションボックスコピー
 │   ├── ViewportPosition/       # ビューポート位置コピー (自動マッチング)
 │   ├── CropBoxCopy/            # トリミング領域コピー
-│   └── BeamTopLevel/           # 梁天端レベル色分け (平面ビュー)
+│   ├── BeamTopLevel/           # 梁天端レベル色分け (平面ビュー)
+│   └── LanguageSwitch/         # 言語切替・バージョン情報・マニュアル
+├── Localization/               # 多言語リソース
+│   ├── Loc.cs                  # 多言語マネージャー (静的クラス)
+│   ├── StringsJP.cs            # 日本語文字列辞書
+│   ├── StringsEN.cs            # 英語文字列辞書
+│   └── StringsCN.cs            # 中国語（簡体字）文字列辞書
 ├── Resources/Icons/            # 32x32アイコン (12個)
 ├── Properties/                 # AssemblyInfo.cs
 ├── Packages/                   # 配布パッケージテンプレート (バージョン別)
@@ -626,12 +632,13 @@ Commands/RoomTagCreator/
 2. **シート** — シート一括作成
 3. **ビュー** — ビューポート位置コピー/ペースト、トリミング領域コピー/ペースト、3Dビューコピー/ペースト、セクションボックスコピー/ペースト
 4. **注釈・詳細** — 部屋タグ自動配置、塗潰し領域 分割・統合
-5. **構造** — 梁下端色分け、梁天端色分け
+5. **構造** — 梁下端色分け、梁天端色分け、耐火被覆色分け
 6. **データ** — EXCELエクスポート、EXCELインポート
+7. **設定** — 言語切替（JP/US/CN）、バージョン情報、マニュアル
 
 ### 実装
 - `Application.cs` の `OnStartup()` で各パネルを個別メソッドで構築
-- `CreateGridLevelPanel()`, `CreateSheetPanel()`, `CreateViewPanel()`, `CreateAnnotationPanel()`, `CreateStructuralPanel()`
+- `CreateGridLevelPanel()`, `CreateSheetPanel()`, `CreateViewPanel()`, `CreateAnnotationPanel()`, `CreateStructuralPanel()`, `CreateDataPanel()`, `CreateSettingsPanel()`
 
 ## ExcelExportImport（EXCELエクスポート/インポート）設計メモ
 
@@ -942,3 +949,128 @@ Commands/FireProtection/
 - **動作確認**: Revit 環境で動作確認済み
 - **アイコン**: I型梁 + グレー塗潰し被覆 + 3色ブロック（`fire_protection_32.png` / `_96.png`）
 - **リボン登録**: 構造パネル「色分け」セクションに追加済み
+
+## 多言語UI（Localization）設計メモ
+
+### 概要
+リボンUI・全WPFダイアログ・TaskDialogメッセージを日本語/英語/中国語（簡体字）の3言語に対応。ランタイムで即時切替可能。
+
+### 対応言語
+| コード | 言語 | 国旗アイコン |
+|--------|------|-------------|
+| JP | 日本語（デフォルト） | `flag_jp_16.png` / `flag_jp_32.png` |
+| US | English | `flag_us_16.png` / `flag_us_32.png` |
+| CN | 简体中文 | `flag_cn_16.png` / `flag_cn_32.png` |
+
+### アーキテクチャ
+
+#### 多言語マネージャー (`Localization/Loc.cs`)
+- 静的クラス、シングルトン的に使用
+- `Loc.S("Key")` で現在の言語の文字列を取得
+- フォールバック: キーが見つからない場合は日本語 → キー文字列そのもの
+- 言語設定はアセンブリディレクトリの `28tools_lang.txt` に永続化
+- `Loc.LanguageChanged` イベントでランタイム切替を通知
+
+#### 文字列辞書 (`Localization/StringsJP.cs`, `StringsEN.cs`, `StringsCN.cs`)
+- 各言語約325エントリの `Dictionary<string, string>`
+- キー命名規則: `{カテゴリ}.{サブカテゴリ}.{項目}` 形式
+  - `Ribbon.Panel.GridLevel` — パネル名
+  - `Ribbon.GridBubble.Both` — ボタンテキスト
+  - `Ribbon.GridBubble.Both.Tip` — ツールチップ
+  - `Common.OK`, `Common.Cancel` — 共通UI文字列
+  - `Sheet.Title`, `Fire.Step1.Title` — ダイアログ固有文字列
+
+#### 言語切替コマンド (`Commands/LanguageSwitch/`)
+- `SwitchToJapaneseCommand` / `SwitchToEnglishCommand` / `SwitchToChineseCommand`
+- `AboutCommand` — バージョン情報ダイアログ表示
+- `ManualCommand` — ブラウザでマニュアルURL (https://28tools.com/addins.html) を開く
+
+### 設定パネル（リボン右端）の構成
+
+3段スタック構成 (`AddStackedItems`):
+1. **言語プルダウン** — `PulldownButton` + 3つのサブボタン（国旗アイコン付き）
+2. **バージョン情報** — ⓘ アイコン (`ver_16.png`)、`AboutCommand` を実行
+3. **マニュアル** — ? アイコン (`manual_16.png`)、`ManualCommand` を実行
+
+### ランタイム言語切替の仕組み
+
+1. ユーザーが言語プルダウンからJP/US/CNを選択
+2. `SwitchTo*Command` → `Loc.SetLanguage()` 実行
+3. `Loc.LanguageChanged` イベント発火
+4. `Application.UpdateRibbonLanguage()` が呼ばれ:
+   - 全パネルタイトルを更新（`_panelKeys` 辞書）
+   - 全ボタンテキストを更新（`_buttonTextKeys` 辞書）
+   - 全ツールチップを更新（`_buttonTipKeys` 辞書）
+   - 言語プルダウンの国旗アイコンを動的に差し替え
+5. WPFダイアログは次回表示時に `ApplyLocalization()` で翻訳適用
+
+### WPFダイアログの多言語化パターン
+
+```csharp
+public DialogName(/* params */)
+{
+    InitializeComponent();
+    ApplyLocalization();  // 翻訳を即座に適用
+}
+
+private void ApplyLocalization()
+{
+    this.Title = Loc.S("DialogName.Title");
+    labelX.Text = Loc.S("DialogName.LabelX");
+    btnOK.Content = Loc.S("Common.OK");
+}
+```
+
+多言語化済みダイアログ（全8種）:
+- SheetCreationDialog, BeamTopLevelDialog, BeamUnderLevelDialog
+- FilledRegionSplitMergeDialog, FireProtectionDialog
+- ExportDialog, ImportDialog, RoomTagUI
+
+### コード構成
+```
+Commands/LanguageSwitch/
+├── LanguageSwitchCommand.cs      # 3言語切替コマンド (JP/US/CN)
+├── AboutCommand.cs               # バージョン情報表示
+└── ManualCommand.cs              # マニュアルURLを開く
+
+Localization/
+├── Loc.cs                        # 多言語マネージャー (静的クラス)
+├── StringsJP.cs                  # 日本語辞書 (~325エントリ)
+├── StringsEN.cs                  # 英語辞書
+└── StringsCN.cs                  # 中国語（簡体字）辞書
+```
+
+### 開発で得た知見
+
+#### リボンボタンのランタイム更新
+- `RibbonItem.ItemText` でボタンテキストを変更可能
+- `PulldownButton.Image` でアイコンを動的に差し替え可能
+- パネルタイトルは `RibbonPanel.Title` で変更可能
+- ボタンとパネルの参照は `Application.cs` のフィールドに保持しておく必要がある
+  （`_panels`, `_buttons`, `LanguagePulldown` 等）
+
+#### ボタン名⇔ローカライゼーションキーのマッピング
+- `_buttonTextKeys` / `_buttonTipKeys` で内部ボタン名とキーを対応付け
+- `_panelKeys` はパネルのインデックスベースの配列
+- ボタン追加時にマッピングも同時に追加しないと言語切替で更新されない
+
+#### 国旗アイコンの動的差し替え
+- `LoadImage()` で `pack://application:,,,/` URI から読み込み → `BitmapImage.Freeze()` 必須
+- 言語コード → ファイル名の変換: `$"flag_{Loc.CurrentLang.ToLower()}_16.png"`
+- 16px版をスタックボタンの `Image` に設定、32px版はプルダウンサブボタンの `LargeImage`
+
+#### 翻訳辞書の管理
+- 3言語ファイルのキーは完全に一致させる（キー不一致時はJPにフォールバック）
+- 新機能追加時は3ファイル全てに同時にエントリを追加
+- TaskDialogメッセージもダイアログ同様に `Loc.S()` で翻訳可能
+
+#### 設定パネルの3段スタック
+- `AddStackedItems()` は2個または3個の `RibbonItemData` を受け取る
+- 3段スタック時はアイコンサイズ16px、テキストは短めにする
+- プルダウンボタンもスタックアイテムとして配置可能
+
+### 現在のステータス
+- **機能実装**: 完了（言語切替、リボン全体更新、WPFダイアログ8種、TaskDialogメッセージ）
+- **対応言語**: 日本語（デフォルト）、英語、中国語（簡体字）
+- **アイコン**: 国旗3種 (`flag_jp/us/cn`)、ⓘバージョン情報 (`ver`)、?マニュアル (`manual`)
+- **動作確認**: 未確認（Revit環境でのテストが必要）
