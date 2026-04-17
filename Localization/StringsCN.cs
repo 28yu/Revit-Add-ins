@@ -124,6 +124,8 @@ namespace Tools28.Localization
             { "FilledRegion.InfoSplit", "已选择: {0}个区域（可拆分: {1}个, 共{2}个区域）" },
             { "FilledRegion.InfoMerge", "已选择: {0}个区域（共{1}个区域）→ 合并为1个区域" },
             { "FilledRegion.InfoGeneral", "已选择: {0}个区域" },
+            { "FilledRegion.SplitResult", "已将{0}个区域拆分为{1}个独立区域。" },
+            { "FilledRegion.MergeResult", "已将{0}个区域合并为1个区域。" },
 
             // === RoomTag Dialog ===
             { "RoomTag.Title", "房间标签自动配置" },

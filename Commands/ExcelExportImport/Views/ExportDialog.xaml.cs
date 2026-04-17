@@ -8,6 +8,7 @@ using Autodesk.Revit.DB;
 using Microsoft.Win32;
 using Tools28.Commands.ExcelExportImport.Models;
 using Tools28.Commands.ExcelExportImport.Services;
+using Tools28.Localization;
 
 namespace Tools28.Commands.ExcelExportImport.Views
 {
@@ -268,11 +269,11 @@ namespace Tools28.Commands.ExcelExportImport.Views
                     var checkedCategories = _allCategories.Where(c => c.IsChecked).ToList();
                     var settings = SettingsService.CreateFromSelection(checkedCategories, _outputParameters);
                     SettingsService.SaveSettings(dialog.FileName, settings);
-                    MessageBox.Show("設定を保存しました。", "設定保存", MessageBoxButton.OK, MessageBoxImage.Information);
+                    MessageBox.Show(Loc.S("Export.SettingsSaved"), Loc.S("Export.SettingsSaveTitle"), MessageBoxButton.OK, MessageBoxImage.Information);
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"設定の保存に失敗しました。\n{ex.Message}", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
+                    MessageBox.Show(string.Format(Loc.S("Export.SettingsSaveFailed"), ex.Message), Loc.S("Common.Error"), MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
         }
@@ -294,7 +295,7 @@ namespace Tools28.Commands.ExcelExportImport.Views
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"設定の読み込みに失敗しました。\n{ex.Message}", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
+                    MessageBox.Show(string.Format(Loc.S("Export.SettingsLoadFailed"), ex.Message), Loc.S("Common.Error"), MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
         }
@@ -355,7 +356,7 @@ namespace Tools28.Commands.ExcelExportImport.Views
         {
             if (_outputParameters.Count == 0)
             {
-                MessageBox.Show("出力するパラメータを選択してください。", "確認",
+                MessageBox.Show(Loc.S("Export.SelectParams"), Loc.S("Common.Confirm"),
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
@@ -363,7 +364,7 @@ namespace Tools28.Commands.ExcelExportImport.Views
             SelectedCategories = _allCategories.Where(c => c.IsChecked).ToList();
             if (SelectedCategories.Count == 0)
             {
-                MessageBox.Show("カテゴリを選択してください。", "確認",
+                MessageBox.Show(Loc.S("Export.SelectCategory"), Loc.S("Common.Confirm"),
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }

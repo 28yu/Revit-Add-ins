@@ -1,6 +1,7 @@
 using System.Linq;
 using System.Windows;
 using Autodesk.Revit.DB;
+using Tools28.Localization;
 
 namespace Tools28.Commands.FilledRegionSplitMerge
 {
@@ -83,16 +84,16 @@ namespace Tools28.Commands.FilledRegionSplitMerge
 
                 int totalAreas = multiAreaRegions.Sum(fr => fr.GetBoundaries().Count);
 
-                TextInfo.Text = $"選択: {_analysis.FilledRegions.Count}個の領域（分割可能: {multiAreaRegions.Count}個、合計{totalAreas}エリア）";
+                TextInfo.Text = string.Format(Loc.S("FilledRegion.InfoSplit"), _analysis.FilledRegions.Count, multiAreaRegions.Count, totalAreas);
             }
             else if (RadioMerge?.IsChecked == true)
             {
                 int totalAreas = _analysis.FilledRegions.Sum(fr => fr.GetBoundaries().Count);
-                TextInfo.Text = $"選択: {_analysis.FilledRegions.Count}個の領域（合計{totalAreas}エリア）→ 1個の領域に統合";
+                TextInfo.Text = string.Format(Loc.S("FilledRegion.InfoMerge"), _analysis.FilledRegions.Count, totalAreas);
             }
             else
             {
-                TextInfo.Text = $"選択: {_analysis.FilledRegions.Count}個の領域";
+                TextInfo.Text = string.Format(Loc.S("FilledRegion.InfoGeneral"), _analysis.FilledRegions.Count);
             }
         }
 
@@ -101,8 +102,8 @@ namespace Tools28.Commands.FilledRegionSplitMerge
             // 操作が選択されているか確認
             if (RadioSplit.IsChecked != true && RadioMerge.IsChecked != true)
             {
-                MessageBox.Show("操作（分割または統合）を選択してください。",
-                    "入力エラー",
+                MessageBox.Show(Loc.S("FilledRegion.SelectOperation"),
+                    Loc.S("Common.InputError"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
                 return;
@@ -113,8 +114,8 @@ namespace Tools28.Commands.FilledRegionSplitMerge
             {
                 if (ComboPattern.SelectedItem == null)
                 {
-                    MessageBox.Show("塗り潰しパターンを選択してください。",
-                        "入力エラー",
+                    MessageBox.Show(Loc.S("FilledRegion.SelectPatternWarn"),
+                        Loc.S("Common.InputError"),
                         MessageBoxButton.OK,
                         MessageBoxImage.Warning);
                     return;

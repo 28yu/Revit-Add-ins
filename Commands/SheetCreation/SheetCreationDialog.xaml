@@ -213,7 +213,7 @@
 
             <!-- 図枠選択 -->
             <StackPanel Grid.Row="0" Margin="0,0,0,20">
-                <TextBlock Text="図枠を選択:" Style="{StaticResource LabelStyle}"/>
+                <TextBlock x:Name="txtSelectTitleBlock" Text="図枠を選択:" Style="{StaticResource LabelStyle}"/>
                 <ComboBox x:Name="TitleBlockComboBox" 
                           Style="{StaticResource ComboBoxStyle}"
                           SelectionChanged="TitleBlockComboBox_SelectionChanged"
@@ -222,27 +222,27 @@
 
             <!-- 作成枚数 -->
             <StackPanel Grid.Row="1" Margin="0,0,0,20">
-                <TextBlock Text="作成枚数:" Style="{StaticResource LabelStyle}"/>
+                <TextBlock x:Name="txtCount" Text="作成枚数:" Style="{StaticResource LabelStyle}"/>
                 <TextBox x:Name="SheetCountTextBox" 
                          Style="{StaticResource TextBoxStyle}"
                          Text="5"
                          TextChanged="SheetCountTextBox_TextChanged"
                          PreviewTextInput="SheetCountTextBox_PreviewTextInput"/>
-                <TextBlock Text="※ 1～100の範囲で入力してください" 
-                           FontSize="10" 
+                <TextBlock x:Name="txtCountHint" Text="※ 1～100の範囲で入力してください"
+                           FontSize="10"
                            Foreground="#666666"
                            Margin="0,5,0,0"/>
             </StackPanel>
 
             <!-- 図面No -->
             <StackPanel Grid.Row="2" Margin="0,0,0,20">
-                <TextBlock Text="図面No:" Style="{StaticResource LabelStyle}"/>
+                <TextBlock x:Name="txtDrawingNo" Text="図面No:" Style="{StaticResource LabelStyle}"/>
                 <TextBox x:Name="PrefixTextBox" 
                          Style="{StaticResource TextBoxStyle}"
                          TextChanged="PrefixTextBox_TextChanged"
                          MaxLength="20"/>
-                <TextBlock Text="※ 空欄の場合は図面Noなし（例: D-駐住, A-棟, など）" 
-                           FontSize="10" 
+                <TextBlock x:Name="txtDrawingNoHint" Text="※ 空欄の場合は図面Noなし（例: D-駐住, A-棟, など）"
+                           FontSize="10"
                            Foreground="#666666"
                            Margin="0,5,0,0"/>
             </StackPanel>
@@ -260,7 +260,7 @@
                         Click="CreateButton_Click"
                         x:Name="CreateButton"
                         IsEnabled="True"/>
-                <Button Content="キャンセル" 
+                <Button x:Name="btnCancel" Content="キャンセル"
                         Style="{StaticResource SecondaryButtonStyle}"
                         Click="CancelButton_Click"/>
             </StackPanel>

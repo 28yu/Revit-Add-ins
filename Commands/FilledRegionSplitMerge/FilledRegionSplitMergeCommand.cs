@@ -81,7 +81,7 @@ namespace Tools28.Commands.FilledRegionSplitMerge
                                 processedCount += count;
                             }
 
-                            resultMessage = $"{regionsToSplit.Count}個の領域を{processedCount}個の独立した領域に分割しました。";
+                            resultMessage = string.Format(Loc.S("FilledRegion.SplitResult"), regionsToSplit.Count, processedCount);
                         }
                         else // Merge
                         {
@@ -91,7 +91,7 @@ namespace Tools28.Commands.FilledRegionSplitMerge
                                 analysis.FilledRegions,
                                 dialog.SelectedPattern.Id);
 
-                            resultMessage = $"{processedCount}個の領域を1個の領域に統合しました。";
+                            resultMessage = string.Format(Loc.S("FilledRegion.MergeResult"), processedCount);
                         }
 
                         trans.Commit();

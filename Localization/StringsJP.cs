@@ -124,6 +124,8 @@ namespace Tools28.Localization
             { "FilledRegion.InfoSplit", "選択: {0}個の領域（分割可能: {1}個、合計{2}エリア）" },
             { "FilledRegion.InfoMerge", "選択: {0}個の領域（合計{1}エリア）→ 1個の領域に統合" },
             { "FilledRegion.InfoGeneral", "選択: {0}個の領域" },
+            { "FilledRegion.SplitResult", "{0}個の領域を{1}個の独立した領域に分割しました。" },
+            { "FilledRegion.MergeResult", "{0}個の領域を1個の領域に統合しました。" },
 
             // === RoomTag Dialog ===
             { "RoomTag.Title", "部屋タグ自動配置" },

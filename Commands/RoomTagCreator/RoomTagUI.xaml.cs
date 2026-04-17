@@ -10,6 +10,7 @@ using System.Windows.Media;
 using System.Windows.Shapes;
 using Autodesk.Revit.DB;
 using Tools28.Commands.RoomTagCreator.Model;
+using Tools28.Localization;
 
 namespace Tools28.Commands.RoomTagCreator
 {
@@ -190,28 +191,28 @@ namespace Tools28.Commands.RoomTagCreator
             // バリデーション
             if (string.IsNullOrWhiteSpace(ViewNameTextBox.Text))
             {
-                MessageBox.Show("ビュー名を入力してください。", "警告",
+                MessageBox.Show(Loc.S("RoomTag.EnterViewName"), Loc.S("Common.Warning"),
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
             if (_rooms.Count == 0)
             {
-                MessageBox.Show("部屋が選択されていません。", "警告",
+                MessageBox.Show(Loc.S("RoomTag.SelectRooms"), Loc.S("Common.Warning"),
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
             if (TagTypeComboBox.SelectedIndex < 0 || _tagTypes.Count == 0)
             {
-                MessageBox.Show("タグファミリタイプを選択してください。", "警告",
+                MessageBox.Show(Loc.S("RoomTag.SelectTagType"), Loc.S("Common.Warning"),
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
             if (!double.TryParse(SpacingTextBox.Text, out double spacing) || spacing < 0)
             {
-                MessageBox.Show("タグ間隔には0以上の数値を入力してください。", "入力エラー",
+                MessageBox.Show(Loc.S("RoomTag.InvalidSpacing"), Loc.S("Common.InputError"),
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }

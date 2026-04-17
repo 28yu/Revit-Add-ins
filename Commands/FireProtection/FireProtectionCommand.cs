@@ -4,6 +4,7 @@ using System.Linq;
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using Tools28.Localization;
 
 namespace Tools28.Commands.FireProtection
 {
@@ -55,8 +56,8 @@ namespace Tools28.Commands.FireProtection
 
                     if (targetViews.Count == 0)
                     {
-                        TaskDialog.Show("エラー",
-                            "シート上に対応するビュー（平面、天伏、構造伏、断面）がありません。");
+                        TaskDialog.Show(Loc.S("Common.Error"),
+                            Loc.S("Fire.NoViewOnSheet"));
                         return Result.Cancelled;
                     }
                 }
@@ -69,8 +70,8 @@ namespace Tools28.Commands.FireProtection
                 }
                 else
                 {
-                    TaskDialog.Show("エラー",
-                        "平面ビュー、天井伏図、構造伏図、断面図、またはシートで実行してください。");
+                    TaskDialog.Show(Loc.S("Common.Error"),
+                        Loc.S("Fire.WrongView"));
                     return Result.Cancelled;
                 }
 
@@ -105,8 +106,8 @@ namespace Tools28.Commands.FireProtection
 
                 if (allBeams.Count == 0 && allColumns.Count == 0)
                 {
-                    TaskDialog.Show("エラー",
-                        "ビュー内に梁（構造フレーム）または柱（構造柱）が見つかりません。");
+                    TaskDialog.Show(Loc.S("Common.Error"),
+                        Loc.S("Fire.NoElements"));
                     return Result.Cancelled;
                 }
 
@@ -490,11 +491,9 @@ namespace Tools28.Commands.FireProtection
                     ? "凡例ビュー「耐火被覆色分け凡例」を作成しました"
                     : "凡例ビュー作成をスキップしました";
 
-                TaskDialog.Show("耐火被覆色分け - 完了",
-                    $"処理が完了しました。\n\n" +
-                    $"対象ビュー数: {targetViews.Count}\n" +
-                    $"塗潰領域: {regionCount} 個作成\n" +
-                    $"耐火被覆種類: {settings.Types.Count}\n" +
+                TaskDialog.Show(Loc.S("Fire.DoneTitle"),
+                    string.Format(Loc.S("Fire.DoneMsg"), targetViews.Count, regionCount) +
+                    $"\n耐火被覆種類: {settings.Types.Count}\n" +
                     $"{legendInfo}");
 
                 return Result.Succeeded;

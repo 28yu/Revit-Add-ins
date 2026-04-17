@@ -5,6 +5,7 @@ using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using RevitApp = Autodesk.Revit.ApplicationServices.Application;
+using Tools28.Localization;
 
 namespace Tools28.Commands.BeamTopLevel
 {
@@ -26,16 +27,16 @@ namespace Tools28.Commands.BeamTopLevel
                 if (activeView.ViewType != ViewType.FloorPlan &&
                     activeView.ViewType != ViewType.EngineeringPlan)
                 {
-                    TaskDialog.Show("エラー",
-                        "アクティブビューが平面ビューまたは構造伏図ではありません。\n平面ビューまたは構造伏図を開いた状態で実行してください。");
+                    TaskDialog.Show(Loc.S("Common.Error"),
+                        Loc.S("BeamTop.NotPlanView"));
                     return Result.Cancelled;
                 }
 
                 // チェック2: ビューテンプレート
                 if (activeView.ViewTemplateId != ElementId.InvalidElementId)
                 {
-                    TaskDialogResult templateResult = TaskDialog.Show("ビューテンプレート確認",
-                        "ビューテンプレートが設定されています。\nフィルタを作成するにはテンプレートを解除する必要があります。\n\nテンプレートを解除しますか？",
+                    TaskDialogResult templateResult = TaskDialog.Show(Loc.S("BeamTop.ViewTemplate"),
+                        Loc.S("BeamTop.ViewTemplateMsg"),
                         TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No);
 
                     if (templateResult == TaskDialogResult.Yes)
@@ -62,7 +63,7 @@ namespace Tools28.Commands.BeamTopLevel
 
                 if (beams.Count == 0)
                 {
-                    TaskDialog.Show("エラー", "ビュー内に梁（構造フレーム）が見つかりません。");
+                    TaskDialog.Show(Loc.S("Common.Error"), Loc.S("BeamTop.NoBeams"));
                     return Result.Cancelled;
                 }
 
@@ -70,7 +71,7 @@ namespace Tools28.Commands.BeamTopLevel
                 Level refLevel = activeView.GenLevel;
                 if (refLevel == null)
                 {
-                    TaskDialog.Show("エラー", "ビューの参照レベルが取得できません。");
+                    TaskDialog.Show(Loc.S("Common.Error"), Loc.S("BeamTop.NoRefLevel"));
                     return Result.Cancelled;
                 }
 
@@ -220,7 +221,7 @@ namespace Tools28.Commands.BeamTopLevel
                     resultMessage += "\n\n※ 失敗した梁は赤色フィルタで表示されています。";
                 }
 
-                TaskDialog.Show("梁天端色分け - 完了", resultMessage);
+                TaskDialog.Show(Loc.S("BeamTop.DoneTitle"), resultMessage);
 
                 return Result.Succeeded;
             }

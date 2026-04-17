@@ -124,6 +124,8 @@ namespace Tools28.Localization
             { "FilledRegion.InfoSplit", "Selected: {0} regions (splittable: {1}, total {2} areas)" },
             { "FilledRegion.InfoMerge", "Selected: {0} regions (total {1} areas) → merge into 1 region" },
             { "FilledRegion.InfoGeneral", "Selected: {0} regions" },
+            { "FilledRegion.SplitResult", "Split {0} regions into {1} independent regions." },
+            { "FilledRegion.MergeResult", "Merged {0} regions into 1 region." },
 
             // === RoomTag Dialog ===
             { "RoomTag.Title", "Room Tag Auto Placement" },

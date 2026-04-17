@@ -5,6 +5,7 @@ using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using RevitApp = Autodesk.Revit.ApplicationServices.Application;
+using Tools28.Localization;
 
 namespace Tools28.Commands.BeamUnderLevel
 {
@@ -25,16 +26,16 @@ namespace Tools28.Commands.BeamUnderLevel
                 // チェック1: ビュータイプ（天井伏図 = CeilingPlan）
                 if (activeView.ViewType != ViewType.CeilingPlan)
                 {
-                    TaskDialog.Show("エラー",
-                        "アクティブビューが天井伏図ではありません。\n天井伏図を開いた状態で実行してください。");
+                    TaskDialog.Show(Loc.S("Common.Error"),
+                        Loc.S("BeamUnder.NotCeiling"));
                     return Result.Cancelled;
                 }
 
                 // チェック2: ビューテンプレート
                 if (activeView.ViewTemplateId != ElementId.InvalidElementId)
                 {
-                    TaskDialogResult templateResult = TaskDialog.Show("ビューテンプレート確認",
-                        "ビューテンプレートが設定されています。\nフィルタを作成するにはテンプレートを解除する必要があります。\n\nテンプレートを解除しますか？",
+                    TaskDialogResult templateResult = TaskDialog.Show(Loc.S("BeamUnder.ViewTemplate"),
+                        Loc.S("BeamUnder.ViewTemplateMsg"),
                         TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No);
 
                     if (templateResult == TaskDialogResult.Yes)
@@ -61,7 +62,7 @@ namespace Tools28.Commands.BeamUnderLevel
 
                 if (beams.Count == 0)
                 {
-                    TaskDialog.Show("エラー", "ビュー内に梁（構造フレーム）が見つかりません。");
+                    TaskDialog.Show(Loc.S("Common.Error"), Loc.S("BeamUnder.NoBeams"));
                     return Result.Cancelled;
                 }
 
@@ -76,7 +77,7 @@ namespace Tools28.Commands.BeamUnderLevel
                 Level refLevel = activeView.GenLevel;
                 if (refLevel == null)
                 {
-                    TaskDialog.Show("エラー", "ビューの参照レベルが取得できません。");
+                    TaskDialog.Show(Loc.S("Common.Error"), Loc.S("BeamUnder.NoRefLevel"));
                     return Result.Cancelled;
                 }
 
@@ -88,7 +89,7 @@ namespace Tools28.Commands.BeamUnderLevel
 
                 if (upperLevels.Count == 0)
                 {
-                    TaskDialog.Show("エラー", "参照レベルより上のレベルが見つかりません。");
+                    TaskDialog.Show(Loc.S("Common.Error"), Loc.S("BeamUnder.NoUpperLevel"));
                     return Result.Cancelled;
                 }
 
@@ -252,7 +253,7 @@ namespace Tools28.Commands.BeamUnderLevel
                     resultMessage += "\n\n※ 失敗した梁は赤色フィルタで表示されています。";
                 }
 
-                TaskDialog.Show("梁下端色分け - 完了", resultMessage);
+                TaskDialog.Show(Loc.S("BeamUnder.DoneTitle"), resultMessage);
 
                 return Result.Succeeded;
             }

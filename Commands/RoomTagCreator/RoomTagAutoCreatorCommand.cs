@@ -94,7 +94,7 @@ namespace Tools28.Commands.RoomTagCreator
 
                 if (dialog.Layout == null)
                 {
-                    TaskDialog.Show("エラー", "配置設定が取得できませんでした。");
+                    TaskDialog.Show(Loc.S("Common.Error"), Loc.S("RoomTag.NoLayout"));
                     return Result.Failed;
                 }
 
@@ -119,7 +119,7 @@ namespace Tools28.Commands.RoomTagCreator
                         {
                             t1.RollBack();
                             tg.RollBack();
-                            TaskDialog.Show("エラー", ex.Message);
+                            TaskDialog.Show(Loc.S("Common.Error"), ex.Message);
                             return Result.Failed;
                         }
                         t1.Commit();
@@ -139,7 +139,7 @@ namespace Tools28.Commands.RoomTagCreator
                             {
                                 t2.RollBack();
                                 tg.RollBack();
-                                TaskDialog.Show("エラー", "部屋タグの生成に失敗しました。");
+                                TaskDialog.Show(Loc.S("Common.Error"), Loc.S("RoomTag.GenFailed"));
                                 return Result.Failed;
                             }
                         }
@@ -147,8 +147,8 @@ namespace Tools28.Commands.RoomTagCreator
                         {
                             t2.RollBack();
                             tg.RollBack();
-                            TaskDialog.Show("エラー",
-                                $"部屋タグの生成中にエラーが発生しました。\n{ex.Message}");
+                            TaskDialog.Show(Loc.S("Common.Error"),
+                                string.Format(Loc.S("RoomTag.GenError"), ex.Message));
                             return Result.Failed;
                         }
                         t2.Commit();
@@ -159,10 +159,8 @@ namespace Tools28.Commands.RoomTagCreator
                     // 3. 新規ビューに切り替え
                     uidoc.ActiveView = newView;
 
-                    TaskDialog.Show("完了",
-                        $"部屋タグの自動配置が完了しました。\n\n" +
-                        $"ビュー名: {dialog.NewViewName}\n" +
-                        $"配置タグ数: {dialog.SelectedRooms.Count}");
+                    TaskDialog.Show(Loc.S("Common.Complete"),
+                        string.Format(Loc.S("RoomTag.Done"), dialog.NewViewName, dialog.SelectedRooms.Count));
                 }
 
                 return Result.Succeeded;

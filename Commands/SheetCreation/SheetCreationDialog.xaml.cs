@@ -6,6 +6,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using Autodesk.Revit.DB;
+using Tools28.Localization;
 
 namespace Tools28.Commands.SheetCreation
 {
@@ -40,6 +41,7 @@ namespace Tools28.Commands.SheetCreation
         public SheetCreationDialog(Document doc)
         {
             InitializeComponent();
+            ApplyLocalization();
 
             _doc = doc;
             SheetCount = 5;
@@ -62,8 +64,8 @@ namespace Tools28.Commands.SheetCreation
             if (symbols.Count == 0)
             {
                 MessageBox.Show(
-                    "プロジェクトに図枠ファミリがロードされていません。",
-                    "警告",
+                    Loc.S("Sheet.NoTitleBlock"),
+                    Loc.S("Common.Warning"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning
                 );
@@ -138,13 +140,13 @@ namespace Tools28.Commands.SheetCreation
         {
             if (SelectedTitleBlock == null)
             {
-                MessageBox.Show("図枠を選択してください。", "警告", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(Loc.S("Sheet.SelectTitleBlockWarn"), Loc.S("Common.Warning"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
             if (SheetCount < 1 || SheetCount > 100)
             {
-                MessageBox.Show("作成枚数は1～100の範囲で入力してください。", "警告", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(Loc.S("Sheet.CountRange"), Loc.S("Common.Warning"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 

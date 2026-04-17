@@ -7,6 +7,7 @@ using System.Windows.Controls;
 using Autodesk.Revit.DB;
 using Microsoft.Win32;
 using Tools28.Commands.ExcelExportImport.Services;
+using Tools28.Localization;
 
 namespace Tools28.Commands.ExcelExportImport.Views
 {
@@ -61,8 +62,8 @@ namespace Tools28.Commands.ExcelExportImport.Views
             var openFiles = ExcelProcessHelper.GetOpenExcelFiles();
             if (openFiles.Count == 0)
             {
-                MessageBox.Show("開いているExcelファイルが見つかりません。",
-                    "確認", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show(Loc.S("Import.NoOpenFile"),
+                    Loc.S("Common.Confirm"), MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
             else if (openFiles.Count == 1)
@@ -229,8 +230,8 @@ namespace Tools28.Commands.ExcelExportImport.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"ファイルの読み込みに失敗しました。\n{ex.Message}",
-                    "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show(string.Format(Loc.S("Import.ReadFailed"), ex.Message),
+                    Loc.S("Common.Error"), MessageBoxButton.OK, MessageBoxImage.Error);
                 ImportButton.IsEnabled = false;
             }
         }

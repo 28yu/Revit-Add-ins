@@ -6,6 +6,7 @@ using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using Tools28.Commands.ExcelExportImport.Services;
 using Tools28.Commands.ExcelExportImport.Views;
+using Tools28.Localization;
 
 namespace Tools28.Commands.ExcelExportImport
 {
@@ -124,7 +125,7 @@ namespace Tools28.Commands.ExcelExportImport
                     }
                 }
 
-                TaskDialog.Show("インポート結果", sb.ToString());
+                TaskDialog.Show(Loc.S("Import.ResultTitle"), sb.ToString());
 
                 return Result.Succeeded;
             }
