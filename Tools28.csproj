@@ -65,6 +65,14 @@
     <Resource Include="Resources\Icons\excel_import_96.png" />
     <Resource Include="Resources\Icons\language_16.png" />
     <Resource Include="Resources\Icons\language_32.png" />
+    <Resource Include="Resources\Icons\flag_jp_16.png" />
+    <Resource Include="Resources\Icons\flag_jp_32.png" />
+    <Resource Include="Resources\Icons\flag_us_16.png" />
+    <Resource Include="Resources\Icons\flag_us_32.png" />
+    <Resource Include="Resources\Icons\flag_cn_16.png" />
+    <Resource Include="Resources\Icons\flag_cn_32.png" />
+    <Resource Include="Resources\Icons\ver_16.png" />
+    <Resource Include="Resources\Icons\ver_32.png" />
   </ItemGroup>
 
 

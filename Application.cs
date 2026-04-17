@@ -338,35 +338,64 @@ namespace Tools28
 
 
         /// <summary>
-        /// 設定パネルを作成（リボン最右端、小ボタン）
-        /// Revit API では単独ボタンは常に大サイズになるため、AddStackedItems で小サイズに配置する
+        /// 設定パネルを作成（リボン最右端、小ボタン2段スタック）
         /// </summary>
         private void CreateSettingsPanel(UIControlledApplication application, string tabName, string assemblyPath)
         {
             RibbonPanel panel = application.CreateRibbonPanel(tabName, "設定");
 
-            // 言語切替ボタン
-            PushButtonData languageButtonData = new PushButtonData(
+            // 言語切替プルダウン（▼付きドロップダウン）
+            PulldownButtonData languagePulldownData = new PulldownButtonData(
                 "LanguageSwitch",
-                "言語 / Lang",
-                assemblyPath,
-                "Tools28.Commands.LanguageSwitch.LanguageSwitchCommand");
-            languageButtonData.ToolTip = "UIの表示言語を切り替えます (日本語 / English / 中文)";
-            languageButtonData.Image = LoadImage("language_16.png");
-            languageButtonData.LargeImage = LoadImage("language_32.png");
+                "言語 ▼");
+            languagePulldownData.ToolTip = "UIの表示言語を切り替えます (日本語 / English / 中文)";
+            languagePulldownData.Image = LoadImage("language_16.png");
+            languagePulldownData.LargeImage = LoadImage("language_32.png");
 
-            // バージョン情報ボタン（スタック表示用の2つ目のアイテム）
+            // バージョン情報ボタン
             PushButtonData aboutButtonData = new PushButtonData(
                 "About",
-                "情報",
+                "バージョン情報",
                 assemblyPath,
                 "Tools28.Commands.LanguageSwitch.AboutCommand");
             aboutButtonData.ToolTip = "28 Tools のバージョン情報を表示します";
-            aboutButtonData.Image = LoadImage("language_16.png");
-            aboutButtonData.LargeImage = LoadImage("language_32.png");
+            aboutButtonData.Image = LoadImage("ver_16.png");
+            aboutButtonData.LargeImage = LoadImage("ver_32.png");
 
             // 2段スタックで小ボタン化
-            panel.AddStackedItems(languageButtonData, aboutButtonData);
+            var stackedItems = panel.AddStackedItems(languagePulldownData, aboutButtonData);
+
+            // プルダウンメニューに言語選択肢を追加
+            PulldownButton languagePulldown = stackedItems[0] as PulldownButton;
+            if (languagePulldown != null)
+            {
+                PushButtonData jpData = new PushButtonData(
+                    "LangJP", "JP　日本語",
+                    assemblyPath,
+                    "Tools28.Commands.LanguageSwitch.SwitchToJapaneseCommand");
+                jpData.Image = LoadImage("flag_jp_16.png");
+                jpData.LargeImage = LoadImage("flag_jp_32.png");
+                jpData.ToolTip = "日本語に切り替えます";
+                languagePulldown.AddPushButton(jpData);
+
+                PushButtonData enData = new PushButtonData(
+                    "LangUS", "US　English",
+                    assemblyPath,
+                    "Tools28.Commands.LanguageSwitch.SwitchToEnglishCommand");
+                enData.Image = LoadImage("flag_us_16.png");
+                enData.LargeImage = LoadImage("flag_us_32.png");
+                enData.ToolTip = "Switch to English";
+                languagePulldown.AddPushButton(enData);
+
+                PushButtonData cnData = new PushButtonData(
+                    "LangCN", "CN　中文",
+                    assemblyPath,
+                    "Tools28.Commands.LanguageSwitch.SwitchToChineseCommand");
+                cnData.Image = LoadImage("flag_cn_16.png");
+                cnData.LargeImage = LoadImage("flag_cn_32.png");
+                cnData.ToolTip = "切换为中文";
+                languagePulldown.AddPushButton(cnData);
+            }
         }
 
         /// <summary>
