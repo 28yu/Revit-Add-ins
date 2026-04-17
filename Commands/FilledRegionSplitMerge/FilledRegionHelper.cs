@@ -131,7 +131,7 @@ namespace Tools28.Commands.FilledRegionSplitMerge
         }
 
         /// <summary>
-        /// 複数の塗り潰し領域を統合
+        /// 複数の塗り潰し領域を統合（重なり合う領域にも対応）
         /// </summary>
         /// <returns>統合された領域数</returns>
         public static int MergeFilledRegions(Document doc, List<FilledRegion> filledRegions, ElementId newTypeId)
@@ -141,19 +141,18 @@ namespace Tools28.Commands.FilledRegionSplitMerge
                 return 0; // 統合不可
             }
 
-            // 全ての境界線を取得
-            var allBoundaries = new List<CurveLoop>();
+            // 各領域の境界ループを収集
+            var regionLoops = new List<IList<CurveLoop>>();
             View view = null;
 
             foreach (var fr in filledRegions)
             {
                 var boundaries = fr.GetBoundaries();
-                allBoundaries.AddRange(boundaries);
+                if (boundaries != null && boundaries.Count > 0)
+                    regionLoops.Add(boundaries);
 
                 if (view == null)
-                {
                     view = doc.GetElement(fr.OwnerViewId) as View;
-                }
             }
 
             if (view == null)
@@ -161,14 +160,133 @@ namespace Tools28.Commands.FilledRegionSplitMerge
                 throw new InvalidOperationException("ビューが見つかりません");
             }
 
-            // 新しい統合領域を作成
-            FilledRegion.Create(doc, newTypeId, view.Id, allBoundaries);
+            if (regionLoops.Count == 0)
+                return 0;
+
+            // 重なり合う領域を考慮してブーリアン和で統合
+            var mergedLoops = UnionRegionLoops(regionLoops);
+
+            // Union に失敗した場合はフォールバック（単純連結）
+            if (mergedLoops == null || mergedLoops.Count == 0)
+            {
+                mergedLoops = new List<CurveLoop>();
+                foreach (var loops in regionLoops)
+                    mergedLoops.AddRange(loops);
+            }
+
+            FilledRegion.Create(doc, newTypeId, view.Id, mergedLoops);
 
             // 元の領域を全て削除
             var idsToDelete = filledRegions.Select(fr => fr.Id).ToList();
             doc.Delete(idsToDelete);
 
             return filledRegions.Count;
+        }
+
+        /// <summary>
+        /// 複数の CurveLoop 群をブーリアン和で統合する
+        /// （重なり合う領域を1つの輪郭に統合、離れている領域は複数ループとして残る）
+        /// </summary>
+        private static List<CurveLoop> UnionRegionLoops(List<IList<CurveLoop>> regionLoops)
+        {
+            // 共通の基準平面（最初の外形ループから法線を決定）
+            XYZ normal = null;
+            foreach (var loops in regionLoops)
+            {
+                if (loops.Count == 0) continue;
+                try
+                {
+                    var plane = loops[0].GetPlane();
+                    if (plane != null)
+                    {
+                        normal = plane.Normal.Normalize();
+                        break;
+                    }
+                }
+                catch { }
+            }
+
+            if (normal == null)
+                return null;
+
+            const double thickness = 1.0; // 1 feet の薄板として押し出し
+
+            Solid unionSolid = null;
+
+            foreach (var loops in regionLoops)
+            {
+                Solid solid;
+                try
+                {
+                    solid = GeometryCreationUtilities.CreateExtrusionGeometry(loops, normal, thickness);
+                }
+                catch
+                {
+                    continue;
+                }
+
+                if (solid == null || solid.Volume < 1e-9)
+                    continue;
+
+                if (unionSolid == null)
+                {
+                    unionSolid = solid;
+                    continue;
+                }
+
+                try
+                {
+                    var combined = BooleanOperationsUtils.ExecuteBooleanOperation(
+                        unionSolid, solid, BooleanOperationsType.Union);
+                    if (combined != null && combined.Volume > 1e-9)
+                        unionSolid = combined;
+                }
+                catch
+                {
+                    // 和集合に失敗した場合はその領域を無視して続行
+                }
+            }
+
+            if (unionSolid == null)
+                return null;
+
+            // 押し出し方向の"上面"となる平面（法線が +normal と一致する PlanarFace）を取得
+            PlanarFace topFace = null;
+            foreach (Face face in unionSolid.Faces)
+            {
+                if (face is PlanarFace pf
+                    && pf.FaceNormal.IsAlmostEqualTo(normal))
+                {
+                    topFace = pf;
+                    break;
+                }
+            }
+
+            if (topFace == null)
+                return null;
+
+            try
+            {
+                var rawLoops = topFace.GetEdgesAsCurveLoops();
+                if (rawLoops == null || rawLoops.Count == 0)
+                    return null;
+
+                // 上面は押し出し方向へ thickness ぶんオフセットしているので元平面へ戻す
+                var back = Transform.CreateTranslation(-thickness * normal);
+                var result = new List<CurveLoop>();
+                foreach (var loop in rawLoops)
+                {
+                    var moved = new CurveLoop();
+                    foreach (Curve c in loop)
+                        moved.Append(c.CreateTransformed(back));
+                    result.Add(moved);
+                }
+                return result;
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         /// <summary>
