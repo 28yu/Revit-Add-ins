@@ -221,6 +221,7 @@ namespace Tools28.Commands.FireProtection
                 // 実行: 各ビューに対して処理
                 ElementId legendViewId = null;
                 int regionCount = 0;
+                bool hasColumnFrame = false;
 
                 using (Transaction trans = new Transaction(doc, "耐火被覆色分け"))
                 {
@@ -400,7 +401,7 @@ namespace Tools28.Commands.FireProtection
                         }
 
                         // 凡例は1回だけ作成
-                        bool hasColumnFrame = targetViews.Any(
+                        hasColumnFrame = targetViews.Any(
                             v => v.ViewType != ViewType.Section);
                         var beamCountByType = new Dictionary<string, int>();
                         legendViewId = LegendManager.CreateLegendDraftingView(
