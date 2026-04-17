@@ -5,6 +5,13 @@
 - 1行目: 変更内容の要約（日本語、50文字以内目安）
 - 例: `通知メッセージを日本語化`, `梁天端色分け機能を追加`, `ビルドスクリプトの権限エラーを修正`
 
+## ⚠️ 多言語化ルール（必須）
+- **新機能の追加・既存機能の改善時は、必ず3言語（JP/US/CN）を同時に対応すること**
+- UI上に表示される全ての文字列（ボタン名、ツールチップ、ダイアログテキスト、エラーメッセージ、TaskDialog等）は `Loc.S("Key")` を使用し、ハードコードされた日本語文字列を書かない
+- 翻訳エントリは `Localization/StringsJP.cs`, `StringsEN.cs`, `StringsCN.cs` の3ファイルに同じキーで同時追加
+- リボンボタン追加時は `_buttonTextKeys` / `_buttonTipKeys` へのマッピング追加も忘れないこと
+- 詳細は「新機能追加手順 > 2. 多言語リソースの追加」を参照
+
 ## プロジェクト概要
 - **名前**: Tools28
 - **種類**: Autodesk Revit アドイン (C# / .NET Framework 4.8)
@@ -158,19 +165,24 @@ C:\ProgramData\Autodesk\Revit\Addins\{VERSION}\
 
 **新機能の追加やバージョン番号の変更時は、以下のファイルを必ず更新すること：**
 
-1. **`Packages/{VERSION}/README.txt`** (全6バージョン)
+1. **`Localization/StringsJP.cs`, `StringsEN.cs`, `StringsCN.cs`** (3ファイル同時)
+   - 新機能のUI文字列（ボタン名、ツールチップ、ダイアログ文字列、エラーメッセージ等）
+   - 3ファイル全てに同じキーを追加（キー不一致は禁止）
+
+2. **`Packages/{VERSION}/README.txt`** (全6バージョン)
    - タイトルのバージョン番号（例: `28 Tools v2.0 for Revit 2024`）
    - 「新機能・変更点」セクションに追加機能を記載
    - 「機能一覧」セクションに新しいコマンドを追加
 
-2. **`Packages/{VERSION}/install.bat`** (全6バージョン)
+3. **`Packages/{VERSION}/install.bat`** (全6バージョン)
    - ヘッダーのバージョン番号（例: `28 Tools v2.0 for Revit 2024`）
 
-3. **`.github/workflows/build-and-release.yml`**
+4. **`.github/workflows/build-and-release.yml`**
    - Release body の「機能一覧」セクションに新機能を追加
 
-4. **`Application.cs`**
+5. **`Application.cs`**
    - リボンに新しいボタンを登録
+   - `_buttonTextKeys` / `_buttonTipKeys` にマッピングを追加（言語切替時の動的更新用）
 
 #### 更新コマンド例（全6バージョン一括更新）
 ```bash
@@ -248,21 +260,81 @@ namespace Tools28.Commands.FeatureName
 }
 ```
 
-### 2. リボンへの登録
+### 2. 多言語リソースの追加（必須）
 
-`Application.cs` の `OnStartup()` メソッド内でボタンを追加：
+**新機能追加・既存機能改善時は、必ず3言語同時に対応すること。**
+
+#### 2-1. 翻訳辞書にエントリを追加
+
+3ファイル全てに同じキーを追加する（キーの不一致は禁止）：
 
 ```csharp
+// Localization/StringsJP.cs
+{ "FeatureName.Title", "機能名タイトル" },
+{ "FeatureName.Description", "機能の説明文" },
+
+// Localization/StringsEN.cs
+{ "FeatureName.Title", "Feature Name Title" },
+{ "FeatureName.Description", "Description of the feature" },
+
+// Localization/StringsCN.cs
+{ "FeatureName.Title", "功能名称标题" },
+{ "FeatureName.Description", "功能说明" },
+```
+
+キー命名規則:
+- リボンボタン: `Ribbon.FeatureName.ButtonName` / `Ribbon.FeatureName.ButtonName.Tip`
+- パネル名: `Ribbon.Panel.PanelName`
+- ダイアログ: `FeatureName.Title`, `FeatureName.LabelX`
+- 共通: `Common.OK`, `Common.Cancel` 等は既存を再利用
+
+#### 2-2. コード内の文字列を `Loc.S()` で置換
+
+```csharp
+// ❌ ハードコードされた日本語
+btn.ToolTip = "機能の説明";
+TaskDialog.Show("エラー", "選択してください");
+
+// ✅ 多言語対応
+btn.ToolTip = Loc.S("Ribbon.FeatureName.Tip");
+TaskDialog.Show(Loc.S("Common.Error"), Loc.S("FeatureName.SelectPrompt"));
+```
+
+#### 2-3. WPFダイアログがある場合
+
+`ApplyLocalization()` メソッドを実装し、コンストラクタで呼び出す：
+
+```csharp
+private void ApplyLocalization()
+{
+    this.Title = Loc.S("FeatureName.Title");
+    labelX.Text = Loc.S("FeatureName.LabelX");
+    btnOK.Content = Loc.S("Common.OK");
+    btnCancel.Content = Loc.S("Common.Cancel");
+}
+```
+
+### 3. リボンへの登録
+
+`Application.cs` の `OnStartup()` メソッド内でボタンを追加し、多言語マッピングも登録：
+
+```csharp
+// ボタン作成（テキストとツールチップは Loc.S() で取得）
 PushButton btn = panel.AddItem(new PushButtonData(
     "FeatureName",
-    "機能名",
+    Loc.S("Ribbon.FeatureName.Button"),
     assemblyPath,
     "Tools28.Commands.FeatureName.FeatureNameCommand"
 )) as PushButton;
-btn.ToolTip = "機能の説明";
+btn.ToolTip = Loc.S("Ribbon.FeatureName.Button.Tip");
+
+// 言語切替時の動的更新用マッピングに追加
+_buttons["FeatureName"] = btn;
+_buttonTextKeys["FeatureName"] = "Ribbon.FeatureName.Button";
+_buttonTipKeys["FeatureName"] = "Ribbon.FeatureName.Button.Tip";
 ```
 
-### 3. アイコンの追加（オプション）
+### 5. アイコンの追加（オプション）
 
 `Resources/Icons/` に32x32 PNGを追加し、`.csproj` に `<Resource>` を追加
 
@@ -272,7 +344,7 @@ btn.ToolTip = "機能の説明";
 </ItemGroup>
 ```
 
-### 4. ビルド＆テスト
+### 6. ビルド＆テスト
 
 ```powershell
 .\QuickBuild.ps1  # Revit 2022でビルド→デプロイ
