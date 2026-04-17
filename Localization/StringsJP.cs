@@ -304,6 +304,12 @@ namespace Tools28.Localization
             { "Export.SettingsLoadFailed", "設定の読み込みに失敗しました。\n{0}" },
             { "Export.SelectParams", "出力するパラメータを選択してください。" },
             { "Export.SelectCategory", "カテゴリを選択してください。" },
+            { "Export.Scope.WindowTitle", "EXCELエクスポート" },
+            { "Export.Scope.Title", "書出し範囲の選択" },
+            { "Export.Scope.Description", "書出す要素の範囲を選択してください。" },
+            { "Export.Scope.Project", "プロジェクト全体の要素" },
+            { "Export.Scope.View", "現在のビューにある要素" },
+            { "Export.Scope.Selection", "現在選択されている要素" },
 
             // === ExcelImport Dialog ===
             { "Import.Title", "EXCELインポート" },

@@ -18,6 +18,9 @@ namespace Tools28.Commands.ExcelExportImport.Views
     public partial class ExportDialog : Window
     {
         private readonly Document _doc;
+        private readonly ExportScope _scope;
+        private readonly View _activeView;
+        private readonly ICollection<ElementId> _selectionIds;
 
         // 全カテゴリ一覧
         private List<CategoryInfo> _allCategories;
@@ -36,13 +39,26 @@ namespace Tools28.Commands.ExcelExportImport.Views
         public bool SplitByCategory { get; private set; } = true;
 
         public ExportDialog(Document doc)
+            : this(doc, ExportScope.EntireProject, null, null)
+        {
+        }
+
+        public ExportDialog(
+            Document doc,
+            ExportScope scope,
+            View activeView,
+            ICollection<ElementId> selectionIds)
         {
             InitializeComponent();
             ApplyLocalization();
             _doc = doc;
+            _scope = scope;
+            _activeView = activeView;
+            _selectionIds = selectionIds;
 
-            // カテゴリ一覧を取得・表示
-            _allCategories = RevitCategoryHelper.GetCategoriesWithElements(doc);
+            // 選択スコープに応じてカテゴリ一覧を取得・表示
+            _allCategories = RevitCategoryHelper.GetCategoriesWithElements(
+                doc, _scope, _activeView, _selectionIds);
             CategoryListBox.ItemsSource = _allCategories;
         }
 
@@ -117,7 +133,7 @@ namespace Tools28.Commands.ExcelExportImport.Views
             foreach (var cat in checkedCategories)
             {
                 var parameters = ParameterService.GetParametersForCategory(
-                    _doc, cat.BuiltInCategory, cat.Name);
+                    _doc, cat.BuiltInCategory, cat.Name, _scope, _activeView, _selectionIds);
                 _allParameters.AddRange(parameters);
             }
 

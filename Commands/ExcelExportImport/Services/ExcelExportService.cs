@@ -26,7 +26,10 @@ namespace Tools28.Commands.ExcelExportImport.Services
             string filePath,
             List<CategoryInfo> selectedCategories,
             List<ParameterInfo> outputParameters,
-            bool splitByCategory = true)
+            bool splitByCategory = true,
+            ExportScope scope = ExportScope.EntireProject,
+            View activeView = null,
+            ICollection<ElementId> selectionIds = null)
         {
             var results = new Dictionary<string, int>();
 
@@ -34,11 +37,11 @@ namespace Tools28.Commands.ExcelExportImport.Services
             {
                 if (splitByCategory)
                 {
-                    ExportSplitByCategory(doc, workbook, selectedCategories, outputParameters, results);
+                    ExportSplitByCategory(doc, workbook, selectedCategories, outputParameters, results, scope, activeView, selectionIds);
                 }
                 else
                 {
-                    ExportSingleSheet(doc, workbook, selectedCategories, outputParameters, results);
+                    ExportSingleSheet(doc, workbook, selectedCategories, outputParameters, results, scope, activeView, selectionIds);
                 }
 
                 workbook.SaveAs(filePath);
@@ -55,7 +58,10 @@ namespace Tools28.Commands.ExcelExportImport.Services
             XLWorkbook workbook,
             List<CategoryInfo> selectedCategories,
             List<ParameterInfo> outputParameters,
-            Dictionary<string, int> results)
+            Dictionary<string, int> results,
+            ExportScope scope,
+            View activeView,
+            ICollection<ElementId> selectionIds)
         {
             foreach (var category in selectedCategories)
             {
@@ -100,7 +106,8 @@ namespace Tools28.Commands.ExcelExportImport.Services
                 worksheet.Row(1).Height = 25;
 
                 // データ行を作成
-                var elements = RevitCategoryHelper.GetElementsByCategory(doc, category.BuiltInCategory);
+                var elements = RevitCategoryHelper.GetElementsByCategory(
+                    doc, category.BuiltInCategory, scope, activeView, selectionIds);
                 int row = 2;
 
                 foreach (var elem in elements)
@@ -152,7 +159,10 @@ namespace Tools28.Commands.ExcelExportImport.Services
             XLWorkbook workbook,
             List<CategoryInfo> selectedCategories,
             List<ParameterInfo> outputParameters,
-            Dictionary<string, int> results)
+            Dictionary<string, int> results,
+            ExportScope scope,
+            View activeView,
+            ICollection<ElementId> selectionIds)
         {
             // 全カテゴリ共通のユニークなパラメータリスト（DisplayName順序を維持）
             var allParams = outputParameters
@@ -200,7 +210,8 @@ namespace Tools28.Commands.ExcelExportImport.Services
                 if (categoryParams.Count == 0)
                     continue;
 
-                var elements = RevitCategoryHelper.GetElementsByCategory(doc, category.BuiltInCategory);
+                var elements = RevitCategoryHelper.GetElementsByCategory(
+                    doc, category.BuiltInCategory, scope, activeView, selectionIds);
 
                 foreach (var elem in elements)
                 {

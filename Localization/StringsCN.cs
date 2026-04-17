@@ -304,6 +304,12 @@ namespace Tools28.Localization
             { "Export.SettingsLoadFailed", "加载设置失败。\n{0}" },
             { "Export.SelectParams", "请选择要输出的参数。" },
             { "Export.SelectCategory", "请选择类别。" },
+            { "Export.Scope.WindowTitle", "Excel导出" },
+            { "Export.Scope.Title", "选择导出范围" },
+            { "Export.Scope.Description", "请选择要导出的元素范围。" },
+            { "Export.Scope.Project", "整个项目的元素" },
+            { "Export.Scope.View", "当前视图中的元素" },
+            { "Export.Scope.Selection", "当前选中的元素" },
 
             // === ExcelImport Dialog ===
             { "Import.Title", "Excel导入" },

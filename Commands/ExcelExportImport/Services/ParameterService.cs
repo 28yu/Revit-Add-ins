@@ -14,56 +14,91 @@ namespace Tools28.Commands.ExcelExportImport.Services
         /// <summary>
         /// 指定カテゴリの要素から全パラメータ情報を取得
         /// </summary>
-        public static List<ParameterInfo> GetParametersForCategory(Document doc, BuiltInCategory category, string categoryName)
+        public static List<ParameterInfo> GetParametersForCategory(
+            Document doc,
+            BuiltInCategory category,
+            string categoryName,
+            Models.ExportScope scope = Models.ExportScope.EntireProject,
+            View activeView = null,
+            ICollection<ElementId> selectionIds = null)
         {
             var parameters = new HashSet<ParameterInfo>();
+            var seenTypeIds = new HashSet<ElementId>();
 
-            var elements = new FilteredElementCollector(doc)
-                .OfCategory(category)
-                .WhereElementIsNotElementType()
-                .Take(50) // パラメータ列挙のため少数サンプルで十分
-                .ToList();
+            var elements = RevitCategoryHelper.GetElementsByCategory(
+                doc, category, scope, activeView, selectionIds);
 
+            // 各タイプにつき先頭インスタンス1件だけ調べる
+            // （同カテゴリ・同タイプのインスタンスパラメータは同一なので十分）
+            bool instanceParamsCollected = false;
             foreach (var elem in elements)
             {
-                // インスタンスパラメータ
-                foreach (Parameter param in elem.Parameters)
-                {
-                    if (param.Definition == null || string.IsNullOrEmpty(param.Definition.Name))
-                        continue;
+                var typeId = elem.GetTypeId();
+                bool isNewType = typeId != null && typeId != ElementId.InvalidElementId
+                                 && seenTypeIds.Add(typeId);
 
-                    var info = new ParameterInfo(
-                        param.Definition.Name,
-                        false,
-                        param.IsReadOnly,
-                        categoryName);
-                    parameters.Add(info);
+                // 初回または新タイプのインスタンスからパラメータを収集
+                if (!instanceParamsCollected || isNewType)
+                {
+                    CollectParameters(elem, false, categoryName, parameters);
+                    instanceParamsCollected = true;
                 }
 
-                // タイプパラメータ
-                var typeId = elem.GetTypeId();
-                if (typeId != null && typeId != ElementId.InvalidElementId)
+                if (isNewType)
                 {
                     var elemType = doc.GetElement(typeId);
                     if (elemType != null)
-                    {
-                        foreach (Parameter param in elemType.Parameters)
-                        {
-                            if (param.Definition == null || string.IsNullOrEmpty(param.Definition.Name))
-                                continue;
-
-                            var info = new ParameterInfo(
-                                param.Definition.Name,
-                                true,
-                                param.IsReadOnly,
-                                categoryName);
-                            parameters.Add(info);
-                        }
-                    }
+                        CollectParameters(elemType, true, categoryName, parameters);
                 }
             }
 
+            // カテゴリに属する全タイプからもパラメータを収集
+            // （スコープ外・未使用タイプのパラメータも拾う）
+            var allTypes = new FilteredElementCollector(doc)
+                .OfCategory(category)
+                .WhereElementIsElementType()
+                .ToList();
+            foreach (var et in allTypes)
+            {
+                if (!seenTypeIds.Add(et.Id))
+                    continue;
+                CollectParameters(et, true, categoryName, parameters);
+            }
+
+            // インスタンスパラメータが取れていなければ、
+            // プロジェクト全体から1件だけサンプリング（スコープ外でも）
+            if (!instanceParamsCollected)
+            {
+                var anyInstance = new FilteredElementCollector(doc)
+                    .OfCategory(category)
+                    .WhereElementIsNotElementType()
+                    .FirstElement();
+                if (anyInstance != null)
+                    CollectParameters(anyInstance, false, categoryName, parameters);
+            }
+
             return parameters.OrderBy(p => p.DisplayName).ToList();
+        }
+
+        private static void CollectParameters(
+            Element element,
+            bool isTypeParameter,
+            string categoryName,
+            HashSet<ParameterInfo> bucket)
+        {
+            if (element == null) return;
+
+            foreach (Parameter param in element.Parameters)
+            {
+                if (param?.Definition == null || string.IsNullOrEmpty(param.Definition.Name))
+                    continue;
+
+                bucket.Add(new ParameterInfo(
+                    param.Definition.Name,
+                    isTypeParameter,
+                    param.IsReadOnly,
+                    categoryName));
+            }
         }
 
         /// <summary>
