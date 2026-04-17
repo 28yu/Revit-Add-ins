@@ -39,8 +39,43 @@ namespace Tools28.Commands.BeamUnderLevel
         public BeamUnderLevelDialog(BeamUnderLevelDialogData data)
         {
             InitializeComponent();
+            ApplyLocalization();
             _data = data;
             InitializeStep1();
+        }
+
+        private void ApplyLocalization()
+        {
+            this.Title = Loc.S("BeamUnder.Title");
+            StepIndicator.Text = Loc.S("BeamUnder.Step1");
+            txtViewInfo.Text = Loc.S("BeamUnder.ViewInfo");
+            txtViewName.Text = Loc.S("BeamUnder.ViewName");
+            txtBeamCount.Text = Loc.S("BeamUnder.BeamCount");
+            txtTextTypeSetting.Text = Loc.S("BeamUnder.TextTypeSetting");
+            txtLegendTextType.Text = Loc.S("BeamUnder.LegendTextType");
+            txtLabelTextType.Text = Loc.S("BeamUnder.LabelTextType");
+            txtTextTypeHint.Text = Loc.S("BeamUnder.TextTypeHint");
+            txtLevelSetting.Text = Loc.S("BeamUnder.LevelSetting");
+            txtRefLevel.Text = Loc.S("BeamUnder.RefLevel");
+            txtUpperLevel.Text = Loc.S("BeamUnder.UpperLevel");
+            txtFloorHeight.Text = Loc.S("BeamUnder.FloorHeight");
+            txtLevelHint.Text = Loc.S("BeamUnder.LevelHint");
+            txtHeightParam.Text = Loc.S("BeamUnder.HeightParam");
+            txtHeightParamHint.Text = Loc.S("BeamUnder.HeightParamHint");
+            txtTopParam.Text = Loc.S("BeamUnder.TopParam");
+            txtTopParamHint.Text = Loc.S("BeamUnder.TopParamHint");
+            txtSummary.Text = Loc.S("BeamUnder.Summary");
+            txtProcessContent.Text = Loc.S("BeamUnder.ProcessContent");
+            chkSharedParam.Content = Loc.S("BeamUnder.SharedParam");
+            chkCalcValue.Content = Loc.S("BeamUnder.CalcValue");
+            chkCreateFilter.Content = Loc.S("BeamUnder.CreateFilter");
+            chkCreateLegend.Content = Loc.S("BeamUnder.CreateLegend");
+            txtExistingFilter.Text = Loc.S("BeamUnder.ExistingFilter");
+            OverwriteCheckBox.Content = Loc.S("BeamUnder.OverwriteFilter");
+            txtOverwriteHint.Text = Loc.S("BeamUnder.OverwriteHint");
+            BackButton.Content = Loc.S("Common.Back");
+            NextButton.Content = Loc.S("Common.Next");
+            CancelButton.Content = Loc.S("Common.Cancel");
         }
 
         #region ステップ1: レベル設定
@@ -545,10 +580,10 @@ namespace Tools28.Commands.BeamUnderLevel
             Step4Panel.Visibility = step == 4 ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
 
             BackButton.IsEnabled = step > 1;
-            NextButton.Content = step == TotalSteps ? "実行" : "次へ";
+            NextButton.Content = step == TotalSteps ? Loc.S("Common.Execute") : Loc.S("Common.Next");
 
-            string[] stepNames = { "", "レベル設定、凡例設定", "梁高さパラメータ選択", "梁天端レベルパラメータ選択", "処理確認" };
-            StepIndicator.Text = $"ステップ {step} / {TotalSteps}  {stepNames[step]}";
+            string[] stepNames = { "", Loc.S("BeamUnder.StepName1"), Loc.S("BeamUnder.StepName2"), Loc.S("BeamUnder.StepName3"), Loc.S("BeamUnder.StepName4") };
+            StepIndicator.Text = Loc.S("Common.StepIndicator", step, TotalSteps, stepNames[step]);
         }
 
         private void NextButton_Click(object sender, RoutedEventArgs e)

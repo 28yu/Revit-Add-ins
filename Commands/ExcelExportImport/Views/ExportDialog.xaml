@@ -313,19 +313,19 @@
 
             <!-- 設定ボタン群 -->
             <StackPanel Grid.Column="0" Orientation="Horizontal">
-                <Button Content="設定復元" Style="{StaticResource SecondaryButtonStyle}"
+                <Button x:Name="btnResetSettings" Content="設定復元" Style="{StaticResource SecondaryButtonStyle}"
                         Click="ResetSettingsButton_Click"/>
-                <Button Content="設定読込" Style="{StaticResource SecondaryButtonStyle}"
+                <Button x:Name="btnLoadSettings" Content="設定読込" Style="{StaticResource SecondaryButtonStyle}"
                         Click="LoadSettingsButton_Click"/>
-                <Button Content="設定保存" Style="{StaticResource SecondaryButtonStyle}"
+                <Button x:Name="btnSaveSettings" Content="設定保存" Style="{StaticResource SecondaryButtonStyle}"
                         Click="SaveSettingsButton_Click"/>
             </StackPanel>
 
             <!-- OK/キャンセルボタン -->
             <StackPanel Grid.Column="2" Orientation="Horizontal">
-                <Button Content="OK" Style="{StaticResource PrimaryButtonStyle}"
+                <Button x:Name="btnOK" Content="OK" Style="{StaticResource PrimaryButtonStyle}"
                         Click="OkButton_Click"/>
-                <Button Content="キャンセル" Style="{StaticResource SecondaryButtonStyle}"
+                <Button x:Name="btnCancel" Content="キャンセル" Style="{StaticResource SecondaryButtonStyle}"
                         Click="CancelButton_Click"/>
             </StackPanel>
         </Grid>

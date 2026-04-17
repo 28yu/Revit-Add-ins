@@ -38,11 +38,33 @@ namespace Tools28.Commands.ExcelExportImport.Views
         public ExportDialog(Document doc)
         {
             InitializeComponent();
+            ApplyLocalization();
             _doc = doc;
 
             // カテゴリ一覧を取得・表示
             _allCategories = RevitCategoryHelper.GetCategoriesWithElements(doc);
             CategoryListBox.ItemsSource = _allCategories;
+        }
+
+        private void ApplyLocalization()
+        {
+            this.Title = Loc.S("Export.Title");
+            grpCategory.Header = Loc.S("Export.SelectCategory.Header");
+            btnSearchCat.Content = Loc.S("Common.Search");
+            grpParameter.Header = Loc.S("Export.Parameter");
+            btnSearchParam.Content = Loc.S("Common.Search");
+            btnAddToOutput.ToolTip = Loc.S("Export.AddToOutput");
+            btnRemoveFromOutput.ToolTip = Loc.S("Export.RemoveFromOutput");
+            grpOutput.Header = Loc.S("Export.Output");
+            btnSearchOutput.Content = Loc.S("Common.Search");
+            btnMoveUp.ToolTip = Loc.S("Export.MoveUp");
+            btnMoveDown.ToolTip = Loc.S("Export.MoveDown");
+            SplitByCategoryCheckBox.Content = Loc.S("Export.SplitByCategory");
+            btnResetSettings.Content = Loc.S("Export.ResetSettings");
+            btnLoadSettings.Content = Loc.S("Export.LoadSettings");
+            btnSaveSettings.Content = Loc.S("Export.SaveSettings");
+            btnOK.Content = Loc.S("Common.OK");
+            btnCancel.Content = Loc.S("Common.Cancel");
         }
 
         #region カテゴリ選択

@@ -94,7 +94,7 @@
         </Grid.RowDefinitions>
 
         <!-- ファイル選択 -->
-        <GroupBox Grid.Row="0" Header="Excelファイル" FontSize="12" Margin="0,0,0,8">
+        <GroupBox x:Name="grpExcelFile" Grid.Row="0" Header="Excelファイル" FontSize="12" Margin="0,0,0,8">
             <Grid Margin="4">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -104,11 +104,11 @@
                 <TextBox x:Name="FilePathTextBox" Grid.Column="0"
                          IsReadOnly="True" FontSize="11" Padding="4,2"
                          BorderBrush="#CCCCCC"/>
-                <Button Grid.Column="1" Content="開いているファイル"
+                <Button x:Name="btnOpenFiles" Grid.Column="1" Content="開いているファイル"
                         Style="{StaticResource SecondaryButtonStyle}"
                         Margin="4,0,0,0"
                         Click="OpenFilesButton_Click"/>
-                <Button Grid.Column="2" Content="参照..."
+                <Button x:Name="btnBrowse" Grid.Column="2" Content="参照..."
                         Style="{StaticResource SecondaryButtonStyle}"
                         Margin="4,0,0,0"
                         Click="BrowseButton_Click"/>
@@ -116,14 +116,14 @@
         </GroupBox>
 
         <!-- シート情報 -->
-        <GroupBox Grid.Row="1" Header="シート情報" FontSize="12" Margin="0,0,0,8">
+        <GroupBox x:Name="grpSheetInfo" Grid.Row="1" Header="シート情報" FontSize="12" Margin="0,0,0,8">
             <TextBlock x:Name="SheetInfoText" FontSize="11" Margin="8,4"
                        Text="Excelファイルを選択してください"
                        Foreground="#666666"/>
         </GroupBox>
 
         <!-- プレビュー -->
-        <GroupBox Grid.Row="2" Header="変更プレビュー" FontSize="12">
+        <GroupBox x:Name="grpPreview" Grid.Row="2" Header="変更プレビュー" FontSize="12">
             <DataGrid x:Name="PreviewDataGrid"
                       AutoGenerateColumns="False"
                       IsReadOnly="True"
@@ -157,7 +157,7 @@
                     Style="{StaticResource PrimaryButtonStyle}"
                     IsEnabled="False"
                     Click="ImportButton_Click"/>
-            <Button Content="キャンセル" Style="{StaticResource SecondaryButtonStyle}"
+            <Button x:Name="btnCancel" Content="キャンセル" Style="{StaticResource SecondaryButtonStyle}"
                     Click="CancelButton_Click"/>
         </StackPanel>
     </Grid>

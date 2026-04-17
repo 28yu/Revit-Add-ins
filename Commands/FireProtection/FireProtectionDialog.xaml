@@ -138,7 +138,7 @@
                     <Border Background="White" BorderBrush="#D3D3D3"
                             BorderThickness="1" CornerRadius="3" Padding="15,12" Margin="0,0,0,10">
                         <StackPanel>
-                            <TextBlock Style="{StaticResource SectionHeader}" Text="耐火被覆パラメータ"/>
+                            <TextBlock x:Name="txtParamLabel" Style="{StaticResource SectionHeader}" Text="耐火被覆パラメータ"/>
                             <ComboBox x:Name="ParameterComboBox" Style="{StaticResource ComboBoxStyle}"
                                       SelectionChanged="Parameter_Changed"/>
                             <TextBlock x:Name="ParameterNoteText" Style="{StaticResource NoteStyle}"
@@ -150,8 +150,8 @@
                     <Border Background="White" BorderBrush="#D3D3D3"
                             BorderThickness="1" CornerRadius="3" Padding="15,12" Margin="0,0,0,10">
                         <StackPanel>
-                            <TextBlock Style="{StaticResource SectionHeader}" Text="検出された耐火被覆の種類"/>
-                            <TextBlock Margin="0,0,0,6" FontSize="10" Foreground="Red"
+                            <TextBlock x:Name="txtDetectedTypes" Style="{StaticResource SectionHeader}" Text="検出された耐火被覆の種類"/>
+                            <TextBlock x:Name="txtColorHint" Margin="0,0,0,6" FontSize="10" Foreground="Red"
                                        Text="※ 色の四角をクリックすると変更できます"/>
                             <StackPanel x:Name="DetectedTypesPanel"/>
                         </StackPanel>
@@ -163,9 +163,10 @@
                         <StackPanel Orientation="Horizontal">
                             <!-- 左: 入力欄 -->
                             <StackPanel Margin="0,0,40,0">
-                                <TextBlock Style="{StaticResource SectionHeader}" Text="塗り潰し領域のオフセット設定"/>
+                                <TextBlock x:Name="txtOffsetSetting" Style="{StaticResource SectionHeader}" Text="塗り潰し領域のオフセット設定"/>
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                                    <RadioButton x:Name="CommonOffsetRadio" Content="共通オフセット"
+                                    <RadioButton x:Name="CommonOffsetRadio"
+                                                 Content="共通オフセット"
                                                  GroupName="OffsetMode"
                                                  IsChecked="True" FontSize="12"
                                                  VerticalAlignment="Center" Margin="0,0,15,0"
@@ -173,15 +174,16 @@
                                     <TextBox x:Name="CommonOffsetInput" Width="80" Height="26"
                                              FontSize="12" Padding="4,2" Text="200"
                                              VerticalContentAlignment="Center"/>
-                                    <TextBlock Text=" mm" FontSize="12"
+                                    <TextBlock x:Name="txtMm" Text=" mm" FontSize="12"
                                                VerticalAlignment="Center" Margin="4,0,0,0"/>
                                 </StackPanel>
-                                <RadioButton x:Name="PerTypeOffsetRadio" Content="種類ごとに個別オフセット"
+                                <RadioButton x:Name="PerTypeOffsetRadio"
+                                             Content="種類ごとに個別オフセット"
                                              GroupName="OffsetMode"
                                              FontSize="12" Margin="0,0,0,4"
                                              Checked="OffsetMode_Changed"/>
                                 <StackPanel x:Name="PerTypeOffsetPanel"/>
-                                <TextBlock Style="{StaticResource NoteStyle}"
+                                <TextBlock x:Name="txtOffsetHint" Style="{StaticResource NoteStyle}"
                                            Text="※ 梁のエッジからの距離（mm）"/>
                             </StackPanel>
 
@@ -201,7 +203,7 @@
                                     <Line X1="0" Y1="52" X2="160" Y2="52" Stroke="#333" StrokeThickness="1"
                                           StrokeDashArray="8 3 2 3"/>
                                     <!-- ▽梁面テキスト（梁面線の上、オフセット領域内） -->
-                                    <TextBlock Canvas.Left="25" Canvas.Top="7" Text="▽ 梁面" FontSize="11"
+                                    <TextBlock x:Name="txtBeamFace" Canvas.Left="25" Canvas.Top="7" Text="▽ 梁面" FontSize="11"
                                                Foreground="#333" FontWeight="Bold"/>
                                     <!-- A寸法線（梁面→オフセット上端）縦線 -->
                                     <Line X1="115" Y1="22" X2="115" Y2="5" Stroke="#CC0000" StrokeThickness="1"/>
@@ -225,7 +227,7 @@
                     <Border x:Name="ColumnSettingsPanel" Background="White" BorderBrush="#D3D3D3"
                             BorderThickness="1" CornerRadius="3" Padding="15,12" Margin="0,0,0,10">
                         <StackPanel>
-                            <TextBlock Style="{StaticResource SectionHeader}" Text="柱 耐火被覆設定"/>
+                            <TextBlock x:Name="txtColumnSetting" Style="{StaticResource SectionHeader}" Text="柱 耐火被覆設定"/>
                             <StackPanel Orientation="Horizontal">
                                 <!-- 左: 入力欄 -->
                                 <StackPanel Margin="0,0,60,0">
@@ -240,14 +242,14 @@
                                             <RowDefinition Height="8"/>
                                             <RowDefinition Height="Auto"/>
                                         </Grid.RowDefinitions>
-                                        <TextBlock Grid.Row="0" Grid.Column="0" Style="{StaticResource LabelStyle}"
+                                        <TextBlock x:Name="txtColumnDistA" Grid.Row="0" Grid.Column="0" Style="{StaticResource LabelStyle}"
                                                    Text="A: 柱中心からの距離:" VerticalAlignment="Center"/>
                                         <TextBox Grid.Row="0" Grid.Column="1" x:Name="ColumnAInput"
                                                  Height="26" FontSize="12" Padding="4,2" Text="400"
                                                  VerticalContentAlignment="Center"/>
                                         <TextBlock Grid.Row="0" Grid.Column="2" Text=" mm" FontSize="12"
                                                    VerticalAlignment="Center" Margin="4,0,0,0"/>
-                                        <TextBlock Grid.Row="2" Grid.Column="0" Style="{StaticResource LabelStyle}"
+                                        <TextBlock x:Name="txtColumnWidthB" Grid.Row="2" Grid.Column="0" Style="{StaticResource LabelStyle}"
                                                    Text="B: 外側の幅:" VerticalAlignment="Center"/>
                                         <TextBox Grid.Row="2" Grid.Column="1" x:Name="ColumnBInput"
                                                  Height="26" FontSize="12" Padding="4,2" Text="150"
@@ -255,7 +257,7 @@
                                         <TextBlock Grid.Row="2" Grid.Column="2" Text=" mm" FontSize="12"
                                                    VerticalAlignment="Center" Margin="4,0,0,0"/>
                                     </Grid>
-                                    <TextBlock Style="{StaticResource NoteStyle}" Margin="0,6,0,0"
+                                    <TextBlock x:Name="txtColumnHint" Style="{StaticResource NoteStyle}" Margin="0,6,0,0"
                                                Text="※ 柱中心からA、そこから外側にB幅"/>
                                 </StackPanel>
 
@@ -272,7 +274,7 @@
                                         <!-- 柱本体 正方形 -->
                                         <Rectangle Canvas.Left="40" Canvas.Top="55" Width="55" Height="55"
                                                    Fill="White" Stroke="#333" StrokeThickness="3" RadiusX="4" RadiusY="4"/>
-                                        <TextBlock Canvas.Left="54" Canvas.Top="72" Text="柱" FontSize="12"
+                                        <TextBlock x:Name="txtColumn" Canvas.Left="54" Canvas.Top="72" Text="柱" FontSize="12"
                                                    Foreground="#333" FontWeight="Bold"/>
                                         <!-- 柱中心線（縦） -->
                                         <Line X1="67" Y1="20" X2="67" Y2="55" Stroke="#999" StrokeThickness="0.5"/>
@@ -302,7 +304,7 @@
                     <Border Background="White" BorderBrush="#D3D3D3"
                             BorderThickness="1" CornerRadius="3" Padding="15,12" Margin="0,0,0,10">
                         <StackPanel>
-                            <TextBlock Style="{StaticResource SectionHeader}" Text="表示設定"/>
+                            <TextBlock x:Name="txtDisplaySetting" Style="{StaticResource SectionHeader}" Text="表示設定"/>
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="140"/>
@@ -315,15 +317,15 @@
                                     <RowDefinition Height="8"/>
                                     <RowDefinition Height="Auto"/>
                                 </Grid.RowDefinitions>
-                                <TextBlock Grid.Row="0" Grid.Column="0" Style="{StaticResource LabelStyle}"
+                                <TextBlock x:Name="txtLineStyle" Grid.Row="0" Grid.Column="0" Style="{StaticResource LabelStyle}"
                                            Text="境界線の線種:" VerticalAlignment="Center"/>
                                 <ComboBox Grid.Row="0" Grid.Column="1" x:Name="LineStyleComboBox"
                                           Style="{StaticResource ComboBoxStyle}"/>
-                                <TextBlock Grid.Row="2" Grid.Column="0" Style="{StaticResource LabelStyle}"
+                                <TextBlock x:Name="txtFillPattern" Grid.Row="2" Grid.Column="0" Style="{StaticResource LabelStyle}"
                                            Text="塗り潰し領域パターン:" VerticalAlignment="Center"/>
                                 <ComboBox Grid.Row="2" Grid.Column="1" x:Name="FillPatternComboBox"
                                           Style="{StaticResource ComboBoxStyle}"/>
-                                <TextBlock Grid.Row="4" Grid.Column="0" Style="{StaticResource LabelStyle}"
+                                <TextBlock x:Name="txtLegendTextType" Grid.Row="4" Grid.Column="0" Style="{StaticResource LabelStyle}"
                                            Text="凡例の文字タイプ:" VerticalAlignment="Center"/>
                                 <ComboBox Grid.Row="4" Grid.Column="1" x:Name="TextNoteTypeComboBox"
                                           Style="{StaticResource ComboBoxStyle}"/>
