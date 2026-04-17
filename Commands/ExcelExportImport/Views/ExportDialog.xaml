@@ -148,7 +148,7 @@
             </Grid.ColumnDefinitions>
 
             <!-- 左カラム: カテゴリを選択 -->
-            <GroupBox Grid.Column="0" Header="カテゴリを選択" Margin="0,0,4,0" FontSize="12">
+            <GroupBox x:Name="grpCategory" Grid.Column="0" Header="カテゴリを選択" Margin="0,0,4,0" FontSize="12">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -162,7 +162,7 @@
                         <TextBox x:Name="CategorySearchBox" Grid.Column="0"
                                  Style="{StaticResource SearchBoxStyle}"
                                  TextChanged="CategorySearchBox_TextChanged"/>
-                        <Button Grid.Column="1" Content="検索" Width="40" Height="24" Margin="4,0,0,0"
+                        <Button x:Name="btnSearchCat" Grid.Column="1" Content="検索" Width="40" Height="24" Margin="4,0,0,0"
                                 Style="{StaticResource SecondaryButtonStyle}"
                                 Click="CategorySearchButton_Click"/>
                     </Grid>

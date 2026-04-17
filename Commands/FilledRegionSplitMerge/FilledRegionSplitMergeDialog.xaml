@@ -18,7 +18,7 @@
         </Grid.RowDefinitions>
 
         <!-- 操作選択 -->
-        <GroupBox Header="操作" Grid.Row="0" Padding="10">
+        <GroupBox x:Name="grpOperation" Header="操作" Grid.Row="0" Padding="10">
             <StackPanel>
                 <RadioButton x:Name="RadioSplit"
                              Content="分割（複数エリアを持つ領域を個別の領域に分割）"
@@ -40,7 +40,7 @@
                   Padding="10"
                   IsEnabled="False">
             <StackPanel>
-                <TextBlock Text="統合後の塗り潰しパターンを選択してください："
+                <TextBlock x:Name="txtSelectPattern" Text="統合後の塗り潰しパターンを選択してください："
                            Margin="0,0,0,5"/>
                 <ComboBox x:Name="ComboPattern"
                           Height="25"
@@ -59,13 +59,13 @@
         <StackPanel Grid.Row="6"
                     Orientation="Horizontal"
                     HorizontalAlignment="Right">
-            <Button Content="OK"
+            <Button x:Name="btnOK" Content="OK"
                     Width="80"
                     Height="28"
                     Margin="0,0,10,0"
                     IsDefault="True"
                     Click="BtnOk_Click"/>
-            <Button Content="キャンセル"
+            <Button x:Name="btnCancel" Content="キャンセル"
                     Width="80"
                     Height="28"
                     IsCancel="True"

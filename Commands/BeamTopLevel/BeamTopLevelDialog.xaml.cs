@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using Autodesk.Revit.DB;
+using Tools28.Localization;
 
 namespace Tools28.Commands.BeamTopLevel
 {
@@ -29,8 +30,37 @@ namespace Tools28.Commands.BeamTopLevel
         public BeamTopLevelDialog(BeamTopLevelDialogData data)
         {
             InitializeComponent();
+            ApplyLocalization();
             _data = data;
             InitializeStep1();
+        }
+
+        private void ApplyLocalization()
+        {
+            this.Title = Loc.S("BeamTop.Title");
+            StepIndicator.Text = Loc.S("BeamTop.Step1");
+            txtViewInfo.Text = Loc.S("BeamTop.ViewInfo");
+            txtViewName.Text = Loc.S("BeamTop.ViewName");
+            txtBeamCount.Text = Loc.S("BeamTop.BeamCount");
+            txtRefLevel.Text = Loc.S("BeamTop.RefLevel");
+            txtTextTypeSetting.Text = Loc.S("BeamTop.TextTypeSetting");
+            txtLegendTextType.Text = Loc.S("BeamTop.LegendTextType");
+            txtLabelTextType.Text = Loc.S("BeamTop.LabelTextType");
+            txtTextTypeHint.Text = Loc.S("BeamTop.TextTypeHint");
+            txtParamSelect.Text = Loc.S("BeamTop.ParamSelect");
+            txtParamHint.Text = Loc.S("BeamTop.ParamHint");
+            txtSummary.Text = Loc.S("BeamTop.Summary");
+            txtProcessContent.Text = Loc.S("BeamTop.ProcessContent");
+            chkSharedParam.Content = Loc.S("BeamTop.SharedParam");
+            chkGetValue.Content = Loc.S("BeamTop.GetValue");
+            chkCreateFilter.Content = Loc.S("BeamTop.CreateFilter");
+            chkCreateLegend.Content = Loc.S("BeamTop.CreateLegend");
+            txtExistingFilter.Text = Loc.S("BeamTop.ExistingFilter");
+            OverwriteCheckBox.Content = Loc.S("BeamTop.OverwriteFilter");
+            txtOverwriteHint.Text = Loc.S("BeamTop.OverwriteHint");
+            BackButton.Content = Loc.S("Common.Back");
+            NextButton.Content = Loc.S("Common.Next");
+            CancelButton.Content = Loc.S("Common.Cancel");
         }
 
         #region ステップ1: 基本設定
@@ -297,10 +327,10 @@ namespace Tools28.Commands.BeamTopLevel
             Step3Panel.Visibility = step == 3 ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
 
             BackButton.IsEnabled = step > 1;
-            NextButton.Content = step == TotalSteps ? "実行" : "次へ";
+            NextButton.Content = step == TotalSteps ? Loc.S("Common.Execute") : Loc.S("Common.Next");
 
-            string[] stepNames = { "", "基本設定", "梁天端レベルパラメータ選択", "処理確認" };
-            StepIndicator.Text = $"ステップ {step} / {TotalSteps}  {stepNames[step]}";
+            string[] stepNames = { "", Loc.S("BeamTop.StepName1"), Loc.S("BeamTop.StepName2"), Loc.S("BeamTop.StepName3") };
+            StepIndicator.Text = Loc.S("Common.StepIndicator", step, TotalSteps, stepNames[step]);
         }
 
         private void NextButton_Click(object sender, RoutedEventArgs e)

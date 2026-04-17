@@ -162,7 +162,7 @@
                 <Border Grid.Row="0" Background="White" BorderBrush="#D3D3D3"
                         BorderThickness="1" CornerRadius="3" Padding="15,12" Margin="0,0,0,15">
                     <StackPanel>
-                        <TextBlock Style="{StaticResource SectionHeader}" Text="ビュー情報"/>
+                        <TextBlock x:Name="txtViewInfo" Style="{StaticResource SectionHeader}" Text="ビュー情報"/>
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="120"/>
@@ -173,12 +173,12 @@
                                 <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
 
-                            <TextBlock Grid.Row="0" Grid.Column="0" Style="{StaticResource LabelStyle}"
+                            <TextBlock x:Name="txtViewName" Grid.Row="0" Grid.Column="0" Style="{StaticResource LabelStyle}"
                                        Text="ビュー名:"/>
                             <TextBlock Grid.Row="0" Grid.Column="1" Style="{StaticResource ValueStyle}"
                                        x:Name="ViewNameText"/>
 
-                            <TextBlock Grid.Row="1" Grid.Column="0" Style="{StaticResource LabelStyle}"
+                            <TextBlock x:Name="txtBeamCount" Grid.Row="1" Grid.Column="0" Style="{StaticResource LabelStyle}"
                                        Text="梁数:"/>
                             <TextBlock Grid.Row="1" Grid.Column="1" Style="{StaticResource ValueStyle}"
                                        x:Name="BeamCountText"/>
@@ -190,7 +190,7 @@
                 <Border Grid.Row="1" Background="White" BorderBrush="#D3D3D3"
                         BorderThickness="1" CornerRadius="3" Padding="15,12" Margin="0,0,0,15">
                     <StackPanel>
-                        <TextBlock Style="{StaticResource SectionHeader}" Text="文字タイプ設定"/>
+                        <TextBlock x:Name="txtTextTypeSetting" Style="{StaticResource SectionHeader}" Text="文字タイプ設定"/>
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="150"/>
@@ -202,19 +202,19 @@
                                 <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
 
-                            <TextBlock Grid.Row="0" Grid.Column="0" Style="{StaticResource LabelStyle}"
+                            <TextBlock x:Name="txtLegendTextType" Grid.Row="0" Grid.Column="0" Style="{StaticResource LabelStyle}"
                                        Text="凡例の文字タイプ:" VerticalAlignment="Center"/>
                             <ComboBox Grid.Row="0" Grid.Column="1"
                                       x:Name="TextNoteTypeComboBox"
                                       Style="{StaticResource ComboBoxStyle}"/>
 
-                            <TextBlock Grid.Row="2" Grid.Column="0" Style="{StaticResource LabelStyle}"
+                            <TextBlock x:Name="txtLabelTextType" Grid.Row="2" Grid.Column="0" Style="{StaticResource LabelStyle}"
                                        Text="梁ラベルの文字タイプ:" VerticalAlignment="Center"/>
                             <ComboBox Grid.Row="2" Grid.Column="1"
                                       x:Name="BeamLabelTypeComboBox"
                                       Style="{StaticResource ComboBoxStyle}"/>
                         </Grid>
-                        <TextBlock Style="{StaticResource NoteStyle}"
+                        <TextBlock x:Name="txtTextTypeHint" Style="{StaticResource NoteStyle}"
                                    Text="※ 凡例は製図ビューの文字、梁ラベルは天井伏図上の梁に表示する文字です"/>
                     </StackPanel>
                 </Border>
@@ -223,7 +223,7 @@
                 <Border Grid.Row="2" Background="White" BorderBrush="#D3D3D3"
                         BorderThickness="1" CornerRadius="3" Padding="15,12" Margin="0,0,0,15">
                     <StackPanel>
-                        <TextBlock Style="{StaticResource SectionHeader}" Text="レベル設定"/>
+                        <TextBlock x:Name="txtLevelSetting" Style="{StaticResource SectionHeader}" Text="レベル設定"/>
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="120"/>
@@ -237,24 +237,24 @@
                                 <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
 
-                            <TextBlock Grid.Row="0" Grid.Column="0" Style="{StaticResource LabelStyle}"
+                            <TextBlock x:Name="txtRefLevel" Grid.Row="0" Grid.Column="0" Style="{StaticResource LabelStyle}"
                                        Text="参照レベル:" VerticalAlignment="Center"/>
                             <TextBlock Grid.Row="0" Grid.Column="1" Style="{StaticResource ValueStyle}"
                                        x:Name="RefLevelText" VerticalAlignment="Center"/>
 
-                            <TextBlock Grid.Row="2" Grid.Column="0" Style="{StaticResource LabelStyle}"
+                            <TextBlock x:Name="txtUpperLevel" Grid.Row="2" Grid.Column="0" Style="{StaticResource LabelStyle}"
                                        Text="上位レベル:" VerticalAlignment="Center"/>
                             <ComboBox Grid.Row="2" Grid.Column="1"
                                       x:Name="LowerLevelComboBox"
                                       Style="{StaticResource ComboBoxStyle}"
                                       SelectionChanged="LowerLevelComboBox_SelectionChanged"/>
 
-                            <TextBlock Grid.Row="4" Grid.Column="0" Style="{StaticResource LabelStyle}"
+                            <TextBlock x:Name="txtFloorHeight" Grid.Row="4" Grid.Column="0" Style="{StaticResource LabelStyle}"
                                        Text="階高:" VerticalAlignment="Center"/>
                             <TextBlock Grid.Row="4" Grid.Column="1" Style="{StaticResource ValueStyle}"
                                        x:Name="FloorHeightText" VerticalAlignment="Center"/>
                         </Grid>
-                        <TextBlock Style="{StaticResource NoteStyle}"
+                        <TextBlock x:Name="txtLevelHint" Style="{StaticResource NoteStyle}"
                                    Text="※ 参照レベルを基準として梁下端レベルを算出します"/>
                     </StackPanel>
                 </Border>
@@ -268,8 +268,8 @@
                 </Grid.RowDefinitions>
 
                 <StackPanel Grid.Row="0" Margin="0,0,0,10">
-                    <TextBlock Style="{StaticResource SectionHeader}" Text="梁高さパラメータ選択"/>
-                    <TextBlock Style="{StaticResource NoteStyle}"
+                    <TextBlock x:Name="txtHeightParam" Style="{StaticResource SectionHeader}" Text="梁高さパラメータ選択"/>
+                    <TextBlock x:Name="txtHeightParamHint" Style="{StaticResource NoteStyle}"
                                Text="※ ファミリ毎に梁高さとして使用するパラメータを選択してください"/>
                 </StackPanel>
 

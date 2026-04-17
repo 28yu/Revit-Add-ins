@@ -21,8 +21,21 @@ namespace Tools28.Commands.FilledRegionSplitMerge
         public FilledRegionSplitMergeDialog(FilledRegionHelper.SelectionAnalysis analysis)
         {
             InitializeComponent();
+            ApplyLocalization();
             _analysis = analysis;
             InitializeDialog();
+        }
+
+        private void ApplyLocalization()
+        {
+            this.Title = Loc.S("FilledRegion.Title");
+            grpOperation.Header = Loc.S("FilledRegion.Operation");
+            RadioSplit.Content = Loc.S("FilledRegion.Split");
+            RadioMerge.Content = Loc.S("FilledRegion.Merge");
+            GroupPattern.Header = Loc.S("FilledRegion.Pattern");
+            txtSelectPattern.Text = Loc.S("FilledRegion.SelectPattern");
+            btnOK.Content = Loc.S("Common.OK");
+            btnCancel.Content = Loc.S("Common.Cancel");
         }
 
         private void InitializeDialog()

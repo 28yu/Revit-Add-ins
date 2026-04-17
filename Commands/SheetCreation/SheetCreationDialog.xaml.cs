@@ -51,6 +51,18 @@ namespace Tools28.Commands.SheetCreation
             RestoreLastSettings();
         }
 
+        private void ApplyLocalization()
+        {
+            this.Title = Loc.S("Sheet.Title");
+            txtSelectTitleBlock.Text = Loc.S("Sheet.SelectTitleBlock");
+            txtCount.Text = Loc.S("Sheet.Count");
+            txtCountHint.Text = Loc.S("Sheet.CountHint");
+            txtDrawingNo.Text = Loc.S("Sheet.DrawingNo");
+            txtDrawingNoHint.Text = Loc.S("Sheet.DrawingNoHint");
+            CreateButton.Content = Loc.S("Common.Create");
+            btnCancel.Content = Loc.S("Common.Cancel");
+        }
+
         private void LoadTitleBlocks()
         {
             var symbols = new FilteredElementCollector(_doc)
