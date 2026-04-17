@@ -694,6 +694,46 @@ Commands/RoomTagCreator/
 - **アイコン**: 表形式アイコン（`room_tag_32.png`）- 上部通し行 + 下部グリッド
 - **リボン登録**: 未確認（Application.cs への登録が必要）
 
+## FilledRegionSplitMerge（塗潰し領域 分割・統合）設計メモ
+
+### 概要
+複数エリアを持つ1つの塗潰し領域を個別の領域に分割、または複数の塗潰し領域を1つに統合するコマンド。
+
+### コード構成
+```
+Commands/FilledRegionSplitMerge/
+├── FilledRegionSplitMergeCommand.cs   # メインコマンド (IExternalCommand)
+├── FilledRegionSplitMergeDialog.xaml  # 操作選択ダイアログ
+├── FilledRegionSplitMergeDialog.xaml.cs
+└── FilledRegionHelper.cs              # 分割・統合ロジック
+```
+
+### ⚠️ 統合処理は 2D ブーリアン和で行う（重なり合う領域への対応）
+- 単純に `FilledRegion.Create(doc, typeId, viewId, allLoops)` で全境界線を連結すると、
+  **領域が重なっていると Revit がエラーを出す、または重なり部分を穴として扱う**
+- **対策**: 各領域を薄板ソリッドに押し出し → ブーリアン和 → 上面の境界ループを取得
+- 実装: `FilledRegionHelper.UnionRegionLoops`
+
+#### アルゴリズム
+1. 最初の外形ループから `GetPlane().Normal` で基準法線を決定
+2. 各領域の `GetBoundaries()` を `GeometryCreationUtilities.CreateExtrusionGeometry(loops, normal, 1.0)` で薄板ソリッド化
+3. `BooleanOperationsUtils.ExecuteBooleanOperation(..., BooleanOperationsType.Union)` で順に和集合
+4. 結果ソリッドの **上面**（`PlanarFace.FaceNormal.IsAlmostEqualTo(normal)`）を取得
+5. `topFace.GetEdgesAsCurveLoops()` で統合後の境界ループを取得
+6. **`Transform.CreateTranslation(-thickness * normal)` で元平面に戻す**
+   （押し出し分オフセットしているので戻さないと Z が 1ft ずれる）
+7. 元の領域を全削除し、新しい領域を作成
+
+#### フォールバック
+- Union に失敗した場合（`combined == null`、例外発生時）は従来の単純連結にフォールバック
+- これにより離れている領域も今まで通り複数ループの塗潰し領域として残る
+
+#### 開発で得た知見
+- `GeometryCreationUtilities.CreateExtrusionGeometry` は CurveLoop の向き（CCW/CW）と normal の右手則が一致しないと失敗する
+  → `GetPlane().Normal` から得た normal を使えば OK（Plane の法線は CurveLoop の向きに整合している）
+- 上面ループの Z 座標は押し出し分オフセットするので、必ず元平面に戻す
+- FilledRegion.Create は CurveLoop の Z を projection するようだが、念のため戻しておく
+
 ## リボンメニュー整理
 
 ### 概要
@@ -818,8 +858,34 @@ Commands/ExcelExportImport/
 - 既存の Grid に行を追加する場合、`<Grid.RowDefinitions>` に `<RowDefinition Height="Auto"/>` を追加
 - 既存の `Grid.Row` 参照を持つ要素のインデックスも更新が必要（後続の行がずれる）
 
+#### ⚠️ CheckBox.Content に文字列をバインドすると `_` が消える
+- WPF の `CheckBox.Content="{Binding Foo}"` では文字列中の `_` がアクセスキー（Alt+文字）として解釈され非表示になる
+- Revit のパラメータ名には `_` を含むものが多い（例: `T-H_s`, `Haunch_Calculation`）のでまともに表示されない
+- **対策**: `<CheckBox><TextBlock Text="{Binding Foo}"/></CheckBox>` の形に変更する（TextBlock は `_` をそのまま描画）
+- 同じ問題は `Label.Content`, `ContentControl.Content` 全般に起こる。テキスト表示はなるべく `TextBlock` で行うこと
+
+#### エクスポート範囲（スコープ）対応
+- `Models/ExportScope.cs` enum: `EntireProject` / `ActiveView` / `Selection`
+- `Views/ScopeSelectionDialog` — ボタン実行直後に 3択ダイアログを出してスコープを決定
+- `RevitCategoryHelper.GetCategoriesWithElements` / `GetElementsByCategory` / `ParameterService.GetParametersForCategory`
+  すべてが `(doc, scope, activeView, selectionIds)` を受け取り、`FilteredElementCollector` の生成方法を切り替える
+  - ActiveView: `new FilteredElementCollector(doc, view.Id)`
+  - Selection: `new FilteredElementCollector(doc, selectionIds)`
+  - EntireProject: `new FilteredElementCollector(doc)`
+
+#### 通り芯・レベル等の注釈カテゴリのエクスポート対応
+- 従来 `CategoryType.Model | AnalyticalModel` のみ許可していたが、`Annotation` も対象化
+- 注釈は数が多いので **ホワイトリスト** で絞る（`RevitCategoryHelper.IsUsefulAnnotationCategory`）
+  - `OST_Grids`, `OST_Levels`, `OST_Sheets`, `OST_Views`, `OST_Viewports`, `OST_TextNotes`,
+    `OST_GenericAnnotation`, `OST_RevisionClouds`, `OST_ScheduleGraphics`
+
+#### パラメータ全網羅取得
+- 旧: `.Take(50)` で先頭 50 要素だけサンプリング → レアなタイプのパラメータが漏れる
+- 新: 「各タイプにつき先頭インスタンス 1 件」+「カテゴリの全タイプ（`WhereElementIsElementType`）」で重複排除しつつ網羅
+- パフォーマンス: HashSet で重複除去しているので、サンプリング回数自体は少ない
+
 ### 現在のステータス
-- **機能実装**: 完了（エクスポート、インポート、プレビュー、色付け、設定保存、シート統合モード、インポート凡例）
+- **機能実装**: 完了（エクスポート、インポート、プレビュー、色付け、設定保存、シート統合モード、インポート凡例、スコープ選択、通り芯対応、パラメータ全網羅）
 - **動作確認**: Revit 環境で全バージョン動作確認済み
 - **アイコン**: `excel_export_32.png`, `excel_import_32.png`
 
