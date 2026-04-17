@@ -12,6 +12,9 @@ namespace Tools28.Commands.ExcelExportImport.Models
         public bool IsChecked { get; set; }
         public int ElementCount { get; set; }
 
+        /// <summary>表示用ラベル (「カテゴリ名 (件数)」)</summary>
+        public string DisplayLabel => $"{Name} ({ElementCount})";
+
         public CategoryInfo(BuiltInCategory builtInCategory, string name, int elementCount)
         {
             BuiltInCategory = builtInCategory;

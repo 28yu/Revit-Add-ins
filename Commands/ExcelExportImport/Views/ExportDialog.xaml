@@ -171,11 +171,12 @@
                              SelectionChanged="CategoryListBox_SelectionChanged">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <CheckBox Content="{Binding}"
-                                          IsChecked="{Binding IsChecked}"
+                                <CheckBox IsChecked="{Binding IsChecked}"
                                           Checked="CategoryCheckBox_Changed"
                                           Unchecked="CategoryCheckBox_Changed"
-                                          FontSize="11" Margin="2,1"/>
+                                          FontSize="11" Margin="2,1">
+                                    <TextBlock Text="{Binding DisplayLabel}"/>
+                                </CheckBox>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
@@ -217,9 +218,10 @@
                         </ListBox.GroupStyle>
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <CheckBox Content="{Binding DisplayName}"
-                                          IsChecked="{Binding IsChecked}"
-                                          FontSize="11" Margin="2,1"/>
+                                <CheckBox IsChecked="{Binding IsChecked}"
+                                          FontSize="11" Margin="2,1">
+                                    <TextBlock Text="{Binding DisplayName}"/>
+                                </CheckBox>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
