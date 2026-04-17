@@ -839,3 +839,106 @@ Claude Code で「テストビルドして」→ `build/test` ブランチを pu
 - **配布方式**: GitHub Pages（リポジトリ自体がウェブサイト）
 - **ZIPの配置先**: 28tools-download の GitHub Releases
 - **ダウンロードパスワード**: 28tools
+
+## FireProtection（耐火被覆範囲色分け）設計メモ
+
+### 概要
+平面・天伏・断面ビュー上の梁・柱を耐火被覆種類別に色分け塗潰しするコマンド。シートをアクティブにして実行すると、配置されている対象ビュー全てを一括処理し、自動生成した凡例（製図ビュー）をシート右上に自動配置する。
+
+### コード構成
+```
+Commands/FireProtection/
+├── FireProtectionCommand.cs       # メインコマンド (IExternalCommand)
+├── FireProtectionDialog.xaml      # WPF設定ダイアログ
+├── FireProtectionDialog.xaml.cs   # ダイアログのコードビハインド
+├── FireProtectionDialogData.cs    # データモデル
+├── BeamGeometryHelper.cs          # 梁ジオメトリ処理（平面/断面、柱連携クリップ）
+├── FilledRegionCreator.cs         # 塗潰し領域作成 + 自動配色生成
+└── LegendManager.cs               # 凡例製図ビューの作成（Excelセル表形式）
+```
+
+### 凡例シート自動配置の設計
+- アクティブビューがシートで凡例ビューが作成済みの場合のみ動作
+- **別トランザクション**で実行（凡例ビューをコミット後に Viewport.Create する必要があるため）
+- 配置位置: 右上角固定、項目数からサイズ推定して配置
+  - `estW = 85mm`（色四角列20mm + テキスト列65mm）
+  - `estH = titleH + totalRows * rowH + noteH` （`noteH=45mm`は注記セクション概算）
+  - 余白 `margin = 50mm` + 微調整 `upOffset = 25mm`, `rightOffset = 30mm`
+- デバッグログ: `C:\temp\FireProtection_debug.txt` に VP ID と座標を記録
+
+### 自動配色の設計
+- 12色の独立パレット（赤／青／緑／黄／紫／ピンク／シアン／オレンジ／黄緑／ティール／マゼンタ／インディゴ）
+- 梁用: 薄い色合い（パステル）、柱用: 濃い色合い（ビビッド）
+- 13種類以上は明度を ×0.6 または +50〜80 で大きく変化させて重複回避
+
+### 開発で得た重要な知見
+
+#### ⚠️ アイコン PNG の DPI メタデータが必須（WPF 表示サイズ問題）
+- **症状**: 自作した96px PNGをLargeImageに設定するとリボンからはみ出して表示される
+- **原因**: WPF は PNG の DPI メタデータを基に論理ピクセル寸法を決定する
+  - 既存の動作するアイコン（beam_top_level_96.png 等）は **DPI=288** が設定されている
+  - 96px ÷ (288/96) = 32 論理ピクセル として表示される
+  - DPI が未設定だと 96px がそのまま 96 論理ピクセルとして扱われ、ボタン枠を超える
+- **対策**: Pillow で保存時に `dpi=(288.0106, 288.0106)` を指定する
+  ```python
+  img96.save(path, dpi=(288.0106, 288.0106))
+  ```
+- 32px版は `dpi=(96.012, 96.012)` で OK
+- **検証方法**: `Image.open(path).info` で `dpi` キーがあるか確認
+
+#### アイコンの右側カラーパレット仕様（既存と統一）
+- **8×8 ピクセルの塗潰しのみ、囲い線なし**
+- x範囲: 22-29、y範囲: 1-8 / 11-18 / 21-28（2px間隔）
+- 色: ピンク`(255,128,148)`, 黄`(218,185,47)`, 青`(30,144,255)`
+- ピクセル単位で `beam_under_level_32.png` と一致させること
+
+#### ⚠️ トランザクションブロック内で宣言した変数のスコープ
+- `using (Transaction trans) { ... }` ブロック内で宣言した変数は、ブロック終了後に使えない
+- 凡例シート自動配置（別トランザクション）で `hasColumnFrame` 等のフラグを使う場合は、
+  **トランザクション開始前に宣言**して、ブロック内で代入のみ行う
+  ```csharp
+  bool hasColumnFrame = false;
+  using (Transaction trans = new Transaction(doc, "..."))
+  {
+      // ...
+      hasColumnFrame = targetViews.Any(...);  // 代入のみ
+  }
+  // ここで hasColumnFrame を使える
+  ```
+
+#### Viewport.Create のサイズ取得問題
+- 凡例ビューのサイズを `view.GetBoxOutline()` で取得しようとすると失敗するケースあり
+  （ビューが直前のトランザクションでコミットされたばかりで、内部キャッシュが未更新）
+- **対策**: 項目数からサイズを推定して直接配置する方式が確実
+  ```csharp
+  double estH = titleH + totalRows * rowH + noteH;
+  double estW = colW + textW;
+  double vpCX = outline.Max.U - margin - estW / 2.0;
+  ```
+
+#### 自動配色アルゴリズムの注意点
+- ベース色を3色だけにして残りを明度シフトで生成すると、cycle≥1 のときに元色とほぼ同色になる
+  （例: factor=0.95 で `(255,153,104) → (248,151,105)` で見分け不能）
+- **対策**: ベースパレットを十分な数（12色程度）まで拡張し、超過時のみ明度を大きく変化させる
+
+#### 凡例の Excel セル表形式
+- タイトル行 + 各種類の色行 + 柱行 + 注記行を、表形式（横線・縦線）で構成
+- 横線: 各行の境界 + 上下端
+- 縦線: 左端 / 色四角列右端（colDivX=20mm）/ 右端
+- 色四角は 18×8mm（行内に1mm余白）
+- 注記は `※` ごとに別 TextNote、行間隔 `textHeight * 1.6 * lineCount + textHeight * 2.5`
+- mm固定寸法 + テキスト垂直中央配置で安定したレイアウト
+
+#### 柱枠線の非表示
+- 柱の枠型（内側に穴の開いた矩形）の塗潰しは外周線が出るため、`SetLineStyleId()` で
+  「非表示」または「Invisible」スタイルを適用して枠線を消す
+  ```csharp
+  var invisStyle = ... GraphicsStyle ... where Name.Contains("非表示") ...;
+  if (invisStyle != null) fr.SetLineStyleId(invisStyle.Id);
+  ```
+
+### 現在のステータス
+- **機能実装**: 完了（ダイアログ、梁/柱検出、自動配色、塗潰し、凡例、シート自動配置）
+- **動作確認**: Revit 環境で動作確認済み
+- **アイコン**: I型梁 + グレー塗潰し被覆 + 3色ブロック（`fire_protection_32.png` / `_96.png`）
+- **リボン登録**: 構造パネル「色分け」セクションに追加済み
