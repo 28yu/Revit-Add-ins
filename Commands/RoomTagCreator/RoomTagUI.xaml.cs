@@ -31,6 +31,7 @@ namespace Tools28.Commands.RoomTagCreator
         public RoomTagUI(Document doc, List<RoomInfo> rooms, string sourceViewName)
         {
             InitializeComponent();
+            ApplyLocalization();
 
             _doc = doc;
 
@@ -48,6 +49,27 @@ namespace Tools28.Commands.RoomTagCreator
             // 初期表示
             RowCountText.Text = _rowCount.ToString();
             UpdatePreview();
+        }
+
+        private void ApplyLocalization()
+        {
+            this.Title = Loc.S("RoomTag.Title");
+            txtViewName.Text = Loc.S("RoomTag.ViewName");
+            txtViewFamilyType.Text = Loc.S("RoomTag.ViewFamilyType");
+            FloorPlanRadio.Content = Loc.S("RoomTag.FloorPlan");
+            CeilingPlanRadio.Content = Loc.S("RoomTag.CeilingPlan");
+            txtTagFamilyType.Text = Loc.S("RoomTag.TagFamilyType");
+            txtTagSpacing.Text = Loc.S("RoomTag.TagSpacing");
+            txtRoomList.Text = Loc.S("RoomTag.RoomList");
+            btnMoveUp.ToolTip = Loc.S("RoomTag.MoveUp");
+            btnMoveDown.ToolTip = Loc.S("RoomTag.MoveDown");
+            btnDelete.ToolTip = Loc.S("RoomTag.Delete");
+            txtUnclosedHint.Text = Loc.S("RoomTag.UnclosedHint");
+            txtPreview.Text = Loc.S("RoomTag.Preview");
+            btnIncRows.ToolTip = Loc.S("RoomTag.IncRows");
+            btnDecRows.ToolTip = Loc.S("RoomTag.DecRows");
+            ExecuteButton.Content = Loc.S("Common.Execute");
+            CancelButton.Content = Loc.S("Common.Cancel");
         }
 
         private void LoadTagTypes()

@@ -573,10 +573,10 @@ namespace Tools28.Commands.FireProtection
                 ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
 
             BackButton.IsEnabled = step > 1;
-            NextButton.Content = step == TotalSteps ? "実行" : "次へ";
+            NextButton.Content = step == TotalSteps ? Loc.S("Common.Execute") : Loc.S("Common.Next");
 
-            string[] stepNames = { "", "基本設定", "オフセット・表示設定", "処理確認" };
-            StepIndicator.Text = $"ステップ {step} / {TotalSteps}  {stepNames[step]}";
+            string[] stepNames = { "", Loc.S("Fire.StepName1"), Loc.S("Fire.StepName2"), Loc.S("Fire.StepName3") };
+            StepIndicator.Text = string.Format(Loc.S("Common.StepIndicator"), step, TotalSteps, stepNames[step]);
         }
 
         private void NextButton_Click(object sender, RoutedEventArgs e)

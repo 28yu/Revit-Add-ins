@@ -583,7 +583,7 @@ namespace Tools28.Commands.BeamUnderLevel
             NextButton.Content = step == TotalSteps ? Loc.S("Common.Execute") : Loc.S("Common.Next");
 
             string[] stepNames = { "", Loc.S("BeamUnder.StepName1"), Loc.S("BeamUnder.StepName2"), Loc.S("BeamUnder.StepName3"), Loc.S("BeamUnder.StepName4") };
-            StepIndicator.Text = Loc.S("Common.StepIndicator", step, TotalSteps, stepNames[step]);
+            StepIndicator.Text = string.Format(Loc.S("Common.StepIndicator"), step, TotalSteps, stepNames[step]);
         }
 
         private void NextButton_Click(object sender, RoutedEventArgs e)
