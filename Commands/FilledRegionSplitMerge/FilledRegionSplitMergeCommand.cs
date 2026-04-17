@@ -4,6 +4,7 @@ using System.Linq;
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using Tools28.Localization;
 
 namespace Tools28.Commands.FilledRegionSplitMerge
 {
@@ -26,8 +27,8 @@ namespace Tools28.Commands.FilledRegionSplitMerge
                 // 選択がない場合、ユーザーに選択を促す
                 if (selectedIds.Count == 0)
                 {
-                    TaskDialog.Show("塗潰し領域 分割/統合",
-                        "塗り潰し領域を選択してから、このコマンドを実行してください。");
+                    TaskDialog.Show(Loc.S("FilledRegion.Title"),
+                        Loc.S("FilledRegion.SelectFirst"));
                     return Result.Cancelled;
                 }
 
@@ -36,17 +37,15 @@ namespace Tools28.Commands.FilledRegionSplitMerge
 
                 if (analysis.FilledRegions.Count == 0)
                 {
-                    TaskDialog.Show("塗潰し領域 分割/統合",
-                        "塗り潰し領域が選択されていません。\n塗り潰し領域を選択してから、このコマンドを実行してください。");
+                    TaskDialog.Show(Loc.S("FilledRegion.Title"),
+                        Loc.S("FilledRegion.NoneSelected"));
                     return Result.Cancelled;
                 }
 
                 if (!analysis.CanSplit && !analysis.CanMerge)
                 {
-                    TaskDialog.Show("塗潰し領域 分割/統合",
-                        "分割または統合できる塗り潰し領域がありません。\n\n" +
-                        "• 分割: 複数のエリアを持つ領域を選択してください\n" +
-                        "• 統合: 複数の領域を選択してください");
+                    TaskDialog.Show(Loc.S("FilledRegion.Title"),
+                        Loc.S("FilledRegion.NoneAvailable"));
                     return Result.Cancelled;
                 }
 
@@ -98,7 +97,7 @@ namespace Tools28.Commands.FilledRegionSplitMerge
                         trans.Commit();
 
                         // ステップ10: 完了メッセージ表示
-                        TaskDialog.Show("処理完了", resultMessage);
+                        TaskDialog.Show(Loc.S("Common.ProcessComplete"), resultMessage);
 
                         // デバッグログ出力
                         LogToFile($"[{DateTime.Now}] {resultMessage}");
@@ -119,8 +118,8 @@ namespace Tools28.Commands.FilledRegionSplitMerge
                 // エラーログ出力
                 LogToFile($"[{DateTime.Now}] エラー: {ex.Message}\n{ex.StackTrace}");
 
-                TaskDialog.Show("エラー",
-                    $"処理中にエラーが発生しました。\n\n{ex.Message}");
+                TaskDialog.Show(Loc.S("Common.Error"),
+                    string.Format(Loc.S("FilledRegion.ProcessError"), ex.Message));
 
                 return Result.Failed;
             }

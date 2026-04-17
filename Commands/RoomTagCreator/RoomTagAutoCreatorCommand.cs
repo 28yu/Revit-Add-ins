@@ -5,6 +5,7 @@ using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using Autodesk.Revit.UI.Selection;
+using Tools28.Localization;
 
 namespace Tools28.Commands.RoomTagCreator
 {
@@ -25,8 +26,8 @@ namespace Tools28.Commands.RoomTagCreator
                 // シートビューか確認
                 if (activeView.ViewType != ViewType.DrawingSheet)
                 {
-                    TaskDialog.Show("エラー",
-                        "シートビューを開いた状態で実行してください。");
+                    TaskDialog.Show(Loc.S("Common.Error"),
+                        Loc.S("RoomTag.OpenSheet"));
                     return Result.Cancelled;
                 }
 
@@ -50,7 +51,7 @@ namespace Tools28.Commands.RoomTagCreator
                 Viewport viewport = doc.GetElement(pickedRef.ElementId) as Viewport;
                 if (viewport == null)
                 {
-                    TaskDialog.Show("エラー", "ビューポートが取得できませんでした。");
+                    TaskDialog.Show(Loc.S("Common.Error"), Loc.S("RoomTag.NoViewport"));
                     return Result.Cancelled;
                 }
 
@@ -58,7 +59,7 @@ namespace Tools28.Commands.RoomTagCreator
                 View sourceView = doc.GetElement(viewport.ViewId) as View;
                 if (sourceView == null)
                 {
-                    TaskDialog.Show("エラー", "ビューポートのビューが取得できませんでした。");
+                    TaskDialog.Show(Loc.S("Common.Error"), Loc.S("RoomTag.NoView"));
                     return Result.Cancelled;
                 }
 
@@ -66,7 +67,7 @@ namespace Tools28.Commands.RoomTagCreator
                 var rooms = RoomTagService.GetViewportRooms(doc, viewport);
                 if (rooms.Count == 0)
                 {
-                    TaskDialog.Show("警告", "選択したビューポート内に部屋が見つかりません。");
+                    TaskDialog.Show(Loc.S("Common.Warning"), Loc.S("RoomTag.NoRooms"));
                     return Result.Cancelled;
                 }
 
@@ -80,14 +81,14 @@ namespace Tools28.Commands.RoomTagCreator
                 // ダイアログ結果の検証
                 if (string.IsNullOrEmpty(dialog.SelectedViewFamilyTypeName))
                 {
-                    TaskDialog.Show("エラー", "ビューファミリタイプが選択されていません。");
+                    TaskDialog.Show(Loc.S("Common.Error"), Loc.S("RoomTag.NoViewType"));
                     return Result.Failed;
                 }
 
                 if (dialog.SelectedTagTypeId == null ||
                     dialog.SelectedTagTypeId == ElementId.InvalidElementId)
                 {
-                    TaskDialog.Show("エラー", "タグファミリタイプが選択されていません。");
+                    TaskDialog.Show(Loc.S("Common.Error"), Loc.S("RoomTag.NoTagType"));
                     return Result.Failed;
                 }
 

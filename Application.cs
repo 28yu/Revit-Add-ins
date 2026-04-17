@@ -1,8 +1,10 @@
-﻿using System;
+using System;
+using System.Collections.Generic;
 using Autodesk.Revit.UI;
 using System.Reflection;
 using System.Windows.Media.Imaging;
 using System.IO;
+using Tools28.Localization;
 
 namespace Tools28
 {
@@ -10,15 +12,71 @@ namespace Tools28
     {
         internal static PulldownButton LanguagePulldown { get; private set; }
 
+        private static readonly List<RibbonPanel> _panels = new List<RibbonPanel>();
+        private static readonly Dictionary<string, RibbonItem> _buttons = new Dictionary<string, RibbonItem>();
+
+        private static readonly string[] _panelKeys = {
+            "Ribbon.Panel.GridBubble", "Ribbon.Panel.SheetView", "Ribbon.Panel.3DView",
+            "Ribbon.Panel.Annotation", "Ribbon.Panel.Structural", "Ribbon.Panel.Excel",
+            "Ribbon.Panel.Settings"
+        };
+
+        private static readonly Dictionary<string, string> _buttonTextKeys = new Dictionary<string, string>
+        {
+            { "GridBubbleBoth", "Ribbon.GridBubble.Both" },
+            { "GridBubbleLeft", "Ribbon.GridBubble.Left" },
+            { "GridBubbleRight", "Ribbon.GridBubble.Right" },
+            { "SheetCreation", "Ribbon.Sheet.Create" },
+            { "ViewportPositionCopy", "Ribbon.Viewport.Copy" },
+            { "ViewportPositionPaste", "Ribbon.Viewport.Paste" },
+            { "CropBoxCopy", "Ribbon.CropBox.Copy" },
+            { "CropBoxPaste", "Ribbon.CropBox.Paste" },
+            { "ViewCopy", "Ribbon.View.Copy" },
+            { "ViewPaste", "Ribbon.View.Paste" },
+            { "SectionBoxCopy", "Ribbon.SectionBox.Copy" },
+            { "SectionBoxPaste", "Ribbon.SectionBox.Paste" },
+            { "RoomTagAutoCreator", "Ribbon.RoomTag" },
+            { "FilledRegionSplitMerge2", "Ribbon.FilledRegion" },
+            { "BeamUnderLevel", "Ribbon.BeamUnder" },
+            { "BeamTopLevel", "Ribbon.BeamTop" },
+            { "FireProtection", "Ribbon.FireProtection" },
+            { "ExcelExport", "Ribbon.Excel.Export" },
+            { "ExcelImport", "Ribbon.Excel.Import" },
+            { "About", "Ribbon.Settings.About" },
+            { "Manual", "Ribbon.Settings.Manual" },
+        };
+
+        private static readonly Dictionary<string, string> _buttonTipKeys = new Dictionary<string, string>
+        {
+            { "GridBubbleBoth", "Ribbon.GridBubble.Both.Tip" },
+            { "GridBubbleLeft", "Ribbon.GridBubble.Left.Tip" },
+            { "GridBubbleRight", "Ribbon.GridBubble.Right.Tip" },
+            { "SheetCreation", "Ribbon.Sheet.Create.Tip" },
+            { "ViewportPositionCopy", "Ribbon.Viewport.Copy.Tip" },
+            { "ViewportPositionPaste", "Ribbon.Viewport.Paste.Tip" },
+            { "CropBoxCopy", "Ribbon.CropBox.Copy.Tip" },
+            { "CropBoxPaste", "Ribbon.CropBox.Paste.Tip" },
+            { "ViewCopy", "Ribbon.View.Copy.Tip" },
+            { "ViewPaste", "Ribbon.View.Paste.Tip" },
+            { "SectionBoxCopy", "Ribbon.SectionBox.Copy.Tip" },
+            { "SectionBoxPaste", "Ribbon.SectionBox.Paste.Tip" },
+            { "RoomTagAutoCreator", "Ribbon.RoomTag.Tip" },
+            { "FilledRegionSplitMerge2", "Ribbon.FilledRegion.Tip" },
+            { "BeamUnderLevel", "Ribbon.BeamUnder.Tip" },
+            { "BeamTopLevel", "Ribbon.BeamTop.Tip" },
+            { "FireProtection", "Ribbon.FireProtection.Tip" },
+            { "ExcelExport", "Ribbon.Excel.Export.Tip" },
+            { "ExcelImport", "Ribbon.Excel.Import.Tip" },
+            { "About", "Ribbon.Settings.About.Tip" },
+            { "Manual", "Ribbon.Settings.Manual.Tip" },
+        };
+
         public Result OnStartup(UIControlledApplication application)
         {
-            // 依存DLLの解決ハンドラを登録（ClosedXML等の依存先をアドインフォルダから読み込む）
-            // Revit 2021等で System.Runtime.CompilerServices.Unsafe が見つからないエラーを防止
             AppDomain.CurrentDomain.AssemblyResolve += OnAssemblyResolve;
 
             try
             {
-                // デバッグログ: DLLの読み込み元とビルド時刻を記録
                 string debugLogPath = @"C:\temp\Tools28_debug.txt";
                 try
                 {
@@ -27,8 +85,7 @@ namespace Tools28
                     string logContent = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] OnStartup 開始\n"
                         + $"  DLL場所: {asm.Location}\n"
                         + $"  DLLバージョン: {asm.GetName().Version}\n"
-                        + $"  DLL更新日時: {File.GetLastWriteTime(asm.Location):yyyy-MM-dd HH:mm:ss}\n"
-                        + $"  ボタン名テスト: 塗潰し領域分割統合\n";
+                        + $"  DLL更新日時: {File.GetLastWriteTime(asm.Location):yyyy-MM-dd HH:mm:ss}\n";
                     File.AppendAllText(debugLogPath, logContent);
                 }
                 catch { }
@@ -38,7 +95,6 @@ namespace Tools28
 
                 string assemblyPath = Assembly.GetExecutingAssembly().Location;
 
-                // パネル作成
                 CreateGridBubblePanel(application, tabName, assemblyPath);
                 CreateSheetViewPanel(application, tabName, assemblyPath);
                 CreateThreeDViewPanel(application, tabName, assemblyPath);
@@ -47,25 +103,58 @@ namespace Tools28
                 CreateExcelPanel(application, tabName, assemblyPath);
                 CreateSettingsPanel(application, tabName, assemblyPath);
 
+                Loc.LanguageChanged += UpdateRibbonLanguage;
+                UpdateRibbonLanguage();
+
                 return Result.Succeeded;
             }
             catch (Exception ex)
             {
-                TaskDialog.Show("エラー", $"アドインの起動に失敗しました。\n{ex.Message}");
+                TaskDialog.Show(Loc.S("Common.Error"), string.Format(Loc.S("App.StartupFailed"), ex.Message));
                 return Result.Failed;
             }
         }
 
         public Result OnShutdown(UIControlledApplication application)
         {
+            Loc.LanguageChanged -= UpdateRibbonLanguage;
             AppDomain.CurrentDomain.AssemblyResolve -= OnAssemblyResolve;
             return Result.Succeeded;
         }
 
-        /// <summary>
-        /// 依存DLLをアドインフォルダから解決するハンドラ
-        /// ClosedXMLの依存先（System.Runtime.CompilerServices.Unsafe等）がGACにない環境で必要
-        /// </summary>
+        internal static void UpdateRibbonLanguage()
+        {
+            for (int i = 0; i < _panels.Count && i < _panelKeys.Length; i++)
+            {
+                try { _panels[i].Title = Loc.S(_panelKeys[i]); } catch { }
+            }
+
+            foreach (var kv in _buttonTextKeys)
+            {
+                if (_buttons.TryGetValue(kv.Key, out var btn))
+                {
+                    try { btn.ItemText = Loc.S(kv.Value); } catch { }
+                }
+            }
+
+            foreach (var kv in _buttonTipKeys)
+            {
+                if (_buttons.TryGetValue(kv.Key, out var btn))
+                {
+                    try { btn.ToolTip = Loc.S(kv.Value); } catch { }
+                }
+            }
+
+            if (LanguagePulldown != null)
+            {
+                try
+                {
+                    LanguagePulldown.ItemText = Loc.CurrentLang;
+                    LanguagePulldown.ToolTip = Loc.S("Ribbon.Settings.Lang.Tip");
+                } catch { }
+            }
+        }
+
         private Assembly OnAssemblyResolve(object sender, ResolveEventArgs args)
         {
             try
@@ -77,367 +166,225 @@ namespace Tools28
                 if (File.Exists(dllPath))
                     return Assembly.LoadFrom(dllPath);
             }
-            catch
-            {
-                // アセンブリ解決の失敗は無視（別のハンドラやデフォルト解決に任せる）
-            }
+            catch { }
             return null;
         }
 
-        /// <summary>
-        /// 符号ON/OFFパネルを作成
-        /// </summary>
+        private RibbonItem AddButton(RibbonPanel panel, PushButtonData data)
+        {
+            var item = panel.AddItem(data);
+            _buttons[data.Name] = item;
+            return item;
+        }
+
         private void CreateGridBubblePanel(UIControlledApplication application, string tabName, string assemblyPath)
         {
-            RibbonPanel panel = application.CreateRibbonPanel(tabName, "符号 ON/OFF");
+            RibbonPanel panel = application.CreateRibbonPanel(tabName, Loc.S("Ribbon.Panel.GridBubble"));
+            _panels.Add(panel);
 
-            // 両端ボタン
-            PushButtonData bothButtonData = new PushButtonData(
-                "GridBubbleBoth",
-                "両端",
-                assemblyPath,
-                "Tools28.Commands.GridBubble.ExecuteGridBubbleBothCommand");
-            bothButtonData.ToolTip = "通り芯・レベルの符号を両端に表示します";
-            bothButtonData.LargeImage = LoadImage("both_96.png");
-            panel.AddItem(bothButtonData);
+            var bothData = new PushButtonData("GridBubbleBoth", Loc.S("Ribbon.GridBubble.Both"), assemblyPath, "Tools28.Commands.GridBubble.ExecuteGridBubbleBothCommand");
+            bothData.ToolTip = Loc.S("Ribbon.GridBubble.Both.Tip");
+            bothData.LargeImage = LoadImage("both_96.png");
+            AddButton(panel, bothData);
 
-            // 左端ボタン
-            PushButtonData leftButtonData = new PushButtonData(
-                "GridBubbleLeft",
-                "左端",
-                assemblyPath,
-                "Tools28.Commands.GridBubble.ExecuteGridBubbleLeftCommand");
-            leftButtonData.ToolTip = "通り芯・レベルの符号を左端のみに表示します";
-            leftButtonData.LargeImage = LoadImage("left_96.png");
-            panel.AddItem(leftButtonData);
+            var leftData = new PushButtonData("GridBubbleLeft", Loc.S("Ribbon.GridBubble.Left"), assemblyPath, "Tools28.Commands.GridBubble.ExecuteGridBubbleLeftCommand");
+            leftData.ToolTip = Loc.S("Ribbon.GridBubble.Left.Tip");
+            leftData.LargeImage = LoadImage("left_96.png");
+            AddButton(panel, leftData);
 
-            // 右端ボタン
-            PushButtonData rightButtonData = new PushButtonData(
-                "GridBubbleRight",
-                "右端",
-                assemblyPath,
-                "Tools28.Commands.GridBubble.ExecuteGridBubbleRightCommand");
-            rightButtonData.ToolTip = "通り芯・レベルの符号を右端のみに表示します";
-            rightButtonData.LargeImage = LoadImage("right_96.png");
-            panel.AddItem(rightButtonData);
+            var rightData = new PushButtonData("GridBubbleRight", Loc.S("Ribbon.GridBubble.Right"), assemblyPath, "Tools28.Commands.GridBubble.ExecuteGridBubbleRightCommand");
+            rightData.ToolTip = Loc.S("Ribbon.GridBubble.Right.Tip");
+            rightData.LargeImage = LoadImage("right_96.png");
+            AddButton(panel, rightData);
         }
 
-        /// <summary>
-        /// シート・ビューパネルを作成
-        /// </summary>
         private void CreateSheetViewPanel(UIControlledApplication application, string tabName, string assemblyPath)
         {
-            RibbonPanel panel = application.CreateRibbonPanel(tabName, "シート・ビュー");
+            RibbonPanel panel = application.CreateRibbonPanel(tabName, Loc.S("Ribbon.Panel.SheetView"));
+            _panels.Add(panel);
 
-            // シート一括作成ボタン
-            PushButtonData sheetButtonData = new PushButtonData(
-                "SheetCreation",
-                "一括作成",
-                assemblyPath,
-                "Tools28.Commands.SheetCreation.ExecuteSheetCreationCommand");
-            sheetButtonData.ToolTip = "図枠を指定して複数のシートを一括作成します";
-            sheetButtonData.LargeImage = LoadImage("sheet_creation_96.png");
-            panel.AddItem(sheetButtonData);
+            var sheetData = new PushButtonData("SheetCreation", Loc.S("Ribbon.Sheet.Create"), assemblyPath, "Tools28.Commands.SheetCreation.ExecuteSheetCreationCommand");
+            sheetData.ToolTip = Loc.S("Ribbon.Sheet.Create.Tip");
+            sheetData.LargeImage = LoadImage("sheet_creation_96.png");
+            AddButton(panel, sheetData);
 
-            // セパレータ
             panel.AddSeparator();
 
-            // ビューポート位置コピーボタン
-            PushButtonData viewportCopyButtonData = new PushButtonData(
-                "ViewportPositionCopy",
-                "ビューポート\n位置コピー",
-                assemblyPath,
-                "Tools28.Commands.ViewportPosition.ExecuteViewportPositionCopyCommand");
-            viewportCopyButtonData.ToolTip = "シート上のビューポート位置をコピーします";
-            viewportCopyButtonData.LargeImage = LoadImage("viewport_copy_96.png");
-            panel.AddItem(viewportCopyButtonData);
+            var vpCopyData = new PushButtonData("ViewportPositionCopy", Loc.S("Ribbon.Viewport.Copy"), assemblyPath, "Tools28.Commands.ViewportPosition.ExecuteViewportPositionCopyCommand");
+            vpCopyData.ToolTip = Loc.S("Ribbon.Viewport.Copy.Tip");
+            vpCopyData.LargeImage = LoadImage("viewport_copy_96.png");
+            AddButton(panel, vpCopyData);
 
-            // ビューポート位置ペーストボタン
-            PushButtonData viewportPasteButtonData = new PushButtonData(
-                "ViewportPositionPaste",
-                "ビューポート\n位置ペースト",
-                assemblyPath,
-                "Tools28.Commands.ViewportPosition.ExecuteViewportPositionPasteCommand");
-            viewportPasteButtonData.ToolTip = "コピーしたビューポート位置を他のシートに適用します";
-            viewportPasteButtonData.LargeImage = LoadImage("viewport_paste_96.png");
-            panel.AddItem(viewportPasteButtonData);
+            var vpPasteData = new PushButtonData("ViewportPositionPaste", Loc.S("Ribbon.Viewport.Paste"), assemblyPath, "Tools28.Commands.ViewportPosition.ExecuteViewportPositionPasteCommand");
+            vpPasteData.ToolTip = Loc.S("Ribbon.Viewport.Paste.Tip");
+            vpPasteData.LargeImage = LoadImage("viewport_paste_96.png");
+            AddButton(panel, vpPasteData);
 
-            // セパレータ
             panel.AddSeparator();
 
-            // トリミング領域コピーボタン
-            PushButtonData cropBoxCopyButtonData = new PushButtonData(
-                "CropBoxCopy",
-                "トリミング\n領域コピー",
-                assemblyPath,
-                "Tools28.Commands.CropBoxCopy.ExecuteCropBoxCopyCommand");
-            cropBoxCopyButtonData.ToolTip = "ビューのトリミング領域をコピーします";
-            cropBoxCopyButtonData.LargeImage = LoadImage("cropbox_copy_96.png");
-            panel.AddItem(cropBoxCopyButtonData);
+            var cbCopyData = new PushButtonData("CropBoxCopy", Loc.S("Ribbon.CropBox.Copy"), assemblyPath, "Tools28.Commands.CropBoxCopy.ExecuteCropBoxCopyCommand");
+            cbCopyData.ToolTip = Loc.S("Ribbon.CropBox.Copy.Tip");
+            cbCopyData.LargeImage = LoadImage("cropbox_copy_96.png");
+            AddButton(panel, cbCopyData);
 
-            // トリミング領域ペーストボタン
-            PushButtonData cropBoxPasteButtonData = new PushButtonData(
-                "CropBoxPaste",
-                "トリミング\n領域ペースト",
-                assemblyPath,
-                "Tools28.Commands.CropBoxCopy.ExecuteCropBoxPasteCommand");
-            cropBoxPasteButtonData.ToolTip = "コピーしたトリミング領域を他のビューに適用します";
-            cropBoxPasteButtonData.LargeImage = LoadImage("cropbox_paste_96.png");
-            panel.AddItem(cropBoxPasteButtonData);
+            var cbPasteData = new PushButtonData("CropBoxPaste", Loc.S("Ribbon.CropBox.Paste"), assemblyPath, "Tools28.Commands.CropBoxCopy.ExecuteCropBoxPasteCommand");
+            cbPasteData.ToolTip = Loc.S("Ribbon.CropBox.Paste.Tip");
+            cbPasteData.LargeImage = LoadImage("cropbox_paste_96.png");
+            AddButton(panel, cbPasteData);
         }
 
-        /// <summary>
-        /// 3Dビューパネルを作成
-        /// </summary>
         private void CreateThreeDViewPanel(UIControlledApplication application, string tabName, string assemblyPath)
         {
-            RibbonPanel panel = application.CreateRibbonPanel(tabName, "3Dビュー");
+            RibbonPanel panel = application.CreateRibbonPanel(tabName, Loc.S("Ribbon.Panel.3DView"));
+            _panels.Add(panel);
 
-            // 視点コピーボタン
-            PushButtonData viewCopyButtonData = new PushButtonData(
-                "ViewCopy",
-                "視点コピー",
-                assemblyPath,
-                "Tools28.Commands.ViewCopy.ExecuteViewCopyCommand");
-            viewCopyButtonData.ToolTip = "3Dビューの視点をコピーします";
-            viewCopyButtonData.LargeImage = LoadImage("view_copy_96.png");
-            panel.AddItem(viewCopyButtonData);
+            var viewCopyData = new PushButtonData("ViewCopy", Loc.S("Ribbon.View.Copy"), assemblyPath, "Tools28.Commands.ViewCopy.ExecuteViewCopyCommand");
+            viewCopyData.ToolTip = Loc.S("Ribbon.View.Copy.Tip");
+            viewCopyData.LargeImage = LoadImage("view_copy_96.png");
+            AddButton(panel, viewCopyData);
 
-            // 視点ペーストボタン
-            PushButtonData viewPasteButtonData = new PushButtonData(
-                "ViewPaste",
-                "視点ペースト",
-                assemblyPath,
-                "Tools28.Commands.ViewCopy.ExecuteViewPasteCommand");
-            viewPasteButtonData.ToolTip = "コピーした視点を他の3Dビューに適用します";
-            viewPasteButtonData.LargeImage = LoadImage("view_paste_96.png");
-            panel.AddItem(viewPasteButtonData);
+            var viewPasteData = new PushButtonData("ViewPaste", Loc.S("Ribbon.View.Paste"), assemblyPath, "Tools28.Commands.ViewCopy.ExecuteViewPasteCommand");
+            viewPasteData.ToolTip = Loc.S("Ribbon.View.Paste.Tip");
+            viewPasteData.LargeImage = LoadImage("view_paste_96.png");
+            AddButton(panel, viewPasteData);
 
-            // セパレータ
             panel.AddSeparator();
 
-            // 切断ボックスコピーボタン
-            PushButtonData sectionBoxCopyButtonData = new PushButtonData(
-                "SectionBoxCopy",
-                "切断ボックス\nコピー",
-                assemblyPath,
-                "Tools28.Commands.SectionBoxCopy.ExecuteSectionBoxCopyCommand");
-            sectionBoxCopyButtonData.ToolTip = "3Dビューの切断ボックスをコピーします";
-            sectionBoxCopyButtonData.LargeImage = LoadImage("sectionbox_copy_96.png");
-            panel.AddItem(sectionBoxCopyButtonData);
+            var sbCopyData = new PushButtonData("SectionBoxCopy", Loc.S("Ribbon.SectionBox.Copy"), assemblyPath, "Tools28.Commands.SectionBoxCopy.ExecuteSectionBoxCopyCommand");
+            sbCopyData.ToolTip = Loc.S("Ribbon.SectionBox.Copy.Tip");
+            sbCopyData.LargeImage = LoadImage("sectionbox_copy_96.png");
+            AddButton(panel, sbCopyData);
 
-            // 切断ボックスペーストボタン
-            PushButtonData sectionBoxPasteButtonData = new PushButtonData(
-                "SectionBoxPaste",
-                "切断ボックス\nペースト",
-                assemblyPath,
-                "Tools28.Commands.SectionBoxCopy.ExecuteSectionBoxPasteCommand");
-            sectionBoxPasteButtonData.ToolTip = "コピーした切断ボックスを他の3Dビューに適用します";
-            sectionBoxPasteButtonData.LargeImage = LoadImage("sectionbox_paste_96.png");
-            panel.AddItem(sectionBoxPasteButtonData);
+            var sbPasteData = new PushButtonData("SectionBoxPaste", Loc.S("Ribbon.SectionBox.Paste"), assemblyPath, "Tools28.Commands.SectionBoxCopy.ExecuteSectionBoxPasteCommand");
+            sbPasteData.ToolTip = Loc.S("Ribbon.SectionBox.Paste.Tip");
+            sbPasteData.LargeImage = LoadImage("sectionbox_paste_96.png");
+            AddButton(panel, sbPasteData);
         }
 
-        /// <summary>
-        /// 注釈・詳細パネルを作成
-        /// </summary>
         private void CreateAnnotationPanel(UIControlledApplication application, string tabName, string assemblyPath)
         {
-            RibbonPanel panel = application.CreateRibbonPanel(tabName, "注釈・詳細");
+            RibbonPanel panel = application.CreateRibbonPanel(tabName, Loc.S("Ribbon.Panel.Annotation"));
+            _panels.Add(panel);
 
-            // 部屋タグ自動配置ボタン
-            PushButtonData roomTagButtonData = new PushButtonData(
-                "RoomTagAutoCreator",
-                "部屋タグ\n自動配置",
-                assemblyPath,
-                "Tools28.Commands.RoomTagCreator.RoomTagAutoCreatorCommand");
-            roomTagButtonData.ToolTip = "ビューポート内の部屋タグを指定方向・間隔で自動配置します";
-            roomTagButtonData.LargeImage = LoadImage("room_tag_96.png");
-            panel.AddItem(roomTagButtonData);
+            var roomTagData = new PushButtonData("RoomTagAutoCreator", Loc.S("Ribbon.RoomTag"), assemblyPath, "Tools28.Commands.RoomTagCreator.RoomTagAutoCreatorCommand");
+            roomTagData.ToolTip = Loc.S("Ribbon.RoomTag.Tip");
+            roomTagData.LargeImage = LoadImage("room_tag_96.png");
+            AddButton(panel, roomTagData);
 
-            // セパレータ
             panel.AddSeparator();
 
-            // 塗潰し領域 分割/統合ボタン
-            PushButtonData filledRegionButtonData = new PushButtonData(
-                "FilledRegionSplitMerge2",
-                "塗潰し領域\n分割･統合",
-                assemblyPath,
-                "Tools28.Commands.FilledRegionSplitMerge.FilledRegionSplitMergeCommand");
-            filledRegionButtonData.ToolTip = "配置されている塗潰領域を分割/統合します";
-            filledRegionButtonData.LargeImage = LoadImage("filled_region_96.png");
-            panel.AddItem(filledRegionButtonData);
-
+            var filledData = new PushButtonData("FilledRegionSplitMerge2", Loc.S("Ribbon.FilledRegion"), assemblyPath, "Tools28.Commands.FilledRegionSplitMerge.FilledRegionSplitMergeCommand");
+            filledData.ToolTip = Loc.S("Ribbon.FilledRegion.Tip");
+            filledData.LargeImage = LoadImage("filled_region_96.png");
+            AddButton(panel, filledData);
         }
 
-        /// <summary>
-        /// 色分けパネルを作成
-        /// </summary>
         private void CreateStructuralPanel(UIControlledApplication application, string tabName, string assemblyPath)
         {
-            RibbonPanel panel = application.CreateRibbonPanel(tabName, "色分け");
+            RibbonPanel panel = application.CreateRibbonPanel(tabName, Loc.S("Ribbon.Panel.Structural"));
+            _panels.Add(panel);
 
-            // 梁下端色分けボタン
-            PushButtonData beamUnderLevelButtonData = new PushButtonData(
-                "BeamUnderLevel",
-                "梁下端\n色分け",
-                assemblyPath,
-                "Tools28.Commands.BeamUnderLevel.BeamUnderLevelCommand");
-            beamUnderLevelButtonData.ToolTip = "天井伏図の梁下端レベルを自動算出し、レベル別に色分け表示します";
-            beamUnderLevelButtonData.LargeImage = LoadImage("beam_under_level_96.png");
-            panel.AddItem(beamUnderLevelButtonData);
+            var beamUnderData = new PushButtonData("BeamUnderLevel", Loc.S("Ribbon.BeamUnder"), assemblyPath, "Tools28.Commands.BeamUnderLevel.BeamUnderLevelCommand");
+            beamUnderData.ToolTip = Loc.S("Ribbon.BeamUnder.Tip");
+            beamUnderData.LargeImage = LoadImage("beam_under_level_96.png");
+            AddButton(panel, beamUnderData);
 
-            // 梁天端色分けボタン
-            PushButtonData beamTopLevelButtonData = new PushButtonData(
-                "BeamTopLevel",
-                "梁天端\n色分け",
-                assemblyPath,
-                "Tools28.Commands.BeamTopLevel.BeamTopLevelCommand");
-            beamTopLevelButtonData.ToolTip = "平面ビューの梁天端レベルをパラメータから取得し、レベル別に色分け表示します";
-            beamTopLevelButtonData.LargeImage = LoadImage("beam_top_level_96.png");
-            panel.AddItem(beamTopLevelButtonData);
+            var beamTopData = new PushButtonData("BeamTopLevel", Loc.S("Ribbon.BeamTop"), assemblyPath, "Tools28.Commands.BeamTopLevel.BeamTopLevelCommand");
+            beamTopData.ToolTip = Loc.S("Ribbon.BeamTop.Tip");
+            beamTopData.LargeImage = LoadImage("beam_top_level_96.png");
+            AddButton(panel, beamTopData);
 
-            // セパレータ
             panel.AddSeparator();
 
-            // 耐火被覆色分けボタン
-            PushButtonData fireProtectionButtonData = new PushButtonData(
-                "FireProtection",
-                "耐火被覆\n色分け",
-                assemblyPath,
-                "Tools28.Commands.FireProtection.FireProtectionCommand");
-            fireProtectionButtonData.ToolTip = "梁の耐火被覆範囲を自動検出し、種類別に色分けした塗潰領域を作成します";
-            fireProtectionButtonData.LargeImage = LoadImage("fire_protection_96.png");
-            panel.AddItem(fireProtectionButtonData);
+            var fireData = new PushButtonData("FireProtection", Loc.S("Ribbon.FireProtection"), assemblyPath, "Tools28.Commands.FireProtection.FireProtectionCommand");
+            fireData.ToolTip = Loc.S("Ribbon.FireProtection.Tip");
+            fireData.LargeImage = LoadImage("fire_protection_96.png");
+            AddButton(panel, fireData);
         }
 
-        /// <summary>
-        /// Excel連携パネルを作成
-        /// </summary>
         private void CreateExcelPanel(UIControlledApplication application, string tabName, string assemblyPath)
         {
-            RibbonPanel panel = application.CreateRibbonPanel(tabName, "Excel連携");
+            RibbonPanel panel = application.CreateRibbonPanel(tabName, Loc.S("Ribbon.Panel.Excel"));
+            _panels.Add(panel);
 
-            // Excelエクスポートボタン
-            PushButtonData exportButtonData = new PushButtonData(
-                "ExcelExport",
-                "Excel\nエクスポート",
-                assemblyPath,
-                "Tools28.Commands.ExcelExportImport.ExcelExportCommand");
-            exportButtonData.ToolTip = "パラメータをExcelに書き出します";
-            exportButtonData.LargeImage = LoadImage("excel_export_96.png");
-            panel.AddItem(exportButtonData);
+            var exportData = new PushButtonData("ExcelExport", Loc.S("Ribbon.Excel.Export"), assemblyPath, "Tools28.Commands.ExcelExportImport.ExcelExportCommand");
+            exportData.ToolTip = Loc.S("Ribbon.Excel.Export.Tip");
+            exportData.LargeImage = LoadImage("excel_export_96.png");
+            AddButton(panel, exportData);
 
-            // Excelインポートボタン
-            PushButtonData importButtonData = new PushButtonData(
-                "ExcelImport",
-                "Excel\nインポート",
-                assemblyPath,
-                "Tools28.Commands.ExcelExportImport.ExcelImportCommand");
-            importButtonData.ToolTip = "Excelからパラメータを読み込みます";
-            importButtonData.LargeImage = LoadImage("excel_import_96.png");
-            panel.AddItem(importButtonData);
+            var importData = new PushButtonData("ExcelImport", Loc.S("Ribbon.Excel.Import"), assemblyPath, "Tools28.Commands.ExcelExportImport.ExcelImportCommand");
+            importData.ToolTip = Loc.S("Ribbon.Excel.Import.Tip");
+            importData.LargeImage = LoadImage("excel_import_96.png");
+            AddButton(panel, importData);
         }
 
-
-        /// <summary>
-        /// 設定パネルを作成（リボン最右端、小ボタン3段スタック）
-        /// </summary>
         private void CreateSettingsPanel(UIControlledApplication application, string tabName, string assemblyPath)
         {
-            RibbonPanel panel = application.CreateRibbonPanel(tabName, "設定");
+            RibbonPanel panel = application.CreateRibbonPanel(tabName, Loc.S("Ribbon.Panel.Settings"));
+            _panels.Add(panel);
 
-            // 言語切替プルダウン（▼付きドロップダウン）
-            PulldownButtonData languagePulldownData = new PulldownButtonData(
-                "LanguageSwitch",
-                "JP");
-            languagePulldownData.ToolTip = "UIの表示言語を切り替えます (JP / US / CN)";
-            languagePulldownData.Image = LoadImage("flag_jp_16.png");
+            string currentLang = Loc.CurrentLang;
+            string flagIcon = $"flag_{currentLang.ToLower()}_16.png";
+            if (currentLang == "US") flagIcon = "flag_us_16.png";
 
-            // バージョン情報ボタン
-            PushButtonData aboutButtonData = new PushButtonData(
-                "About",
-                "バージョン情報",
-                assemblyPath,
-                "Tools28.Commands.LanguageSwitch.AboutCommand");
-            aboutButtonData.ToolTip = "28 Tools のバージョン情報を表示します";
-            aboutButtonData.Image = LoadImage("ver_16.png");
+            var langData = new PulldownButtonData("LanguageSwitch", currentLang);
+            langData.ToolTip = Loc.S("Ribbon.Settings.Lang.Tip");
+            langData.Image = LoadImage(flagIcon);
 
-            // マニュアルボタン
-            PushButtonData manualButtonData = new PushButtonData(
-                "Manual",
-                "マニュアル",
-                assemblyPath,
-                "Tools28.Commands.LanguageSwitch.ManualCommand");
-            manualButtonData.ToolTip = "28 Tools のマニュアルをブラウザで開きます";
-            manualButtonData.Image = LoadImage("manual_16.png");
+            var aboutData = new PushButtonData("About", Loc.S("Ribbon.Settings.About"), assemblyPath, "Tools28.Commands.LanguageSwitch.AboutCommand");
+            aboutData.ToolTip = Loc.S("Ribbon.Settings.About.Tip");
+            aboutData.Image = LoadImage("ver_16.png");
 
-            // 3段スタックで小ボタン化
-            var stackedItems = panel.AddStackedItems(languagePulldownData, aboutButtonData, manualButtonData);
+            var manualData = new PushButtonData("Manual", Loc.S("Ribbon.Settings.Manual"), assemblyPath, "Tools28.Commands.LanguageSwitch.ManualCommand");
+            manualData.ToolTip = Loc.S("Ribbon.Settings.Manual.Tip");
+            manualData.Image = LoadImage("manual_16.png");
 
-            // プルダウンメニューに言語選択肢を追加
+            var stackedItems = panel.AddStackedItems(langData, aboutData, manualData);
+
+            _buttons["About"] = stackedItems[1] as RibbonItem;
+            _buttons["Manual"] = stackedItems[2] as RibbonItem;
+
             LanguagePulldown = stackedItems[0] as PulldownButton;
             if (LanguagePulldown != null)
             {
-                PushButtonData jpData = new PushButtonData(
-                    "LangJP", "JP",
-                    assemblyPath,
-                    "Tools28.Commands.LanguageSwitch.SwitchToJapaneseCommand");
+                var jpData = new PushButtonData("LangJP", "JP", assemblyPath, "Tools28.Commands.LanguageSwitch.SwitchToJapaneseCommand");
                 jpData.Image = LoadImage("flag_jp_16.png");
                 jpData.LargeImage = LoadImage("flag_jp_32.png");
-                jpData.ToolTip = "日本語に切り替えます";
+                jpData.ToolTip = Loc.S("Ribbon.Settings.Lang.JP.Tip");
                 LanguagePulldown.AddPushButton(jpData);
 
-                PushButtonData enData = new PushButtonData(
-                    "LangUS", "US",
-                    assemblyPath,
-                    "Tools28.Commands.LanguageSwitch.SwitchToEnglishCommand");
+                var enData = new PushButtonData("LangUS", "US", assemblyPath, "Tools28.Commands.LanguageSwitch.SwitchToEnglishCommand");
                 enData.Image = LoadImage("flag_us_16.png");
                 enData.LargeImage = LoadImage("flag_us_32.png");
-                enData.ToolTip = "Switch to English";
+                enData.ToolTip = Loc.S("Ribbon.Settings.Lang.US.Tip");
                 LanguagePulldown.AddPushButton(enData);
 
-                PushButtonData cnData = new PushButtonData(
-                    "LangCN", "CN",
-                    assemblyPath,
-                    "Tools28.Commands.LanguageSwitch.SwitchToChineseCommand");
+                var cnData = new PushButtonData("LangCN", "CN", assemblyPath, "Tools28.Commands.LanguageSwitch.SwitchToChineseCommand");
                 cnData.Image = LoadImage("flag_cn_16.png");
                 cnData.LargeImage = LoadImage("flag_cn_32.png");
-                cnData.ToolTip = "切换为中文";
+                cnData.ToolTip = Loc.S("Ribbon.Settings.Lang.CN.Tip");
                 LanguagePulldown.AddPushButton(cnData);
             }
         }
 
-        /// <summary>
-        /// 画像を読み込み（ハイブリッド方式）
-        /// </summary>
         private BitmapImage LoadImage(string fileName)
         {
-            BitmapImage image = null;
-
-            // 方法1: リソースから読み込み（優先）
             try
             {
                 string packUri = $"pack://application:,,,/Tools28;component/Resources/Icons/{fileName}";
-                image = new BitmapImage(new Uri(packUri));
+                var image = new BitmapImage(new Uri(packUri));
                 image.Freeze();
                 return image;
             }
-            catch
-            {
-                // リソースからの読み込みに失敗
-            }
+            catch { }
 
-            // 方法2: 外部ファイルから読み込み（フォールバック）
             try
             {
-                string assemblyPath = Assembly.GetExecutingAssembly().Location;
-                string assemblyDir = Path.GetDirectoryName(assemblyPath);
-                string iconFolder = Path.Combine(assemblyDir, "Icons");
-                string filePath = Path.Combine(iconFolder, fileName);
-
+                string assemblyDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+                string filePath = Path.Combine(assemblyDir, "Icons", fileName);
                 if (File.Exists(filePath))
                 {
-                    image = new BitmapImage();
+                    var image = new BitmapImage();
                     image.BeginInit();
                     image.UriSource = new Uri(filePath, UriKind.Absolute);
                     image.CacheOption = BitmapCacheOption.OnLoad;
@@ -446,10 +393,7 @@ namespace Tools28
                     return image;
                 }
             }
-            catch
-            {
-                // 外部ファイルからの読み込みにも失敗
-            }
+            catch { }
 
             return null;
         }
