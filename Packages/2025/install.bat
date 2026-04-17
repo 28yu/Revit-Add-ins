@@ -67,7 +67,7 @@ echo.
 echo Revit 2025を完全に再起動してください。
 echo リボンに「28 Tools」タブが表示されます。
 echo.
-echo マニュアル: https://28yu.github.io/28tools-manual/
+echo マニュアル: https://28tools.com/addins.html
 echo.
 
 pause

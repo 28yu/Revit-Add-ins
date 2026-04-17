@@ -259,7 +259,7 @@ namespace Tools28.Commands.BeamUnderLevel
             catch (Exception ex)
             {
                 message = $"梁下端色分け処理中にエラーが発生しました。\n\n{ex.Message}" +
-                    "\n\nマニュアル: https://28yu.github.io/28tools-manual/" +
+                    "\n\nマニュアル: https://28tools.com/addins.html" +
                     "\n配布サイト: https://28yu.github.io/28tools-download/";
                 return Result.Failed;
             }

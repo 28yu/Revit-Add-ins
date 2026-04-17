@@ -46,7 +46,7 @@
 uninstall.bat を管理者として実行してください。
 
 【マニュアル】
-https://28yu.github.io/28tools-manual/
+https://28tools.com/addins.html
 
 【対応バージョン】
 Revit 2026

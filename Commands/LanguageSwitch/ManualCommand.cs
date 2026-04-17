@@ -15,7 +15,7 @@ namespace Tools28.Commands.LanguageSwitch
         {
             Process.Start(new ProcessStartInfo
             {
-                FileName = "https://28yu.github.io/28tools-manual/",
+                FileName = "https://28tools.com/addins.html",
                 UseShellExecute = true
             });
             return Result.Succeeded;

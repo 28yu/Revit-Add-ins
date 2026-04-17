@@ -506,7 +506,7 @@ namespace Tools28.Commands.FireProtection
                     (ex.InnerException != null
                         ? $"\n\n--- InnerException ---\n{ex.InnerException.Message}\n{ex.InnerException.StackTrace}"
                         : "") +
-                    "\n\nマニュアル: https://28yu.github.io/28tools-manual/" +
+                    "\n\nマニュアル: https://28tools.com/addins.html" +
                     "\n配布サイト: https://28yu.github.io/28tools-download/";
                 return Result.Failed;
             }

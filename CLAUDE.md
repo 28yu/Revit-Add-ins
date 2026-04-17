@@ -276,7 +276,7 @@ btn.ToolTip = "機能の説明";
 
 ## 外部参照
 
-- **マニュアル**: https://28yu.github.io/28tools-manual/
+- **マニュアル**: https://28tools.com/addins.html
 - **配布サイト**: https://28yu.github.io/28tools-download/
 - **リポジトリ**: https://github.com/28yu/Revit-Add-ins
 

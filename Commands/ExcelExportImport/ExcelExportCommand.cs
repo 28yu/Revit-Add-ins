@@ -54,7 +54,7 @@ namespace Tools28.Commands.ExcelExportImport
             }
             catch (Exception ex)
             {
-                message = ex.Message + "\n\nマニュアル: https://28yu.github.io/28tools-manual/";
+                message = ex.Message + "\n\nマニュアル: https://28tools.com/addins.html";
                 return Result.Failed;
             }
         }

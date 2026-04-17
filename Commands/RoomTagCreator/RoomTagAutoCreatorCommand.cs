@@ -170,7 +170,7 @@ namespace Tools28.Commands.RoomTagCreator
             {
                 message = $"部屋タグ自動配置中にエラーが発生しました。\n\n{ex.Message}" +
                     $"\n\n--- スタックトレース ---\n{ex.StackTrace}" +
-                    "\n\nマニュアル: https://28yu.github.io/28tools-manual/" +
+                    "\n\nマニュアル: https://28tools.com/addins.html" +
                     "\n配布サイト: https://28yu.github.io/28tools-download/";
                 return Result.Failed;
             }
