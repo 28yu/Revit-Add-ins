@@ -286,8 +286,8 @@
                 </Grid.RowDefinitions>
 
                 <StackPanel Grid.Row="0" Margin="0,0,0,10">
-                    <TextBlock Style="{StaticResource SectionHeader}" Text="梁天端レベルパラメータ選択"/>
-                    <TextBlock Style="{StaticResource NoteStyle}"
+                    <TextBlock x:Name="txtTopParam" Style="{StaticResource SectionHeader}" Text="梁天端レベルパラメータ選択"/>
+                    <TextBlock x:Name="txtTopParamHint" Style="{StaticResource NoteStyle}"
                                Text="※ ファミリ毎に梁天端レベル（参照レベルからのオフセット）として使用するパラメータを選択してください"/>
                 </StackPanel>
 
@@ -304,7 +304,7 @@
                     <Border Background="White" BorderBrush="#D3D3D3"
                             BorderThickness="1" CornerRadius="3" Padding="15,12" Margin="0,0,0,15">
                         <StackPanel>
-                            <TextBlock Style="{StaticResource SectionHeader}" Text="処理概要"/>
+                            <TextBlock x:Name="txtSummary" Style="{StaticResource SectionHeader}" Text="処理概要"/>
                             <TextBlock x:Name="SummaryText" Style="{StaticResource LabelStyle}"
                                        TextWrapping="Wrap"/>
                         </StackPanel>
@@ -314,15 +314,15 @@
                     <Border Background="White" BorderBrush="#D3D3D3"
                             BorderThickness="1" CornerRadius="3" Padding="15,12" Margin="0,0,0,15">
                         <StackPanel>
-                            <TextBlock Style="{StaticResource SectionHeader}" Text="処理内容"/>
+                            <TextBlock x:Name="txtProcessContent" Style="{StaticResource SectionHeader}" Text="処理内容"/>
                             <StackPanel>
-                                <CheckBox Content="共有パラメータ作成・バインド"
+                                <CheckBox x:Name="chkSharedParam" Content="共有パラメータ作成・バインド"
                                           IsChecked="True" IsEnabled="False" Margin="0,3"/>
-                                <CheckBox Content="梁下レベル値の計算・書き込み"
+                                <CheckBox x:Name="chkCalcValue" Content="梁下レベル値の計算・書き込み"
                                           IsChecked="True" IsEnabled="False" Margin="0,3"/>
-                                <CheckBox Content="フィルタ自動作成・色分け"
+                                <CheckBox x:Name="chkCreateFilter" Content="フィルタ自動作成・色分け"
                                           IsChecked="True" IsEnabled="False" Margin="0,3"/>
-                                <CheckBox Content="凡例の製図ビュー作成"
+                                <CheckBox x:Name="chkCreateLegend" Content="凡例の製図ビュー作成"
                                           IsChecked="True" IsEnabled="False" Margin="0,3"/>
                             </StackPanel>
                         </StackPanel>
@@ -332,12 +332,12 @@
                     <Border Background="#FFF8E1" BorderBrush="#FFD54F"
                             BorderThickness="1" CornerRadius="3" Padding="15,12">
                         <StackPanel>
-                            <TextBlock FontSize="12" FontWeight="Bold" Foreground="#F57F17"
+                            <TextBlock x:Name="txtExistingFilter" FontSize="12" FontWeight="Bold" Foreground="#F57F17"
                                        Text="既存フィルタについて" Margin="0,0,0,5"/>
                             <CheckBox x:Name="OverwriteCheckBox" IsChecked="True"
                                       Content="既存の「梁下_」フィルタを上書きする"
                                       FontSize="11" Margin="0,3"/>
-                            <TextBlock Style="{StaticResource NoteStyle}"
+                            <TextBlock x:Name="txtOverwriteHint" Style="{StaticResource NoteStyle}"
                                        Text="※ チェックを外すと既存フィルタはそのまま残ります"/>
                         </StackPanel>
                     </Border>
@@ -356,7 +356,7 @@
                 <Button x:Name="NextButton" Content="次へ"
                         Style="{StaticResource PrimaryButtonStyle}"
                         Click="NextButton_Click"/>
-                <Button Content="キャンセル"
+                <Button x:Name="CancelButton" Content="キャンセル"
                         Style="{StaticResource SecondaryButtonStyle}"
                         Click="CancelButton_Click"/>
             </StackPanel>

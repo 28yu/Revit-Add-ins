@@ -183,7 +183,7 @@
             </GroupBox>
 
             <!-- 中央カラム: パラメータ -->
-            <GroupBox Grid.Column="1" Header="パラメータ" Margin="4,0,4,0" FontSize="12">
+            <GroupBox x:Name="grpParameter" Grid.Column="1" Header="パラメータ" Margin="4,0,4,0" FontSize="12">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -197,7 +197,7 @@
                         <TextBox x:Name="ParameterSearchBox" Grid.Column="0"
                                  Style="{StaticResource SearchBoxStyle}"
                                  TextChanged="ParameterSearchBox_TextChanged"/>
-                        <Button Grid.Column="1" Content="検索" Width="40" Height="24" Margin="4,0,0,0"
+                        <Button x:Name="btnSearchParam" Grid.Column="1" Content="検索" Width="40" Height="24" Margin="4,0,0,0"
                                 Style="{StaticResource SecondaryButtonStyle}"
                                 Click="ParameterSearchButton_Click"/>
                     </Grid>
@@ -228,16 +228,16 @@
 
             <!-- パラメータ⇔出力の追加/削除ボタン -->
             <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="2,0">
-                <Button Content="＞" ToolTip="出力に追加"
+                <Button x:Name="btnAddToOutput" Content="＞" ToolTip="出力に追加"
                         Style="{StaticResource MoveButtonStyle}"
                         Click="AddToOutputButton_Click" Margin="0,2"/>
-                <Button Content="＜" ToolTip="出力から削除"
+                <Button x:Name="btnRemoveFromOutput" Content="＜" ToolTip="出力から削除"
                         Style="{StaticResource MoveButtonStyle}"
                         Click="RemoveFromOutputButton_Click" Margin="0,2"/>
             </StackPanel>
 
             <!-- 右カラム: 出力 -->
-            <GroupBox Grid.Column="3" Header="出力" Margin="4,0,0,0" FontSize="12">
+            <GroupBox x:Name="grpOutput" Grid.Column="3" Header="出力" Margin="4,0,0,0" FontSize="12">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -251,7 +251,7 @@
                         <TextBox x:Name="OutputSearchBox" Grid.Column="0"
                                  Style="{StaticResource SearchBoxStyle}"
                                  TextChanged="OutputSearchBox_TextChanged"/>
-                        <Button Grid.Column="1" Content="検索" Width="40" Height="24" Margin="4,0,0,0"
+                        <Button x:Name="btnSearchOutput" Grid.Column="1" Content="検索" Width="40" Height="24" Margin="4,0,0,0"
                                 Style="{StaticResource SecondaryButtonStyle}"
                                 Click="OutputSearchButton_Click"/>
                     </Grid>
@@ -288,10 +288,10 @@
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
             <StackPanel Grid.Column="3" Orientation="Horizontal" HorizontalAlignment="Center" Margin="4,6,0,0">
-                <Button Content="▲" ToolTip="上へ移動"
+                <Button x:Name="btnMoveUp" Content="▲" ToolTip="上へ移動"
                         Style="{StaticResource MoveButtonStyle}"
                         Click="MoveUpButton_Click"/>
-                <Button Content="▼" ToolTip="下へ移動"
+                <Button x:Name="btnMoveDown" Content="▼" ToolTip="下へ移動"
                         Style="{StaticResource MoveButtonStyle}"
                         Click="MoveDownButton_Click"/>
             </StackPanel>
