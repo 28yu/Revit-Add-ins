@@ -452,8 +452,9 @@ namespace Tools28.Commands.FireProtection
                                 double estW = 85.0 * mm; // 20mm(色四角列) + 65mm(テキスト列)
 
                                 // 右上固定: VP右端=シート右端-margin, VP上端=シート上端-margin
-                                double upOffset = 25.0 * mm; // 上方向への微調整
-                                double vpCX = outline.Max.U - margin - estW / 2.0;
+                                double upOffset = 25.0 * mm;    // 上方向への微調整
+                                double rightOffset = 20.0 * mm; // 右方向への微調整
+                                double vpCX = outline.Max.U - margin - estW / 2.0 + rightOffset;
                                 double vpCY = outline.Max.V - margin - estH / 2.0 + upOffset;
 
                                 Viewport vp = Viewport.Create(
