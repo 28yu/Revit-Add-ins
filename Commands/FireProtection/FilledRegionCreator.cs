@@ -439,8 +439,17 @@ namespace Tools28.Commands.FireProtection
                 new { R = 255, G = 153, B = 104 }, // 薄赤
                 new { R = 128, G = 191, B = 255 }, // 薄青
                 new { R = 100, G = 255, B = 100 }, // 薄緑
+                new { R = 255, G = 255, B = 128 }, // 薄黄
+                new { R = 191, G = 128, B = 255 }, // 薄紫
+                new { R = 255, G = 128, B = 191 }, // 薄ピンク
+                new { R = 128, G = 255, B = 255 }, // 薄シアン
+                new { R = 255, G = 191, B = 128 }, // 薄オレンジ
+                new { R = 191, G = 255, B = 128 }, // 薄黄緑
+                new { R = 128, G = 255, B = 191 }, // 薄ティール
+                new { R = 255, G = 128, B = 255 }, // 薄マゼンタ
+                new { R = 128, G = 128, B = 255 }, // 薄インディゴ
             };
-            return GenerateFromBase(baseColors, count, 0.85f);
+            return GenerateFromBase(baseColors, count, true);
         }
 
         /// <summary>
@@ -450,11 +459,20 @@ namespace Tools28.Commands.FireProtection
         {
             var baseColors = new[]
             {
-                new { R = 255, G = 0, B = 0 },   // 濃赤
-                new { R = 0, G = 0, B = 255 },   // 濃青
-                new { R = 0, G = 128, B = 0 },   // 濃緑
+                new { R = 255, G = 0,   B = 0   }, // 濃赤
+                new { R = 0,   G = 0,   B = 255 }, // 濃青
+                new { R = 0,   G = 128, B = 0   }, // 濃緑
+                new { R = 204, G = 204, B = 0   }, // 濃黄
+                new { R = 102, G = 0,   B = 204 }, // 濃紫
+                new { R = 204, G = 0,   B = 102 }, // 濃ピンク
+                new { R = 0,   G = 204, B = 204 }, // 濃シアン
+                new { R = 204, G = 102, B = 0   }, // 濃オレンジ
+                new { R = 102, G = 204, B = 0   }, // 濃黄緑
+                new { R = 0,   G = 204, B = 102 }, // 濃ティール
+                new { R = 204, G = 0,   B = 204 }, // 濃マゼンタ
+                new { R = 0,   G = 0,   B = 128 }, // 濃インディゴ
             };
-            return GenerateFromBase(baseColors, count, 0.7f);
+            return GenerateFromBase(baseColors, count, false);
         }
 
         /// <summary>
@@ -466,7 +484,7 @@ namespace Tools28.Commands.FireProtection
         }
 
         private static List<Color> GenerateFromBase(
-            dynamic[] baseColors, int count, float shiftFactor)
+            dynamic[] baseColors, int count, bool isLight)
         {
             var colors = new List<Color>();
             for (int i = 0; i < count; i++)
@@ -478,12 +496,40 @@ namespace Tools28.Commands.FireProtection
 
                 if (i >= baseColors.Length)
                 {
-                    // 4色目以降: 色相をシフトして自動生成
+                    // パレット超過時: サイクル毎に明度を大きく変化させて重複回避
                     int cycle = i / baseColors.Length;
-                    float factor = shiftFactor + (cycle % 3) * 0.1f;
-                    r = Math.Min((int)(r * factor + (1 - factor) * 128), 255);
-                    g = Math.Min((int)(g * factor + (1 - factor) * 128), 255);
-                    b = Math.Min((int)(b * factor + (1 - factor) * 128), 255);
+                    if (isLight)
+                    {
+                        // 薄色: 奇数サイクルで濃く、偶数サイクルでさらに淡く
+                        if (cycle % 2 == 1)
+                        {
+                            r = (int)(r * 0.6);
+                            g = (int)(g * 0.6);
+                            b = (int)(b * 0.6);
+                        }
+                        else
+                        {
+                            r = Math.Min(r + 50, 255);
+                            g = Math.Min(g + 50, 255);
+                            b = Math.Min(b + 50, 255);
+                        }
+                    }
+                    else
+                    {
+                        // 濃色: 奇数サイクルで淡く、偶数サイクルでさらに濃く
+                        if (cycle % 2 == 1)
+                        {
+                            r = Math.Min(r + 80, 255);
+                            g = Math.Min(g + 80, 255);
+                            b = Math.Min(b + 80, 255);
+                        }
+                        else
+                        {
+                            r = (int)(r * 0.6);
+                            g = (int)(g * 0.6);
+                            b = (int)(b * 0.6);
+                        }
+                    }
                 }
 
                 colors.Add(new Color((byte)r, (byte)g, (byte)b));
