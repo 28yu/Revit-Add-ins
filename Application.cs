@@ -151,6 +151,11 @@ namespace Tools28
                 {
                     LanguagePulldown.ItemText = Loc.CurrentLang;
                     LanguagePulldown.ToolTip = Loc.S("Ribbon.Settings.Lang.Tip");
+
+                    string flagFile = $"flag_{Loc.CurrentLang.ToLower()}_16.png";
+                    var flagImage = LoadImage(flagFile);
+                    if (flagImage != null)
+                        LanguagePulldown.Image = flagImage;
                 } catch { }
             }
         }
@@ -367,7 +372,7 @@ namespace Tools28
             }
         }
 
-        private BitmapImage LoadImage(string fileName)
+        private static BitmapImage LoadImage(string fileName)
         {
             try
             {

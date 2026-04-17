@@ -165,15 +165,15 @@ namespace Tools28.Commands.FireProtection
             {
                 // DisplayMemberPath を使わず ToString で表示
                 foreach (var p in paramList)
-                    p.ParameterName = $"{p.ParameterName}（{p.DetectedCount}件検出）";
+                    p.ParameterName = p.ParameterName + string.Format(Loc.S("Fire.ParamDetectedSuffix"), p.DetectedCount);
 
                 ParameterComboBox.DisplayMemberPath = "ParameterName";
                 ParameterComboBox.SelectedIndex = 0;
-                ParameterNoteText.Text = $"※ {paramList.Count} 個のパラメータを検出しました";
+                ParameterNoteText.Text = string.Format(Loc.S("Fire.ParamDetected"), paramList.Count);
             }
             else
             {
-                ParameterNoteText.Text = "※「耐火被覆」を含むパラメータが見つかりません";
+                ParameterNoteText.Text = Loc.S("Fire.ParamNotFound");
                 DetectedTypesPanel.Children.Clear();
                 _typeEntries.Clear();
             }
@@ -257,7 +257,7 @@ namespace Tools28.Commands.FireProtection
                 int fgIdx = idx;
                 var fgCheck = new CheckBox
                 {
-                    Content = "前景",
+                    Content = Loc.S("Fire.Foreground"),
                     IsChecked = entry.ForegroundVisible,
                     FontSize = 11,
                     VerticalAlignment = VerticalAlignment.Center,
@@ -285,7 +285,7 @@ namespace Tools28.Commands.FireProtection
                 int bgIdx = idx;
                 var bgCheck = new CheckBox
                 {
-                    Content = "背景",
+                    Content = Loc.S("Fire.Background"),
                     IsChecked = entry.BackgroundVisible,
                     FontSize = 11,
                     VerticalAlignment = VerticalAlignment.Center,
@@ -334,7 +334,7 @@ namespace Tools28.Commands.FireProtection
                     // 柱前景
                     var colFgCheck = new CheckBox
                     {
-                        Content = "前景",
+                        Content = Loc.S("Fire.Foreground"),
                         IsChecked = entry.ColForegroundVisible,
                         FontSize = 10,
                         VerticalAlignment = VerticalAlignment.Center,
@@ -361,7 +361,7 @@ namespace Tools28.Commands.FireProtection
                     // 柱背景
                     var colBgCheck = new CheckBox
                     {
-                        Content = "背景",
+                        Content = Loc.S("Fire.Background"),
                         IsChecked = entry.ColBackgroundVisible,
                         FontSize = 10,
                         VerticalAlignment = VerticalAlignment.Center,
@@ -532,27 +532,27 @@ namespace Tools28.Commands.FireProtection
         {
             SavePerTypeOffsets();
 
-            string catText = _data.IsSectionView ? "梁・柱" : "梁";
+            string catText = _data.IsSectionView ? Loc.S("Fire.CategoryBeamColumn") : Loc.S("Fire.CategoryBeam");
 
-            string summary = $"ビュー: {_data.ViewName}\n" +
-                $"対象カテゴリ: {catText}\n\n";
+            string summary = string.Format(Loc.S("Fire.SummaryView"), _data.ViewName) + "\n" +
+                string.Format(Loc.S("Fire.SummaryCategory"), catText) + "\n\n";
 
             var selectedParam = ParameterComboBox.SelectedItem as FireProtectionParameterInfo;
-            summary += $"耐火被覆パラメータ: {selectedParam?.ParameterName ?? "なし"}\n";
-            summary += $"検出された種類: {_typeEntries.Count}\n";
+            summary += string.Format(Loc.S("Fire.SummaryParam"), selectedParam?.ParameterName ?? Loc.S("Fire.SummaryNone")) + "\n";
+            summary += string.Format(Loc.S("Fire.SummaryTypes"), _typeEntries.Count) + "\n";
 
             foreach (var entry in _typeEntries)
             {
                 double offset = CommonOffsetRadio.IsChecked == true
                     ? ParseDouble(CommonOffsetInput.Text, 50)
                     : entry.OffsetMm;
-                summary += $"  - {entry.Name}（オフセット: {offset}mm）\n";
+                summary += string.Format(Loc.S("Fire.SummaryOffset"), entry.Name, offset) + "\n";
             }
 
             var selectedLine = LineStyleComboBox.SelectedItem as LineStyleItem;
             var selectedPattern = FillPatternComboBox.SelectedItem as FillPatternItem;
-            summary += $"\n境界線: {selectedLine?.Name ?? "なし"}\n";
-            summary += $"塗りパターン: {selectedPattern?.Name ?? "なし"}";
+            summary += "\n" + string.Format(Loc.S("Fire.SummaryBorder"), selectedLine?.Name ?? Loc.S("Fire.SummaryNone")) + "\n";
+            summary += string.Format(Loc.S("Fire.SummaryPattern"), selectedPattern?.Name ?? Loc.S("Fire.SummaryNone"));
 
             SummaryText.Text = summary;
         }
@@ -585,9 +585,8 @@ namespace Tools28.Commands.FireProtection
             {
                 if (_typeEntries.Count == 0)
                 {
-                    MessageBox.Show("耐火被覆パラメータに値が設定された要素がありません。\n" +
-                        "パラメータを確認してください。",
-                        "入力エラー", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    MessageBox.Show(Loc.S("Fire.NoParamValues"),
+                        Loc.S("Common.InputError"), MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }
 
