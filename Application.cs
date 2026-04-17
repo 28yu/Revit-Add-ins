@@ -303,7 +303,7 @@ namespace Tools28
                 assemblyPath,
                 "Tools28.Commands.FireProtection.FireProtectionCommand");
             fireProtectionButtonData.ToolTip = "梁の耐火被覆範囲を自動検出し、種類別に色分けした塗潰領域を作成します";
-            // fireProtectionButtonData.LargeImage = LoadImage("fire_protection_96.png");
+            fireProtectionButtonData.LargeImage = LoadImage("fire_protection_96.png");
             panel.AddItem(fireProtectionButtonData);
         }
 
