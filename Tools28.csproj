@@ -60,6 +60,8 @@
     <Resource Include="Resources\Icons\beam_under_level_96.png" />
     <Resource Include="Resources\Icons\beam_top_level_96.png" />
     <Resource Include="Resources\Icons\fire_protection_96.png" />
+    <Resource Include="Resources\Icons\formwork_32.png" />
+    <Resource Include="Resources\Icons\formwork_96.png" />
     <Resource Include="Resources\Icons\room_tag_96.png" />
     <Resource Include="Resources\Icons\excel_export_96.png" />
     <Resource Include="Resources\Icons\excel_import_96.png" />

@@ -12,6 +12,7 @@ namespace Tools28.Localization
             { "Ribbon.Panel.3DView", "3D视图" },
             { "Ribbon.Panel.Annotation", "注释·详图" },
             { "Ribbon.Panel.Structural", "色分" },
+            { "Ribbon.Panel.Quantity", "数量" },
             { "Ribbon.Panel.Excel", "Excel" },
             { "Ribbon.Panel.Settings", "设置" },
 
@@ -58,6 +59,10 @@ namespace Tools28.Localization
             { "Ribbon.BeamTop.Tip", "从参数获取梁顶标高并按标高色分显示" },
             { "Ribbon.FireProtection", "防火涂层\n色分" },
             { "Ribbon.FireProtection.Tip", "自动检测防火涂层范围并创建按类型色分的填充区域" },
+
+            // === Ribbon: Quantity ===
+            { "Ribbon.Formwork", "模板数量\n计算" },
+            { "Ribbon.Formwork.Tip", "从结构模型自动计算模板数量（面积），并输出到 Excel / Revit 汇总视图 / 色分3D视图" },
 
             // === Ribbon: Excel ===
             { "Ribbon.Excel.Export", "Excel\n导出" },
@@ -328,6 +333,41 @@ namespace Tools28.Localization
             { "Import.ResultTitle", "导入结果" },
             { "Import.NoOpenFile", "未找到已打开的Excel文件。" },
             { "Import.ReadFailed", "读取文件失败。\n{0}" },
+
+            // === FormworkCalculator Dialog ===
+            { "Formwork.Title", "模板数量计算" },
+            { "Formwork.Scope.Header", "计算范围" },
+            { "Formwork.Scope.Project", "整个项目" },
+            { "Formwork.Scope.View", "当前视图中可见的构件" },
+            { "Formwork.Group.Header", "汇总分组" },
+            { "Formwork.Group.Category", "按部位（柱·梁·墙·板·基础·楼梯）" },
+            { "Formwork.Group.Zone", "按施工区" },
+            { "Formwork.Group.Type", "按模板种类" },
+            { "Formwork.Group.ParamName", "参数名称:" },
+            { "Formwork.Output.Header", "输出设置" },
+            { "Formwork.Output.Excel", "导出到 Excel" },
+            { "Formwork.Output.Schedule", "创建 Revit 汇总视图" },
+            { "Formwork.Output.View3D", "创建色分 3D 视图" },
+            { "Formwork.Color.Header", "色分方案" },
+            { "Formwork.Color.Category", "按部位" },
+            { "Formwork.Color.Zone", "按施工区" },
+            { "Formwork.Color.Type", "按模板种类" },
+            { "Formwork.Option.Header", "选项" },
+            { "Formwork.Option.ShowDeducted", "同时显示扣除面" },
+            { "Formwork.Option.UseGL", "使用 GL 标高扣除地下部分" },
+            { "Formwork.NeedZoneParam", "要按施工区分组时，请输入施工区参数名称。" },
+            { "Formwork.NeedTypeParam", "要按模板种类分组时，请输入模板种类参数名称。" },
+            { "Formwork.BadGL", "GL 标高值无效。请输入数字。" },
+            { "Formwork.SaveExcelTitle", "模板数量 - Excel 保存位置" },
+            { "Formwork.NoElements", "未找到目标构件。" },
+            { "Formwork.CalcFailed", "模板数量计算时发生错误。\n{0}" },
+            { "Formwork.ExcelFailed", "Excel 导出时发生错误。\n{0}" },
+            { "Formwork.ViewFailed", "创建视图时发生错误。\n{0}" },
+            { "Formwork.DoneTitle", "模板数量计算 - 完成" },
+            { "Formwork.DoneMsg", "处理已完成。\n\n构件数: {0}\n模板面积: {1:F2} ㎡\n扣除面积: {2:F2} ㎡\n倾斜面（不纳入）: {3:F2} ㎡" },
+            { "Formwork.ExcelAt", "Excel 输出: {0}" },
+            { "Formwork.ErrorCount", "错误·注释: {0} 条" },
+            { "Formwork.Fatal", "模板数量计算时发生严重错误。\n{0}" },
         };
     }
 }

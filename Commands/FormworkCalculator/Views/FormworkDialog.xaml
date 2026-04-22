@@ -1,0 +1,128 @@
+<Window x:Class="Tools28.Commands.FormworkCalculator.Views.FormworkDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="型枠数量算出"
+        SizeToContent="Height"
+        Width="520"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="NoResize">
+    <Grid Margin="15">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="10"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="10"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="10"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="10"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="15"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- 計算範囲 -->
+        <GroupBox x:Name="grpScope" Header="計算範囲" Grid.Row="0" Padding="10">
+            <StackPanel>
+                <RadioButton x:Name="RadioEntireProject" GroupName="Scope" IsChecked="True" Margin="0,3">
+                    <TextBlock x:Name="txtScopeProject" Text="プロジェクト全体"/>
+                </RadioButton>
+                <RadioButton x:Name="RadioCurrentView" GroupName="Scope" Margin="0,3">
+                    <TextBlock x:Name="txtScopeView" Text="現在のビューに表示されている要素"/>
+                </RadioButton>
+            </StackPanel>
+        </GroupBox>
+
+        <!-- 集計区分 -->
+        <GroupBox x:Name="grpGrouping" Header="集計区分" Grid.Row="2" Padding="10">
+            <StackPanel>
+                <CheckBox x:Name="ChkByCategory" IsChecked="True" Margin="0,3">
+                    <TextBlock x:Name="txtByCategory" Text="部位別（柱・梁・壁・スラブ・基礎・階段）"/>
+                </CheckBox>
+                <Grid Margin="0,3">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="100"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <CheckBox x:Name="ChkByZone" Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock x:Name="txtByZone" Text="工区別" Margin="0,0,10,0"/>
+                    </CheckBox>
+                    <TextBlock x:Name="lblZoneParam" Grid.Column="1" Text="パラメータ名:" VerticalAlignment="Center" Margin="10,0,5,0"/>
+                    <TextBox x:Name="TxtZoneParam" Grid.Column="2" Height="22"/>
+                </Grid>
+                <Grid Margin="0,3">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="100"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <CheckBox x:Name="ChkByType" Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock x:Name="txtByType" Text="型枠種別" Margin="0,0,10,0"/>
+                    </CheckBox>
+                    <TextBlock x:Name="lblTypeParam" Grid.Column="1" Text="パラメータ名:" VerticalAlignment="Center" Margin="10,0,5,0"/>
+                    <TextBox x:Name="TxtTypeParam" Grid.Column="2" Height="22"/>
+                </Grid>
+            </StackPanel>
+        </GroupBox>
+
+        <!-- 出力設定 -->
+        <GroupBox x:Name="grpOutput" Header="出力設定" Grid.Row="4" Padding="10">
+            <StackPanel>
+                <CheckBox x:Name="ChkExportExcel" IsChecked="True" Margin="0,3">
+                    <TextBlock x:Name="txtExportExcel" Text="Excel ファイルに出力"/>
+                </CheckBox>
+                <CheckBox x:Name="ChkCreateSchedule" IsChecked="True" Margin="0,3">
+                    <TextBlock x:Name="txtCreateSchedule" Text="Revit 集計ビューを作成"/>
+                </CheckBox>
+                <CheckBox x:Name="ChkCreate3DView" IsChecked="True" Margin="0,3">
+                    <TextBlock x:Name="txtCreate3DView" Text="色分け 3D ビューを作成"/>
+                </CheckBox>
+            </StackPanel>
+        </GroupBox>
+
+        <!-- 色分け -->
+        <GroupBox x:Name="grpColor" Header="色分け区分" Grid.Row="6" Padding="10">
+            <StackPanel Orientation="Horizontal">
+                <RadioButton x:Name="RadioColorCategory" GroupName="Color" IsChecked="True" Margin="0,0,15,0">
+                    <TextBlock x:Name="txtColorCat" Text="部位別"/>
+                </RadioButton>
+                <RadioButton x:Name="RadioColorZone" GroupName="Color" Margin="0,0,15,0">
+                    <TextBlock x:Name="txtColorZone" Text="工区別"/>
+                </RadioButton>
+                <RadioButton x:Name="RadioColorType" GroupName="Color">
+                    <TextBlock x:Name="txtColorType" Text="型枠種別"/>
+                </RadioButton>
+            </StackPanel>
+        </GroupBox>
+
+        <!-- オプション -->
+        <GroupBox x:Name="grpOption" Header="オプション" Grid.Row="8" Padding="10">
+            <StackPanel>
+                <CheckBox x:Name="ChkShowDeducted" Margin="0,3">
+                    <TextBlock x:Name="txtShowDeducted" Text="控除面も表示する"/>
+                </CheckBox>
+                <Grid Margin="0,3">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="60"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <CheckBox x:Name="ChkUseGL" Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock x:Name="txtUseGL" Text="GL 高さで地中部分を控除" Margin="0,0,10,0"/>
+                    </CheckBox>
+                    <TextBox x:Name="TxtGL" Grid.Column="1" Text="0.000" Height="22"/>
+                    <TextBlock Grid.Column="2" Text=" m" VerticalAlignment="Center" Margin="5,0,0,0"/>
+                </Grid>
+            </StackPanel>
+        </GroupBox>
+
+        <!-- ボタン -->
+        <StackPanel Grid.Row="10" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button x:Name="btnOK" Content="実行" Width="100" Height="28" Margin="0,0,10,0"
+                    IsDefault="True" Click="BtnOk_Click"/>
+            <Button x:Name="btnCancel" Content="キャンセル" Width="100" Height="28"
+                    IsCancel="True" Click="BtnCancel_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>

@@ -12,6 +12,7 @@ namespace Tools28.Localization
             { "Ribbon.Panel.3DView", "3D View" },
             { "Ribbon.Panel.Annotation", "Annotation" },
             { "Ribbon.Panel.Structural", "Color Code" },
+            { "Ribbon.Panel.Quantity", "Quantity" },
             { "Ribbon.Panel.Excel", "Excel" },
             { "Ribbon.Panel.Settings", "Settings" },
 
@@ -58,6 +59,10 @@ namespace Tools28.Localization
             { "Ribbon.BeamTop.Tip", "Get beam top level from parameters and apply color coding by level" },
             { "Ribbon.FireProtection", "Fireproofing\nColor Code" },
             { "Ribbon.FireProtection.Tip", "Auto-detect fireproofing zones and create color-coded filled regions" },
+
+            // === Ribbon: Quantity ===
+            { "Ribbon.Formwork", "Formwork\nQuantity" },
+            { "Ribbon.Formwork.Tip", "Auto-calculate formwork quantity (area) from the structural model and output to Excel / Revit view / color-coded 3D view" },
 
             // === Ribbon: Excel ===
             { "Ribbon.Excel.Export", "Excel\nExport" },
@@ -328,6 +333,41 @@ namespace Tools28.Localization
             { "Import.ResultTitle", "Import Result" },
             { "Import.NoOpenFile", "No open Excel file found." },
             { "Import.ReadFailed", "Failed to read the file.\n{0}" },
+
+            // === FormworkCalculator Dialog ===
+            { "Formwork.Title", "Formwork Quantity" },
+            { "Formwork.Scope.Header", "Calculation Scope" },
+            { "Formwork.Scope.Project", "Entire project" },
+            { "Formwork.Scope.View", "Elements visible in the current view" },
+            { "Formwork.Group.Header", "Grouping" },
+            { "Formwork.Group.Category", "By category (Columns / Beams / Walls / Slabs / Foundations / Stairs)" },
+            { "Formwork.Group.Zone", "By zone" },
+            { "Formwork.Group.Type", "By formwork type" },
+            { "Formwork.Group.ParamName", "Parameter name:" },
+            { "Formwork.Output.Header", "Output" },
+            { "Formwork.Output.Excel", "Export to Excel" },
+            { "Formwork.Output.Schedule", "Create Revit summary view" },
+            { "Formwork.Output.View3D", "Create color-coded 3D view" },
+            { "Formwork.Color.Header", "Color Scheme" },
+            { "Formwork.Color.Category", "By category" },
+            { "Formwork.Color.Zone", "By zone" },
+            { "Formwork.Color.Type", "By formwork type" },
+            { "Formwork.Option.Header", "Options" },
+            { "Formwork.Option.ShowDeducted", "Show deducted faces" },
+            { "Formwork.Option.UseGL", "Deduct below-ground parts using GL elevation" },
+            { "Formwork.NeedZoneParam", "Please enter the zone parameter name to enable grouping by zone." },
+            { "Formwork.NeedTypeParam", "Please enter the formwork-type parameter name to enable grouping by type." },
+            { "Formwork.BadGL", "Invalid GL elevation value. Please enter a number." },
+            { "Formwork.SaveExcelTitle", "Formwork Quantity - Excel Save Location" },
+            { "Formwork.NoElements", "No target elements found." },
+            { "Formwork.CalcFailed", "An error occurred during formwork quantity calculation.\n{0}" },
+            { "Formwork.ExcelFailed", "An error occurred during Excel export.\n{0}" },
+            { "Formwork.ViewFailed", "An error occurred during view creation.\n{0}" },
+            { "Formwork.DoneTitle", "Formwork Quantity - Completed" },
+            { "Formwork.DoneMsg", "Processing completed.\n\nElements: {0}\nFormwork area: {1:F2} m²\nDeducted area: {2:F2} m²\nInclined (excluded): {3:F2} m²" },
+            { "Formwork.ExcelAt", "Excel output: {0}" },
+            { "Formwork.ErrorCount", "Errors / notes: {0}" },
+            { "Formwork.Fatal", "A fatal error occurred during formwork quantity calculation.\n{0}" },
         };
     }
 }

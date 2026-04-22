@@ -17,8 +17,8 @@ namespace Tools28
 
         private static readonly string[] _panelKeys = {
             "Ribbon.Panel.GridBubble", "Ribbon.Panel.SheetView", "Ribbon.Panel.3DView",
-            "Ribbon.Panel.Annotation", "Ribbon.Panel.Structural", "Ribbon.Panel.Excel",
-            "Ribbon.Panel.Settings"
+            "Ribbon.Panel.Annotation", "Ribbon.Panel.Structural", "Ribbon.Panel.Quantity",
+            "Ribbon.Panel.Excel", "Ribbon.Panel.Settings"
         };
 
         private static readonly Dictionary<string, string> _buttonTextKeys = new Dictionary<string, string>
@@ -40,6 +40,7 @@ namespace Tools28
             { "BeamUnderLevel", "Ribbon.BeamUnder" },
             { "BeamTopLevel", "Ribbon.BeamTop" },
             { "FireProtection", "Ribbon.FireProtection" },
+            { "Formwork", "Ribbon.Formwork" },
             { "ExcelExport", "Ribbon.Excel.Export" },
             { "ExcelImport", "Ribbon.Excel.Import" },
             { "About", "Ribbon.Settings.About" },
@@ -65,6 +66,7 @@ namespace Tools28
             { "BeamUnderLevel", "Ribbon.BeamUnder.Tip" },
             { "BeamTopLevel", "Ribbon.BeamTop.Tip" },
             { "FireProtection", "Ribbon.FireProtection.Tip" },
+            { "Formwork", "Ribbon.Formwork.Tip" },
             { "ExcelExport", "Ribbon.Excel.Export.Tip" },
             { "ExcelImport", "Ribbon.Excel.Import.Tip" },
             { "About", "Ribbon.Settings.About.Tip" },
@@ -100,6 +102,7 @@ namespace Tools28
                 CreateThreeDViewPanel(application, tabName, assemblyPath);
                 CreateAnnotationPanel(application, tabName, assemblyPath);
                 CreateStructuralPanel(application, tabName, assemblyPath);
+                CreateQuantityPanel(application, tabName, assemblyPath);
                 CreateExcelPanel(application, tabName, assemblyPath);
                 CreateSettingsPanel(application, tabName, assemblyPath);
 
@@ -305,6 +308,17 @@ namespace Tools28
             fireData.ToolTip = Loc.S("Ribbon.FireProtection.Tip");
             fireData.LargeImage = LoadImage("fire_protection_96.png");
             AddButton(panel, fireData);
+        }
+
+        private void CreateQuantityPanel(UIControlledApplication application, string tabName, string assemblyPath)
+        {
+            RibbonPanel panel = application.CreateRibbonPanel(tabName, Loc.S("Ribbon.Panel.Quantity"));
+            _panels.Add(panel);
+
+            var formworkData = new PushButtonData("Formwork", Loc.S("Ribbon.Formwork"), assemblyPath, "Tools28.Commands.FormworkCalculator.FormworkCalculatorCommand");
+            formworkData.ToolTip = Loc.S("Ribbon.Formwork.Tip");
+            formworkData.LargeImage = LoadImage("formwork_96.png");
+            AddButton(panel, formworkData);
         }
 
         private void CreateExcelPanel(UIControlledApplication application, string tabName, string assemblyPath)

@@ -12,6 +12,7 @@ namespace Tools28.Localization
             { "Ribbon.Panel.3DView", "3Dビュー" },
             { "Ribbon.Panel.Annotation", "注釈・詳細" },
             { "Ribbon.Panel.Structural", "色分け" },
+            { "Ribbon.Panel.Quantity", "数量" },
             { "Ribbon.Panel.Excel", "Excel連携" },
             { "Ribbon.Panel.Settings", "設定" },
 
@@ -58,6 +59,10 @@ namespace Tools28.Localization
             { "Ribbon.BeamTop.Tip", "平面ビューの梁天端レベルをパラメータから取得し、レベル別に色分け表示します" },
             { "Ribbon.FireProtection", "耐火被覆\n色分け" },
             { "Ribbon.FireProtection.Tip", "梁の耐火被覆範囲を自動検出し、種類別に色分けした塗潰領域を作成します" },
+
+            // === Ribbon: Quantity ===
+            { "Ribbon.Formwork", "型枠数量\n算出" },
+            { "Ribbon.Formwork.Tip", "躯体モデルから型枠数量（面積）を自動算出し、Excel/Revit集計表/色分け3Dビューを出力します" },
 
             // === Ribbon: Excel ===
             { "Ribbon.Excel.Export", "Excel\nエクスポート" },
@@ -328,6 +333,41 @@ namespace Tools28.Localization
             { "Import.ResultTitle", "インポート結果" },
             { "Import.NoOpenFile", "開いているExcelファイルが見つかりません。" },
             { "Import.ReadFailed", "ファイルの読み込みに失敗しました。\n{0}" },
+
+            // === FormworkCalculator Dialog ===
+            { "Formwork.Title", "型枠数量算出" },
+            { "Formwork.Scope.Header", "計算範囲" },
+            { "Formwork.Scope.Project", "プロジェクト全体" },
+            { "Formwork.Scope.View", "現在のビューに表示されている要素" },
+            { "Formwork.Group.Header", "集計区分" },
+            { "Formwork.Group.Category", "部位別（柱・梁・壁・スラブ・基礎・階段）" },
+            { "Formwork.Group.Zone", "工区別" },
+            { "Formwork.Group.Type", "型枠種別" },
+            { "Formwork.Group.ParamName", "パラメータ名:" },
+            { "Formwork.Output.Header", "出力設定" },
+            { "Formwork.Output.Excel", "Excel ファイルに出力" },
+            { "Formwork.Output.Schedule", "Revit 集計ビューを作成" },
+            { "Formwork.Output.View3D", "色分け 3D ビューを作成" },
+            { "Formwork.Color.Header", "色分け区分" },
+            { "Formwork.Color.Category", "部位別" },
+            { "Formwork.Color.Zone", "工区別" },
+            { "Formwork.Color.Type", "型枠種別" },
+            { "Formwork.Option.Header", "オプション" },
+            { "Formwork.Option.ShowDeducted", "控除面も表示する" },
+            { "Formwork.Option.UseGL", "GL 高さで地中部分を控除" },
+            { "Formwork.NeedZoneParam", "工区別集計を有効にする場合は、工区パラメータ名を入力してください。" },
+            { "Formwork.NeedTypeParam", "型枠種別集計を有効にする場合は、型枠種別パラメータ名を入力してください。" },
+            { "Formwork.BadGL", "GL 高さの値が正しくありません。数値を入力してください。" },
+            { "Formwork.SaveExcelTitle", "型枠数量集計 - Excel 保存先" },
+            { "Formwork.NoElements", "対象要素が見つかりませんでした。" },
+            { "Formwork.CalcFailed", "型枠数量の計算中にエラーが発生しました。\n{0}" },
+            { "Formwork.ExcelFailed", "Excel 出力中にエラーが発生しました。\n{0}" },
+            { "Formwork.ViewFailed", "ビュー作成中にエラーが発生しました。\n{0}" },
+            { "Formwork.DoneTitle", "型枠数量算出 - 完了" },
+            { "Formwork.DoneMsg", "処理が完了しました。\n\n対象要素数: {0}\n型枠面積: {1:F2} ㎡\n控除面積: {2:F2} ㎡\n傾斜面（計算対象外）: {3:F2} ㎡" },
+            { "Formwork.ExcelAt", "Excel 出力先: {0}" },
+            { "Formwork.ErrorCount", "エラー・注記: {0} 件" },
+            { "Formwork.Fatal", "型枠数量算出中に致命的なエラーが発生しました。\n{0}" },
         };
     }
 }
