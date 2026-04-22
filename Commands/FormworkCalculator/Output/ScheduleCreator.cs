@@ -2,122 +2,109 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Autodesk.Revit.DB;
-using Tools28.Commands.FormworkCalculator.Models;
+using Tools28.Commands.FormworkCalculator.Engine;
 
 namespace Tools28.Commands.FormworkCalculator.Output
 {
     /// <summary>
-    /// 集計結果を Revit のテキスト TextNote ベースの表として作成する。
-    /// ViewSchedule の自動生成は要素カテゴリに依存するため、本実装では製図ビュー + TextNote で表示する簡易版。
+    /// ViewSchedule を作成して DirectShape に格納した型枠情報を集計表示する。
+    /// OST_GenericModel カテゴリで、識別用マーカーパラメータによりフィルタ。
     /// </summary>
     internal static class ScheduleCreator
     {
-        internal static ElementId CreateSummaryDraftingView(
-            Document doc,
-            FormworkResult result,
-            FormworkSettings settings,
-            ElementId textNoteTypeId = null)
+        internal static ElementId CreateSchedule(Document doc)
         {
-            var vftype = FindDraftingViewType(doc);
-            if (vftype == null) return null;
-
-            ViewDrafting view;
-            try { view = ViewDrafting.Create(doc, vftype.Id); }
-            catch { return null; }
-
-            string viewName = $"型枠数量集計_{DateTime.Now:yyyyMMdd_HHmmss}";
-            try { view.Name = viewName; } catch { }
-
-            if (textNoteTypeId == null || textNoteTypeId == ElementId.InvalidElementId)
-            {
-                var tnt = new FilteredElementCollector(doc)
-                    .OfClass(typeof(TextNoteType))
-                    .Cast<TextNoteType>()
-                    .FirstOrDefault();
-                if (tnt != null) textNoteTypeId = tnt.Id;
-            }
-            if (textNoteTypeId == null) return view.Id;
-
-            var lines = BuildLines(result, settings);
-            string content = string.Join("\n", lines);
-            var opts = new TextNoteOptions(textNoteTypeId)
-            {
-                HorizontalAlignment = HorizontalTextAlignment.Left,
-            };
+            ViewSchedule schedule;
             try
             {
-                TextNote.Create(doc, view.Id, new XYZ(0, 0, 0), content, opts);
+                schedule = ViewSchedule.CreateSchedule(
+                    doc, new ElementId(BuiltInCategory.OST_GenericModel));
             }
-            catch { }
+            catch
+            {
+                return null;
+            }
+            if (schedule == null) return null;
 
-            return view.Id;
+            string viewName = $"型枠数量集計_{DateTime.Now:yyyyMMdd_HHmmss}";
+            try { schedule.Name = viewName; } catch { }
+
+            var def = schedule.Definition;
+            var schedulable = def.GetSchedulableFields();
+
+            // ① 部位フィールド
+            var categoryField = AddFieldByName(doc, def, schedulable, FormworkParameterManager.ParamCategory);
+            // ② 区分フィールド
+            var groupField = AddFieldByName(doc, def, schedulable, FormworkParameterManager.ParamGroupKey);
+            // ③ タイプ名（DirectShapeType 名）
+            var typeNameField = AddFieldByBip(def, schedulable, BuiltInParameter.ALL_MODEL_TYPE_NAME);
+            // ④ 面積
+            var areaField = AddFieldByName(doc, def, schedulable, FormworkParameterManager.ParamArea);
+            // ⑤ マーカー（フィルタ用、非表示）
+            var markerField = AddFieldByName(doc, def, schedulable, FormworkParameterManager.ParamMarker);
+            if (markerField != null)
+            {
+                try { markerField.IsHidden = true; } catch { }
+            }
+
+            // フィルタ: マーカー == "28Tools_Formwork"
+            if (markerField != null)
+            {
+                try
+                {
+                    var filter = new ScheduleFilter(
+                        markerField.FieldId,
+                        ScheduleFilterType.Equal,
+                        FormworkParameterManager.MarkerValue);
+                    def.AddFilter(filter);
+                }
+                catch { }
+            }
+
+            // 部位でグループ化・合計
+            if (categoryField != null)
+            {
+                try
+                {
+                    var sort = new ScheduleSortGroupField(categoryField.FieldId);
+                    sort.ShowHeader = true;
+                    sort.ShowFooter = true;
+                    sort.ShowBlankLine = false;
+                    def.AddSortGroupField(sort);
+                }
+                catch { }
+            }
+
+            // 総合計を有効化
+            try { def.ShowGrandTotal = true; } catch { }
+            try { def.IsItemized = true; } catch { }
+
+            return schedule.Id;
         }
 
-        private static ViewFamilyType FindDraftingViewType(Document doc)
+        private static ScheduleField AddFieldByName(
+            Document doc,
+            ScheduleDefinition def,
+            IList<SchedulableField> schedulable,
+            string paramName)
         {
-            foreach (var t in new FilteredElementCollector(doc)
-                .OfClass(typeof(ViewFamilyType))
-                .Cast<ViewFamilyType>())
+            var sf = schedulable.FirstOrDefault(f =>
             {
-                if (t.ViewFamily == ViewFamily.Drafting) return t;
-            }
-            return null;
+                try { return f.GetName(doc) == paramName; }
+                catch { return false; }
+            });
+            if (sf == null) return null;
+            try { return def.AddField(sf); } catch { return null; }
         }
 
-        private static IEnumerable<string> BuildLines(FormworkResult r, FormworkSettings s)
+        private static ScheduleField AddFieldByBip(
+            ScheduleDefinition def,
+            IList<SchedulableField> schedulable,
+            BuiltInParameter bip)
         {
-            yield return "型枠数量集計";
-            yield return $"作成日時: {DateTime.Now:yyyy/MM/dd HH:mm:ss}";
-            yield return $"対象要素数: {r.ProcessedElementCount}";
-            yield return "";
-            yield return "■ 総括";
-            yield return $"  型枠面積合計: {r.TotalFormworkArea:F2} ㎡";
-            yield return $"  控除面積合計: {r.TotalDeductedArea:F2} ㎡";
-            yield return $"  傾斜面（計算対象外）: {r.InclinedFaceArea:F2} ㎡";
-            yield return "";
-
-            yield return "■ 部位別";
-            yield return "  部位      要素数     型枠面積(㎡)   控除面積(㎡)";
-            foreach (var c in r.CategoryResults)
-            {
-                yield return $"  {CategoryLabel(c.Category),-8}  {c.ElementCount,5}    {c.FormworkArea,10:F2}    {c.DeductedArea,10:F2}";
-            }
-
-            if (s.GroupByZone && r.ZoneResults.Count > 0)
-            {
-                yield return "";
-                yield return "■ 工区別";
-                foreach (var z in r.ZoneResults)
-                    yield return $"  {z.Zone}: {z.FormworkArea:F2} ㎡ ({z.ElementCount}要素)";
-            }
-
-            if (s.GroupByFormworkType && r.TypeResults.Count > 0)
-            {
-                yield return "";
-                yield return "■ 型枠種別";
-                foreach (var t in r.TypeResults)
-                    yield return $"  {t.FormworkType}: {t.FormworkArea:F2} ㎡ ({t.ElementCount}要素)";
-            }
-
-            if (r.Errors.Count > 0)
-            {
-                yield return "";
-                yield return $"■ エラー・注記: {r.Errors.Count} 件";
-            }
-        }
-
-        private static string CategoryLabel(CategoryGroup cg)
-        {
-            switch (cg)
-            {
-                case CategoryGroup.Column: return "柱";
-                case CategoryGroup.Beam: return "梁";
-                case CategoryGroup.Wall: return "壁";
-                case CategoryGroup.Slab: return "スラブ";
-                case CategoryGroup.Foundation: return "基礎";
-                case CategoryGroup.Stairs: return "階段";
-                default: return "その他";
-            }
+            var sf = schedulable.FirstOrDefault(f => f.ParameterId == new ElementId(bip));
+            if (sf == null) return null;
+            try { return def.AddField(sf); } catch { return null; }
         }
     }
 }

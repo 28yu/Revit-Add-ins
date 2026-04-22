@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
@@ -35,7 +36,6 @@ namespace Tools28.Commands.FormworkCalculator
 
                 var settings = dialog.Settings;
 
-                // Excel 出力先を先に決める
                 if (settings.ExportToExcel)
                 {
                     using (var sfd = new SaveFileDialog
@@ -51,9 +51,8 @@ namespace Tools28.Commands.FormworkCalculator
                     }
                 }
 
-                // 計算実行（読み取り専用）
                 var calc = new FormworkCalcEngine(doc, settings, activeView);
-                FormworkResult result = null;
+                FormworkResult result;
                 try
                 {
                     result = calc.Run();
@@ -71,7 +70,6 @@ namespace Tools28.Commands.FormworkCalculator
                     return Result.Cancelled;
                 }
 
-                // Excel 出力
                 if (settings.ExportToExcel && !string.IsNullOrEmpty(settings.ExcelOutputPath))
                 {
                     try
@@ -85,24 +83,47 @@ namespace Tools28.Commands.FormworkCalculator
                     }
                 }
 
-                // Revit 側の出力（トランザクション必要）
+                // Revit 側の出力（共有パラメータ → DirectShape → 集計表 → 他ビュー非表示）
                 ElementId scheduleViewId = null;
                 ElementId view3DId = null;
+                List<ElementId> createdShapeIds = null;
 
                 if (settings.CreateSchedule || settings.Create3DView)
                 {
-                    using (Transaction t = new Transaction(doc, "型枠数量算出 - ビュー作成"))
+                    // Step 1: 共有パラメータを用意
+                    using (var tParams = new Transaction(doc, "型枠数量算出 - 共有パラメータ"))
+                    {
+                        tParams.Start();
+                        try
+                        {
+                            FormworkParameterManager.EnsureParameters(doc, uiapp.Application);
+                            tParams.Commit();
+                        }
+                        catch
+                        {
+                            tParams.RollBack();
+                        }
+                    }
+
+                    // Step 2: DirectShape 作成 + 集計表作成
+                    using (var t = new Transaction(doc, "型枠数量算出 - ビュー作成"))
                     {
                         t.Start();
                         try
                         {
-                            if (settings.CreateSchedule)
-                                scheduleViewId = ScheduleCreator.CreateSummaryDraftingView(doc, result, settings);
-
                             if (settings.Create3DView)
                             {
                                 var v3d = FormworkVisualizer.CreateVisualization(doc, result, settings);
-                                if (v3d != null) view3DId = v3d.Id;
+                                if (v3d?.AnalysisView != null)
+                                {
+                                    view3DId = v3d.AnalysisView.Id;
+                                    createdShapeIds = v3d.CreatedShapeIds;
+                                }
+                            }
+
+                            if (settings.CreateSchedule)
+                            {
+                                scheduleViewId = ScheduleCreator.CreateSchedule(doc);
                             }
 
                             t.Commit();
@@ -114,9 +135,26 @@ namespace Tools28.Commands.FormworkCalculator
                                 string.Format(Loc.S("Formwork.ViewFailed"), ex.Message));
                         }
                     }
+
+                    // Step 3: 他ビュー非表示（作成した DirectShape を既存ビューで隠す）
+                    if (createdShapeIds != null && createdShapeIds.Count > 0)
+                    {
+                        using (var tHide = new Transaction(doc, "型枠数量算出 - 他ビュー非表示"))
+                        {
+                            tHide.Start();
+                            try
+                            {
+                                FormworkVisualizer.HideInOtherViews(doc, createdShapeIds, view3DId);
+                                tHide.Commit();
+                            }
+                            catch
+                            {
+                                tHide.RollBack();
+                            }
+                        }
+                    }
                 }
 
-                // 結果表示
                 string summary =
                     string.Format(Loc.S("Formwork.DoneMsg"),
                         result.ProcessedElementCount,
@@ -126,6 +164,13 @@ namespace Tools28.Commands.FormworkCalculator
 
                 if (settings.ExportToExcel && !string.IsNullOrEmpty(settings.ExcelOutputPath))
                     summary += "\n\n" + string.Format(Loc.S("Formwork.ExcelAt"), settings.ExcelOutputPath);
+
+                if (createdShapeIds != null && createdShapeIds.Count > 0)
+                    summary += "\n\n" + string.Format(Loc.S("Formwork.ShapesCreated"), createdShapeIds.Count);
+
+                if (scheduleViewId != null)
+                    summary += "\n" + Loc.S("Formwork.ScheduleCreated");
+
                 if (result.Errors.Count > 0)
                     summary += "\n\n" + string.Format(Loc.S("Formwork.ErrorCount"), result.Errors.Count);
 

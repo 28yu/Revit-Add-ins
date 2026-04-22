@@ -368,6 +368,8 @@ namespace Tools28.Localization
             { "Formwork.ExcelAt", "Excel output: {0}" },
             { "Formwork.ErrorCount", "Errors / notes: {0}" },
             { "Formwork.Fatal", "A fatal error occurred during formwork quantity calculation.\n{0}" },
+            { "Formwork.ShapesCreated", "Formwork face objects created: {0} (auto-hidden in other views)" },
+            { "Formwork.ScheduleCreated", "Schedule \"Formwork_Quantity_YYYYMMDD_HHMMSS\" has been created" },
         };
     }
 }
