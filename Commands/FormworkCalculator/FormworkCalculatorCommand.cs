@@ -1,5 +1,4 @@
 using System;
-using System.Windows.Forms;
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
@@ -8,6 +7,8 @@ using Tools28.Commands.FormworkCalculator.Models;
 using Tools28.Commands.FormworkCalculator.Output;
 using Tools28.Commands.FormworkCalculator.Views;
 using Tools28.Localization;
+using SaveFileDialog = System.Windows.Forms.SaveFileDialog;
+using WinFormsDialogResult = System.Windows.Forms.DialogResult;
 using TaskDialog = Autodesk.Revit.UI.TaskDialog;
 
 namespace Tools28.Commands.FormworkCalculator
@@ -44,7 +45,7 @@ namespace Tools28.Commands.FormworkCalculator
                         FileName = $"FormworkQuantity_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx",
                     })
                     {
-                        if (sfd.ShowDialog() != DialogResult.OK)
+                        if (sfd.ShowDialog() != WinFormsDialogResult.OK)
                             return Result.Cancelled;
                         settings.ExcelOutputPath = sfd.FileName;
                     }
