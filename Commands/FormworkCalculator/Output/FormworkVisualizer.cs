@@ -8,10 +8,10 @@ using Tools28.Commands.FormworkCalculator.Models;
 namespace Tools28.Commands.FormworkCalculator.Output
 {
     /// <summary>
-    /// 型枠面を DirectShape 化して色分け3Dビューを作成する。
-    /// - 分類キー毎に DirectShapeType を作成し、名前で識別可能にする
-    /// - OverrideGraphicSettings で前景サーフェスパターンの可視化＋色付け
-    /// - 既存ビューでは自動的に非表示にする（解析専用ビューのみ表示）
+    /// 型枠面を DirectShape として作成し、View Filter で色分けする。
+    /// - 分類キー毎に DirectShapeType を作成（名前で識別可能）
+    /// - 色付けは View Filter ベース（ユーザーが実行後に編集可能）
+    /// - 元の躯体要素の表示はそのまま（半透明等のオーバーライドは入れない）
     /// </summary>
     internal static class FormworkVisualizer
     {
@@ -19,6 +19,8 @@ namespace Tools28.Commands.FormworkCalculator.Output
         {
             public View3D AnalysisView;
             public List<ElementId> CreatedShapeIds = new List<ElementId>();
+            public Dictionary<string, (byte R, byte G, byte B)> KeyColors
+                = new Dictionary<string, (byte, byte, byte)>();
         }
 
         private static readonly Dictionary<CategoryGroup, (byte R, byte G, byte B)> _categoryColors
@@ -58,15 +60,17 @@ namespace Tools28.Commands.FormworkCalculator.Output
             try { view.Name = viewName; } catch { }
             vr.AnalysisView = view;
 
-            // GL 高さ
-            double? glFeet = null;
-            if (settings.UseGLDeduction)
-            {
-                glFeet = UnitUtils.ConvertToInternalUnits(settings.GLElevationMeters, UnitTypeId.Meters);
-            }
+            // 接触検出込みで面を再計算
+            var facesByElement = FormworkCalcEngine.RecomputeFaces(doc, result, settings);
 
             // 分類キーに基づく色割当
             var keyAssignment = AssignColors(result, settings);
+
+            // 控除面表示時は「控除面」キーを追加（単色グレー）
+            if (settings.ShowDeductedFaces)
+                keyAssignment["控除面"] = (180, 180, 180);
+
+            vr.KeyColors = new Dictionary<string, (byte, byte, byte)>(keyAssignment);
 
             // 分類キー毎に DirectShapeType を作成（名前で識別可能にする）
             var typeIdByKey = new Dictionary<string, ElementId>();
@@ -85,25 +89,11 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 }
             }
 
-            // 塗り潰しパターン（Drafting Solid fill）
-            ElementId solidFillId = GetDraftingSolidFillPatternId(doc);
-
             foreach (var er in result.ElementResults)
             {
-                var revitElem = doc.GetElement(new ElementId(er.ElementId));
-                if (revitElem == null) continue;
-
-                var solids = SolidUnionProcessor.GetSolids(revitElem);
-                if (solids.Count == 0) continue;
-                var unioned = SolidUnionProcessor.Union(solids);
-                var finalSolids = unioned != null ? new List<Solid> { unioned } : solids;
-                double minZ = FaceClassifier.GetMinZ(finalSolids);
-                var faces = FaceClassifier.ClassifyAll(finalSolids, glFeet, minZ);
+                if (!facesByElement.TryGetValue(er.ElementId, out var faces)) continue;
 
                 string key = GetKey(er, settings);
-                if (!keyAssignment.TryGetValue(key, out var color))
-                    color = (180, 180, 180);
-
                 typeIdByKey.TryGetValue(key, out var typeId);
                 catLabelByKey.TryGetValue(key, out var catLabel);
                 catLabel = catLabel ?? CategoryLabel(er.Category);
@@ -132,11 +122,11 @@ namespace Tools28.Commands.FormworkCalculator.Output
                             try { ds.SetTypeId(typeId); } catch { }
                         }
 
-                        // 共有パラメータに識別用値を書き込み
                         try
                         {
                             double areaM2 = UnitUtils.ConvertFromInternalUnits(fi.Area, UnitTypeId.SquareMeters);
-                            FormworkParameterManager.SetInstanceValues(ds, catLabel, key, areaM2);
+                            string filterKey = IsDeducted(fi.FaceType) ? "控除面" : key;
+                            FormworkParameterManager.SetInstanceValues(ds, catLabel, filterKey, areaM2);
                         }
                         catch { }
 
@@ -144,30 +134,14 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     }
                     catch { continue; }
 
-                    if (dsId == null) continue;
-
-                    // 色オーバーライド
-                    ApplyColorOverride(view, dsId, color, fi.FaceType, solidFillId);
-
-                    vr.CreatedShapeIds.Add(dsId);
+                    if (dsId != null) vr.CreatedShapeIds.Add(dsId);
                 }
             }
 
-            // 元要素を半透明に
+            // View Filter による色分けを適用（個別要素オーバーライドは使わない）
             try
             {
-                var baseOgs = new OverrideGraphicSettings();
-                baseOgs.SetSurfaceTransparency(70);
-                foreach (var er in result.ElementResults)
-                {
-                    try
-                    {
-                        var id = new ElementId(er.ElementId);
-                        if (doc.GetElement(id) != null)
-                            view.SetElementOverrides(id, baseOgs);
-                    }
-                    catch { }
-                }
+                FormworkFilterManager.ApplyColorFilters(doc, view, keyAssignment);
             }
             catch { }
 
@@ -191,7 +165,6 @@ namespace Tools28.Commands.FormworkCalculator.Output
 
             foreach (var v in allViews)
             {
-                // Schedule / Legend は HideElements 不可
                 if (v is ViewSchedule) continue;
                 if (v.ViewType == ViewType.Legend) continue;
 
@@ -199,43 +172,8 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 {
                     v.HideElements(idsList);
                 }
-                catch
-                {
-                    // ビューで隠せない要素がある場合などは無視
-                }
+                catch { }
             }
-        }
-
-        private static void ApplyColorOverride(
-            View view, ElementId targetId,
-            (byte R, byte G, byte B) color, FaceType ftype, ElementId solidFillId)
-        {
-            byte r, g, b;
-            if (ftype == FaceType.Error)
-            {
-                r = 220; g = 30; b = 30;
-            }
-            else if (IsDeducted(ftype))
-            {
-                var d = DeductedColor(ftype);
-                r = d.R; g = d.G; b = d.B;
-            }
-            else
-            {
-                r = color.R; g = color.G; b = color.B;
-            }
-
-            var ogs = new OverrideGraphicSettings();
-            var revitColor = new Color(r, g, b);
-
-            ogs.SetProjectionLineColor(revitColor);
-            ogs.SetSurfaceForegroundPatternColor(revitColor);
-            if (solidFillId != null && solidFillId != ElementId.InvalidElementId)
-                ogs.SetSurfaceForegroundPatternId(solidFillId);
-            ogs.SetSurfaceForegroundPatternVisible(true);
-            ogs.SetSurfaceBackgroundPatternVisible(false);
-
-            try { view.SetElementOverrides(targetId, ogs); } catch { }
         }
 
         private static DirectShapeType GetOrCreateDirectShapeType(Document doc, string typeName)
@@ -292,25 +230,13 @@ namespace Tools28.Commands.FormworkCalculator.Output
                    t == FaceType.DeductedBelowGL;
         }
 
-        private static (byte R, byte G, byte B) DeductedColor(FaceType t)
-        {
-            switch (t)
-            {
-                case FaceType.DeductedTop: return (180, 230, 180);
-                case FaceType.DeductedBottom: return (200, 170, 130);
-                case FaceType.DeductedContact: return (200, 200, 200);
-                case FaceType.DeductedBelowGL: return (160, 140, 120);
-                default: return (220, 220, 220);
-            }
-        }
-
         private static string GetKey(ElementResult er, FormworkSettings s)
         {
             switch (s.ColorScheme)
             {
                 case ColorSchemeType.ByZone: return string.IsNullOrEmpty(er.Zone) ? "未設定" : er.Zone;
                 case ColorSchemeType.ByFormworkType: return string.IsNullOrEmpty(er.FormworkType) ? "未設定" : er.FormworkType;
-                default: return "C:" + er.Category;
+                default: return CategoryLabel(er.Category);
             }
         }
 
@@ -321,7 +247,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
             if (s.ColorScheme == ColorSchemeType.ByCategory)
             {
                 foreach (var kv in _categoryColors)
-                    map["C:" + kv.Key] = kv.Value;
+                    map[CategoryLabel(kv.Key)] = kv.Value;
                 return map;
             }
 
@@ -335,32 +261,6 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 i++;
             }
             return map;
-        }
-
-        /// <summary>
-        /// Drafting（製図）ソリッド塗り潰しパターンの Id を取得。サーフェスオーバーライド用。
-        /// </summary>
-        private static ElementId GetDraftingSolidFillPatternId(Document doc)
-        {
-            var fps = new FilteredElementCollector(doc)
-                .OfClass(typeof(FillPatternElement))
-                .Cast<FillPatternElement>();
-            foreach (var fp in fps)
-            {
-                var pattern = fp.GetFillPattern();
-                if (pattern == null) continue;
-                if (pattern.IsSolidFill && pattern.Target == FillPatternTarget.Drafting)
-                    return fp.Id;
-            }
-            // フォールバック: Model の solid fill を探す
-            foreach (var fp in fps)
-            {
-                var pattern = fp.GetFillPattern();
-                if (pattern == null) continue;
-                if (pattern.IsSolidFill)
-                    return fp.Id;
-            }
-            return ElementId.InvalidElementId;
         }
 
         private static Solid CreateThinSolidFromFace(FaceClassifier.FaceInfo fi)

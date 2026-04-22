@@ -8,7 +8,9 @@ namespace Tools28.Commands.FormworkCalculator.Engine
 {
     /// <summary>
     /// 型枠数量算出のメインクラス。
-    /// 要素収集 → Solid 結合 → 面分類 → 開口加算 → 集計。
+    /// Pass 1: 要素毎の Solid 取得・面分類
+    /// Pass 2: 要素間接触面の検出と DeductedContact への変更
+    /// Pass 3: 開口加算・集計
     /// </summary>
     internal class FormworkCalcEngine
     {
@@ -38,49 +40,73 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 return result;
             }
 
-            // GL 高さ（m → feet）
             double? glFeet = null;
             if (_settings.UseGLDeduction)
             {
                 glFeet = UnitUtils.ConvertToInternalUnits(_settings.GLElevationMeters, UnitTypeId.Meters);
             }
 
-            _progress?.Report($"要素ごとに処理中... 0 / {elements.Count}");
-
-            int idx = 0;
             var openingDeltas = OpeningProcessor.Compute(_doc, elements);
             var openingMap = openingDeltas.ToDictionary(o => o.HostElementId, o => o);
 
-            // 個別要素ごとに計算（Phase 1実装: Boolean 結合は部位内 + 近接に限定）
-            var elementsByGroup = elements.GroupBy(e => ElementCollector.ToCategoryGroup(e)).ToList();
+            // Pass 1: 要素毎に面を分類
+            _progress?.Report($"Pass 1: 面分類中... 0 / {elements.Count}");
+            var contexts = new List<ContactFaceDetector.ElementFacesContext>();
+            var elemByContext = new Dictionary<int, Element>();
 
-            foreach (var grp in elementsByGroup)
+            int idx = 0;
+            foreach (var elem in elements)
             {
-                foreach (var elem in grp)
-                {
-                    idx++;
-                    if (idx % 10 == 0)
-                        _progress?.Report($"要素ごとに処理中... {idx} / {elements.Count}");
+                idx++;
+                if (idx % 10 == 0)
+                    _progress?.Report($"Pass 1: 面分類中... {idx} / {elements.Count}");
 
-                    try
+                try
+                {
+                    var ctx = ClassifyElementFaces(elem, glFeet);
+                    if (ctx != null)
                     {
-                        var er = ProcessElement(elem, glFeet, openingMap);
-                        if (er != null)
-                        {
-                            result.ElementResults.Add(er);
-                        }
+                        contexts.Add(ctx);
+                        elemByContext[ctx.ElementId] = elem;
                     }
-                    catch (Exception ex)
+                }
+                catch (Exception ex)
+                {
+                    result.Errors.Add(new ErrorLogEntry
                     {
-                        result.Errors.Add(new ErrorLogEntry
-                        {
-                            ElementId = elem.Id.IntegerValue,
-                            CategoryName = elem.Category?.Name ?? string.Empty,
-                            ElementName = elem.Name,
-                            ErrorKind = "ProcessError",
-                            Message = ex.Message,
-                        });
-                    }
+                        ElementId = elem.Id.IntegerValue,
+                        CategoryName = elem.Category?.Name ?? string.Empty,
+                        ElementName = elem.Name,
+                        ErrorKind = "ClassifyError",
+                        Message = ex.Message,
+                    });
+                }
+            }
+
+            // Pass 2: 要素間接触面を検出して控除
+            _progress?.Report("Pass 2: 接触面を検出中...");
+            ContactFaceDetector.RefineContactFaces(contexts);
+
+            // Pass 3: 開口加算 + ElementResult 作成
+            _progress?.Report("Pass 3: 集計中...");
+            foreach (var ctx in contexts)
+            {
+                var elem = elemByContext[ctx.ElementId];
+                try
+                {
+                    var er = BuildElementResult(elem, ctx, openingMap);
+                    if (er != null) result.ElementResults.Add(er);
+                }
+                catch (Exception ex)
+                {
+                    result.Errors.Add(new ErrorLogEntry
+                    {
+                        ElementId = ctx.ElementId,
+                        CategoryName = elem.Category?.Name ?? string.Empty,
+                        ElementName = elem.Name,
+                        ErrorKind = "AggregateError",
+                        Message = ex.Message,
+                    });
                 }
             }
 
@@ -88,78 +114,72 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             return result;
         }
 
-        private ElementResult ProcessElement(
-            Element elem,
-            double? glFeet,
-            Dictionary<int, OpeningProcessor.OpeningDelta> openingMap)
+        private ContactFaceDetector.ElementFacesContext ClassifyElementFaces(
+            Element elem, double? glFeet)
         {
             var solids = SolidUnionProcessor.GetSolids(elem);
             if (solids.Count == 0) return null;
 
-            // 同一要素内のソリッドを結合
             Solid unioned = SolidUnionProcessor.Union(solids);
             var finalSolids = unioned != null ? new List<Solid> { unioned } : solids;
 
             double minZ = FaceClassifier.GetMinZ(finalSolids);
-
             var faceInfos = FaceClassifier.ClassifyAll(finalSolids, glFeet, minZ);
 
-            // 基礎底面以外の最下面を控除 (OST_StructuralFoundation のみ)
             bool isFoundation = ElementCollector.ToCategoryGroup(elem) == CategoryGroup.Foundation;
             if (!isFoundation)
             {
-                // 非基礎要素: 最下の下向き面は DeductedContact として扱う（土中・スラブ上等）
                 foreach (var fi in faceInfos)
                 {
                     if (fi.FaceType == FaceType.DeductedBottom)
-                    {
                         fi.FaceType = FaceType.DeductedContact;
-                    }
                 }
             }
 
-            double formwork = 0;
-            double dedTop = 0;
-            double dedBottom = 0;
-            double dedContact = 0;
-            double inclined = 0;
+            BoundingBoxXYZ bb = null;
+            try { bb = elem.get_BoundingBox(null); } catch { }
 
-            foreach (var fi in faceInfos)
+            return new ContactFaceDetector.ElementFacesContext
+            {
+                ElementId = elem.Id.IntegerValue,
+                BB = bb,
+                Faces = faceInfos,
+            };
+        }
+
+        private ElementResult BuildElementResult(
+            Element elem,
+            ContactFaceDetector.ElementFacesContext ctx,
+            Dictionary<int, OpeningProcessor.OpeningDelta> openingMap)
+        {
+            double formwork = 0, dedTop = 0, dedBottom = 0, dedContact = 0, inclined = 0;
+
+            foreach (var fi in ctx.Faces)
             {
                 double aM2 = FeetSqToM2(fi.Area);
                 switch (fi.FaceType)
                 {
-                    case FaceType.FormworkRequired:
-                        formwork += aM2;
-                        break;
-                    case FaceType.DeductedTop:
-                        dedTop += aM2;
-                        break;
-                    case FaceType.DeductedBottom:
-                        dedBottom += aM2;
-                        break;
+                    case FaceType.FormworkRequired: formwork += aM2; break;
+                    case FaceType.DeductedTop: dedTop += aM2; break;
+                    case FaceType.DeductedBottom: dedBottom += aM2; break;
                     case FaceType.DeductedContact:
-                    case FaceType.DeductedBelowGL:
-                        dedContact += aM2;
-                        break;
-                    case FaceType.Inclined:
-                        inclined += aM2;
-                        break;
+                    case FaceType.DeductedBelowGL: dedContact += aM2; break;
+                    case FaceType.Inclined: inclined += aM2; break;
                 }
             }
 
             double openingDeducted = 0;
             double openingAdded = 0;
-            if (openingMap.TryGetValue(elem.Id.IntegerValue, out var od))
+            if (openingMap.TryGetValue(ctx.ElementId, out var od))
             {
                 openingDeducted = FeetSqToM2(od.DeductedArea);
                 openingAdded = FeetSqToM2(od.AddedEdgeArea);
                 formwork = Math.Max(0, formwork - openingDeducted + openingAdded);
             }
 
-            var er = new ElementResult
+            return new ElementResult
             {
-                ElementId = elem.Id.IntegerValue,
+                ElementId = ctx.ElementId,
                 ElementName = elem.Name ?? string.Empty,
                 Category = ElementCollector.ToCategoryGroup(elem),
                 CategoryName = elem.Category?.Name ?? string.Empty,
@@ -177,8 +197,60 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 OpeningAreaDeducted = openingDeducted,
                 OpeningEdgeAreaAdded = openingAdded,
             };
+        }
 
-            return er;
+        /// <summary>
+        /// 可視化のため、分類後の面を要素IDごとに提供する（可視化サイドで再計算を避ける）。
+        /// </summary>
+        internal static Dictionary<int, List<FaceClassifier.FaceInfo>> RecomputeFaces(
+            Document doc,
+            FormworkResult result,
+            FormworkSettings settings)
+        {
+            var map = new Dictionary<int, List<FaceClassifier.FaceInfo>>();
+            double? glFeet = null;
+            if (settings.UseGLDeduction)
+                glFeet = UnitUtils.ConvertToInternalUnits(settings.GLElevationMeters, UnitTypeId.Meters);
+
+            // 一括で contexts を再計算し接触検出を同様に適用
+            var contexts = new List<ContactFaceDetector.ElementFacesContext>();
+            var elements = result.ElementResults
+                .Select(er => doc.GetElement(new ElementId(er.ElementId)))
+                .Where(e => e != null).ToList();
+
+            foreach (var elem in elements)
+            {
+                var solids = SolidUnionProcessor.GetSolids(elem);
+                if (solids.Count == 0) continue;
+                var unioned = SolidUnionProcessor.Union(solids);
+                var final = unioned != null ? new List<Solid> { unioned } : solids;
+                double minZ = FaceClassifier.GetMinZ(final);
+                var faces = FaceClassifier.ClassifyAll(final, glFeet, minZ);
+
+                bool isFoundation = ElementCollector.ToCategoryGroup(elem) == CategoryGroup.Foundation;
+                if (!isFoundation)
+                {
+                    foreach (var f in faces)
+                        if (f.FaceType == FaceType.DeductedBottom) f.FaceType = FaceType.DeductedContact;
+                }
+
+                BoundingBoxXYZ bb = null;
+                try { bb = elem.get_BoundingBox(null); } catch { }
+
+                contexts.Add(new ContactFaceDetector.ElementFacesContext
+                {
+                    ElementId = elem.Id.IntegerValue,
+                    BB = bb,
+                    Faces = faces,
+                });
+            }
+
+            ContactFaceDetector.RefineContactFaces(contexts);
+
+            foreach (var ctx in contexts)
+                map[ctx.ElementId] = ctx.Faces;
+
+            return map;
         }
 
         private static string NormalizeParamValue(string s)
@@ -195,7 +267,6 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         private static void Aggregate(FormworkResult result)
         {
             double total = 0, deducted = 0, inclined = 0;
-
             var byCat = new Dictionary<CategoryGroup, CategoryResult>();
             var byZone = new Dictionary<string, ZoneResult>();
             var byType = new Dictionary<string, FormworkTypeResult>();
