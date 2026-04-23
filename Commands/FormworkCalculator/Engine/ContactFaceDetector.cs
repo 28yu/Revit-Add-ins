@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Linq;
 using Autodesk.Revit.DB;
 using Tools28.Commands.FormworkCalculator.Models;
 
@@ -8,14 +7,19 @@ namespace Tools28.Commands.FormworkCalculator.Engine
     /// <summary>
     /// 要素同士の接触面（結合面）を検出して DeductedContact に変更する。
     ///
-    /// アプローチ: ReferenceIntersector を使用
-    ///   - 各 FormworkRequired 面の中央から外向き（法線方向）に極短いレイを発射
-    ///   - 即座に他の構造要素にヒットした場合、接触面と判定
-    ///   - これにより以下のケースが確実に検出される:
-    ///       - 壁の T 字結合 (壁端面 → 別壁側面)
-    ///       - 梁と柱の取り合い (梁端面 → 柱側面)
-    ///       - 梁底と基礎/柱の接触
-    ///       - スラブ同士の結合
+    /// 【アプローチ】
+    ///   1. 各 FormworkRequired 面の中心から "要素の内側" に小さくオフセットした点を origin とする
+    ///   2. origin から法線方向（外向き）に ReferenceIntersector でレイを発射
+    ///   3. 返されるヒットは Proximity 順なので:
+    ///        a. 最初のヒットは自分自身の面 (origin は内側 → 法線方向へ進むと自面に当たる)
+    ///        b. ownId フィルタで自分を除外
+    ///        c. 次のヒットまでの「面の先の距離 (gap)」が閾値以内なら接触
+    ///
+    /// 【なぜ origin を内側にするか】
+    ///   origin を面の外側に置くと、面同士が完全に密着している場合に
+    ///   ReferenceIntersector が自面と隣面の両方を origin より前方と見なせず、
+    ///   代わりに隣要素の「反対側の面」を最初にヒットしてしまう。
+    ///   隣要素が厚いと Proximity が閾値を超えて接触なしと誤判定される。
     /// </summary>
     internal class ContactFaceDetector
     {
@@ -26,15 +30,11 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             public List<FaceClassifier.FaceInfo> Faces = new List<FaceClassifier.FaceInfo>();
         }
 
-        // ヒットの近接距離: 50mm 以内なら接触とみなす（モデリング誤差・小隙間を吸収）
-        private const double ProximityFeet = 0.16;     // ≒ 50mm
-        // 面中央から発射するレイの始点オフセット (面の外側 1mm)
-        private const double RayOriginOffsetFeet = 0.0033; // ≒ 1mm
+        // origin を面の内側に置くオフセット (要素内部側)
+        private const double OriginOffsetInsideFeet = 0.033;  // ≈ 10mm
+        // 自面通過後の gap 許容値 (隙間・モデリング誤差吸収)
+        private const double MaxGapFeet = 0.16;                // ≈ 50mm
 
-        /// <summary>
-        /// View3D を使って ReferenceIntersector で接触面検出を実行。
-        /// View3D は ReferenceIntersector の必須引数。
-        /// </summary>
         internal static void RefineContactFaces(
             Document doc,
             View3D rayView,
@@ -42,7 +42,6 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         {
             if (rayView == null) return;
 
-            // 検出対象は対象スコープの構造カテゴリ全般
             var bicList = new List<BuiltInCategory>
             {
                 BuiltInCategory.OST_Walls,
@@ -74,7 +73,6 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                     if (fi.FaceType != FaceType.FormworkRequired) continue;
                     if (fi.Normal == null) continue;
 
-                    // 面の中心点を取得
                     BoundingBoxUV bbA;
                     try { bbA = fi.Face.GetBoundingBox(); }
                     catch { continue; }
@@ -84,8 +82,9 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                     catch { continue; }
                     if (pt == null) continue;
 
-                    // 面の外側にわずかに出した点から、法線方向に短いレイを発射
-                    XYZ origin = pt + fi.Normal * RayOriginOffsetFeet;
+                    // origin を面の内側（要素の中心側）に設定。法線方向に発射すれば
+                    // 先に自面に当たり、さらに先に隣要素があればそれにも当たる。
+                    XYZ origin = pt - fi.Normal * OriginOffsetInsideFeet;
 
                     bool isContact = false;
                     try
@@ -95,14 +94,14 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                         {
                             foreach (var h in hits)
                             {
-                                // 自分自身のヒットは無視
                                 var hitId = h.GetReference()?.ElementId;
                                 if (hitId == null || hitId == ownId) continue;
 
-                                // 近接距離チェック
-                                if (h.Proximity > ProximityFeet) break;
+                                // 自面（Proximity ≈ OriginOffsetInsideFeet）を通過してから
+                                // 隣要素までの gap を計算
+                                double gap = h.Proximity - OriginOffsetInsideFeet;
+                                if (gap > MaxGapFeet) break;
 
-                                // 他要素に近接ヒット = 接触
                                 isContact = true;
                                 break;
                             }

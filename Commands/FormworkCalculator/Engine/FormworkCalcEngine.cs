@@ -132,12 +132,27 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             // 基礎以外の最下面は FormworkRequired として扱う（梁底・柱底等は形枠必要）
             // 他要素との接触は ContactDetector が個別に検出する
             bool isFoundation = ElementCollector.ToCategoryGroup(elem) == CategoryGroup.Foundation;
+            bool isSlab = ElementCollector.ToCategoryGroup(elem) == CategoryGroup.Slab;
+
             if (!isFoundation)
             {
                 foreach (var fi in faceInfos)
                 {
                     if (fi.FaceType == FaceType.DeductedBottom)
                         fi.FaceType = FaceType.FormworkRequired;
+                }
+            }
+
+            // 床(スラブ)の天端は常に型枠不要: 最上部以外の段差・凹みを含め全ての上向き水平面を除外
+            if (isSlab)
+            {
+                foreach (var fi in faceInfos)
+                {
+                    if (fi.Normal != null && fi.Normal.Z > 0.99 &&
+                        fi.FaceType == FaceType.FormworkRequired)
+                    {
+                        fi.FaceType = FaceType.DeductedTop;
+                    }
                 }
             }
 
@@ -234,12 +249,26 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 var faces = FaceClassifier.ClassifyAll(final, glFeet, minZ, maxZ);
 
                 bool isFoundation = ElementCollector.ToCategoryGroup(elem) == CategoryGroup.Foundation;
+                bool isSlab = ElementCollector.ToCategoryGroup(elem) == CategoryGroup.Slab;
+
                 if (!isFoundation)
                 {
                     foreach (var f in faces)
                     {
                         if (f.FaceType == FaceType.DeductedBottom)
                             f.FaceType = FaceType.FormworkRequired;
+                    }
+                }
+
+                if (isSlab)
+                {
+                    foreach (var f in faces)
+                    {
+                        if (f.Normal != null && f.Normal.Z > 0.99 &&
+                            f.FaceType == FaceType.FormworkRequired)
+                        {
+                            f.FaceType = FaceType.DeductedTop;
+                        }
                     }
                 }
 
