@@ -7,27 +7,33 @@ namespace Tools28.Commands.FormworkCalculator.Engine
 {
     /// <summary>
     /// Solid の Face を走査して型枠要否を判定する。
+    /// 【ルール】
+    ///   - 上向き水平面 (nz > 0.99) かつ最上面 → DeductedTop
+    ///   - 下向き水平面 (nz < -0.99) かつ最下面 → DeductedBottom
+    ///   - その他の上向き面（リビールの底など）→ FormworkRequired
+    ///   - その他の下向き面（リビールの天井など）→ FormworkRequired
+    ///   - 垂直面 → FormworkRequired
+    ///   - 傾斜面 → FormworkRequired (リビール/スイープの斜面など)
+    ///   - GL より下の垂直/下向き面 → DeductedBelowGL (オプション)
     /// </summary>
     internal static class FaceClassifier
     {
-        private const double VerticalZTol = 0.99;      // 水平面判定: |Nz| > 0.99
-        private const double HorizontalZTol = 0.01;    // 垂直面判定: |Nz| < 0.01
+        private const double VerticalZTol = 0.99;      // |Nz| > 0.99 → 水平
+        private const double TopBottomTol = 0.01;      // 面の高さがmin/max±この距離以内なら最上/最下面
 
         internal class FaceInfo
         {
             public Face Face;
-            public XYZ Normal;       // 代表法線（面中央）
+            public XYZ Normal;
             public double Area;
             public FaceType FaceType;
         }
 
-        /// <summary>
-        /// 結合 Solid 群から全 Face を取り出して分類する。
-        /// </summary>
         internal static List<FaceInfo> ClassifyAll(
             IEnumerable<Solid> unionedSolids,
             double? glElevationFeet,
-            double minBottomZ)
+            double minBottomZ,
+            double maxTopZ)
         {
             var list = new List<FaceInfo>();
             foreach (var s in unionedSolids)
@@ -35,14 +41,15 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 if (s == null) continue;
                 foreach (Face f in s.Faces)
                 {
-                    var info = Classify(f, glElevationFeet, minBottomZ);
+                    var info = Classify(f, glElevationFeet, minBottomZ, maxTopZ);
                     if (info != null) list.Add(info);
                 }
             }
             return list;
         }
 
-        internal static FaceInfo Classify(Face f, double? glElevationFeet, double minBottomZ)
+        internal static FaceInfo Classify(
+            Face f, double? glElevationFeet, double minBottomZ, double maxTopZ)
         {
             if (f == null) return null;
             XYZ n = GetFaceNormal(f);
@@ -55,19 +62,24 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             FaceType type;
             double nz = n.Z;
 
+            BoundingBoxUV bb = null;
+            try { bb = f.GetBoundingBox(); } catch { }
+            UV mid = bb != null ? (bb.Min + bb.Max) * 0.5 : new UV(0, 0);
+            XYZ pt = null;
+            try { pt = f.Evaluate(mid); } catch { }
+
             if (nz > VerticalZTol)
             {
-                type = FaceType.DeductedTop;
+                // 上向き水平面: 最上面のみ DeductedTop。リビール底などは FormworkRequired
+                if (pt != null && Math.Abs(pt.Z - maxTopZ) < TopBottomTol)
+                    type = FaceType.DeductedTop;
+                else
+                    type = FaceType.FormworkRequired;
             }
             else if (nz < -VerticalZTol)
             {
-                // 下向き水平面: 最下部（基礎底面）か判定
-                BoundingBoxUV bb = f.GetBoundingBox();
-                UV mid = (bb.Min + bb.Max) * 0.5;
-                XYZ pt = null;
-                try { pt = f.Evaluate(mid); } catch { }
-
-                if (pt != null && Math.Abs(pt.Z - minBottomZ) < 0.01)
+                // 下向き水平面: 最下面のみ DeductedBottom。リビール天井などは FormworkRequired
+                if (pt != null && Math.Abs(pt.Z - minBottomZ) < TopBottomTol)
                 {
                     type = FaceType.DeductedBottom;
                 }
@@ -80,33 +92,17 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                     type = FaceType.FormworkRequired;
                 }
             }
-            else if (Math.Abs(nz) < HorizontalZTol)
+            else
             {
-                // 垂直面
-                if (glElevationFeet.HasValue)
+                // 垂直面 or 傾斜面 → 全て FormworkRequired (リビール/スイープの斜面も含む)
+                if (glElevationFeet.HasValue && pt != null && pt.Z < glElevationFeet.Value - 1e-3)
                 {
-                    BoundingBoxUV bb = f.GetBoundingBox();
-                    UV mid = (bb.Min + bb.Max) * 0.5;
-                    XYZ pt = null;
-                    try { pt = f.Evaluate(mid); } catch { }
-                    if (pt != null && pt.Z < glElevationFeet.Value - 1e-3)
-                    {
-                        type = FaceType.DeductedBelowGL;
-                    }
-                    else
-                    {
-                        type = FaceType.FormworkRequired;
-                    }
+                    type = FaceType.DeductedBelowGL;
                 }
                 else
                 {
                     type = FaceType.FormworkRequired;
                 }
-            }
-            else
-            {
-                // 傾斜面
-                type = FaceType.Inclined;
             }
 
             return new FaceInfo
@@ -134,9 +130,10 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             }
         }
 
-        internal static double GetMinZ(IEnumerable<Solid> solids)
+        internal static (double minZ, double maxZ) GetZRange(IEnumerable<Solid> solids)
         {
             double minZ = double.MaxValue;
+            double maxZ = double.MinValue;
             foreach (var s in solids)
             {
                 if (s == null) continue;
@@ -148,10 +145,18 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                     {
                         var p = c.GetEndPoint(i);
                         if (p.Z < minZ) minZ = p.Z;
+                        if (p.Z > maxZ) maxZ = p.Z;
                     }
                 }
             }
-            return minZ == double.MaxValue ? 0 : minZ;
+            if (minZ == double.MaxValue) minZ = 0;
+            if (maxZ == double.MinValue) maxZ = 0;
+            return (minZ, maxZ);
+        }
+
+        internal static double GetMinZ(IEnumerable<Solid> solids)
+        {
+            return GetZRange(solids).minZ;
         }
     }
 }

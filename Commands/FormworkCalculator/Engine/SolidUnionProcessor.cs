@@ -70,9 +70,6 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             return acc;
         }
 
-        /// <summary>
-        /// 近接する要素ごとにグループ化して Union する。大規模プロジェクトで失敗しにくくするため。
-        /// </summary>
         internal static List<Solid> UnionByProximity(List<Element> elements, double tol = 0.1)
         {
             var groups = new List<List<Solid>>();

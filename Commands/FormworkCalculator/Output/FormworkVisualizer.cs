@@ -67,11 +67,14 @@ namespace Tools28.Commands.FormworkCalculator.Output
             try { view.Name = AnalysisViewName; } catch { }
             vr.AnalysisView = view;
 
+            // セクションボックスを有効化（要素全体を含むよう自動フィット）
+            EnableSectionBox(doc, view, result);
+
             // 元躯体要素を 20% 透過 + RGB(94,94,94) で表示
             ApplySourceElementAppearance(doc, view, result);
 
-            // 接触検出込みで面を再計算
-            var facesByElement = FormworkCalcEngine.RecomputeFaces(doc, result, settings);
+            // 接触検出込みで面を再計算（このビューを ReferenceIntersector の rayView として使用）
+            var facesByElement = FormworkCalcEngine.RecomputeFaces(doc, view, result, settings);
 
             // 分類キーに基づく色割当
             var keyAssignment = AssignColors(result, settings);
@@ -271,6 +274,52 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 i++;
             }
             return map;
+        }
+
+        /// <summary>
+        /// 解析対象要素の BoundingBox を全て囲む形でセクションボックスを設定し有効化。
+        /// </summary>
+        private static void EnableSectionBox(Document doc, View3D view, FormworkResult result)
+        {
+            try
+            {
+                XYZ minP = null, maxP = null;
+                foreach (var er in result.ElementResults)
+                {
+                    var elem = doc.GetElement(new ElementId(er.ElementId));
+                    if (elem == null) continue;
+                    BoundingBoxXYZ bb = null;
+                    try { bb = elem.get_BoundingBox(null); } catch { }
+                    if (bb == null) continue;
+                    if (minP == null)
+                    {
+                        minP = bb.Min;
+                        maxP = bb.Max;
+                    }
+                    else
+                    {
+                        minP = new XYZ(System.Math.Min(minP.X, bb.Min.X),
+                                       System.Math.Min(minP.Y, bb.Min.Y),
+                                       System.Math.Min(minP.Z, bb.Min.Z));
+                        maxP = new XYZ(System.Math.Max(maxP.X, bb.Max.X),
+                                       System.Math.Max(maxP.Y, bb.Max.Y),
+                                       System.Math.Max(maxP.Z, bb.Max.Z));
+                    }
+                }
+
+                if (minP != null && maxP != null)
+                {
+                    double margin = 1.0; // 1ft 余裕
+                    var sb = new BoundingBoxXYZ
+                    {
+                        Min = new XYZ(minP.X - margin, minP.Y - margin, minP.Z - margin),
+                        Max = new XYZ(maxP.X + margin, maxP.Y + margin, maxP.Z + margin),
+                    };
+                    view.SetSectionBox(sb);
+                }
+                view.IsSectionBoxActive = true;
+            }
+            catch { }
         }
 
         /// <summary>

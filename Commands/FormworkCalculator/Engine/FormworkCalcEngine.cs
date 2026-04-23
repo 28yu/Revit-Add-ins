@@ -9,21 +9,30 @@ namespace Tools28.Commands.FormworkCalculator.Engine
     /// <summary>
     /// 型枠数量算出のメインクラス。
     /// Pass 1: 要素毎の Solid 取得・面分類
-    /// Pass 2: 要素間接触面の検出と DeductedContact への変更
+    /// Pass 2: ReferenceIntersector で要素間接触面の検出 → DeductedContact
     /// Pass 3: 開口加算・集計
+    ///
+    /// Pass 2 には View3D が必須なので、コマンド側から渡してもらう。
     /// </summary>
     internal class FormworkCalcEngine
     {
         private readonly Document _doc;
         private readonly FormworkSettings _settings;
         private readonly View _activeView;
+        private readonly View3D _rayView;
         private readonly IProgress<string> _progress;
 
-        internal FormworkCalcEngine(Document doc, FormworkSettings settings, View activeView, IProgress<string> progress = null)
+        internal FormworkCalcEngine(
+            Document doc,
+            FormworkSettings settings,
+            View activeView,
+            View3D rayView,
+            IProgress<string> progress = null)
         {
             _doc = doc;
             _settings = settings;
             _activeView = activeView;
+            _rayView = rayView;
             _progress = progress;
         }
 
@@ -34,17 +43,11 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             _progress?.Report("要素を収集中...");
             var elements = ElementCollector.Collect(_doc, _settings, _activeView);
             result.ProcessedElementCount = elements.Count;
-
-            if (elements.Count == 0)
-            {
-                return result;
-            }
+            if (elements.Count == 0) return result;
 
             double? glFeet = null;
             if (_settings.UseGLDeduction)
-            {
                 glFeet = UnitUtils.ConvertToInternalUnits(_settings.GLElevationMeters, UnitTypeId.Meters);
-            }
 
             var openingDeltas = OpeningProcessor.Compute(_doc, elements);
             var openingMap = openingDeltas.ToDictionary(o => o.HostElementId, o => o);
@@ -83,9 +86,9 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 }
             }
 
-            // Pass 2: 要素間接触面を検出して控除
+            // Pass 2: ReferenceIntersector で接触面を検出して控除
             _progress?.Report("Pass 2: 接触面を検出中...");
-            ContactFaceDetector.RefineContactFaces(contexts);
+            ContactFaceDetector.RefineContactFaces(_doc, _rayView, contexts);
 
             // Pass 3: 開口加算 + ElementResult 作成
             _progress?.Report("Pass 3: 集計中...");
@@ -123,16 +126,18 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             Solid unioned = SolidUnionProcessor.Union(solids);
             var finalSolids = unioned != null ? new List<Solid> { unioned } : solids;
 
-            double minZ = FaceClassifier.GetMinZ(finalSolids);
-            var faceInfos = FaceClassifier.ClassifyAll(finalSolids, glFeet, minZ);
+            var (minZ, maxZ) = FaceClassifier.GetZRange(finalSolids);
+            var faceInfos = FaceClassifier.ClassifyAll(finalSolids, glFeet, minZ, maxZ);
 
+            // 基礎以外の最下面は FormworkRequired として扱う（梁底・柱底等は形枠必要）
+            // 他要素との接触は ContactDetector が個別に検出する
             bool isFoundation = ElementCollector.ToCategoryGroup(elem) == CategoryGroup.Foundation;
             if (!isFoundation)
             {
                 foreach (var fi in faceInfos)
                 {
                     if (fi.FaceType == FaceType.DeductedBottom)
-                        fi.FaceType = FaceType.DeductedContact;
+                        fi.FaceType = FaceType.FormworkRequired;
                 }
             }
 
@@ -200,10 +205,12 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         }
 
         /// <summary>
-        /// 可視化のため、分類後の面を要素IDごとに提供する（可視化サイドで再計算を避ける）。
+        /// 可視化のため、分類後の面を要素IDごとに提供する。
+        /// View3D が必要（ReferenceIntersector のため）。
         /// </summary>
         internal static Dictionary<int, List<FaceClassifier.FaceInfo>> RecomputeFaces(
             Document doc,
+            View3D rayView,
             FormworkResult result,
             FormworkSettings settings)
         {
@@ -212,7 +219,6 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             if (settings.UseGLDeduction)
                 glFeet = UnitUtils.ConvertToInternalUnits(settings.GLElevationMeters, UnitTypeId.Meters);
 
-            // 一括で contexts を再計算し接触検出を同様に適用
             var contexts = new List<ContactFaceDetector.ElementFacesContext>();
             var elements = result.ElementResults
                 .Select(er => doc.GetElement(new ElementId(er.ElementId)))
@@ -224,14 +230,17 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 if (solids.Count == 0) continue;
                 var unioned = SolidUnionProcessor.Union(solids);
                 var final = unioned != null ? new List<Solid> { unioned } : solids;
-                double minZ = FaceClassifier.GetMinZ(final);
-                var faces = FaceClassifier.ClassifyAll(final, glFeet, minZ);
+                var (minZ, maxZ) = FaceClassifier.GetZRange(final);
+                var faces = FaceClassifier.ClassifyAll(final, glFeet, minZ, maxZ);
 
                 bool isFoundation = ElementCollector.ToCategoryGroup(elem) == CategoryGroup.Foundation;
                 if (!isFoundation)
                 {
                     foreach (var f in faces)
-                        if (f.FaceType == FaceType.DeductedBottom) f.FaceType = FaceType.DeductedContact;
+                    {
+                        if (f.FaceType == FaceType.DeductedBottom)
+                            f.FaceType = FaceType.FormworkRequired;
+                    }
                 }
 
                 BoundingBoxXYZ bb = null;
@@ -245,7 +254,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 });
             }
 
-            ContactFaceDetector.RefineContactFaces(contexts);
+            ContactFaceDetector.RefineContactFaces(doc, rayView, contexts);
 
             foreach (var ctx in contexts)
                 map[ctx.ElementId] = ctx.Faces;

@@ -21,6 +21,8 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         internal static List<Element> Collect(Document doc, FormworkSettings settings, View activeView)
         {
             var result = new List<Element>();
+            var seenIds = new HashSet<int>();
+
             foreach (var key in settings.IncludedCategories)
             {
                 if (!_nameToCat.TryGetValue(key, out var bic))
@@ -34,25 +36,49 @@ namespace Tools28.Commands.FormworkCalculator.Engine
 
                 if (bic == BuiltInCategory.OST_Walls)
                 {
+                    // 壁本体のみ（カーテンウォール等は除外）。WallSweep は別途追加する。
                     elems = elems.Where(e =>
                     {
-                        var w = e as Wall;
-                        if (w == null) return false;
+                        if (!(e is Wall w)) return false;
                         var wt = doc.GetElement(w.GetTypeId()) as WallType;
                         if (wt == null) return true;
                         return wt.Function == WallFunction.Retaining ||
                                wt.Kind == WallKind.Basic;
                     }).ToList();
-                }
 
-                result.AddRange(elems);
+                    foreach (var e in elems)
+                    {
+                        if (seenIds.Add(e.Id.IntegerValue)) result.Add(e);
+                    }
+
+                    // 壁スイープ・リビール（独立した WallSweep 要素として存在）も追加
+                    FilteredElementCollector swCol = settings.Scope == CalculationScope.CurrentView
+                        ? new FilteredElementCollector(doc, activeView.Id)
+                        : new FilteredElementCollector(doc);
+                    var sweeps = swCol.OfClass(typeof(WallSweep))
+                        .WhereElementIsNotElementType()
+                        .ToList();
+                    foreach (var sw in sweeps)
+                    {
+                        if (seenIds.Add(sw.Id.IntegerValue)) result.Add(sw);
+                    }
+                }
+                else
+                {
+                    foreach (var e in elems)
+                    {
+                        if (seenIds.Add(e.Id.IntegerValue)) result.Add(e);
+                    }
+                }
             }
             return result;
         }
 
         internal static CategoryGroup ToCategoryGroup(Element elem)
         {
-            if (elem?.Category == null) return CategoryGroup.Other;
+            if (elem == null) return CategoryGroup.Other;
+            if (elem is WallSweep) return CategoryGroup.Wall;
+            if (elem.Category == null) return CategoryGroup.Other;
             switch ((BuiltInCategory)elem.Category.Id.IntegerValue)
             {
                 case BuiltInCategory.OST_StructuralColumns: return CategoryGroup.Column;
