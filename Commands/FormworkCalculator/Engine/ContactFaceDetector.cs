@@ -7,19 +7,15 @@ namespace Tools28.Commands.FormworkCalculator.Engine
     /// <summary>
     /// 要素同士の接触面（結合面）を検出して DeductedContact に変更する。
     ///
-    /// 【アプローチ】
-    ///   1. 各 FormworkRequired 面の中心から "要素の内側" に小さくオフセットした点を origin とする
-    ///   2. origin から法線方向（外向き）に ReferenceIntersector でレイを発射
-    ///   3. 返されるヒットは Proximity 順なので:
-    ///        a. 最初のヒットは自分自身の面 (origin は内側 → 法線方向へ進むと自面に当たる)
-    ///        b. ownId フィルタで自分を除外
-    ///        c. 次のヒットまでの「面の先の距離 (gap)」が閾値以内なら接触
+    /// 【アプローチ】両方向レイキャスティング
+    ///   - 面の中心点から、法線方向の両側 (+normal / -normal) にそれぞれレイを発射
+    ///   - ReferenceIntersector で「自面の先に別要素の面が近接」しているかを確認
+    ///   - どちらかの方向で接触が検出されたら DeductedContact に変更
     ///
-    /// 【なぜ origin を内側にするか】
-    ///   origin を面の外側に置くと、面同士が完全に密着している場合に
-    ///   ReferenceIntersector が自面と隣面の両方を origin より前方と見なせず、
-    ///   代わりに隣要素の「反対側の面」を最初にヒットしてしまう。
-    ///   隣要素が厚いと Proximity が閾値を超えて接触なしと誤判定される。
+    /// 【なぜ両方向か】
+    ///   Boolean Union 後の Solid で、Face.ComputeNormal() が返す法線が
+    ///   必ずしも "外向き" とは限らないため、normal 方向の仮定を外す。
+    ///   接触は片側だけで発生するため、正しい側でのみヒットが発生する。
     /// </summary>
     internal class ContactFaceDetector
     {
@@ -30,9 +26,9 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             public List<FaceClassifier.FaceInfo> Faces = new List<FaceClassifier.FaceInfo>();
         }
 
-        // origin を面の内側に置くオフセット (要素内部側)
+        // 面の反対側に origin を置くオフセット（要素の内部側）
         private const double OriginOffsetInsideFeet = 0.033;  // ≈ 10mm
-        // 自面通過後の gap 許容値 (隙間・モデリング誤差吸収)
+        // 自面通過後の gap 許容値
         private const double MaxGapFeet = 0.16;                // ≈ 50mm
 
         internal static void RefineContactFaces(
@@ -82,37 +78,49 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                     catch { continue; }
                     if (pt == null) continue;
 
-                    // origin を面の内側（要素の中心側）に設定。法線方向に発射すれば
-                    // 先に自面に当たり、さらに先に隣要素があればそれにも当たる。
-                    XYZ origin = pt - fi.Normal * OriginOffsetInsideFeet;
-
-                    bool isContact = false;
-                    try
-                    {
-                        var hits = ri.Find(origin, fi.Normal);
-                        if (hits != null)
-                        {
-                            foreach (var h in hits)
-                            {
-                                var hitId = h.GetReference()?.ElementId;
-                                if (hitId == null || hitId == ownId) continue;
-
-                                // 自面（Proximity ≈ OriginOffsetInsideFeet）を通過してから
-                                // 隣要素までの gap を計算
-                                double gap = h.Proximity - OriginOffsetInsideFeet;
-                                if (gap > MaxGapFeet) break;
-
-                                isContact = true;
-                                break;
-                            }
-                        }
-                    }
-                    catch { }
+                    // 両方向にレイを発射（法線の向きの不確かさを吸収）
+                    bool isContact =
+                        CheckRayDirection(ri, pt, fi.Normal, ownId) ||
+                        CheckRayDirection(ri, pt, -fi.Normal, ownId);
 
                     if (isContact)
                         fi.FaceType = FaceType.DeductedContact;
                 }
             }
+        }
+
+        /// <summary>
+        /// 指定方向にレイを発射して、自面通過後の近接ヒットがあれば接触と判定。
+        /// origin は方向の反対側にオフセットを取る（自面が最初のヒットになるよう）。
+        /// </summary>
+        private static bool CheckRayDirection(
+            ReferenceIntersector ri, XYZ pt, XYZ direction, ElementId ownId)
+        {
+            XYZ origin = pt - direction * OriginOffsetInsideFeet;
+
+            try
+            {
+                var hits = ri.Find(origin, direction);
+                if (hits == null) return false;
+
+                foreach (var h in hits)
+                {
+                    var hitId = h.GetReference()?.ElementId;
+                    if (hitId == null) continue;
+                    if (hitId == ownId) continue;  // 自要素をスキップ
+
+                    // 自面（Proximity ≈ OriginOffsetInsideFeet）を通過してから
+                    // 隣要素までの gap を計算
+                    double gap = h.Proximity - OriginOffsetInsideFeet;
+                    if (gap > MaxGapFeet) return false;
+                    if (gap < -MaxGapFeet) continue;  // 明らかに後方はスキップ
+
+                    return true;
+                }
+            }
+            catch { }
+
+            return false;
         }
     }
 }

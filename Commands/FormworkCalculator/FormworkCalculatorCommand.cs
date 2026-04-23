@@ -222,17 +222,14 @@ namespace Tools28.Commands.FormworkCalculator
         }
 
         /// <summary>
-        /// ReferenceIntersector 用の 3D ビューを取得。既存があればそれを使い、無ければ一時作成。
+        /// ReferenceIntersector 用の 3D ビューを常に新規作成する。
+        /// 既存ビューを流用すると、ビューテンプレート・セクションボックス・
+        /// カテゴリ非表示などでレイキャストが正しく機能しないため、
+        /// 必ず解析専用の一時ビューを使う。
         /// </summary>
         private static View3D FindOrCreateRayView(Document doc, out bool created)
         {
             created = false;
-            var existing = new FilteredElementCollector(doc)
-                .OfClass(typeof(View3D))
-                .Cast<View3D>()
-                .FirstOrDefault(v => !v.IsTemplate && !v.IsPerspective);
-            if (existing != null) return existing;
-
             var vftype = new FilteredElementCollector(doc)
                 .OfClass(typeof(ViewFamilyType))
                 .Cast<ViewFamilyType>()
@@ -241,6 +238,13 @@ namespace Tools28.Commands.FormworkCalculator
 
             var v3d = View3D.CreateIsometric(doc, vftype.Id);
             try { v3d.Name = "Tools28_型枠_RayView_" + DateTime.Now.Ticks; } catch { }
+
+            // ビューテンプレート・セクションボックスを解除し、全カテゴリを可視化
+            try { v3d.ViewTemplateId = ElementId.InvalidElementId; } catch { }
+            try { v3d.IsSectionBoxActive = false; } catch { }
+            try { v3d.DetailLevel = ViewDetailLevel.Fine; } catch { }
+            try { v3d.DisplayStyle = DisplayStyle.Shading; } catch { }
+
             created = true;
             return v3d;
         }

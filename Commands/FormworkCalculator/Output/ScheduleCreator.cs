@@ -8,17 +8,14 @@ namespace Tools28.Commands.FormworkCalculator.Output
     /// <summary>
     /// ViewSchedule を作成して DirectShape に格納した型枠情報を集計表示する。
     ///
-    /// レイアウト:
-    ///   - 対象カテゴリ: OST_GenericModel
-    ///   - フィルタ: 28Tools_FormworkMarker == "28Tools_Formwork"
-    ///   - 列: 部位 / 区分 / タイプ名 / 面積
-    ///   - 部位でグループ化（ヘッダー・フッター表示 → 部位毎の合計行）
-    ///   - 区分で2段目ソート
-    ///   - 総合計表示
-    ///   - IsItemized = true (各行を表示、フッターで合計)
+    /// レイアウト（まとめ表示）:
+    ///   - IsItemized = false → 同じ (部位, 区分, タイプ名) の行をまとめて集計
+    ///   - 列: 件数 / 部位 / 区分 / タイプ名 / 面積(合計)
+    ///   - 部位でグループ化 (ShowHeader + ShowFooter → 部位毎の合計行)
+    ///   - 総合計行を表示
     ///
-    /// フィールド検索は SharedParameterElement の ElementId ベース + 名前ベースの
-    /// ダブルチェックで取りこぼしを防ぐ。
+    /// SchedulableField の検索は SharedParameterElement.Id による ParameterId 一致を
+    /// 優先、見つからなければ名前一致でフォールバック。
     /// </summary>
     internal static class ScheduleCreator
     {
@@ -44,21 +41,17 @@ namespace Tools28.Commands.FormworkCalculator.Output
 
             var def = schedule.Definition;
             var schedulable = def.GetSchedulableFields();
-
-            // 共有パラメータ Id マップを先に取得
             var paramIds = GetFormworkSharedParamIds(doc);
 
-            // 列: 部位 / 区分 / タイプ名 / 面積
-            var partField = AddField(doc, def, schedulable, paramIds,
-                FormworkParameterManager.ParamCategory);
-            var groupField = AddField(doc, def, schedulable, paramIds,
-                FormworkParameterManager.ParamGroupKey);
+            // 列順: 件数 / 部位 / 区分 / タイプ名 / 面積
+            var countField = AddCountField(def, schedulable);
+            var partField = AddField(doc, def, schedulable, paramIds, FormworkParameterManager.ParamCategory);
+            var groupField = AddField(doc, def, schedulable, paramIds, FormworkParameterManager.ParamGroupKey);
             var typeNameField = AddFieldByBip(def, schedulable, BuiltInParameter.ALL_MODEL_TYPE_NAME);
-            var areaField = AddField(doc, def, schedulable, paramIds,
-                FormworkParameterManager.ParamArea);
+            var areaField = AddField(doc, def, schedulable, paramIds, FormworkParameterManager.ParamArea);
+
             // マーカー（非表示、フィルタ用）
-            var markerField = AddField(doc, def, schedulable, paramIds,
-                FormworkParameterManager.ParamMarker);
+            var markerField = AddField(doc, def, schedulable, paramIds, FormworkParameterManager.ParamMarker);
             if (markerField != null)
             {
                 try { markerField.IsHidden = true; } catch { }
@@ -73,7 +66,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 catch { }
             }
 
-            // 部位でグループ化（ヘッダー + フッター → 部位毎の合計行）
+            // 部位でグループ化（ヘッダー + フッター = 部位毎の合計行）
             if (partField != null)
             {
                 try
@@ -83,25 +76,44 @@ namespace Tools28.Commands.FormworkCalculator.Output
                         ShowHeader = true,
                         ShowFooter = true,
                         ShowBlankLine = false,
+                        SortOrder = ScheduleSortOrder.Ascending,
                     };
                     def.AddSortGroupField(sortPart);
                 }
                 catch { }
             }
 
-            // 区分で2段目ソート
+            // 区分でソート（グループ化はしない）
             if (groupField != null)
             {
                 try
                 {
-                    var sortGroup = new ScheduleSortGroupField(groupField.FieldId);
+                    var sortGroup = new ScheduleSortGroupField(groupField.FieldId)
+                    {
+                        SortOrder = ScheduleSortOrder.Ascending,
+                    };
                     def.AddSortGroupField(sortGroup);
                 }
                 catch { }
             }
 
-            // 総合計
-            try { def.IsItemized = true; } catch { }
+            // タイプ名でソート
+            if (typeNameField != null)
+            {
+                try
+                {
+                    var sortType = new ScheduleSortGroupField(typeNameField.FieldId)
+                    {
+                        SortOrder = ScheduleSortOrder.Ascending,
+                    };
+                    def.AddSortGroupField(sortType);
+                }
+                catch { }
+            }
+
+            // まとめ表示: IsItemized = false → (部位, 区分, タイプ名) が同じ行をまとめる
+            // Count と Area は自動で合計される
+            try { def.IsItemized = false; } catch { }
             try { def.ShowGrandTotal = true; } catch { }
 
             return schedule.Id;
@@ -121,10 +133,6 @@ namespace Tools28.Commands.FormworkCalculator.Output
             }
         }
 
-        /// <summary>
-        /// 型枠用共有パラメータの名前 → ElementId マップを取得。
-        /// SchedulableField.ParameterId で確実にフィールドを特定するため。
-        /// </summary>
         private static Dictionary<string, ElementId> GetFormworkSharedParamIds(Document doc)
         {
             var map = new Dictionary<string, ElementId>();
@@ -135,7 +143,6 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 FormworkParameterManager.ParamGroupKey,
                 FormworkParameterManager.ParamArea,
             };
-
             try
             {
                 var shared = new FilteredElementCollector(doc)
@@ -151,13 +158,9 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 }
             }
             catch { }
-
             return map;
         }
 
-        /// <summary>
-        /// ParameterId 一致を優先し、無ければ名前一致で SchedulableField を追加。
-        /// </summary>
         private static ScheduleField AddField(
             Document doc,
             ScheduleDefinition def,
@@ -171,7 +174,6 @@ namespace Tools28.Commands.FormworkCalculator.Output
             {
                 sf = schedulable.FirstOrDefault(f => f.ParameterId == pid);
             }
-
             if (sf == null)
             {
                 sf = schedulable.FirstOrDefault(f =>
@@ -180,7 +182,6 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     catch { return false; }
                 });
             }
-
             if (sf == null) return null;
             try { return def.AddField(sf); } catch { return null; }
         }
@@ -191,6 +192,15 @@ namespace Tools28.Commands.FormworkCalculator.Output
             BuiltInParameter bip)
         {
             var sf = schedulable.FirstOrDefault(f => f.ParameterId == new ElementId(bip));
+            if (sf == null) return null;
+            try { return def.AddField(sf); } catch { return null; }
+        }
+
+        private static ScheduleField AddCountField(
+            ScheduleDefinition def,
+            IList<SchedulableField> schedulable)
+        {
+            var sf = schedulable.FirstOrDefault(f => f.FieldType == ScheduleFieldType.Count);
             if (sf == null) return null;
             try { return def.AddField(sf); } catch { return null; }
         }
