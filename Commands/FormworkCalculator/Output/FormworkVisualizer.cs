@@ -47,7 +47,8 @@ namespace Tools28.Commands.FormworkCalculator.Output
         internal static VisualizerResult CreateVisualization(
             Document doc,
             FormworkResult result,
-            FormworkSettings settings)
+            FormworkSettings settings,
+            View3D rayView)
         {
             var vr = new VisualizerResult();
 
@@ -67,14 +68,18 @@ namespace Tools28.Commands.FormworkCalculator.Output
             try { view.Name = AnalysisViewName; } catch { }
             vr.AnalysisView = view;
 
+            // ReferenceIntersector 用 rayView は制限無しを使う（analysis view はセクション
+            // ボックスがあるため使わない）。呼び出し元が rayView を与える前提。
+            var effectiveRayView = rayView ?? view;
+
+            // 接触検出込みで面を再計算（制限無しの rayView を使って正確にヒット判定）
+            var facesByElement = FormworkCalcEngine.RecomputeFaces(doc, effectiveRayView, result, settings);
+
             // セクションボックスを有効化（要素全体を含むよう自動フィット）
             EnableSectionBox(doc, view, result);
 
             // 元躯体要素を 20% 透過 + RGB(94,94,94) で表示
             ApplySourceElementAppearance(doc, view, result);
-
-            // 接触検出込みで面を再計算（このビューを ReferenceIntersector の rayView として使用）
-            var facesByElement = FormworkCalcEngine.RecomputeFaces(doc, view, result, settings);
 
             // 分類キーに基づく色割当
             var keyAssignment = AssignColors(result, settings);
@@ -111,6 +116,15 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 catLabelByKey.TryGetValue(key, out var catLabel);
                 catLabel = catLabel ?? CategoryLabel(er.Category);
 
+                // 要素のレベル名を取得
+                string levelName = string.Empty;
+                try
+                {
+                    var srcElem = doc.GetElement(new ElementId(er.ElementId));
+                    levelName = Engine.ElementCollector.GetElementLevelName(srcElem);
+                }
+                catch { }
+
                 foreach (var fi in faces)
                 {
                     bool visible =
@@ -139,7 +153,8 @@ namespace Tools28.Commands.FormworkCalculator.Output
                         {
                             double areaM2 = UnitUtils.ConvertFromInternalUnits(fi.Area, UnitTypeId.SquareMeters);
                             string filterKey = IsDeducted(fi.FaceType) ? "控除面" : key;
-                            FormworkParameterManager.SetInstanceValues(ds, catLabel, filterKey, areaM2);
+                            FormworkParameterManager.SetInstanceValues(
+                                ds, catLabel, levelName, filterKey, areaM2);
                         }
                         catch { }
 

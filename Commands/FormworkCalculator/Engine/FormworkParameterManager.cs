@@ -14,6 +14,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
     {
         public const string ParamMarker = "28Tools_FormworkMarker";   // 識別用マーカー（"28Tools_Formwork" を書き込む）
         public const string ParamCategory = "28Tools_Formwork_部位";   // 柱 / 梁 / 壁 / ...
+        public const string ParamLevel = "28Tools_Formwork_レベル";    // 参照レベル名
         public const string ParamGroupKey = "28Tools_Formwork_区分";   // 部位 or 工区 or 型枠種別の値
         public const string ParamArea = "28Tools_Formwork_面積";       // 面積（㎡, Length^2）
 
@@ -49,6 +50,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
 
                 CreateAndBindText(defGroup, bindingMap, binding, ParamMarker);
                 CreateAndBindText(defGroup, bindingMap, binding, ParamCategory);
+                CreateAndBindText(defGroup, bindingMap, binding, ParamLevel);
                 CreateAndBindText(defGroup, bindingMap, binding, ParamGroupKey);
                 CreateAndBindArea(defGroup, bindingMap, binding, ParamArea);
             }
@@ -59,10 +61,11 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         }
 
         internal static void SetInstanceValues(
-            Element ds, string categoryLabel, string groupKey, double areaM2)
+            Element ds, string categoryLabel, string levelName, string groupKey, double areaM2)
         {
             SetString(ds, ParamMarker, MarkerValue);
             SetString(ds, ParamCategory, categoryLabel ?? string.Empty);
+            SetString(ds, ParamLevel, levelName ?? string.Empty);
             SetString(ds, ParamGroupKey, groupKey ?? string.Empty);
 
             double feetSq = UnitUtils.ConvertToInternalUnits(areaM2, UnitTypeId.SquareMeters);
@@ -73,16 +76,17 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         {
             var map = doc.ParameterBindings;
             var it = map.ForwardIterator();
-            bool m = false, c = false, g = false, a = false;
+            bool m = false, c = false, l = false, g = false, a = false;
             while (it.MoveNext())
             {
                 var name = it.Key.Name;
                 if (name == ParamMarker) m = true;
                 else if (name == ParamCategory) c = true;
+                else if (name == ParamLevel) l = true;
                 else if (name == ParamGroupKey) g = true;
                 else if (name == ParamArea) a = true;
             }
-            return m && c && g && a;
+            return m && c && l && g && a;
         }
 
         private static string GetSharedParamFilePath()

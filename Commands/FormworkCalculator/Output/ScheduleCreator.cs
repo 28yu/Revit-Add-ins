@@ -8,14 +8,14 @@ namespace Tools28.Commands.FormworkCalculator.Output
     /// <summary>
     /// ViewSchedule を作成して DirectShape に格納した型枠情報を集計表示する。
     ///
-    /// レイアウト（まとめ表示）:
-    ///   - IsItemized = false → 同じ (部位, 区分, タイプ名) の行をまとめて集計
-    ///   - 列: 件数 / 部位 / 区分 / タイプ名 / 面積(合計)
-    ///   - 部位でグループ化 (ShowHeader + ShowFooter → 部位毎の合計行)
+    /// レイアウト（グループ化集計表示）:
+    ///   - IsItemized = false → 同じ (レベル, 部位, タイプ名, 区分) の行をまとめて集計
+    ///   - 列: 件数 / レベル / 部位 / タイプ名 / 区分 / 面積(合計)
+    ///   - 階層グループ化 (ShowHeader + ShowFooter で各階層に合計行):
+    ///       1段目: レベル  (参照レベル毎)
+    ///       2段目: 部位    (カテゴリ毎)
+    ///       3段目: タイプ名 (タイプ毎)
     ///   - 総合計行を表示
-    ///
-    /// SchedulableField の検索は SharedParameterElement.Id による ParameterId 一致を
-    /// 優先、見つからなければ名前一致でフォールバック。
     /// </summary>
     internal static class ScheduleCreator
     {
@@ -43,11 +43,12 @@ namespace Tools28.Commands.FormworkCalculator.Output
             var schedulable = def.GetSchedulableFields();
             var paramIds = GetFormworkSharedParamIds(doc);
 
-            // 列順: 件数 / 部位 / 区分 / タイプ名 / 面積
+            // 列順: 件数 / レベル / 部位 / タイプ名 / 区分 / 面積
             var countField = AddCountField(def, schedulable);
+            var levelField = AddField(doc, def, schedulable, paramIds, FormworkParameterManager.ParamLevel);
             var partField = AddField(doc, def, schedulable, paramIds, FormworkParameterManager.ParamCategory);
-            var groupField = AddField(doc, def, schedulable, paramIds, FormworkParameterManager.ParamGroupKey);
             var typeNameField = AddFieldByBip(def, schedulable, BuiltInParameter.ALL_MODEL_TYPE_NAME);
+            var groupField = AddField(doc, def, schedulable, paramIds, FormworkParameterManager.ParamGroupKey);
             var areaField = AddField(doc, def, schedulable, paramIds, FormworkParameterManager.ParamArea);
 
             // マーカー（非表示、フィルタ用）
@@ -66,24 +67,12 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 catch { }
             }
 
-            // 部位でグループ化（ヘッダー + フッター = 部位毎の合計行）
-            if (partField != null)
-            {
-                try
-                {
-                    var sortPart = new ScheduleSortGroupField(partField.FieldId)
-                    {
-                        ShowHeader = true,
-                        ShowFooter = true,
-                        ShowBlankLine = false,
-                        SortOrder = ScheduleSortOrder.Ascending,
-                    };
-                    def.AddSortGroupField(sortPart);
-                }
-                catch { }
-            }
+            // 階層グループ化: レベル → 部位 → タイプ名（各階層にヘッダー・フッター）
+            AddGroupField(def, levelField);
+            AddGroupField(def, partField);
+            AddGroupField(def, typeNameField);
 
-            // 区分でソート（グループ化はしない）
+            // 区分はソートのみ（小計行は出さない）
             if (groupField != null)
             {
                 try
@@ -97,26 +86,31 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 catch { }
             }
 
-            // タイプ名でソート
-            if (typeNameField != null)
-            {
-                try
-                {
-                    var sortType = new ScheduleSortGroupField(typeNameField.FieldId)
-                    {
-                        SortOrder = ScheduleSortOrder.Ascending,
-                    };
-                    def.AddSortGroupField(sortType);
-                }
-                catch { }
-            }
-
-            // まとめ表示: IsItemized = false → (部位, 区分, タイプ名) が同じ行をまとめる
-            // Count と Area は自動で合計される
+            // まとめ表示と総合計
             try { def.IsItemized = false; } catch { }
             try { def.ShowGrandTotal = true; } catch { }
 
             return schedule.Id;
+        }
+
+        /// <summary>
+        /// グループフィールドとして追加（ヘッダー + フッター付き）。
+        /// </summary>
+        private static void AddGroupField(ScheduleDefinition def, ScheduleField field)
+        {
+            if (field == null) return;
+            try
+            {
+                var sort = new ScheduleSortGroupField(field.FieldId)
+                {
+                    ShowHeader = true,
+                    ShowFooter = true,
+                    ShowBlankLine = false,
+                    SortOrder = ScheduleSortOrder.Ascending,
+                };
+                def.AddSortGroupField(sort);
+            }
+            catch { }
         }
 
         private static void DeleteScheduleByName(Document doc, string name)
@@ -140,6 +134,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
             {
                 FormworkParameterManager.ParamMarker,
                 FormworkParameterManager.ParamCategory,
+                FormworkParameterManager.ParamLevel,
                 FormworkParameterManager.ParamGroupKey,
                 FormworkParameterManager.ParamArea,
             };

@@ -91,6 +91,61 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             }
         }
 
+        /// <summary>
+        /// 要素の関連レベル名を取得する（スラブ・壁・柱・梁など各カテゴリを個別に対応）。
+        /// 見つからない場合は空文字を返す。
+        /// </summary>
+        internal static string GetElementLevelName(Element elem)
+        {
+            if (elem == null) return string.Empty;
+            var doc = elem.Document;
+
+            ElementId levelId = null;
+            try
+            {
+                // 要素型固有のプロパティ
+                if (elem is Wall w) levelId = w.LevelId;
+                else if (elem is Floor floor) levelId = floor.LevelId;
+                else if (elem.LevelId != null && elem.LevelId != ElementId.InvalidElementId)
+                    levelId = elem.LevelId;
+            }
+            catch { }
+
+            if (levelId == null || levelId == ElementId.InvalidElementId)
+            {
+                // 代表的なパラメータから取得
+                var candidates = new[]
+                {
+                    BuiltInParameter.LEVEL_PARAM,
+                    BuiltInParameter.FAMILY_LEVEL_PARAM,
+                    BuiltInParameter.SCHEDULE_LEVEL_PARAM,
+                    BuiltInParameter.INSTANCE_REFERENCE_LEVEL_PARAM,
+                    BuiltInParameter.FAMILY_BASE_LEVEL_PARAM,
+                };
+                foreach (var bip in candidates)
+                {
+                    try
+                    {
+                        var p = elem.get_Parameter(bip);
+                        if (p != null && p.HasValue && p.StorageType == StorageType.ElementId)
+                        {
+                            var id = p.AsElementId();
+                            if (id != null && id != ElementId.InvalidElementId)
+                            {
+                                levelId = id;
+                                break;
+                            }
+                        }
+                    }
+                    catch { }
+                }
+            }
+
+            if (levelId == null || levelId == ElementId.InvalidElementId) return string.Empty;
+            var level = doc.GetElement(levelId) as Level;
+            return level?.Name ?? string.Empty;
+        }
+
         internal static string GetParameterString(Element elem, string paramName)
         {
             if (elem == null || string.IsNullOrEmpty(paramName)) return string.Empty;
