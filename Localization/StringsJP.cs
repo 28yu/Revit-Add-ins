@@ -369,7 +369,7 @@ namespace Tools28.Localization
             { "Formwork.ErrorCount", "エラー・注記: {0} 件" },
             { "Formwork.Fatal", "型枠数量算出中に致命的なエラーが発生しました。\n{0}" },
             { "Formwork.ShapesCreated", "型枠面オブジェクト: {0} 個を作成（他ビューでは自動的に非表示）" },
-            { "Formwork.ScheduleCreated", "集計表「型枠数量集計_YYYYMMDD_HHMMSS」を作成しました" },
+            { "Formwork.ScheduleCreated", "集計表「型枠数量集計」を作成しました" },
         };
     }
 }

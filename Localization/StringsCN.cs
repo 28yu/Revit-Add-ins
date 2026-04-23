@@ -369,7 +369,7 @@ namespace Tools28.Localization
             { "Formwork.ErrorCount", "错误·注释: {0} 条" },
             { "Formwork.Fatal", "模板数量计算时发生严重错误。\n{0}" },
             { "Formwork.ShapesCreated", "已创建模板面对象: {0} 个（在其他视图中自动隐藏）" },
-            { "Formwork.ScheduleCreated", "已创建明细表「模板数量汇总_YYYYMMDD_HHMMSS」" },
+            { "Formwork.ScheduleCreated", "已创建明细表「模板数量汇总」" },
         };
     }
 }

@@ -42,7 +42,7 @@ namespace Tools28.Commands.FormworkCalculator
                     {
                         Title = Loc.S("Formwork.SaveExcelTitle"),
                         Filter = "Excel Workbook (*.xlsx)|*.xlsx",
-                        FileName = $"FormworkQuantity_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx",
+                        FileName = "型枠数量集計.xlsx",
                     })
                     {
                         if (sfd.ShowDialog() != WinFormsDialogResult.OK)

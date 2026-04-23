@@ -11,10 +11,12 @@ namespace Tools28.Commands.FormworkCalculator.Output
     /// 型枠面を DirectShape として作成し、View Filter で色分けする。
     /// - 分類キー毎に DirectShapeType を作成（名前で識別可能）
     /// - 色付けは View Filter ベース（ユーザーが実行後に編集可能）
-    /// - 元の躯体要素の表示はそのまま（半透明等のオーバーライドは入れない）
+    /// - 元の躯体要素は 20% 透過 + RGB(94,94,94) で落ち着いて表示
+    /// - ビュー名から日時を省略（同名が存在する場合は削除してから再作成）
     /// </summary>
     internal static class FormworkVisualizer
     {
+        internal const string AnalysisViewName = "型枠分析";
         internal class VisualizerResult
         {
             public View3D AnalysisView;
@@ -49,6 +51,12 @@ namespace Tools28.Commands.FormworkCalculator.Output
         {
             var vr = new VisualizerResult();
 
+            // 既存の同名ビューを削除
+            DeleteViewByName(doc, AnalysisViewName);
+
+            // 既存の型枠 DirectShape を削除（再実行時の累積を防ぐ）
+            CleanupExistingFormworkShapes(doc);
+
             var view3DType = new FilteredElementCollector(doc)
                 .OfClass(typeof(ViewFamilyType))
                 .Cast<ViewFamilyType>()
@@ -56,9 +64,11 @@ namespace Tools28.Commands.FormworkCalculator.Output
             if (view3DType == null) return vr;
 
             var view = View3D.CreateIsometric(doc, view3DType.Id);
-            string viewName = $"型枠分析_{DateTime.Now:yyyyMMdd_HHmmss}";
-            try { view.Name = viewName; } catch { }
+            try { view.Name = AnalysisViewName; } catch { }
             vr.AnalysisView = view;
+
+            // 元躯体要素を 20% 透過 + RGB(94,94,94) で表示
+            ApplySourceElementAppearance(doc, view, result);
 
             // 接触検出込みで面を再計算
             var facesByElement = FormworkCalcEngine.RecomputeFaces(doc, result, settings);
@@ -261,6 +271,108 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 i++;
             }
             return map;
+        }
+
+        /// <summary>
+        /// 28Tools_FormworkMarker パラメータに "28Tools_Formwork" 値を持つ
+        /// 既存 DirectShape を全て削除する（再実行時の累積を防ぐ）。
+        /// </summary>
+        private static void CleanupExistingFormworkShapes(Document doc)
+        {
+            var toDelete = new List<ElementId>();
+            var collector = new FilteredElementCollector(doc)
+                .OfClass(typeof(DirectShape))
+                .OfCategory(BuiltInCategory.OST_GenericModel);
+            foreach (Element e in collector)
+            {
+                try
+                {
+                    var p = e.LookupParameter(FormworkParameterManager.ParamMarker);
+                    if (p != null && p.StorageType == StorageType.String &&
+                        p.AsString() == FormworkParameterManager.MarkerValue)
+                    {
+                        toDelete.Add(e.Id);
+                    }
+                }
+                catch { }
+            }
+            foreach (var id in toDelete)
+            {
+                try { doc.Delete(id); } catch { }
+            }
+        }
+
+        /// <summary>
+        /// 指定名のビューが既に存在すれば削除する（再実行時の衝突を回避）。
+        /// </summary>
+        private static void DeleteViewByName(Document doc, string name)
+        {
+            var existing = new FilteredElementCollector(doc)
+                .OfClass(typeof(View))
+                .Cast<View>()
+                .Where(v => !v.IsTemplate && v.Name == name)
+                .Select(v => v.Id)
+                .ToList();
+            foreach (var id in existing)
+            {
+                try { doc.Delete(id); } catch { }
+            }
+        }
+
+        /// <summary>
+        /// 元躯体要素を落ち着いた灰色 (RGB 94,94,94) + 20% 透過で表示。
+        /// 塗潰しパターンが無い場合でもサーフェスの色味は設定される。
+        /// </summary>
+        private static void ApplySourceElementAppearance(Document doc, View3D view, FormworkResult result)
+        {
+            try
+            {
+                var gray = new Color(94, 94, 94);
+                var ogs = new OverrideGraphicSettings();
+                ogs.SetSurfaceTransparency(20);
+                ogs.SetSurfaceForegroundPatternColor(gray);
+                ogs.SetSurfaceBackgroundPatternColor(gray);
+                ogs.SetProjectionLineColor(gray);
+
+                ElementId solidFillId = GetDraftingSolidFillPatternId(doc);
+                if (solidFillId != null && solidFillId != ElementId.InvalidElementId)
+                {
+                    ogs.SetSurfaceForegroundPatternId(solidFillId);
+                    ogs.SetSurfaceForegroundPatternVisible(true);
+                }
+
+                foreach (var er in result.ElementResults)
+                {
+                    try
+                    {
+                        var id = new ElementId(er.ElementId);
+                        if (doc.GetElement(id) != null)
+                            view.SetElementOverrides(id, ogs);
+                    }
+                    catch { }
+                }
+            }
+            catch { }
+        }
+
+        private static ElementId GetDraftingSolidFillPatternId(Document doc)
+        {
+            var fps = new FilteredElementCollector(doc)
+                .OfClass(typeof(FillPatternElement))
+                .Cast<FillPatternElement>();
+            foreach (var fp in fps)
+            {
+                var p = fp.GetFillPattern();
+                if (p == null) continue;
+                if (p.IsSolidFill && p.Target == FillPatternTarget.Drafting) return fp.Id;
+            }
+            foreach (var fp in fps)
+            {
+                var p = fp.GetFillPattern();
+                if (p == null) continue;
+                if (p.IsSolidFill) return fp.Id;
+            }
+            return ElementId.InvalidElementId;
         }
 
         private static Solid CreateThinSolidFromFace(FaceClassifier.FaceInfo fi)
