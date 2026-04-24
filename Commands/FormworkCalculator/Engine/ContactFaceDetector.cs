@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Autodesk.Revit.DB;
 using Tools28.Commands.FormworkCalculator.Models;
@@ -7,15 +8,25 @@ namespace Tools28.Commands.FormworkCalculator.Engine
     /// <summary>
     /// 要素同士の接触面（結合面）を検出して DeductedContact に変更する。
     ///
-    /// 【アプローチ】両方向レイキャスティング
-    ///   - 面の中心点から、法線方向の両側 (+normal / -normal) にそれぞれレイを発射
-    ///   - ReferenceIntersector で「自面の先に別要素の面が近接」しているかを確認
-    ///   - どちらかの方向で接触が検出されたら DeductedContact に変更
+    /// 【アプローチ】直接幾何検査（ReferenceIntersector に依存しない）
+    ///   BoundingBox が重なる要素ペアで、以下の条件を全て満たす場合に接触:
+    ///     1. 法線が反平行 (a.N · b.N < -0.9)
+    ///     2. 面積比 a ≤ b × 1.5
+    ///        (a が b より大きすぎる場合は「大面積主壁の側面」なので除外)
+    ///     3. 面 a の中心点 pt が面 b に perpendicular distance ≤ tol で投影できる
+    ///     4. 投影点の UV が面 b の UV bounds 内部にある (境界上ではない)
     ///
-    /// 【なぜ両方向か】
-    ///   Boolean Union 後の Solid で、Face.ComputeNormal() が返す法線が
-    ///   必ずしも "外向き" とは限らないため、normal 方向の仮定を外す。
-    ///   接触は片側だけで発生するため、正しい側でのみヒットが発生する。
+    /// 【なぜ ReferenceIntersector を使わないか】
+    ///   ReferenceIntersector は View3D の可視性制約やセクション・テンプレートに
+    ///   依存し、密着面（Proximity ≈ 0）の検出が不安定。直接幾何検査は Revit の
+    ///   ビュー状態に依存せず決定論的に動作する。
+    ///
+    /// 【判定が期待通りに動くケース】
+    ///   - 壁 T 字結合: 端面（小）center は相手側面（大）上 → Contact
+    ///     相手側面（大）center は端面（小）の外 → 非 Contact (主壁側面を残す)
+    ///   - 梁柱取り合い: 梁端面（小）center は柱側面（大）上 → Contact
+    ///   - 基礎上のフレーム: 梁底（小）center は基礎上面（大）上 → Contact
+    ///   - スラブ結合: 端面同士 center が相互の面上 → 両方 Contact
     /// </summary>
     internal class ContactFaceDetector
     {
@@ -26,101 +37,117 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             public List<FaceClassifier.FaceInfo> Faces = new List<FaceClassifier.FaceInfo>();
         }
 
-        // 面の反対側に origin を置くオフセット（要素の内部側）
-        private const double OriginOffsetInsideFeet = 0.033;  // ≈ 10mm
-        // 自面通過後の gap 許容値
-        private const double MaxGapFeet = 0.16;                // ≈ 50mm
+        private const double CoincidenceTolFeet = 0.05;   // ≈ 15mm
+        private const double AreaRatioLimit = 1.5;
+        private const double AntiParallelThreshold = -0.90;  // cos ≤ -0.9 (≈ 155°)
 
-        internal static void RefineContactFaces(
-            Document doc,
-            View3D rayView,
-            List<ElementFacesContext> contexts)
+        internal static void RefineContactFaces(List<ElementFacesContext> contexts)
         {
-            if (rayView == null) return;
-
-            var bicList = new List<BuiltInCategory>
+            int n = contexts.Count;
+            for (int i = 0; i < n; i++)
             {
-                BuiltInCategory.OST_Walls,
-                BuiltInCategory.OST_StructuralColumns,
-                BuiltInCategory.OST_StructuralFraming,
-                BuiltInCategory.OST_Floors,
-                BuiltInCategory.OST_StructuralFoundation,
-                BuiltInCategory.OST_Stairs,
-            };
-            var multiCatFilter = new ElementMulticategoryFilter(bicList);
-
-            ReferenceIntersector ri;
-            try
-            {
-                ri = new ReferenceIntersector(multiCatFilter, FindReferenceTarget.Face, rayView);
-                ri.FindReferencesInRevitLinks = false;
-            }
-            catch
-            {
-                return;
-            }
-
-            foreach (var ctx in contexts)
-            {
-                var ownId = new ElementId(ctx.ElementId);
-
-                foreach (var fi in ctx.Faces)
+                var ci = contexts[i];
+                if (ci.BB == null) continue;
+                for (int j = 0; j < n; j++)
                 {
-                    if (fi.FaceType != FaceType.FormworkRequired) continue;
-                    if (fi.Normal == null) continue;
+                    if (i == j) continue;
+                    var cj = contexts[j];
+                    if (cj.BB == null) continue;
+                    if (!BBoxesOverlap(ci.BB, cj.BB, CoincidenceTolFeet)) continue;
 
-                    BoundingBoxUV bbA;
-                    try { bbA = fi.Face.GetBoundingBox(); }
-                    catch { continue; }
+                    foreach (var fi in ci.Faces)
+                    {
+                        if (fi.FaceType != FaceType.FormworkRequired) continue;
 
-                    XYZ pt;
-                    try { pt = fi.Face.Evaluate((bbA.Min + bbA.Max) * 0.5); }
-                    catch { continue; }
-                    if (pt == null) continue;
-
-                    // 両方向にレイを発射（法線の向きの不確かさを吸収）
-                    bool isContact =
-                        CheckRayDirection(ri, pt, fi.Normal, ownId) ||
-                        CheckRayDirection(ri, pt, -fi.Normal, ownId);
-
-                    if (isContact)
-                        fi.FaceType = FaceType.DeductedContact;
+                        foreach (var fj in cj.Faces)
+                        {
+                            if (IsFaceCovered(fi, fj))
+                            {
+                                fi.FaceType = FaceType.DeductedContact;
+                                break;
+                            }
+                        }
+                    }
                 }
             }
         }
 
-        /// <summary>
-        /// 指定方向にレイを発射して、自面通過後の近接ヒットがあれば接触と判定。
-        /// origin は方向の反対側にオフセットを取る（自面が最初のヒットになるよう）。
-        /// </summary>
-        private static bool CheckRayDirection(
-            ReferenceIntersector ri, XYZ pt, XYZ direction, ElementId ownId)
+        private static bool BBoxesOverlap(BoundingBoxXYZ a, BoundingBoxXYZ b, double tol)
         {
-            XYZ origin = pt - direction * OriginOffsetInsideFeet;
+            return a.Min.X - tol <= b.Max.X && b.Min.X - tol <= a.Max.X
+                && a.Min.Y - tol <= b.Max.Y && b.Min.Y - tol <= a.Max.Y
+                && a.Min.Z - tol <= b.Max.Z && b.Min.Z - tol <= a.Max.Z;
+        }
 
+        /// <summary>
+        /// 面 a が面 b によって「覆われている」（中心が面 b 内部にある）かを判定。
+        /// </summary>
+        private static bool IsFaceCovered(FaceClassifier.FaceInfo a, FaceClassifier.FaceInfo b)
+        {
+            if (a?.Face == null || b?.Face == null) return false;
+            if (a.Normal == null || b.Normal == null) return false;
+
+            // 条件 1: 反平行
+            double dot = a.Normal.DotProduct(b.Normal);
+            if (dot > AntiParallelThreshold) return false;
+
+            // 条件 2: 面積比
+            double aArea = 0, bArea = 0;
+            try { aArea = a.Face.Area; bArea = b.Face.Area; } catch { }
+            if (aArea <= 1e-6 || bArea <= 1e-6) return false;
+            if (aArea > bArea * AreaRatioLimit) return false;
+
+            // 面 a の中心点
+            BoundingBoxUV bbA;
+            try { bbA = a.Face.GetBoundingBox(); }
+            catch { return false; }
+
+            XYZ pA;
+            try { pA = a.Face.Evaluate((bbA.Min + bbA.Max) * 0.5); }
+            catch { return false; }
+            if (pA == null) return false;
+
+            // 条件 3: 面 a 中心点を面 b に投影し、距離が tol 以内
+            IntersectionResult proj;
+            try { proj = b.Face.Project(pA); }
+            catch { return false; }
+            if (proj == null) return false;
+            if (proj.Distance > CoincidenceTolFeet) return false;
+
+            // 条件 4: 投影先 UV が面 b の UV 範囲の内部にある（境界のすぐ外ではない）
+            // Face.Project は「面上の最近点」を返すため、面 a 中心が面 b の外にある場合
+            // UV が面 b の境界上に落ちる。境界から十分内側にあることを確認する。
             try
             {
-                var hits = ri.Find(origin, direction);
-                if (hits == null) return false;
+                var uv = proj.UVPoint;
+                if (uv == null) return false;
+                BoundingBoxUV bbB;
+                try { bbB = b.Face.GetBoundingBox(); }
+                catch { return false; }
 
-                foreach (var h in hits)
-                {
-                    var hitId = h.GetReference()?.ElementId;
-                    if (hitId == null) continue;
-                    if (hitId == ownId) continue;  // 自要素をスキップ
+                double marginU = (bbB.Max.U - bbB.Min.U) * 0.01;  // 1% margin
+                double marginV = (bbB.Max.V - bbB.Min.V) * 0.01;
 
-                    // 自面（Proximity ≈ OriginOffsetInsideFeet）を通過してから
-                    // 隣要素までの gap を計算
-                    double gap = h.Proximity - OriginOffsetInsideFeet;
-                    if (gap > MaxGapFeet) return false;
-                    if (gap < -MaxGapFeet) continue;  // 明らかに後方はスキップ
+                if (uv.U < bbB.Min.U - 1e-6) return false;
+                if (uv.U > bbB.Max.U + 1e-6) return false;
+                if (uv.V < bbB.Min.V - 1e-6) return false;
+                if (uv.V > bbB.Max.V + 1e-6) return false;
 
-                    return true;
-                }
+                // 境界から少し内側か? (margin を使って boundary-only のプロジェクションを弾く)
+                bool nearBoundary =
+                    uv.U < bbB.Min.U + marginU ||
+                    uv.U > bbB.Max.U - marginU ||
+                    uv.V < bbB.Min.V + marginV ||
+                    uv.V > bbB.Max.V - marginV;
+
+                // 境界上でも、perpendicular distance が十分小さければ接触と見なす
+                // (faces が同一境界上で密着しているケース)
+                if (nearBoundary && proj.Distance > CoincidenceTolFeet * 0.5)
+                    return false;
             }
-            catch { }
+            catch { return false; }
 
-            return false;
+            return true;
         }
     }
 }

@@ -47,8 +47,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
         internal static VisualizerResult CreateVisualization(
             Document doc,
             FormworkResult result,
-            FormworkSettings settings,
-            View3D rayView)
+            FormworkSettings settings)
         {
             var vr = new VisualizerResult();
 
@@ -68,12 +67,8 @@ namespace Tools28.Commands.FormworkCalculator.Output
             try { view.Name = AnalysisViewName; } catch { }
             vr.AnalysisView = view;
 
-            // ReferenceIntersector 用 rayView は制限無しを使う（analysis view はセクション
-            // ボックスがあるため使わない）。呼び出し元が rayView を与える前提。
-            var effectiveRayView = rayView ?? view;
-
-            // 接触検出込みで面を再計算（制限無しの rayView を使って正確にヒット判定）
-            var facesByElement = FormworkCalcEngine.RecomputeFaces(doc, effectiveRayView, result, settings);
+            // 接触検出込みで面を再計算（幾何学的検査なので rayView 不要）
+            var facesByElement = FormworkCalcEngine.RecomputeFaces(doc, result, settings);
 
             // セクションボックスを有効化（要素全体を含むよう自動フィット）
             EnableSectionBox(doc, view, result);

@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
@@ -52,34 +51,10 @@ namespace Tools28.Commands.FormworkCalculator
                     }
                 }
 
-                // ReferenceIntersector に必要な View3D を確保（既存利用 or 一時作成）
-                View3D rayView = null;
-                bool tempViewCreated = false;
-                using (var tRayView = new Transaction(doc, "型枠数量算出 - レイビュー確保"))
-                {
-                    tRayView.Start();
-                    try
-                    {
-                        rayView = FindOrCreateRayView(doc, out tempViewCreated);
-                        tRayView.Commit();
-                    }
-                    catch
-                    {
-                        tRayView.RollBack();
-                    }
-                }
-
-                if (rayView == null)
-                {
-                    TaskDialog.Show(Loc.S("Common.Error"),
-                        "ReferenceIntersector 用の 3D ビューを確保できませんでした。");
-                    return Result.Failed;
-                }
-
                 FormworkResult result;
                 try
                 {
-                    var calc = new FormworkCalcEngine(doc, settings, activeView, rayView);
+                    var calc = new FormworkCalcEngine(doc, settings, activeView);
                     result = calc.Run();
                 }
                 catch (Exception ex)
@@ -92,7 +67,6 @@ namespace Tools28.Commands.FormworkCalculator
                 if (result == null || result.ProcessedElementCount == 0)
                 {
                     TaskDialog.Show(Loc.S("Common.Warning"), Loc.S("Formwork.NoElements"));
-                    DeleteTempRayView(doc, rayView, tempViewCreated);
                     return Result.Cancelled;
                 }
 
@@ -136,7 +110,7 @@ namespace Tools28.Commands.FormworkCalculator
                         {
                             if (settings.Create3DView)
                             {
-                                var v3d = FormworkVisualizer.CreateVisualization(doc, result, settings, rayView);
+                                var v3d = FormworkVisualizer.CreateVisualization(doc, result, settings);
                                 if (v3d?.AnalysisView != null)
                                 {
                                     view3DId = v3d.AnalysisView.Id;
@@ -177,9 +151,6 @@ namespace Tools28.Commands.FormworkCalculator
                     }
                 }
 
-                // 一時 rayView を削除（最終 3D ビューを残す）
-                DeleteTempRayView(doc, rayView, tempViewCreated);
-
                 // 自動作成した 3D ビューをアクティブ化
                 if (view3DId != null && view3DId != ElementId.InvalidElementId)
                 {
@@ -218,52 +189,6 @@ namespace Tools28.Commands.FormworkCalculator
                 message = string.Format(Loc.S("Formwork.Fatal"), ex.Message)
                     + "\n\n" + ex.StackTrace;
                 return Result.Failed;
-            }
-        }
-
-        /// <summary>
-        /// ReferenceIntersector 用の 3D ビューを常に新規作成する。
-        /// 既存ビューを流用すると、ビューテンプレート・セクションボックス・
-        /// カテゴリ非表示などでレイキャストが正しく機能しないため、
-        /// 必ず解析専用の一時ビューを使う。
-        /// </summary>
-        private static View3D FindOrCreateRayView(Document doc, out bool created)
-        {
-            created = false;
-            var vftype = new FilteredElementCollector(doc)
-                .OfClass(typeof(ViewFamilyType))
-                .Cast<ViewFamilyType>()
-                .FirstOrDefault(v => v.ViewFamily == ViewFamily.ThreeDimensional);
-            if (vftype == null) return null;
-
-            var v3d = View3D.CreateIsometric(doc, vftype.Id);
-            try { v3d.Name = "Tools28_型枠_RayView_" + DateTime.Now.Ticks; } catch { }
-
-            // ビューテンプレート・セクションボックスを解除し、全カテゴリを可視化
-            try { v3d.ViewTemplateId = ElementId.InvalidElementId; } catch { }
-            try { v3d.IsSectionBoxActive = false; } catch { }
-            try { v3d.DetailLevel = ViewDetailLevel.Fine; } catch { }
-            try { v3d.DisplayStyle = DisplayStyle.Shading; } catch { }
-
-            created = true;
-            return v3d;
-        }
-
-        private static void DeleteTempRayView(Document doc, View3D view, bool wasCreated)
-        {
-            if (!wasCreated || view == null) return;
-            using (var t = new Transaction(doc, "型枠数量算出 - 一時ビュー削除"))
-            {
-                t.Start();
-                try
-                {
-                    doc.Delete(view.Id);
-                    t.Commit();
-                }
-                catch
-                {
-                    t.RollBack();
-                }
             }
         }
     }
