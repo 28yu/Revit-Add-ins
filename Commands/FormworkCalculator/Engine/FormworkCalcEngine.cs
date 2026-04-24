@@ -35,9 +35,23 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         {
             var result = new FormworkResult();
 
+            FormworkDebugLog.Initialize(_settings?.EnableDebugLog == true);
+            try
+            {
+                return RunCore(result);
+            }
+            finally
+            {
+                FormworkDebugLog.Close();
+            }
+        }
+
+        private FormworkResult RunCore(FormworkResult result)
+        {
             _progress?.Report("要素を収集中...");
             var elements = ElementCollector.Collect(_doc, _settings, _activeView);
             result.ProcessedElementCount = elements.Count;
+            FormworkDebugLog.Log($"Collected elements: {elements.Count}");
             if (elements.Count == 0) return result;
 
             double? glFeet = null;
@@ -81,9 +95,15 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 }
             }
 
+            // Pass 1 完了時: 各要素の面分類内訳をログ
+            LogPass1Summary(contexts);
+
             // Pass 2: 幾何学的な直接検査で接触面を検出して控除
             _progress?.Report("Pass 2: 接触面を検出中...");
             ContactFaceDetector.RefineContactFaces(contexts);
+
+            // Pass 2 完了時: 最終 FormworkRequired 面数
+            LogPostPass2Summary(contexts);
 
             // Pass 3: 開口加算 + ElementResult 作成
             _progress?.Report("Pass 3: 集計中...");
@@ -110,6 +130,57 @@ namespace Tools28.Commands.FormworkCalculator.Engine
 
             Aggregate(result);
             return result;
+        }
+
+        private static void LogPass1Summary(List<ContactFaceDetector.ElementFacesContext> contexts)
+        {
+            if (!FormworkDebugLog.Enabled) return;
+            FormworkDebugLog.Section($"Pass 1: Face Classification (elements={contexts.Count})");
+            int totalReq = 0, totalTop = 0, totalBot = 0, totalCon = 0, totalBGL = 0, totalInc = 0, totalErr = 0;
+            foreach (var ctx in contexts)
+            {
+                int req = 0, top = 0, bot = 0, con = 0, bgl = 0, inc = 0, err = 0;
+                foreach (var f in ctx.Faces)
+                {
+                    switch (f.FaceType)
+                    {
+                        case FaceType.FormworkRequired: req++; break;
+                        case FaceType.DeductedTop: top++; break;
+                        case FaceType.DeductedBottom: bot++; break;
+                        case FaceType.DeductedContact: con++; break;
+                        case FaceType.DeductedBelowGL: bgl++; break;
+                        case FaceType.Inclined: inc++; break;
+                        case FaceType.Error: err++; break;
+                    }
+                }
+                totalReq += req; totalTop += top; totalBot += bot; totalCon += con;
+                totalBGL += bgl; totalInc += inc; totalErr += err;
+                FormworkDebugLog.Log(
+                    $"  E{ctx.ElementId} ({ctx.Category}/{ctx.CategoryName}) " +
+                    $"total={ctx.Faces.Count} Req={req} Top={top} Bot={bot} Con={con} BGL={bgl} Inc={inc} Err={err}");
+            }
+            FormworkDebugLog.Log(
+                $"  TOTAL: Req={totalReq} Top={totalTop} Bot={totalBot} Con={totalCon} " +
+                $"BGL={totalBGL} Inc={totalInc} Err={totalErr}");
+            FormworkDebugLog.Flush();
+        }
+
+        private static void LogPostPass2Summary(List<ContactFaceDetector.ElementFacesContext> contexts)
+        {
+            if (!FormworkDebugLog.Enabled) return;
+            int req = 0, con = 0;
+            foreach (var ctx in contexts)
+            {
+                foreach (var f in ctx.Faces)
+                {
+                    if (f.FaceType == FaceType.FormworkRequired) req++;
+                    else if (f.FaceType == FaceType.DeductedContact) con++;
+                }
+            }
+            FormworkDebugLog.Section("Post Pass 2 Totals");
+            FormworkDebugLog.Log($"  FormworkRequired: {req}");
+            FormworkDebugLog.Log($"  DeductedContact:  {con}");
+            FormworkDebugLog.Flush();
         }
 
         private ContactFaceDetector.ElementFacesContext ClassifyElementFaces(
@@ -157,6 +228,8 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             return new ContactFaceDetector.ElementFacesContext
             {
                 ElementId = elem.Id.IntegerValue,
+                Category = ElementCollector.ToCategoryGroup(elem),
+                CategoryName = elem.Category?.Name ?? string.Empty,
                 BB = bb,
                 Faces = faceInfos,
             };
@@ -272,6 +345,8 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 contexts.Add(new ContactFaceDetector.ElementFacesContext
                 {
                     ElementId = elem.Id.IntegerValue,
+                    Category = ElementCollector.ToCategoryGroup(elem),
+                    CategoryName = elem.Category?.Name ?? string.Empty,
                     BB = bb,
                     Faces = faces,
                 });

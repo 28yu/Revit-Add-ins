@@ -35,6 +35,10 @@ namespace Tools28.Commands.FormworkCalculator.Models
         public bool UseGLDeduction { get; set; }
         public double GLElevationMeters { get; set; }
 
+        // デバッグログ出力 (C:\temp\Formwork_debug.txt)
+        // リリース時は false に変更すること
+        public bool EnableDebugLog { get; set; } = true;
+
         public List<string> IncludedCategories { get; set; } = new List<string>
         {
             "StructuralColumns",

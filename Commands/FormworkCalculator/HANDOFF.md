@@ -1,8 +1,28 @@
 # 型枠数量算出アドイン 開発状況ハンドオフ
 
-**最終更新**: 2026-04-23 (コミット `908de62`)
-**ブランチ**: `claude/revit-formwork-addon-SRINI`
+**最終更新**: 2026-04-24 (デバッグログ基盤を追加)
+**ブランチ**: `claude/fix-formwork-contact-exclusion-6ZGi1` (最新)
 **開発用 Revit**: 2022 (`dev-config.json`)
+
+## 🔎 デバッグログ (2026-04-24 追加)
+
+[18]-3 の原因特定のため、`ContactFaceDetector` の全判定を `C:\temp\Formwork_debug.txt` に出力するデバッグログ機構を導入した。
+
+- **フラグ**: `FormworkSettings.EnableDebugLog` (デフォルト `true`)
+- **集約クラス**: `Commands/FormworkCalculator/Engine/FormworkDebugLog.cs`
+  - 実行ごとにファイルをクリア
+  - 行数上限 200,000 行 (超えたら末尾に `... truncated` を追記して停止)
+  - 内部で `lock` 排他制御
+- **出力内容**:
+  - `Pass 1` 完了時: 要素毎の面分類内訳 (`Req/Top/Bot/Con/BGL/Inc/Err`) とカテゴリ合計
+  - `Pass 2`: BBox 重なりのある要素ペアごとに、反平行条件 (cond1) を通った面ペアの詳細
+    - 法線内積 `dot`, 面積 `aArea/bArea`, 中心点 `pA`, 投影距離 `d`, `uv`, `bbB`
+    - 採用/棄却 (`ACCEPTED` / `REJECTED(cond2-area-ratio|cond3-distance|cond4-uv-out-of-bounds|cond4-near-boundary|...)`)
+  - `Pass 2` 完了時: 最終 FormworkRequired 面数, DeductedContact 面数, `contactChanges` 件数
+
+**リリース時は `FormworkSettings.EnableDebugLog = false` に変更すること。** UI には露出していない。
+
+**次のステップ**: ユーザーにテストケース (壁 T 字・梁柱取り合いで miss が出るモデル) で実行してもらい `Formwork_debug.txt` を共有してもらう → 失敗パターン (どの cond で落ちているか or ACCEPTED なのに視覚的には miss か) を特定して的確な修正に進む。
 
 ---
 
