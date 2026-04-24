@@ -130,6 +130,9 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     Solid thin = CreateThinSolidFromFace(fi);
                     if (thin == null) continue;
 
+                    bool faceHasPartialContact =
+                        fi.FaceType == FaceType.FormworkRequired && fi.PartialContacts.Count > 0;
+
                     ElementId dsId = null;
                     try
                     {
@@ -146,10 +149,19 @@ namespace Tools28.Commands.FormworkCalculator.Output
 
                         try
                         {
-                            double areaM2 = UnitUtils.ConvertFromInternalUnits(fi.Area, UnitTypeId.SquareMeters);
+                            // 部分接触面は面積から控除分を引く (DirectShape 形状は面全体だが、
+                            //  パラメータ上の面積は正確な数値に合わせる)
+                            double effectiveFeetSq = fi.Area;
+                            if (faceHasPartialContact)
+                            {
+                                double partial = 0;
+                                foreach (var pc in fi.PartialContacts) partial += pc.ContactArea;
+                                effectiveFeetSq = Math.Max(0, fi.Area - partial);
+                            }
+                            double areaM2 = UnitUtils.ConvertFromInternalUnits(effectiveFeetSq, UnitTypeId.SquareMeters);
                             string filterKey = IsDeducted(fi.FaceType) ? "控除面" : key;
                             FormworkParameterManager.SetInstanceValues(
-                                ds, catLabel, levelName, filterKey, areaM2);
+                                ds, catLabel, levelName, filterKey, areaM2, faceHasPartialContact);
                         }
                         catch { }
 
@@ -157,7 +169,15 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     }
                     catch { continue; }
 
-                    if (dsId != null) vr.CreatedShapeIds.Add(dsId);
+                    if (dsId != null)
+                    {
+                        vr.CreatedShapeIds.Add(dsId);
+                        // 部分接触面は半透明 (50%) で表示してユーザーに視覚的ヒント
+                        if (faceHasPartialContact)
+                        {
+                            try { ApplyPartialContactOverride(view, dsId); } catch { }
+                        }
+                    }
                 }
             }
 
@@ -412,6 +432,17 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 }
             }
             catch { }
+        }
+
+        /// <summary>
+        /// 部分接触がある面の DirectShape を半透明(50%)で表示する。
+        /// View Filter による色分けの上からオーバーライドされる。
+        /// </summary>
+        private static void ApplyPartialContactOverride(View3D view, ElementId dsId)
+        {
+            var ogs = new OverrideGraphicSettings();
+            ogs.SetSurfaceTransparency(50);
+            view.SetElementOverrides(dsId, ogs);
         }
 
         private static ElementId GetDraftingSolidFillPatternId(Document doc)

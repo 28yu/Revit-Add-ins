@@ -27,6 +27,25 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             public XYZ Normal;
             public double Area;
             public FaceType FaceType;
+
+            /// <summary>
+            /// 部分接触の記録。FaceType が FormworkRequired のまま残る面について、
+            /// 他要素の面と部分的に接触している領域を追跡する。
+            /// BuildElementResult で面積を控除するのに使う。
+            /// Phase 2 で視覚化を厳密化する際にも使う。
+            /// </summary>
+            public List<PartialContact> PartialContacts = new List<PartialContact>();
+        }
+
+        /// <summary>
+        /// 部分接触情報。面A (FormworkRequired) の一部が他要素の面B (小面積) に接触している。
+        /// </summary>
+        internal class PartialContact
+        {
+            public int OtherElementId;      // 接触相手の要素ID
+            public int OtherFaceIndex;      // 相手の面インデックス (debug用)
+            public double ContactArea;      // 控除対象の面積 (feet²)
+            public BoundingBoxUV UvBounds;  // A面におけるB投影先のUV範囲（Phase 2用）
         }
 
         internal static List<FaceInfo> ClassifyAll(

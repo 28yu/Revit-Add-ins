@@ -17,6 +17,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         public const string ParamLevel = "28Tools_Formwork_レベル";    // 参照レベル名
         public const string ParamGroupKey = "28Tools_Formwork_区分";   // 部位 or 工区 or 型枠種別の値
         public const string ParamArea = "28Tools_Formwork_面積";       // 面積（㎡, Length^2）
+        public const string ParamPartialContact = "28Tools_Formwork_部分接触"; // "Yes"/"No" - T字結合等で主面の一部が他要素に接触
 
         public const string MarkerValue = "28Tools_Formwork";
 
@@ -53,6 +54,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 CreateAndBindText(defGroup, bindingMap, binding, ParamLevel);
                 CreateAndBindText(defGroup, bindingMap, binding, ParamGroupKey);
                 CreateAndBindArea(defGroup, bindingMap, binding, ParamArea);
+                CreateAndBindText(defGroup, bindingMap, binding, ParamPartialContact);
             }
             finally
             {
@@ -61,7 +63,8 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         }
 
         internal static void SetInstanceValues(
-            Element ds, string categoryLabel, string levelName, string groupKey, double areaM2)
+            Element ds, string categoryLabel, string levelName, string groupKey, double areaM2,
+            bool hasPartialContact = false)
         {
             SetString(ds, ParamMarker, MarkerValue);
             SetString(ds, ParamCategory, categoryLabel ?? string.Empty);
@@ -70,13 +73,15 @@ namespace Tools28.Commands.FormworkCalculator.Engine
 
             double feetSq = UnitUtils.ConvertToInternalUnits(areaM2, UnitTypeId.SquareMeters);
             SetDouble(ds, ParamArea, feetSq);
+
+            SetString(ds, ParamPartialContact, hasPartialContact ? "Yes" : "No");
         }
 
         private static bool IsAllBound(Document doc)
         {
             var map = doc.ParameterBindings;
             var it = map.ForwardIterator();
-            bool m = false, c = false, l = false, g = false, a = false;
+            bool m = false, c = false, l = false, g = false, a = false, p = false;
             while (it.MoveNext())
             {
                 var name = it.Key.Name;
@@ -85,8 +90,9 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 else if (name == ParamLevel) l = true;
                 else if (name == ParamGroupKey) g = true;
                 else if (name == ParamArea) a = true;
+                else if (name == ParamPartialContact) p = true;
             }
-            return m && c && l && g && a;
+            return m && c && l && g && a && p;
         }
 
         private static string GetSharedParamFilePath()

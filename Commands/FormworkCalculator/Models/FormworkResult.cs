@@ -39,6 +39,12 @@ namespace Tools28.Commands.FormworkCalculator.Models
         public double InclinedArea { get; set; }
         public double OpeningAreaDeducted { get; set; }
         public double OpeningEdgeAreaAdded { get; set; }
+
+        /// <summary>
+        /// 部分接触 (T字結合で主面の一部に他要素が当たっている) が存在するか。
+        /// DirectShape のマーカーパラメータや半透明表示の判定に使う。
+        /// </summary>
+        public bool HasPartialContact { get; set; }
     }
 
     public class FaceAnalysisResult

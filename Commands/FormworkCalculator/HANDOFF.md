@@ -1,8 +1,42 @@
 # 型枠数量算出アドイン 開発状況ハンドオフ
 
-**最終更新**: 2026-04-24 (デバッグログ基盤を追加)
+**最終更新**: 2026-04-24 (Phase 1: 部分接触検出 + 空間索引)
 **ブランチ**: `claude/fix-formwork-contact-exclusion-6ZGi1` (最新)
 **開発用 Revit**: 2022 (`dev-config.json`)
+
+## 🆕 Phase 1: 部分接触 + 大規模対応 (2026-04-24)
+
+[18]-3 の根本解決として「面の部分接触」を扱う仕組みを導入した。T字壁結合等で、主面 (大面積) の一部に他要素が当たっているケースを正しく面積控除できる。
+
+### 追加された仕組み
+
+1. **`PartialContact` データ構造** (`FaceClassifier.cs`)
+   - 面が FormworkRequired のまま、部分的に覆われている領域を記録
+   - `OtherElementId`, `OtherFaceIndex`, `ContactArea`, `UvBounds`
+
+2. **`ContactFaceDetector` の2段階判定** (`ContactFaceDetector.cs`)
+   - Stage 1: Full Contact (従来の area-ratio 1.5 以内) → 面全体を `DeductedContact`
+   - Stage 2: Partial Contact (a > b × 1.5 + b が a 内部) → `PartialContacts` に追加、FormworkRequired は維持
+
+3. **`SpatialGrid` 空間索引** (`SpatialGrid.cs`)
+   - 全要素 BB を 3D 格子セルに登録、隣接セルだけ走査
+   - セルサイズ = 全要素対角線長の中央値 × 2 (自動算出)
+   - O(N²) → O(N) 相当になり 500+ 要素対応
+
+4. **面積控除** (`FormworkCalcEngine.BuildElementResult`)
+   - FormworkRequired 面の実効面積 = 元面積 - Σ(PartialContact.ContactArea)
+   - `DeductedContactArea` に部分接触分も集計
+
+5. **共有パラメータ** (`FormworkParameterManager.cs`)
+   - `28Tools_Formwork_部分接触` (Text, "Yes"/"No") を追加
+   - T字接合等で「一部消されている面」を識別可能
+
+6. **半透明表示** (`FormworkVisualizer.cs`)
+   - 部分接触がある面の DirectShape を 50% 透過で視覚的にヒント
+   - `ApplyPartialContactOverride` でビュー単位オーバーライド
+
+### Phase 2 (将来の改善)
+DirectShape の形状自体を厳密化する (部分接触領域を物理的に切り抜く)。`PartialContact.UvBounds` を元に 2D ポリゴンクリッピング → 薄板 Solid 再構築。Phase 1 の数値は既に正確なので、Phase 2 は視覚化の改善のみ。
 
 ## 🔎 デバッグログ (2026-04-24 追加)
 

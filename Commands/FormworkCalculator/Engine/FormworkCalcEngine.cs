@@ -247,7 +247,18 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 double aM2 = FeetSqToM2(fi.Area);
                 switch (fi.FaceType)
                 {
-                    case FaceType.FormworkRequired: formwork += aM2; break;
+                    case FaceType.FormworkRequired:
+                        {
+                            // Phase 1: 部分接触の面積を控除する
+                            double partialContactFeetSq = 0;
+                            foreach (var pc in fi.PartialContacts)
+                                partialContactFeetSq += pc.ContactArea;
+                            double effectiveFeetSq = Math.Max(0, fi.Area - partialContactFeetSq);
+                            formwork += FeetSqToM2(effectiveFeetSq);
+                            // 部分接触分も控除面積として集計に加える
+                            dedContact += FeetSqToM2(partialContactFeetSq);
+                        }
+                        break;
                     case FaceType.DeductedTop: dedTop += aM2; break;
                     case FaceType.DeductedBottom: dedBottom += aM2; break;
                     case FaceType.DeductedContact:
@@ -263,6 +274,13 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 openingDeducted = FeetSqToM2(od.DeductedArea);
                 openingAdded = FeetSqToM2(od.AddedEdgeArea);
                 formwork = Math.Max(0, formwork - openingDeducted + openingAdded);
+            }
+
+            bool hasPartialContact = false;
+            foreach (var fi in ctx.Faces)
+            {
+                if (fi.FaceType == FaceType.FormworkRequired && fi.PartialContacts.Count > 0)
+                { hasPartialContact = true; break; }
             }
 
             return new ElementResult
@@ -284,6 +302,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 InclinedArea = inclined,
                 OpeningAreaDeducted = openingDeducted,
                 OpeningEdgeAreaAdded = openingAdded,
+                HasPartialContact = hasPartialContact,
             };
         }
 
