@@ -107,6 +107,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                                         OtherFaceIndex = fjIdx,
                                         ContactArea = result.ContactArea,
                                         UvBounds = result.UvBounds,
+                                        UvBoundsOnA = result.UvBoundsOnA,
                                     });
                                     partialContactAdded++;
                                 }
@@ -130,7 +131,8 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         {
             public ContactKind Kind;
             public double ContactArea;
-            public BoundingBoxUV UvBounds;
+            public BoundingBoxUV UvBounds;       // B 自身の UV (debug)
+            public BoundingBoxUV UvBoundsOnA;    // A 面上での B の投影 UV (Phase 2 用)
         }
 
         /// <summary>
@@ -265,6 +267,8 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         /// 面 b の中心を面 a に投影して、a 内部に b が「一部として」収まるかを評価する。
         /// 成立するなら面 b の面積を Partial Contact 面積として返す。
         /// (a >> b の前提で、b 全体が a に覆われている想定)
+        ///
+        /// Phase 2 用に、b の 4 隅を a に投影した UV 矩形 (UvBoundsOnA) も算出する。
         /// </summary>
         private static ContactResult EvaluatePartialBToA(
             FaceClassifier.FaceInfo a, FaceClassifier.FaceInfo b, out string reason)
@@ -304,12 +308,60 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             try { bArea = b.Face.Area; } catch { }
             if (bArea <= 1e-6) { reason = "s2-b-area-zero"; return none; }
 
+            // Phase 2: b の 4 隅を a に投影した UV 矩形を算出
+            BoundingBoxUV uvOnA = ProjectBCornersToA(a.Face, b.Face, bbB);
+
             return new ContactResult
             {
                 Kind = ContactKind.Partial,
                 ContactArea = bArea,
-                UvBounds = bbB,   // 将来 Phase 2 で A 側の UV にマップし直す
+                UvBounds = bbB,
+                UvBoundsOnA = uvOnA,
             };
+        }
+
+        /// <summary>
+        /// 面 b の 4 隅 (BoundingBoxUV の 4 隅) を面 a に投影し、
+        /// 投影先 UV を囲む AABB (Axis-Aligned Bounding Box in UV) を返す。
+        /// 投影失敗や全て境界外の場合は null を返す (→ Phase 2 フォールバック)。
+        /// </summary>
+        private static BoundingBoxUV ProjectBCornersToA(Face a, Face b, BoundingBoxUV bbB)
+        {
+            var corners = new UV[]
+            {
+                new UV(bbB.Min.U, bbB.Min.V),
+                new UV(bbB.Max.U, bbB.Min.V),
+                new UV(bbB.Max.U, bbB.Max.V),
+                new UV(bbB.Min.U, bbB.Max.V),
+            };
+
+            double uMin = double.MaxValue, vMin = double.MaxValue;
+            double uMax = double.MinValue, vMax = double.MinValue;
+            int okCount = 0;
+
+            foreach (var c in corners)
+            {
+                XYZ p;
+                try { p = b.Evaluate(c); } catch { continue; }
+                if (p == null) continue;
+
+                IntersectionResult proj;
+                try { proj = a.Project(p); } catch { continue; }
+                if (proj == null || proj.UVPoint == null) continue;
+                if (proj.Distance > CoincidenceTolFeet * 2) continue; // 許容 2倍
+
+                var uv = proj.UVPoint;
+                if (uv.U < uMin) uMin = uv.U;
+                if (uv.V < vMin) vMin = uv.V;
+                if (uv.U > uMax) uMax = uv.U;
+                if (uv.V > vMax) vMax = uv.V;
+                okCount++;
+            }
+
+            if (okCount < 3) return null; // 4隅中 3 つ以上投影できないと信頼性低い
+            if (uMax <= uMin || vMax <= vMin) return null;
+
+            return new BoundingBoxUV(uMin, vMin, uMax, vMax);
         }
 
         private static string Fmt(double v, int decimals)

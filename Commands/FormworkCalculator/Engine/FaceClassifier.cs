@@ -45,7 +45,14 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             public int OtherElementId;      // 接触相手の要素ID
             public int OtherFaceIndex;      // 相手の面インデックス (debug用)
             public double ContactArea;      // 控除対象の面積 (feet²)
-            public BoundingBoxUV UvBounds;  // A面におけるB投影先のUV範囲（Phase 2用）
+            public BoundingBoxUV UvBounds;  // B面におけるB自身のUV範囲 (debug用)
+
+            /// <summary>
+            /// 面A の UV 空間上で、相手面B の投影が占める矩形。
+            /// Phase 2 の DirectShape 厳密化で使用する。
+            /// null の場合は A 上への投影に失敗したことを示す → Phase 2 はフォールバック。
+            /// </summary>
+            public BoundingBoxUV UvBoundsOnA;
         }
 
         internal static List<FaceInfo> ClassifyAll(

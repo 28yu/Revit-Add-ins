@@ -127,56 +127,91 @@ namespace Tools28.Commands.FormworkCalculator.Output
                         (settings.ShowDeductedFaces && IsDeducted(fi.FaceType));
                     if (!visible) continue;
 
-                    Solid thin = CreateThinSolidFromFace(fi);
-                    if (thin == null) continue;
-
                     bool faceHasPartialContact =
                         fi.FaceType == FaceType.FormworkRequired && fi.PartialContacts.Count > 0;
 
-                    ElementId dsId = null;
-                    try
+                    // Phase 2: 部分接触がある面は矩形差分で厳密な形状を作る。
+                    //   Clipper が成功 → 半透明オーバーライドは不要 (形状が既に正確)
+                    //   Clipper が失敗 → 従来通り面全体を作成 + 半透明オーバーライド (Phase 1)
+                    List<Solid> partSolids = null;
+                    bool clipperUsed = false;
+                    if (faceHasPartialContact)
                     {
-                        var catOst = new ElementId(BuiltInCategory.OST_GenericModel);
-                        var ds = DirectShape.CreateElement(doc, catOst);
-                        ds.ApplicationId = "Tools28";
-                        ds.ApplicationDataId = "Formwork";
-                        ds.SetShape(new GeometryObject[] { thin });
-
-                        if (typeId != null && typeId != ElementId.InvalidElementId)
+                        var clip = PartialContactClipper.TryClip(fi);
+                        if (clip.Success && clip.Solids.Count > 0)
                         {
-                            try { ds.SetTypeId(typeId); } catch { }
+                            partSolids = clip.Solids;
+                            clipperUsed = true;
                         }
+                        else
+                        {
+                            FormworkDebugLog.Log(
+                                $"Clipper fallback: E{er.ElementId} face type={fi.FaceType} " +
+                                $"reason={clip.FailReason}");
+                        }
+                    }
 
+                    if (partSolids == null)
+                    {
+                        Solid thin = CreateThinSolidFromFace(fi);
+                        if (thin == null) continue;
+                        partSolids = new List<Solid> { thin };
+                    }
+
+                    // 部分接触面の控除後面積 (DirectShape ひとつに集約する場合用)
+                    double effectiveFeetSq = fi.Area;
+                    if (faceHasPartialContact)
+                    {
+                        double partial = 0;
+                        foreach (var pc in fi.PartialContacts) partial += pc.ContactArea;
+                        effectiveFeetSq = Math.Max(0, fi.Area - partial);
+                    }
+
+                    // 複数 Solid に分割する場合は、全体の面積を Solid 数で均等に配分しない。
+                    // 代わりに最初の DirectShape に控除後面積を全て乗せる (集計側では要素毎に合算される)。
+                    bool firstShape = true;
+                    foreach (var solid in partSolids)
+                    {
+                        ElementId dsId = null;
                         try
                         {
-                            // 部分接触面は面積から控除分を引く (DirectShape 形状は面全体だが、
-                            //  パラメータ上の面積は正確な数値に合わせる)
-                            double effectiveFeetSq = fi.Area;
-                            if (faceHasPartialContact)
+                            var catOst = new ElementId(BuiltInCategory.OST_GenericModel);
+                            var ds = DirectShape.CreateElement(doc, catOst);
+                            ds.ApplicationId = "Tools28";
+                            ds.ApplicationDataId = "Formwork";
+                            ds.SetShape(new GeometryObject[] { solid });
+
+                            if (typeId != null && typeId != ElementId.InvalidElementId)
                             {
-                                double partial = 0;
-                                foreach (var pc in fi.PartialContacts) partial += pc.ContactArea;
-                                effectiveFeetSq = Math.Max(0, fi.Area - partial);
+                                try { ds.SetTypeId(typeId); } catch { }
                             }
-                            double areaM2 = UnitUtils.ConvertFromInternalUnits(effectiveFeetSq, UnitTypeId.SquareMeters);
-                            string filterKey = IsDeducted(fi.FaceType) ? "控除面" : key;
-                            FormworkParameterManager.SetInstanceValues(
-                                ds, catLabel, levelName, filterKey, areaM2, faceHasPartialContact);
+
+                            try
+                            {
+                                double areaM2 = firstShape
+                                    ? UnitUtils.ConvertFromInternalUnits(effectiveFeetSq, UnitTypeId.SquareMeters)
+                                    : 0.0;
+                                string filterKey = IsDeducted(fi.FaceType) ? "控除面" : key;
+                                FormworkParameterManager.SetInstanceValues(
+                                    ds, catLabel, levelName, filterKey, areaM2, faceHasPartialContact);
+                            }
+                            catch { }
+
+                            dsId = ds.Id;
                         }
-                        catch { }
+                        catch { continue; }
 
-                        dsId = ds.Id;
-                    }
-                    catch { continue; }
-
-                    if (dsId != null)
-                    {
-                        vr.CreatedShapeIds.Add(dsId);
-                        // 部分接触面は半透明 (50%) で表示してユーザーに視覚的ヒント
-                        if (faceHasPartialContact)
+                        if (dsId != null)
                         {
-                            try { ApplyPartialContactOverride(view, dsId); } catch { }
+                            vr.CreatedShapeIds.Add(dsId);
+                            // Clipper でクリップ済みなら形状が既に正確なので半透明不要。
+                            // フォールバック時のみ半透明で「一部控除されている」ことを視覚化。
+                            if (faceHasPartialContact && !clipperUsed)
+                            {
+                                try { ApplyPartialContactOverride(view, dsId); } catch { }
+                            }
                         }
+                        firstShape = false;
                     }
                 }
             }

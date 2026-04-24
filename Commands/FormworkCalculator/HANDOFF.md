@@ -35,8 +35,31 @@
    - 部分接触がある面の DirectShape を 50% 透過で視覚的にヒント
    - `ApplyPartialContactOverride` でビュー単位オーバーライド
 
-### Phase 2 (将来の改善)
-DirectShape の形状自体を厳密化する (部分接触領域を物理的に切り抜く)。`PartialContact.UvBounds` を元に 2D ポリゴンクリッピング → 薄板 Solid 再構築。Phase 1 の数値は既に正確なので、Phase 2 は視覚化の改善のみ。
+## 🆕 Phase 2: DirectShape 形状厳密化 (2026-04-24)
+
+Phase 1 の面積控除に加え、DirectShape の形状自体も接触領域を切り抜いた厳密な矩形にする。
+
+### アプローチ: 矩形ベース 2D 差分
+1. 面 A の CurveLoop が軸平行矩形 (壁・梁・柱・スラブの主面で 90%+ のケース) か判定
+2. 各 `PartialContact.UvBoundsOnA` の矩形を順次差分 (最大 4 サブ矩形に分解)
+3. 各サブ矩形から薄板 Solid を構築 → 分割 DirectShape で生成
+
+### ファイル追加/変更
+- `Engine/PartialContactClipper.cs` — 矩形抽出・差分・Solid 構築
+- `Engine/ContactFaceDetector.cs` — B の 4 隅を A に投影した `UvBoundsOnA` を算出
+- `Output/FormworkVisualizer.cs` — Clipper 成功時は分割 DirectShape、失敗時は Phase 1 の半透明フォールバック
+
+### 非対応ケース (フォールバック動作)
+- 開口付き壁 (CurveLoop が穴を含む → 矩形判定で除外)
+- カーブウォール (非対応要件)
+- 非矩形の面 (4 頂点でない、曲線エッジを含む)
+- 投影失敗 (UvBoundsOnA が null)
+
+フォールバック時は Phase 1 の半透明 DirectShape で動作するため、リグレッションしない。
+
+### 面積パラメータの配分
+分割された DirectShape では、**最初の Solid** にのみ控除後面積を乗せ、残りは 0 にする。
+これにより集計表の合計は従来通り要素毎の面積になる (重複加算を避ける)。
 
 ## 🔎 デバッグログ (2026-04-24 追加)
 
