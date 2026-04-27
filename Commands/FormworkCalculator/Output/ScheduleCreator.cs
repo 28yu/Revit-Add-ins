@@ -68,7 +68,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
             // 面積フィールドは「合計を計算」を有効化（最終的にソート・グループ追加後に再設定）
             if (areaField != null)
             {
-                try { areaField.HasTotals = true; } catch (Exception ex) { LogEx("areaField.HasTotals=true (1st)", ex); }
+                TrySetHasTotals(areaField, true);
                 LogField(areaField, "areaField after-set-hastotals-1");
             }
 
@@ -124,7 +124,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     var freshAreaField = def.GetField(areaField.FieldId);
                     if (freshAreaField != null)
                     {
-                        freshAreaField.HasTotals = true;
+                        TrySetHasTotals(freshAreaField, true);
                         LogField(freshAreaField, "freshAreaField after-set-hastotals-2");
                     }
                 }
@@ -159,7 +159,15 @@ namespace Tools28.Commands.FormworkCalculator.Output
             string colHeading = "?";
             bool isCalculated = false;
             bool isHidden = false;
-            try { hasTotalsStr = field.HasTotals.ToString(); } catch { }
+            try
+            {
+                var prop = typeof(ScheduleField).GetProperty(
+                    "HasTotals",
+                    System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                if (prop != null && prop.CanRead)
+                    hasTotalsStr = ((bool)prop.GetValue(field, null)).ToString();
+            }
+            catch { }
             try { fieldType = field.FieldType.ToString(); } catch { }
             try { colHeading = field.ColumnHeading; } catch { }
             try { isCalculated = field.IsCalculatedField; } catch { }
@@ -175,6 +183,28 @@ namespace Tools28.Commands.FormworkCalculator.Output
             FormworkDebugLog.Log($"  [Sched:EX] {action}: {ex.GetType().Name}: {ex.Message}");
         }
 
+        /// <summary>
+        /// ScheduleField.HasTotals プロパティが存在する場合のみ設定する。
+        /// Revit 2021-2023 では存在しない可能性があるため、コンパイル参照を避けてリフレクションで設定。
+        /// </summary>
+        private static bool TrySetHasTotals(ScheduleField field, bool value)
+        {
+            if (field == null) return false;
+            try
+            {
+                var prop = typeof(ScheduleField).GetProperty(
+                    "HasTotals",
+                    System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                if (prop == null || !prop.CanWrite) return false;
+                prop.SetValue(field, value, null);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                LogEx("TrySetHasTotals", ex);
+                return false;
+            }
+        }
 
         /// <summary>
         /// グループフィールドとして追加（ヘッダー + フッター付き）。
