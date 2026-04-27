@@ -47,7 +47,8 @@ namespace Tools28.Commands.FormworkCalculator.Output
         internal static VisualizerResult CreateVisualization(
             Document doc,
             FormworkResult result,
-            FormworkSettings settings)
+            FormworkSettings settings,
+            View sourceView = null)
         {
             var vr = new VisualizerResult();
 
@@ -66,6 +67,9 @@ namespace Tools28.Commands.FormworkCalculator.Output
             var view = View3D.CreateIsometric(doc, view3DType.Id);
             try { view.Name = AnalysisViewName; } catch { }
             vr.AnalysisView = view;
+
+            // ソースが 3D ビューなら視点（カメラの向き）を継承する
+            CopyOrientationIfPossible(sourceView, view);
 
             // 接触検出込みで面を再計算（幾何学的検査なので rayView 不要）
             var facesByElement = FormworkCalcEngine.RecomputeFaces(doc, result, settings);
@@ -342,6 +346,22 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 i++;
             }
             return map;
+        }
+
+        /// <summary>
+        /// ソースビューが 3D ビューの場合、その視点（EyePosition / ForwardDirection / UpDirection）を
+        /// 新しい解析ビューにコピーする。3D ビュー以外の場合は何もしない（既定のアイソメトリックを維持）。
+        /// </summary>
+        private static void CopyOrientationIfPossible(View sourceView, View3D targetView)
+        {
+            if (!(sourceView is View3D src) || targetView == null) return;
+            try
+            {
+                var orient = src.GetOrientation();
+                if (orient != null)
+                    targetView.SetOrientation(orient);
+            }
+            catch { }
         }
 
         /// <summary>

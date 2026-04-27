@@ -110,7 +110,7 @@ namespace Tools28.Commands.FormworkCalculator
                         {
                             if (settings.Create3DView)
                             {
-                                var v3d = FormworkVisualizer.CreateVisualization(doc, result, settings);
+                                var v3d = FormworkVisualizer.CreateVisualization(doc, result, settings, activeView);
                                 if (v3d?.AnalysisView != null)
                                 {
                                     view3DId = v3d.AnalysisView.Id;
