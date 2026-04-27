@@ -66,9 +66,14 @@ namespace Tools28.Commands.FormworkCalculator.Output
             LogField(areaField, "areaField after-add");
 
             // 面積フィールドは「合計を計算」を有効化 (各グループ/総合計で合算表示)
+            //   ScheduleField.HasTotals は Revit 2024 以降の API。
+            //   Revit 2022/2023 にはこのプロパティが存在しないため、リフレクションで動的に設定する。
+            //   存在しないバージョンではログに記録するのみ (ユーザーが手動でチェックを入れる必要がある)。
             if (areaField != null)
             {
-                try { areaField.HasTotals = true; } catch (Exception ex) { LogEx("areaField.HasTotals=true (1)", ex); }
+                bool setOk = TrySetHasTotals(areaField, true);
+                if (FormworkDebugLog.Enabled)
+                    FormworkDebugLog.Log($"  [Sched] HasTotals reflection set: success={setOk}");
                 LogField(areaField, "areaField after-set-hastotals-1");
             }
 
@@ -124,7 +129,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     var freshAreaField = def.GetField(areaField.FieldId);
                     if (freshAreaField != null)
                     {
-                        freshAreaField.HasTotals = true;
+                        TrySetHasTotals(freshAreaField, true);
                         LogField(freshAreaField, "freshAreaField after-set-hastotals-2");
                     }
                 }
@@ -154,25 +159,57 @@ namespace Tools28.Commands.FormworkCalculator.Output
         private static void LogField(ScheduleField field, string label)
         {
             if (!FormworkDebugLog.Enabled || field == null) return;
-            bool hasTotals = false;
+            string hasTotalsStr = "n/a";
             string fieldType = "?";
             string colHeading = "?";
             bool isCalculated = false;
             bool isHidden = false;
-            try { hasTotals = field.HasTotals; } catch { }
+            try
+            {
+                var prop = typeof(ScheduleField).GetProperty(
+                    "HasTotals",
+                    System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                if (prop != null && prop.CanRead)
+                    hasTotalsStr = ((bool)prop.GetValue(field, null)).ToString();
+            }
+            catch { }
             try { fieldType = field.FieldType.ToString(); } catch { }
             try { colHeading = field.ColumnHeading; } catch { }
             try { isCalculated = field.IsCalculatedField; } catch { }
             try { isHidden = field.IsHidden; } catch { }
             FormworkDebugLog.Log(
                 $"  [Sched:{label}] heading='{colHeading}' fieldType={fieldType} " +
-                $"HasTotals={hasTotals} IsCalculated={isCalculated} IsHidden={isHidden}");
+                $"HasTotals={hasTotalsStr} IsCalculated={isCalculated} IsHidden={isHidden}");
         }
 
         private static void LogEx(string action, Exception ex)
         {
             if (!FormworkDebugLog.Enabled) return;
             FormworkDebugLog.Log($"  [Sched:EX] {action}: {ex.GetType().Name}: {ex.Message}");
+        }
+
+        /// <summary>
+        /// ScheduleField.HasTotals プロパティが存在する場合 (Revit 2024+) のみ設定する。
+        /// 存在しない Revit 2021-2023 ではコンパイル参照を避けるためリフレクションで設定。
+        /// 戻り値: 設定に成功 (= プロパティが存在し書き込みできた) なら true。
+        /// </summary>
+        private static bool TrySetHasTotals(ScheduleField field, bool value)
+        {
+            if (field == null) return false;
+            try
+            {
+                var prop = typeof(ScheduleField).GetProperty(
+                    "HasTotals",
+                    System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                if (prop == null || !prop.CanWrite) return false;
+                prop.SetValue(field, value, null);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                LogEx("TrySetHasTotals", ex);
+                return false;
+            }
         }
 
         /// <summary>
