@@ -68,6 +68,8 @@ namespace Tools28.Commands.FormworkCalculator.Output
             // 面積フィールドは「合計を計算」を有効化（最終的にソート・グループ追加後に再設定）
             if (areaField != null)
             {
+                // 診断: ScheduleField と ScheduleDefinition の全 API を1度だけログに出力
+                if (FormworkDebugLog.Enabled) DiagApiOnce(areaField, def);
                 TrySetHasTotals(areaField, true);
                 LogField(areaField, "areaField after-set-hastotals-1");
             }
@@ -181,6 +183,58 @@ namespace Tools28.Commands.FormworkCalculator.Output
         {
             if (!FormworkDebugLog.Enabled) return;
             FormworkDebugLog.Log($"  [Sched:EX] {action}: {ex.GetType().Name}: {ex.Message}");
+        }
+
+        private static bool _diagDone;
+
+        /// <summary>
+        /// 診断: ScheduleField と ScheduleDefinition の全プロパティ・メソッドを1度だけログに出力。
+        /// Revit 2022 で「合計を計算」を制御する API を特定するため。
+        /// </summary>
+        private static void DiagApiOnce(ScheduleField field, ScheduleDefinition def)
+        {
+            if (_diagDone) return;
+            _diagDone = true;
+            DumpType("ScheduleField", typeof(ScheduleField), field);
+            DumpType("ScheduleDefinition", typeof(ScheduleDefinition), def);
+        }
+
+        private static void DumpType(string label, Type t, object instance)
+        {
+            FormworkDebugLog.Section($"{label} API Diagnostic");
+            try
+            {
+                FormworkDebugLog.Log($"  Type: {t.FullName}");
+                FormworkDebugLog.Log("  -- Properties --");
+                foreach (var p in t.GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
+                {
+                    string val = "?";
+                    try { val = p.CanRead ? (p.GetValue(instance, null)?.ToString() ?? "null") : "(no-read)"; }
+                    catch (Exception ex) { val = "EX:" + ex.GetType().Name; }
+                    FormworkDebugLog.Log($"    {p.Name} : {p.PropertyType.Name} [get={p.CanRead} set={p.CanWrite}] = {val}");
+                }
+                FormworkDebugLog.Log("  -- Methods (Set*/Get*/Is*/Has*/Calc*/Total*) --");
+                foreach (var m in t.GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
+                {
+                    string n = m.Name;
+                    if (n.StartsWith("get_") || n.StartsWith("set_")) continue;
+                    bool relevant = n.StartsWith("Set") || n.StartsWith("Get") ||
+                                    n.StartsWith("Is") || n.StartsWith("Has") ||
+                                    n.IndexOf("Total", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                    n.IndexOf("Calc", StringComparison.OrdinalIgnoreCase) >= 0;
+                    if (!relevant) continue;
+                    var ps = m.GetParameters();
+                    var sig = string.Join(",", ps.Select(p => p.ParameterType.Name).ToArray());
+                    FormworkDebugLog.Log($"    {m.Name}({sig}) -> {m.ReturnType.Name}");
+                }
+                FormworkDebugLog.Log("  -- Nested Types --");
+                foreach (var nt in t.GetNestedTypes(System.Reflection.BindingFlags.Public))
+                    FormworkDebugLog.Log($"    {nt.Name}");
+            }
+            catch (Exception ex)
+            {
+                LogEx($"Diag {label}", ex);
+            }
         }
 
         /// <summary>
