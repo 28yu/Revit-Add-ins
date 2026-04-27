@@ -71,9 +71,18 @@ namespace Tools28.Commands.FormworkCalculator.Output
             //   存在しないバージョンではログに記録するのみ (ユーザーが手動でチェックを入れる必要がある)。
             if (areaField != null)
             {
+                // Revit 2022 で「合計を計算」を有効化する API を診断するため、
+                // 1度目のみ全プロパティ・メソッドを列挙してログに出力する
+                if (FormworkDebugLog.Enabled)
+                    DiagScheduleFieldMembersOnce(areaField);
+
                 bool setOk = TrySetHasTotals(areaField, true);
                 if (FormworkDebugLog.Enabled)
                     FormworkDebugLog.Log($"  [Sched] HasTotals reflection set: success={setOk}");
+
+                // HasTotals 以外の totals 関連プロパティ/メソッドを試す
+                if (!setOk) TryAlternativeTotalsApi(areaField);
+
                 LogField(areaField, "areaField after-set-hastotals-1");
             }
 
@@ -209,6 +218,121 @@ namespace Tools28.Commands.FormworkCalculator.Output
             {
                 LogEx("TrySetHasTotals", ex);
                 return false;
+            }
+        }
+
+        private static bool _diagDone;
+
+        /// <summary>
+        /// 診断用: ScheduleField の全プロパティ・メソッドを1度だけログに出力する。
+        /// Revit 2022 で「合計を計算」を制御する API を特定するため。
+        /// </summary>
+        private static void DiagScheduleFieldMembersOnce(ScheduleField field)
+        {
+            if (_diagDone) return;
+            _diagDone = true;
+            if (field == null) return;
+            FormworkDebugLog.Section("ScheduleField API Diagnostic");
+            try
+            {
+                var t = typeof(ScheduleField);
+                FormworkDebugLog.Log($"  Type: {t.AssemblyQualifiedName}");
+
+                // プロパティ列挙
+                FormworkDebugLog.Log("  -- Properties --");
+                foreach (var p in t.GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
+                {
+                    string val = "?";
+                    try { val = p.CanRead ? (p.GetValue(field, null)?.ToString() ?? "null") : "(no-read)"; }
+                    catch (Exception ex) { val = "EX:" + ex.GetType().Name; }
+                    FormworkDebugLog.Log(
+                        $"    {p.Name} : {p.PropertyType.Name} " +
+                        $"[get={p.CanRead} set={p.CanWrite}] = {val}");
+                }
+
+                // メソッド列挙 (パラメータなしまたは少ないものに絞る)
+                FormworkDebugLog.Log("  -- Methods (Set*/Get*/Is*/Has*/Calc*/Total*) --");
+                foreach (var m in t.GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
+                {
+                    string n = m.Name;
+                    if (n.StartsWith("get_") || n.StartsWith("set_")) continue; // properties accessor
+                    bool relevant = n.StartsWith("Set") || n.StartsWith("Get") ||
+                                    n.StartsWith("Is") || n.StartsWith("Has") ||
+                                    n.IndexOf("Total", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                    n.IndexOf("Calc", StringComparison.OrdinalIgnoreCase) >= 0;
+                    if (!relevant) continue;
+                    var ps = m.GetParameters();
+                    var sig = string.Join(",", ps.Select(p => p.ParameterType.Name).ToArray());
+                    FormworkDebugLog.Log($"    {m.Name}({sig}) -> {m.ReturnType.Name}");
+                }
+            }
+            catch (Exception ex)
+            {
+                LogEx("Diag", ex);
+            }
+        }
+
+        /// <summary>
+        /// HasTotals 以外の代替 API で「合計を計算」を試行する。
+        /// Revit 2022 で利用可能な可能性のあるプロパティ名を順次試す。
+        /// </summary>
+        private static void TryAlternativeTotalsApi(ScheduleField field)
+        {
+            if (field == null) return;
+            // 試行候補のプロパティ名 (Revit のバージョン違いを考慮)
+            string[] candidates = new[]
+            {
+                "ShowTotals",
+                "CalculateTotals",
+                "HasCalculatedTotal",
+                "IsCalculateTotalsCheck",
+                "TotalsType",
+            };
+            var t = typeof(ScheduleField);
+            foreach (var name in candidates)
+            {
+                var prop = t.GetProperty(name,
+                    System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                if (prop == null) continue;
+                FormworkDebugLog.Log($"  [Sched] Found alternative property: {name} type={prop.PropertyType.Name} canWrite={prop.CanWrite}");
+                if (!prop.CanWrite) continue;
+                try
+                {
+                    if (prop.PropertyType == typeof(bool))
+                    {
+                        prop.SetValue(field, true, null);
+                        FormworkDebugLog.Log($"  [Sched] Set {name}=true (bool)");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    LogEx($"set {name}", ex);
+                }
+            }
+
+            // 試行候補のメソッド名
+            string[] methodCandidates = new[]
+            {
+                "SetCalculateTotals",
+                "SetHasTotals",
+                "EnableTotals",
+                "SetTotalsType",
+            };
+            foreach (var name in methodCandidates)
+            {
+                var methods = t.GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
+                    .Where(m => m.Name == name).ToList();
+                foreach (var m in methods)
+                {
+                    var ps = m.GetParameters();
+                    FormworkDebugLog.Log($"  [Sched] Found alternative method: {name}({string.Join(",", ps.Select(p => p.ParameterType.Name).ToArray())})");
+                    // bool 1 引数なら呼んでみる
+                    if (ps.Length == 1 && ps[0].ParameterType == typeof(bool))
+                    {
+                        try { m.Invoke(field, new object[] { true }); FormworkDebugLog.Log($"  [Sched] Invoked {name}(true)"); }
+                        catch (Exception ex) { LogEx($"invoke {name}", ex); }
+                    }
+                }
             }
         }
 
