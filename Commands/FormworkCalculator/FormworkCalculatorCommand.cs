@@ -182,10 +182,12 @@ namespace Tools28.Commands.FormworkCalculator
                     summary += "\n\n" + string.Format(Loc.S("Formwork.ErrorCount"), result.Errors.Count);
 
                 TaskDialog.Show(Loc.S("Formwork.DoneTitle"), summary);
+                FormworkDebugLog.Close();
                 return Result.Succeeded;
             }
             catch (Exception ex)
             {
+                FormworkDebugLog.Close();
                 message = string.Format(Loc.S("Formwork.Fatal"), ex.Message)
                     + "\n\n" + ex.StackTrace;
                 return Result.Failed;

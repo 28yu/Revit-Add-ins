@@ -36,14 +36,9 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             var result = new FormworkResult();
 
             FormworkDebugLog.Initialize(_settings?.EnableDebugLog == true);
-            try
-            {
-                return RunCore(result);
-            }
-            finally
-            {
-                FormworkDebugLog.Close();
-            }
+            // 注: ここで Close() しない。後続の CreateVisualization / CreateSchedule もログ出力するため、
+            // クローズは Command 側 (FormworkCalculatorCommand) で全処理完了後に行う。
+            return RunCore(result);
         }
 
         private FormworkResult RunCore(FormworkResult result)
