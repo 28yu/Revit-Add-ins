@@ -65,24 +65,10 @@ namespace Tools28.Commands.FormworkCalculator.Output
             LogDef(def, "after-add-fields");
             LogField(areaField, "areaField after-add");
 
-            // 面積フィールドは「合計を計算」を有効化 (各グループ/総合計で合算表示)
-            //   ScheduleField.HasTotals は Revit 2024 以降の API。
-            //   Revit 2022/2023 にはこのプロパティが存在しないため、リフレクションで動的に設定する。
-            //   存在しないバージョンではログに記録するのみ (ユーザーが手動でチェックを入れる必要がある)。
+            // 面積フィールドは「合計を計算」を有効化（最終的にソート・グループ追加後に再設定）
             if (areaField != null)
             {
-                // Revit 2022 で「合計を計算」を有効化する API を診断するため、
-                // 1度目のみ全プロパティ・メソッドを列挙してログに出力する
-                if (FormworkDebugLog.Enabled)
-                    DiagScheduleFieldMembersOnce(areaField);
-
-                bool setOk = TrySetHasTotals(areaField, true);
-                if (FormworkDebugLog.Enabled)
-                    FormworkDebugLog.Log($"  [Sched] HasTotals reflection set: success={setOk}");
-
-                // HasTotals 以外の totals 関連プロパティ/メソッドを試す
-                if (!setOk) TryAlternativeTotalsApi(areaField);
-
+                try { areaField.HasTotals = true; } catch (Exception ex) { LogEx("areaField.HasTotals=true (1st)", ex); }
                 LogField(areaField, "areaField after-set-hastotals-1");
             }
 
@@ -127,8 +113,8 @@ namespace Tools28.Commands.FormworkCalculator.Output
             }
             LogDef(def, "after-sort-group");
 
-            // SortGroupField 追加後に再度設定を確認 (Revit が上書きする場合の保険)
-            // FieldId で再取得して設定する (古い参照では Revit 内部状態と同期していない可能性)
+            // SortGroupField 追加後に最終設定（Revit が上書きする場合の保険）。
+            // FieldId で再取得して設定（古い参照では Revit 内部状態と同期していない可能性）。
             try { def.IsItemized = true; } catch (Exception ex) { LogEx("IsItemized=true (after)", ex); }
             try { def.ShowGrandTotal = true; } catch { }
             if (areaField != null)
@@ -138,7 +124,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     var freshAreaField = def.GetField(areaField.FieldId);
                     if (freshAreaField != null)
                     {
-                        TrySetHasTotals(freshAreaField, true);
+                        freshAreaField.HasTotals = true;
                         LogField(freshAreaField, "freshAreaField after-set-hastotals-2");
                     }
                 }
@@ -168,20 +154,12 @@ namespace Tools28.Commands.FormworkCalculator.Output
         private static void LogField(ScheduleField field, string label)
         {
             if (!FormworkDebugLog.Enabled || field == null) return;
-            string hasTotalsStr = "n/a";
+            string hasTotalsStr = "?";
             string fieldType = "?";
             string colHeading = "?";
             bool isCalculated = false;
             bool isHidden = false;
-            try
-            {
-                var prop = typeof(ScheduleField).GetProperty(
-                    "HasTotals",
-                    System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                if (prop != null && prop.CanRead)
-                    hasTotalsStr = ((bool)prop.GetValue(field, null)).ToString();
-            }
-            catch { }
+            try { hasTotalsStr = field.HasTotals.ToString(); } catch { }
             try { fieldType = field.FieldType.ToString(); } catch { }
             try { colHeading = field.ColumnHeading; } catch { }
             try { isCalculated = field.IsCalculatedField; } catch { }
@@ -197,144 +175,6 @@ namespace Tools28.Commands.FormworkCalculator.Output
             FormworkDebugLog.Log($"  [Sched:EX] {action}: {ex.GetType().Name}: {ex.Message}");
         }
 
-        /// <summary>
-        /// ScheduleField.HasTotals プロパティが存在する場合 (Revit 2024+) のみ設定する。
-        /// 存在しない Revit 2021-2023 ではコンパイル参照を避けるためリフレクションで設定。
-        /// 戻り値: 設定に成功 (= プロパティが存在し書き込みできた) なら true。
-        /// </summary>
-        private static bool TrySetHasTotals(ScheduleField field, bool value)
-        {
-            if (field == null) return false;
-            try
-            {
-                var prop = typeof(ScheduleField).GetProperty(
-                    "HasTotals",
-                    System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                if (prop == null || !prop.CanWrite) return false;
-                prop.SetValue(field, value, null);
-                return true;
-            }
-            catch (Exception ex)
-            {
-                LogEx("TrySetHasTotals", ex);
-                return false;
-            }
-        }
-
-        private static bool _diagDone;
-
-        /// <summary>
-        /// 診断用: ScheduleField の全プロパティ・メソッドを1度だけログに出力する。
-        /// Revit 2022 で「合計を計算」を制御する API を特定するため。
-        /// </summary>
-        private static void DiagScheduleFieldMembersOnce(ScheduleField field)
-        {
-            if (_diagDone) return;
-            _diagDone = true;
-            if (field == null) return;
-            FormworkDebugLog.Section("ScheduleField API Diagnostic");
-            try
-            {
-                var t = typeof(ScheduleField);
-                FormworkDebugLog.Log($"  Type: {t.AssemblyQualifiedName}");
-
-                // プロパティ列挙
-                FormworkDebugLog.Log("  -- Properties --");
-                foreach (var p in t.GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
-                {
-                    string val = "?";
-                    try { val = p.CanRead ? (p.GetValue(field, null)?.ToString() ?? "null") : "(no-read)"; }
-                    catch (Exception ex) { val = "EX:" + ex.GetType().Name; }
-                    FormworkDebugLog.Log(
-                        $"    {p.Name} : {p.PropertyType.Name} " +
-                        $"[get={p.CanRead} set={p.CanWrite}] = {val}");
-                }
-
-                // メソッド列挙 (パラメータなしまたは少ないものに絞る)
-                FormworkDebugLog.Log("  -- Methods (Set*/Get*/Is*/Has*/Calc*/Total*) --");
-                foreach (var m in t.GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
-                {
-                    string n = m.Name;
-                    if (n.StartsWith("get_") || n.StartsWith("set_")) continue; // properties accessor
-                    bool relevant = n.StartsWith("Set") || n.StartsWith("Get") ||
-                                    n.StartsWith("Is") || n.StartsWith("Has") ||
-                                    n.IndexOf("Total", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                    n.IndexOf("Calc", StringComparison.OrdinalIgnoreCase) >= 0;
-                    if (!relevant) continue;
-                    var ps = m.GetParameters();
-                    var sig = string.Join(",", ps.Select(p => p.ParameterType.Name).ToArray());
-                    FormworkDebugLog.Log($"    {m.Name}({sig}) -> {m.ReturnType.Name}");
-                }
-            }
-            catch (Exception ex)
-            {
-                LogEx("Diag", ex);
-            }
-        }
-
-        /// <summary>
-        /// HasTotals 以外の代替 API で「合計を計算」を試行する。
-        /// Revit 2022 で利用可能な可能性のあるプロパティ名を順次試す。
-        /// </summary>
-        private static void TryAlternativeTotalsApi(ScheduleField field)
-        {
-            if (field == null) return;
-            // 試行候補のプロパティ名 (Revit のバージョン違いを考慮)
-            string[] candidates = new[]
-            {
-                "ShowTotals",
-                "CalculateTotals",
-                "HasCalculatedTotal",
-                "IsCalculateTotalsCheck",
-                "TotalsType",
-            };
-            var t = typeof(ScheduleField);
-            foreach (var name in candidates)
-            {
-                var prop = t.GetProperty(name,
-                    System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                if (prop == null) continue;
-                FormworkDebugLog.Log($"  [Sched] Found alternative property: {name} type={prop.PropertyType.Name} canWrite={prop.CanWrite}");
-                if (!prop.CanWrite) continue;
-                try
-                {
-                    if (prop.PropertyType == typeof(bool))
-                    {
-                        prop.SetValue(field, true, null);
-                        FormworkDebugLog.Log($"  [Sched] Set {name}=true (bool)");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    LogEx($"set {name}", ex);
-                }
-            }
-
-            // 試行候補のメソッド名
-            string[] methodCandidates = new[]
-            {
-                "SetCalculateTotals",
-                "SetHasTotals",
-                "EnableTotals",
-                "SetTotalsType",
-            };
-            foreach (var name in methodCandidates)
-            {
-                var methods = t.GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
-                    .Where(m => m.Name == name).ToList();
-                foreach (var m in methods)
-                {
-                    var ps = m.GetParameters();
-                    FormworkDebugLog.Log($"  [Sched] Found alternative method: {name}({string.Join(",", ps.Select(p => p.ParameterType.Name).ToArray())})");
-                    // bool 1 引数なら呼んでみる
-                    if (ps.Length == 1 && ps[0].ParameterType == typeof(bool))
-                    {
-                        try { m.Invoke(field, new object[] { true }); FormworkDebugLog.Log($"  [Sched] Invoked {name}(true)"); }
-                        catch (Exception ex) { LogEx($"invoke {name}", ex); }
-                    }
-                }
-            }
-        }
 
         /// <summary>
         /// グループフィールドとして追加（ヘッダー + フッター付き）。
