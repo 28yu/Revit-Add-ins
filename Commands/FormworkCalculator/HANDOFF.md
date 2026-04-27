@@ -199,7 +199,8 @@ Pass 3: 開口加算 + ElementResult 作成 + Aggregate
 - 解析 3D ビュー名: `型枠分析` (日時なし・再実行で上書き)
 - ViewSchedule 名: `型枠数量集計` (日時なし・再実行で上書き)
 - Excel 初期名: `型枠数量集計.xlsx`
-- 集計表のグループ化: レベル → 部位 → タイプ名 (ShowHeader/ShowFooter + IsItemized=false)
+- 集計表のグループ化: レベル → 部位 → タイプ名 (ShowHeader/ShowFooter)
+- 集計表は IsItemized=true (各インスタンス個別表示) + 面積フィールド HasTotals=true (グループ毎・総合計で面積を合算)
 
 ### 色分け
 - `FormworkFilterManager` で View Filter ベース

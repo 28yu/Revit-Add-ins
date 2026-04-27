@@ -8,13 +8,14 @@ namespace Tools28.Commands.FormworkCalculator.Output
     /// <summary>
     /// ViewSchedule を作成して DirectShape に格納した型枠情報を集計表示する。
     ///
-    /// レイアウト（グループ化集計表示）:
-    ///   - IsItemized = false → 同じ (レベル, 部位, タイプ名, 区分) の行をまとめて集計
-    ///   - 列: 件数 / レベル / 部位 / タイプ名 / 区分 / 面積(合計)
+    /// レイアウト（インスタンス内訳 + 階層集計）:
+    ///   - IsItemized = true → 各 DirectShape を個別に表示
+    ///   - 列: 件数 / レベル / 部位 / タイプ名 / 区分 / 面積(合計を計算)
     ///   - 階層グループ化 (ShowHeader + ShowFooter で各階層に合計行):
     ///       1段目: レベル  (参照レベル毎)
     ///       2段目: 部位    (カテゴリ毎)
     ///       3段目: タイプ名 (タイプ毎)
+    ///   - 面積フィールドに HasTotals=true を設定 → 各グループおよび総合計で面積合計を表示
     ///   - 総合計行を表示
     /// </summary>
     internal static class ScheduleCreator
@@ -50,6 +51,11 @@ namespace Tools28.Commands.FormworkCalculator.Output
             var typeNameField = AddFieldByBip(def, schedulable, BuiltInParameter.ALL_MODEL_TYPE_NAME);
             var groupField = AddField(doc, def, schedulable, paramIds, FormworkParameterManager.ParamGroupKey);
             var areaField = AddField(doc, def, schedulable, paramIds, FormworkParameterManager.ParamArea);
+            // 面積フィールドは「合計を計算」を有効化 (各グループ/総合計で合算表示)
+            if (areaField != null)
+            {
+                try { areaField.HasTotals = true; } catch { }
+            }
 
             // マーカー（非表示、フィルタ用）
             var markerField = AddField(doc, def, schedulable, paramIds, FormworkParameterManager.ParamMarker);
@@ -86,8 +92,8 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 catch { }
             }
 
-            // まとめ表示と総合計
-            try { def.IsItemized = false; } catch { }
+            // 各インスタンスを個別表示 + 総合計
+            try { def.IsItemized = true; } catch { }
             try { def.ShowGrandTotal = true; } catch { }
 
             return schedule.Id;
