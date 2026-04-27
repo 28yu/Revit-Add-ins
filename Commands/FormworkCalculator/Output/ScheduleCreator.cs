@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Autodesk.Revit.DB;
@@ -44,11 +45,15 @@ namespace Tools28.Commands.FormworkCalculator.Output
             var schedulable = def.GetSchedulableFields();
             var paramIds = GetFormworkSharedParamIds(doc);
 
+            FormworkDebugLog.Section("Schedule Creation");
+            LogDef(def, "after-create");
+
             // 集計表の基本設定 (フィールド追加前に設定する必要がある場合がある)
             //   IsItemized=true: 各インスタンスを個別行で表示
             //   ShowGrandTotal=true: 末尾に総合計行
-            try { def.IsItemized = true; } catch { }
-            try { def.ShowGrandTotal = true; } catch { }
+            try { def.IsItemized = true; } catch (Exception ex) { LogEx("IsItemized=true (before)", ex); }
+            try { def.ShowGrandTotal = true; } catch (Exception ex) { LogEx("ShowGrandTotal=true (before)", ex); }
+            LogDef(def, "after-set-itemized-before-fields");
 
             // 列順: 件数 / レベル / 部位 / タイプ名 / 区分 / 面積
             var countField = AddCountField(def, schedulable);
@@ -57,10 +62,14 @@ namespace Tools28.Commands.FormworkCalculator.Output
             var typeNameField = AddFieldByBip(def, schedulable, BuiltInParameter.ALL_MODEL_TYPE_NAME);
             var groupField = AddField(doc, def, schedulable, paramIds, FormworkParameterManager.ParamGroupKey);
             var areaField = AddField(doc, def, schedulable, paramIds, FormworkParameterManager.ParamArea);
+            LogDef(def, "after-add-fields");
+            LogField(areaField, "areaField after-add");
+
             // 面積フィールドは「合計を計算」を有効化 (各グループ/総合計で合算表示)
             if (areaField != null)
             {
-                try { areaField.HasTotals = true; } catch { }
+                try { areaField.HasTotals = true; } catch (Exception ex) { LogEx("areaField.HasTotals=true (1)", ex); }
+                LogField(areaField, "areaField after-set-hastotals-1");
             }
 
             // マーカー（非表示、フィルタ用）
@@ -83,6 +92,8 @@ namespace Tools28.Commands.FormworkCalculator.Output
             AddGroupField(def, levelField);
             AddGroupField(def, partField);
             AddGroupField(def, typeNameField);
+            LogDef(def, "after-group-fields");
+            LogField(areaField, "areaField after-group");
 
             // 区分はソートのみ（見出し・フッタは表示しない）
             if (groupField != null)
@@ -100,22 +111,68 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 }
                 catch { }
             }
+            LogDef(def, "after-sort-group");
 
             // SortGroupField 追加後に再度設定を確認 (Revit が上書きする場合の保険)
             // FieldId で再取得して設定する (古い参照では Revit 内部状態と同期していない可能性)
-            try { def.IsItemized = true; } catch { }
+            try { def.IsItemized = true; } catch (Exception ex) { LogEx("IsItemized=true (after)", ex); }
             try { def.ShowGrandTotal = true; } catch { }
             if (areaField != null)
             {
                 try
                 {
                     var freshAreaField = def.GetField(areaField.FieldId);
-                    if (freshAreaField != null) freshAreaField.HasTotals = true;
+                    if (freshAreaField != null)
+                    {
+                        freshAreaField.HasTotals = true;
+                        LogField(freshAreaField, "freshAreaField after-set-hastotals-2");
+                    }
                 }
-                catch { }
+                catch (Exception ex) { LogEx("freshAreaField.HasTotals=true", ex); }
             }
+            LogDef(def, "FINAL");
 
             return schedule.Id;
+        }
+
+        private static void LogDef(ScheduleDefinition def, string stage)
+        {
+            if (!FormworkDebugLog.Enabled) return;
+            bool isItemized = false;
+            bool grandTotal = false;
+            int fieldCount = 0;
+            int sortCount = 0;
+            try { isItemized = def.IsItemized; } catch { }
+            try { grandTotal = def.ShowGrandTotal; } catch { }
+            try { fieldCount = def.GetFieldCount(); } catch { }
+            try { sortCount = def.GetSortGroupFieldCount(); } catch { }
+            FormworkDebugLog.Log(
+                $"  [Sched:{stage}] IsItemized={isItemized} ShowGrandTotal={grandTotal} " +
+                $"fields={fieldCount} sortGroups={sortCount}");
+        }
+
+        private static void LogField(ScheduleField field, string label)
+        {
+            if (!FormworkDebugLog.Enabled || field == null) return;
+            bool hasTotals = false;
+            string fieldType = "?";
+            string colHeading = "?";
+            bool isCalculated = false;
+            bool isHidden = false;
+            try { hasTotals = field.HasTotals; } catch { }
+            try { fieldType = field.FieldType.ToString(); } catch { }
+            try { colHeading = field.ColumnHeading; } catch { }
+            try { isCalculated = field.IsCalculatedField; } catch { }
+            try { isHidden = field.IsHidden; } catch { }
+            FormworkDebugLog.Log(
+                $"  [Sched:{label}] heading='{colHeading}' fieldType={fieldType} " +
+                $"HasTotals={hasTotals} IsCalculated={isCalculated} IsHidden={isHidden}");
+        }
+
+        private static void LogEx(string action, Exception ex)
+        {
+            if (!FormworkDebugLog.Enabled) return;
+            FormworkDebugLog.Log($"  [Sched:EX] {action}: {ex.GetType().Name}: {ex.Message}");
         }
 
         /// <summary>
