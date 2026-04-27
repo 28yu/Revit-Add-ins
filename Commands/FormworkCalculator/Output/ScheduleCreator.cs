@@ -197,6 +197,51 @@ namespace Tools28.Commands.FormworkCalculator.Output
             _diagDone = true;
             DumpType("ScheduleField", typeof(ScheduleField), field);
             DumpType("ScheduleDefinition", typeof(ScheduleDefinition), def);
+            DumpEnum("ScheduleFieldDisplayType", typeof(ScheduleFieldDisplayType));
+            // DisplayType を全 enum 値に切替えながら値を確認 → どれが「合計を計算」か特定
+            ProbeDisplayType(field);
+        }
+
+        private static void DumpEnum(string label, Type enumType)
+        {
+            FormworkDebugLog.Section($"{label} Enum Values");
+            try
+            {
+                foreach (var v in Enum.GetValues(enumType))
+                    FormworkDebugLog.Log($"    {v} = {(int)v}");
+            }
+            catch (Exception ex) { LogEx($"DumpEnum {label}", ex); }
+        }
+
+        /// <summary>
+        /// DisplayType を全 enum 値に順次設定し、適用後の値をログ出力。
+        /// 設定可能な値とその順序を特定するため。
+        /// </summary>
+        private static void ProbeDisplayType(ScheduleField field)
+        {
+            if (field == null) return;
+            FormworkDebugLog.Section("DisplayType Probe");
+            try
+            {
+                var origValue = field.DisplayType;
+                FormworkDebugLog.Log($"  Original DisplayType={origValue}");
+                foreach (var v in Enum.GetValues(typeof(ScheduleFieldDisplayType)))
+                {
+                    try
+                    {
+                        field.DisplayType = (ScheduleFieldDisplayType)v;
+                        var got = field.DisplayType;
+                        FormworkDebugLog.Log($"  Set={v} -> Got={got}");
+                    }
+                    catch (Exception ex)
+                    {
+                        FormworkDebugLog.Log($"  Set={v} -> EX: {ex.GetType().Name}: {ex.Message}");
+                    }
+                }
+                // 元に戻す
+                try { field.DisplayType = origValue; } catch { }
+            }
+            catch (Exception ex) { LogEx("ProbeDisplayType", ex); }
         }
 
         private static void DumpType(string label, Type t, object instance)
