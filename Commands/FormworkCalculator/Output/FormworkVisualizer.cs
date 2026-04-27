@@ -73,6 +73,9 @@ namespace Tools28.Commands.FormworkCalculator.Output
             // セクションボックスを有効化（要素全体を含むよう自動フィット）
             EnableSectionBox(doc, view, result);
 
+            // セクションボックスのアウトラインとレベル線をビュー上で非表示にする
+            HideClutterCategories(view);
+
             // 元躯体要素を 20% 透過 + RGB(94,94,94) で表示
             ApplySourceElementAppearance(doc, view, result);
 
@@ -339,6 +342,29 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 i++;
             }
             return map;
+        }
+
+        /// <summary>
+        /// 3D ビューでセクションボックスのアウトラインとレベル線を非表示にする。
+        /// 解析ビューでは型枠面の色分けが主役なので、これらが視覚的ノイズになるのを防ぐ。
+        /// </summary>
+        private static void HideClutterCategories(View3D view)
+        {
+            var hideCats = new[]
+            {
+                BuiltInCategory.OST_SectionBox, // 切断ボックスのアウトライン
+                BuiltInCategory.OST_Levels,     // レベル線
+            };
+            foreach (var bic in hideCats)
+            {
+                try
+                {
+                    var catId = new ElementId(bic);
+                    if (view.CanCategoryBeHidden(catId))
+                        view.SetCategoryHidden(catId, true);
+                }
+                catch { }
+            }
         }
 
         /// <summary>
