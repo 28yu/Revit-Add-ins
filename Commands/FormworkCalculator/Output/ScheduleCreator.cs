@@ -16,7 +16,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
     ///       1段目: レベル  (参照レベル毎)
     ///       2段目: 部位    (カテゴリ毎)
     ///       3段目: タイプ名 (タイプ毎)
-    ///   - 面積フィールドに HasTotals=true を設定 → 各グループおよび総合計で面積合計を表示
+    ///   - 面積フィールドの DisplayType=Totals → 各グループおよび総合計で面積合計を表示
     ///   - 総合計行を表示
     /// </summary>
     internal static class ScheduleCreator
@@ -66,12 +66,13 @@ namespace Tools28.Commands.FormworkCalculator.Output
             LogField(areaField, "areaField after-add");
 
             // 面積フィールドは「合計を計算」を有効化（最終的にソート・グループ追加後に再設定）
+            //   ScheduleField.DisplayType に ScheduleFieldDisplayType.Totals を設定すると
+            //   集計表プロパティ「書式」タブのドロップダウンが「合計を計算」になる。
             if (areaField != null)
             {
-                // 診断: ScheduleField と ScheduleDefinition の全 API を1度だけログに出力
-                if (FormworkDebugLog.Enabled) DiagApiOnce(areaField, def);
-                TrySetHasTotals(areaField, true);
-                LogField(areaField, "areaField after-set-hastotals-1");
+                try { areaField.DisplayType = ScheduleFieldDisplayType.Totals; }
+                catch (Exception ex) { LogEx("areaField.DisplayType=Totals (1st)", ex); }
+                LogField(areaField, "areaField after-set-displaytype-1");
             }
 
             // マーカー（非表示、フィルタ用）
@@ -126,11 +127,11 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     var freshAreaField = def.GetField(areaField.FieldId);
                     if (freshAreaField != null)
                     {
-                        TrySetHasTotals(freshAreaField, true);
-                        LogField(freshAreaField, "freshAreaField after-set-hastotals-2");
+                        freshAreaField.DisplayType = ScheduleFieldDisplayType.Totals;
+                        LogField(freshAreaField, "freshAreaField after-set-displaytype-2");
                     }
                 }
-                catch (Exception ex) { LogEx("freshAreaField.HasTotals=true", ex); }
+                catch (Exception ex) { LogEx("freshAreaField.DisplayType=Totals", ex); }
             }
             LogDef(def, "FINAL");
 
@@ -156,153 +157,25 @@ namespace Tools28.Commands.FormworkCalculator.Output
         private static void LogField(ScheduleField field, string label)
         {
             if (!FormworkDebugLog.Enabled || field == null) return;
-            string hasTotalsStr = "?";
+            string displayType = "?";
             string fieldType = "?";
             string colHeading = "?";
             bool isCalculated = false;
             bool isHidden = false;
-            try
-            {
-                var prop = typeof(ScheduleField).GetProperty(
-                    "HasTotals",
-                    System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                if (prop != null && prop.CanRead)
-                    hasTotalsStr = ((bool)prop.GetValue(field, null)).ToString();
-            }
-            catch { }
+            try { displayType = field.DisplayType.ToString(); } catch { }
             try { fieldType = field.FieldType.ToString(); } catch { }
             try { colHeading = field.ColumnHeading; } catch { }
             try { isCalculated = field.IsCalculatedField; } catch { }
             try { isHidden = field.IsHidden; } catch { }
             FormworkDebugLog.Log(
                 $"  [Sched:{label}] heading='{colHeading}' fieldType={fieldType} " +
-                $"HasTotals={hasTotalsStr} IsCalculated={isCalculated} IsHidden={isHidden}");
+                $"DisplayType={displayType} IsCalculated={isCalculated} IsHidden={isHidden}");
         }
 
         private static void LogEx(string action, Exception ex)
         {
             if (!FormworkDebugLog.Enabled) return;
             FormworkDebugLog.Log($"  [Sched:EX] {action}: {ex.GetType().Name}: {ex.Message}");
-        }
-
-        private static bool _diagDone;
-
-        /// <summary>
-        /// 診断: ScheduleField と ScheduleDefinition の全プロパティ・メソッドを1度だけログに出力。
-        /// Revit 2022 で「合計を計算」を制御する API を特定するため。
-        /// </summary>
-        private static void DiagApiOnce(ScheduleField field, ScheduleDefinition def)
-        {
-            if (_diagDone) return;
-            _diagDone = true;
-            DumpType("ScheduleField", typeof(ScheduleField), field);
-            DumpType("ScheduleDefinition", typeof(ScheduleDefinition), def);
-            DumpEnum("ScheduleFieldDisplayType", typeof(ScheduleFieldDisplayType));
-            // DisplayType を全 enum 値に切替えながら値を確認 → どれが「合計を計算」か特定
-            ProbeDisplayType(field);
-        }
-
-        private static void DumpEnum(string label, Type enumType)
-        {
-            FormworkDebugLog.Section($"{label} Enum Values");
-            try
-            {
-                foreach (var v in Enum.GetValues(enumType))
-                    FormworkDebugLog.Log($"    {v} = {(int)v}");
-            }
-            catch (Exception ex) { LogEx($"DumpEnum {label}", ex); }
-        }
-
-        /// <summary>
-        /// DisplayType を全 enum 値に順次設定し、適用後の値をログ出力。
-        /// 設定可能な値とその順序を特定するため。
-        /// </summary>
-        private static void ProbeDisplayType(ScheduleField field)
-        {
-            if (field == null) return;
-            FormworkDebugLog.Section("DisplayType Probe");
-            try
-            {
-                var origValue = field.DisplayType;
-                FormworkDebugLog.Log($"  Original DisplayType={origValue}");
-                foreach (var v in Enum.GetValues(typeof(ScheduleFieldDisplayType)))
-                {
-                    try
-                    {
-                        field.DisplayType = (ScheduleFieldDisplayType)v;
-                        var got = field.DisplayType;
-                        FormworkDebugLog.Log($"  Set={v} -> Got={got}");
-                    }
-                    catch (Exception ex)
-                    {
-                        FormworkDebugLog.Log($"  Set={v} -> EX: {ex.GetType().Name}: {ex.Message}");
-                    }
-                }
-                // 元に戻す
-                try { field.DisplayType = origValue; } catch { }
-            }
-            catch (Exception ex) { LogEx("ProbeDisplayType", ex); }
-        }
-
-        private static void DumpType(string label, Type t, object instance)
-        {
-            FormworkDebugLog.Section($"{label} API Diagnostic");
-            try
-            {
-                FormworkDebugLog.Log($"  Type: {t.FullName}");
-                FormworkDebugLog.Log("  -- Properties --");
-                foreach (var p in t.GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
-                {
-                    string val = "?";
-                    try { val = p.CanRead ? (p.GetValue(instance, null)?.ToString() ?? "null") : "(no-read)"; }
-                    catch (Exception ex) { val = "EX:" + ex.GetType().Name; }
-                    FormworkDebugLog.Log($"    {p.Name} : {p.PropertyType.Name} [get={p.CanRead} set={p.CanWrite}] = {val}");
-                }
-                FormworkDebugLog.Log("  -- Methods (Set*/Get*/Is*/Has*/Calc*/Total*) --");
-                foreach (var m in t.GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
-                {
-                    string n = m.Name;
-                    if (n.StartsWith("get_") || n.StartsWith("set_")) continue;
-                    bool relevant = n.StartsWith("Set") || n.StartsWith("Get") ||
-                                    n.StartsWith("Is") || n.StartsWith("Has") ||
-                                    n.IndexOf("Total", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                    n.IndexOf("Calc", StringComparison.OrdinalIgnoreCase) >= 0;
-                    if (!relevant) continue;
-                    var ps = m.GetParameters();
-                    var sig = string.Join(",", ps.Select(p => p.ParameterType.Name).ToArray());
-                    FormworkDebugLog.Log($"    {m.Name}({sig}) -> {m.ReturnType.Name}");
-                }
-                FormworkDebugLog.Log("  -- Nested Types --");
-                foreach (var nt in t.GetNestedTypes(System.Reflection.BindingFlags.Public))
-                    FormworkDebugLog.Log($"    {nt.Name}");
-            }
-            catch (Exception ex)
-            {
-                LogEx($"Diag {label}", ex);
-            }
-        }
-
-        /// <summary>
-        /// ScheduleField.HasTotals プロパティが存在する場合のみ設定する。
-        /// Revit 2021-2023 では存在しない可能性があるため、コンパイル参照を避けてリフレクションで設定。
-        /// </summary>
-        private static bool TrySetHasTotals(ScheduleField field, bool value)
-        {
-            if (field == null) return false;
-            try
-            {
-                var prop = typeof(ScheduleField).GetProperty(
-                    "HasTotals",
-                    System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                if (prop == null || !prop.CanWrite) return false;
-                prop.SetValue(field, value, null);
-                return true;
-            }
-            catch (Exception ex)
-            {
-                LogEx("TrySetHasTotals", ex);
-                return false;
-            }
         }
 
         /// <summary>
