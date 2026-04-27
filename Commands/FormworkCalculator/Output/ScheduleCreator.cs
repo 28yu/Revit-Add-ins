@@ -44,6 +44,12 @@ namespace Tools28.Commands.FormworkCalculator.Output
             var schedulable = def.GetSchedulableFields();
             var paramIds = GetFormworkSharedParamIds(doc);
 
+            // 集計表の基本設定 (フィールド追加前に設定する必要がある場合がある)
+            //   IsItemized=true: 各インスタンスを個別行で表示
+            //   ShowGrandTotal=true: 末尾に総合計行
+            try { def.IsItemized = true; } catch { }
+            try { def.ShowGrandTotal = true; } catch { }
+
             // 列順: 件数 / レベル / 部位 / タイプ名 / 区分 / 面積
             var countField = AddCountField(def, schedulable);
             var levelField = AddField(doc, def, schedulable, paramIds, FormworkParameterManager.ParamLevel);
@@ -78,13 +84,16 @@ namespace Tools28.Commands.FormworkCalculator.Output
             AddGroupField(def, partField);
             AddGroupField(def, typeNameField);
 
-            // 区分はソートのみ（小計行は出さない）
+            // 区分はソートのみ（見出し・フッタは表示しない）
             if (groupField != null)
             {
                 try
                 {
                     var sortGroup = new ScheduleSortGroupField(groupField.FieldId)
                     {
+                        ShowHeader = false,
+                        ShowFooter = false,
+                        ShowBlankLine = false,
                         SortOrder = ScheduleSortOrder.Ascending,
                     };
                     def.AddSortGroupField(sortGroup);
@@ -92,9 +101,19 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 catch { }
             }
 
-            // 各インスタンスを個別表示 + 総合計
+            // SortGroupField 追加後に再度設定を確認 (Revit が上書きする場合の保険)
+            // FieldId で再取得して設定する (古い参照では Revit 内部状態と同期していない可能性)
             try { def.IsItemized = true; } catch { }
             try { def.ShowGrandTotal = true; } catch { }
+            if (areaField != null)
+            {
+                try
+                {
+                    var freshAreaField = def.GetField(areaField.FieldId);
+                    if (freshAreaField != null) freshAreaField.HasTotals = true;
+                }
+                catch { }
+            }
 
             return schedule.Id;
         }
