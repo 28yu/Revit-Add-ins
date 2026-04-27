@@ -1,147 +1,145 @@
 # 型枠数量算出アドイン 開発状況ハンドオフ
 
-**最終更新**: 2026-04-24 (Phase 1: 部分接触検出 + 空間索引)
-**ブランチ**: `claude/fix-formwork-contact-exclusion-6ZGi1` (最新)
+**最終更新**: 2026-04-27
 **開発用 Revit**: 2022 (`dev-config.json`)
 
-## 🆕 Phase 1: 部分接触 + 大規模対応 (2026-04-24)
+---
 
-[18]-3 の根本解決として「面の部分接触」を扱う仕組みを導入した。T字壁結合等で、主面 (大面積) の一部に他要素が当たっているケースを正しく面積控除できる。
+## 現在の状態（2026-04-27 セッション終了時点）
 
-### 追加された仕組み
+### 動作確認済み・本番投入可能な機能
+- 6カテゴリ（構造柱・構造フレーム・壁・床・構造基礎・階段）の型枠面積算出
+- 接触面の自動控除（Full Contact + Partial Contact 両対応）
+- DirectShape による色分け視覚化
+- 3D解析ビュー「型枠分析」自動生成
+- 集計表「型枠数量集計」自動生成（レベル → 部位 → タイプ名で階層グループ化）
+- 面積フィールドに合計を計算表示
+- Excel エクスポート
 
-1. **`PartialContact` データ構造** (`FaceClassifier.cs`)
-   - 面が FormworkRequired のまま、部分的に覆われている領域を記録
-   - `OtherElementId`, `OtherFaceIndex`, `ContactArea`, `UvBounds`
+### このセッションで対応した改善項目
+| # | 内容 | 関連ファイル |
+|---|---|---|
+| 1 | 集計表の面積フィールドに「合計を計算」を設定 | `Output/ScheduleCreator.cs` |
+| 2 | 3D解析ビューでセクションボックス枠線・レベル線を非表示 | `Output/FormworkVisualizer.cs` |
+| 3 | 3D解析ビューの視点を実行時のアクティブ3Dビューに合わせる | `Output/FormworkVisualizer.cs`, `FormworkCalculatorCommand.cs` |
 
-2. **`ContactFaceDetector` の2段階判定** (`ContactFaceDetector.cs`)
-   - Stage 1: Full Contact (従来の area-ratio 1.5 以内) → 面全体を `DeductedContact`
-   - Stage 2: Partial Contact (a > b × 1.5 + b が a 内部) → `PartialContacts` に追加、FormworkRequired は維持
+### 開発時に判明した重要な API 知見
 
-3. **`SpatialGrid` 空間索引** (`SpatialGrid.cs`)
-   - 全要素 BB を 3D 格子セルに登録、隣接セルだけ走査
-   - セルサイズ = 全要素対角線長の中央値 × 2 (自動算出)
-   - O(N²) → O(N) 相当になり 500+ 要素対応
+#### Revit 2022 では `ScheduleField.HasTotals` が存在しない
+- 過去のセッションでリフレクション経由で `HasTotals = true` を試みていたが、Revit 2022 の API では公開プロパティとして存在しないため無効化していた（プロパティ取得結果が null）。
+- **正解 API**: `ScheduleField.DisplayType = ScheduleFieldDisplayType.Totals`
+- `ScheduleFieldDisplayType` enum 値（Revit 2022 で確認済み）:
 
-4. **面積控除** (`FormworkCalcEngine.BuildElementResult`)
-   - FormworkRequired 面の実効面積 = 元面積 - Σ(PartialContact.ContactArea)
-   - `DeductedContactArea` に部分接触分も集計
+| 値 | UI ラベル |
+|---|---|
+| `Standard` (0) | 計算しない |
+| **`Totals` (1)** | **合計を計算** |
+| `MinMax` (2) | 最小値と最大値を計算 |
+| `Max` (3) | 最大値を計算 |
+| `Min` (4) | 最小値を計算 |
 
-5. **共有パラメータ** (`FormworkParameterManager.cs`)
-   - `28Tools_Formwork_部分接触` (Text, "Yes"/"No") を追加
-   - T字接合等で「一部消されている面」を識別可能
+`DisplayType` は Revit 2021-2026 全バージョンで公開 API として存在するため、リフレクション不要で直接プロパティアクセス可能。
 
-6. **半透明表示** (`FormworkVisualizer.cs`)
-   - 部分接触がある面の DirectShape を 50% 透過で視覚的にヒント
-   - `ApplyPartialContactOverride` でビュー単位オーバーライド
+#### View3D の視点コピー
+- 既存ビューの視点を新規ビューにコピーするには `view.SetOrientation(sourceView.GetOrientation())` を使う
+- アクティブビューが `View3D` でないとき（平面ビュー等）は何もしない（既定のアイソメトリックを維持）
 
-## 🆕 Phase 2: DirectShape 形状厳密化 (2026-04-24)
-
-Phase 1 の面積控除に加え、DirectShape の形状自体も接触領域を切り抜いた厳密な矩形にする。
-
-### アプローチ: 矩形ベース 2D 差分
-1. 面 A の CurveLoop が軸平行矩形 (壁・梁・柱・スラブの主面で 90%+ のケース) か判定
-2. 各 `PartialContact.UvBoundsOnA` の矩形を順次差分 (最大 4 サブ矩形に分解)
-3. 各サブ矩形から薄板 Solid を構築 → 分割 DirectShape で生成
-
-### ファイル追加/変更
-- `Engine/PartialContactClipper.cs` — 矩形抽出・差分・Solid 構築
-- `Engine/ContactFaceDetector.cs` — B の 4 隅を A に投影した `UvBoundsOnA` を算出
-- `Output/FormworkVisualizer.cs` — Clipper 成功時は分割 DirectShape、失敗時は Phase 1 の半透明フォールバック
-
-### 非対応ケース (フォールバック動作)
-- 開口付き壁 (CurveLoop が穴を含む → 矩形判定で除外)
-- カーブウォール (非対応要件)
-- 非矩形の面 (4 頂点でない、曲線エッジを含む)
-- 投影失敗 (UvBoundsOnA が null)
-
-フォールバック時は Phase 1 の半透明 DirectShape で動作するため、リグレッションしない。
-
-### 面積パラメータの配分
-分割された DirectShape では、**最初の Solid** にのみ控除後面積を乗せ、残りは 0 にする。
-これにより集計表の合計は従来通り要素毎の面積になる (重複加算を避ける)。
-
-## 🔎 デバッグログ (2026-04-24 追加)
-
-[18]-3 の原因特定のため、`ContactFaceDetector` の全判定を `C:\temp\Formwork_debug.txt` に出力するデバッグログ機構を導入した。
-
-- **フラグ**: `FormworkSettings.EnableDebugLog` (デフォルト `true`)
-- **集約クラス**: `Commands/FormworkCalculator/Engine/FormworkDebugLog.cs`
-  - 実行ごとにファイルをクリア
-  - 行数上限 200,000 行 (超えたら末尾に `... truncated` を追記して停止)
-  - 内部で `lock` 排他制御
-- **出力内容**:
-  - `Pass 1` 完了時: 要素毎の面分類内訳 (`Req/Top/Bot/Con/BGL/Inc/Err`) とカテゴリ合計
-  - `Pass 2`: BBox 重なりのある要素ペアごとに、反平行条件 (cond1) を通った面ペアの詳細
-    - 法線内積 `dot`, 面積 `aArea/bArea`, 中心点 `pA`, 投影距離 `d`, `uv`, `bbB`
-    - 採用/棄却 (`ACCEPTED` / `REJECTED(cond2-area-ratio|cond3-distance|cond4-uv-out-of-bounds|cond4-near-boundary|...)`)
-  - `Pass 2` 完了時: 最終 FormworkRequired 面数, DeductedContact 面数, `contactChanges` 件数
-
-**リリース時は `FormworkSettings.EnableDebugLog = false` に変更すること。** UI には露出していない。
-
-**次のステップ**: ユーザーにテストケース (壁 T 字・梁柱取り合いで miss が出るモデル) で実行してもらい `Formwork_debug.txt` を共有してもらう → 失敗パターン (どの cond で落ちているか or ACCEPTED なのに視覚的には miss か) を特定して的確な修正に進む。
+#### View3D で整理すべきカテゴリ
+- セクションボックス枠線: `BuiltInCategory.OST_SectionBox`
+- レベル線: `BuiltInCategory.OST_Levels`
+- どちらも `view.SetCategoryHidden(catId, true)` で非表示化（実行前に `CanCategoryBeHidden` でガード）
 
 ---
 
-## 全体の進行状況
+## 🎯 今後の機能拡張: マテリアルベース算出
 
-仕様書 (本アドインの元指示) の Phase 1〜5 は一通り実装済み。ユーザーのテストに応じて[1]〜[21]-1 の改善要望に対応し、ほとんどは解決した。
+### 背景と課題
+現在は「カテゴリ」（構造柱・梁・壁・床等）を判定軸にして型枠を拾い出している。しかし実プロジェクトでは:
+- カテゴリは同じでも材料が違う（例: RC柱 vs 鉄骨柱、RC壁 vs ALC壁）
+- ALC や乾式間仕切等は型枠が不要
+- カテゴリで一括処理すると、型枠不要な要素まで対象になってしまう
+- 別途フィルタする手間がかかる
 
-**唯一の未解決問題: [18]-3 要素間接触面の検出**
+### 拡張方針: マテリアルから型枠数量を算出
+要素のマテリアル（材料）を判定軸に変更／併用できるようにする。
+
+#### 想定する要件
+1. **マテリアル選択 UI**: ダイアログでプロジェクト内の全マテリアル一覧から複数選択
+   - 例: `コンクリート - 現場打ち`, `コンクリート - プレキャスト` をチェック → これらの材料を持つ要素のみ対象
+   - 「カテゴリで選ぶ」「マテリアルで選ぶ」「両方使う（AND/OR）」を切替可能
+
+2. **判定対象**:
+   - **構造材** (`Structural Material` パラメータ) を第一候補とする
+   - 複合構造（壁・床）の場合は層ごとにマテリアルが違うので、**主構造層（Core）のマテリアル**を取得
+   - フォールバック: タイプの「マテリアル」パラメータ → なければインスタンスのマテリアル
+
+3. **算出ロジック**:
+   - 既存の面分類・接触検出ロジックは変更不要（要素フィルタ部分のみ拡張）
+   - `ElementCollector` に `IncludedMaterials` (`List<ElementId>`) フィールドを追加
+   - `IncludedCategories` と AND/OR で組み合わせ可能に
+
+4. **集計・色分け**:
+   - 集計表の階層グループに「マテリアル」を追加できるオプション
+   - 色分け基準にも「マテリアル別」を追加（既存の Category/Zone/FormworkType に並べる）
+
+### 実装の見積もり
+
+| 作業 | 影響範囲 | 工数感 |
+|---|---|---|
+| マテリアル選択 UI（ダイアログにリストボックス追加） | `Views/FormworkDialog.xaml(.cs)` | 中 |
+| `FormworkSettings` にマテリアル関連フィールド追加 | `Models/FormworkSettings.cs` | 小 |
+| 要素のマテリアル取得関数 | `Engine/ElementCollector.cs`（新規ヘルパー） | 中 |
+| 要素フィルタにマテリアル条件を追加 | `Engine/ElementCollector.cs` | 中 |
+| 共有パラメータにマテリアル名追加 | `Engine/FormworkParameterManager.cs` | 小 |
+| 集計表にマテリアル列を追加（オプション） | `Output/ScheduleCreator.cs` | 小 |
+| 色分けにマテリアル別を追加 | `Output/FormworkVisualizer.cs`, `Engine/FormworkFilterManager.cs` | 中 |
+| 多言語化エントリ追加 | `Localization/Strings*.cs` (3ファイル) | 小 |
+| `Models/FormworkSettings.cs` の `ColorSchemeType` enum 拡張 | `Models/FormworkSettings.cs` | 小 |
+
+合計: 中規模（1〜2日相当）
+
+### 設計時の注意点
+
+#### マテリアル取得の優先順位
+要素のマテリアル取得は意外と複雑なので、以下の順序でフォールバックさせる：
+1. `Element.StructuralMaterialId`（構造材のみ。柱・梁・基礎で有効）
+2. 複合構造の場合: `WallType.GetCompoundStructure().GetMaterialId(coreLayerIndex)`（壁・床）
+3. タイプパラメータ `Material` (BuiltInParameter `MATERIAL_ID_PARAM`)
+4. インスタンスパラメータでマテリアルが指定されている場合
+5. ジオメトリの `Solid` から `Face.MaterialElementId` を取る（最終手段）
+
+#### マテリアル名は表示名 (`Material.Name`) を使う
+- ElementId は別ファイルにすると一致しない
+- 名前ベースで集計すると、同名の異なる ElementId のマテリアルがある場合に統合されてしまう点に注意（その場合は ElementId 単位で集計し名前は表示用とする）
+
+#### 後方互換性
+- 既存の `IncludedCategories` 設定は維持
+- マテリアル機能は新規オプトインフィールドとして追加（既存ユーザーの設定を壊さない）
 
 ---
 
-## 未解決問題の詳細: [18]-3
+## 既知の課題（未解決のまま終了）
 
-### 現象
-壁の T 字結合や梁と柱の取り合い部で、接触している面にまだ型枠オブジェクト (DirectShape) が作られてしまう。本来はそこに型枠は不要。
+### [18]-3 接触面検出の漏れ（一部ケース）
+壁の T 字結合や梁と柱の取り合い部の一部ケースで、接触面の検出が漏れる場合がある。
+- 第7世代「幾何学的検査 + UV内部判定 + 面積比 + Partial Contact + Boolean Difference」で大半は解決
+- 残るのは特殊形状（Join Geometry で複雑に結合された要素、曲面を持つ面 など）
+- リリース前に再評価が必要なら `C:\temp\Formwork_debug.txt` のログから攻める
 
-### 試したアプローチ (全て一部ケースで miss あり)
-
-| # | アプローチ | 採用期間 | 結果 |
-|---|-----------|---------|------|
-| 1 | 5 点 UV サンプリング + 距離 0.02ft | 初期 | 判定が厳しすぎて検出量が少ない |
-| 2 | 中心点 + 面積比 + Face.Project.Distance 0.05ft | 第2世代 | Face.Project が境界外でも小さい Distance を返すため誤検出 |
-| 3 | ReferenceIntersector (origin 外側 1mm) | 第3世代 | 密着面で隣要素の「反対側の面」にヒット → miss |
-| 4 | ReferenceIntersector (origin 内側 10mm) | 第4世代 | 一部改善するも miss あり |
-| 5 | ReferenceIntersector 両方向レイ | 第5世代 | 一部改善するも miss あり |
-| 6 | ReferenceIntersector + 制限解除 rayView | 第6世代 | 一部改善するも miss あり |
-| 7 | **(現状)** 幾何学的検査 + UV内部判定 + 面積比 | 最新 | まだ miss あり |
-
-### 推定される原因
-- Revit `Face.Project` は面境界外の点でも小さい perpendicular distance を返すが `UVPoint` は境界にクランプされる → UV内部判定で境界近傍を除外しているが Boolean Union 後の面分割で中心点が想定と違う位置にくるケースがある
-- `ReferenceIntersector` は密着面 (Proximity ≈ 0) で挙動が不安定
-- Join Geometry で結合された要素は面の形状が単純な予想と異なる場合がある
+### Phase 1/2 で実装済みのフォールバック
+非対応ケースは Phase 1 の半透明 DirectShape で動作するためリグレッションはしない:
+- 開口付き壁（CurveLoop が穴を含む）
+- カーブウォール
+- 非矩形の面
+- UV投影失敗
 
 ---
 
-## 次セッションで推奨する方針
-
-### 【優先】方針 A: デバッグログで原因特定
-手を動かす前にまず **何がどこで落ちているかを可視化** する。
-
-出力先: `C:\temp\Formwork_debug.txt`
-
-ログすべき内容:
-- Pass 1 完了時: 各要素の face 分類内訳 (Required/Top/Bottom/Contact/...)
-- Pass 2 内: 全ての IsFaceCovered 判定について pass/fail の詳細
-  - 要素A/B の Id, カテゴリ, 面 index, 中心点, 法線, 面積
-  - 法線内積, Face.Project の Distance, UVPoint, UV bounds
-  - **採用/棄却の理由** (条件 1-4 のどれで落ちたか)
-- Pass 2 完了時: 最終 FormworkRequired 面数
-
-ユーザーにテストしてもらいログを共有してもらうことで「**どの接触ペアが何の理由で落ちているか**」を特定できる。
-
-### 方針 B: Boolean Union ベース (仕様書§3.1 の本来方針)
-全要素の Solid をまとめて Union → 結合後の外面のみ抽出 → 内部接触面は自動消滅。
-- 課題: 大量 Union は失敗しやすい、per-element attribution が失われる
-- 対策: 近接要素グループに分割して Union 試行。attribution は Union 前に記録
-
-### 方針 C: Boolean Intersection ベース
-要素ペアの Intersection Solid を計算 → 体積 ≈ 0 かつ表面積 > 0 = 平面接触 → 対応する面を Contact 化
-
-### 方針 D: 2D 多角形オーバーラップ
-反平行+同一平面の面ペアで共通平面に両 CurveLoop を投影 → Sutherland-Hodgman で多角形交差 → 面 A 面積の 50% 以上が面 B に覆われていたら Contact
+## デバッグログ
+- 出力先: `C:\temp\Formwork_debug.txt`
+- 制御フラグ: `FormworkSettings.EnableDebugLog`（デフォルト `true`、UI 非露出）
+- 上限 200,000 行（超えたら `... truncated` で停止）
+- **リリース時は `false` に変更すること**
 
 ---
 
@@ -150,32 +148,35 @@ Phase 1 の面積控除に加え、DirectShape の形状自体も接触領域を
 ```
 Commands/FormworkCalculator/
 ├── FormworkCalculatorCommand.cs       # エントリポイント
+├── HANDOFF.md                         # このファイル
 ├── Models/
-│   ├── FormworkSettings.cs            # UI設定
+│   ├── FormworkSettings.cs            # UI設定（Scope/Categories/Grouping/Color等）
 │   └── FormworkResult.cs              # 計算結果・面情報
 ├── Engine/
-│   ├── ElementCollector.cs            # 要素収集 + レベル/パラメータ取得
+│   ├── ElementCollector.cs            # 要素収集 + カテゴリ判定
 │   ├── SolidUnionProcessor.cs         # Solid 取得 + Boolean Union
-│   ├── FaceClassifier.cs              # 面分類 (Top/Bottom/Required)
-│   ├── ContactFaceDetector.cs         # ★未解決: 接触面検出 (幾何検査版)
+│   ├── FaceClassifier.cs              # 面分類 (Top/Bottom/Required等)
+│   ├── ContactFaceDetector.cs         # 接触面検出（Full + Partial）
+│   ├── PartialContactClipper.cs       # 矩形ベース 2D 差分（Phase 2）
+│   ├── SpatialGrid.cs                 # 空間索引（O(N²)→O(N) 相当）
 │   ├── OpeningProcessor.cs            # 開口部処理
 │   ├── FormworkCalcEngine.cs          # メインエンジン (3-Pass)
 │   ├── FormworkParameterManager.cs    # 共有パラメータ管理
-│   └── FormworkFilterManager.cs       # View Filter 管理
+│   ├── FormworkFilterManager.cs       # View Filter 管理
+│   └── FormworkDebugLog.cs            # デバッグログ
 ├── Output/
 │   ├── ExcelExporter.cs               # Excel 出力
-│   ├── FormworkVisualizer.cs          # 3Dビュー + DirectShape
-│   └── ScheduleCreator.cs             # ViewSchedule 作成
+│   ├── FormworkVisualizer.cs          # 3Dビュー + DirectShape + 視点コピー
+│   └── ScheduleCreator.cs             # 集計表作成（DisplayType=Totals）
 └── Views/
     ├── FormworkDialog.xaml            # メインダイアログ
     └── FormworkDialog.xaml.cs
 ```
 
 ### 3 Pass パイプライン (`FormworkCalcEngine.Run`)
-
 ```
 Pass 1: 要素毎に Solid 取得 → FaceClassifier で分類
-Pass 2: ContactFaceDetector で接触面を DeductedContact に変更 ← ★未解決
+Pass 2: ContactFaceDetector で接触面を DeductedContact に変更
 Pass 3: 開口加算 + ElementResult 作成 + Aggregate
 ```
 
@@ -183,7 +184,7 @@ Pass 3: 開口加算 + ElementResult 作成 + Aggregate
 - `FormworkRequired`: 型枠必要
 - `DeductedTop`: 最上面（スラブは全上向き面）
 - `DeductedBottom`: 最下面（基礎のみ、それ以外は FormworkRequired にコンバート）
-- `DeductedContact`: 他要素との接触面 ← ★
+- `DeductedContact`: 他要素との接触面
 - `DeductedBelowGL`: GL 以下
 - `Inclined`: 傾斜面（現状未使用、全て FormworkRequired 扱い）
 - `Error`: エラー
@@ -194,24 +195,25 @@ Pass 3: 開口加算 + ElementResult 作成 + Aggregate
 - `28Tools_Formwork_レベル` (Text): 参照レベル名
 - `28Tools_Formwork_区分` (Text): 色分けグループキー
 - `28Tools_Formwork_面積` (Area): 面積 (㎡)
+- `28Tools_Formwork_部分接触` (Text "Yes"/"No"): 一部消されている面の識別
 
 ### ビュー・集計表
-- 解析 3D ビュー名: `型枠分析` (日時なし・再実行で上書き)
-- ViewSchedule 名: `型枠数量集計` (日時なし・再実行で上書き)
+- 解析 3D ビュー名: `型枠分析`（再実行で上書き、視点はソース3Dビューを継承）
+- 集計表名: `型枠数量集計`（再実行で上書き）
 - Excel 初期名: `型枠数量集計.xlsx`
-- 集計表のグループ化: レベル → 部位 → タイプ名 (ShowHeader/ShowFooter)
-- 集計表は IsItemized=true (各インスタンス個別表示) + 面積フィールド HasTotals=true (グループ毎・総合計で面積を合算)
+- 集計表のグループ化: レベル → 部位 → タイプ名（ShowHeader/ShowFooter）
+- `IsItemized=true`（インスタンス内訳）+ 面積フィールド `DisplayType=Totals`（合計表示）
 
 ### 色分け
 - `FormworkFilterManager` で View Filter ベース
 - フィルタルール: `28Tools_Formwork_区分 == <groupKey>`
 - 元躯体: RGB(94,94,94) + 20% 透過のオーバーライド
+- 解析ビュー以外では DirectShape を `View.HideElements()` で一括非表示
 
 ---
 
-## ビルド・デプロイ関連
-
-- AutoBuild がローカル Windows で常駐し、main への squash merge を検知して自動再ビルド→デプロイ
-- ブランチ `claude/revit-formwork-addon-SRINI` に push → 自動で main に squash merge される
-- ログ: `AutoBuild.log` / `AutoBuild_detail.log` (リポジトリ直下)
+## ビルド・デプロイ
+- 開発時: `QuickBuild.ps1`（Revit 2022 のみ）
+- 全バージョン: `BuildAll.ps1`
+- 自動デプロイ: ローカル `AutoBuild.ps1` が main の更新を検知して自動再ビルド＆デプロイ
 - 詳細は CLAUDE.md 参照

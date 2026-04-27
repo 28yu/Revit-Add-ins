@@ -1088,6 +1088,102 @@ Commands/FireProtection/
 - **アイコン**: I型梁 + グレー塗潰し被覆 + 3色ブロック（`fire_protection_32.png` / `_96.png`）
 - **リボン登録**: 構造パネル「色分け」セクションに追加済み
 
+## FormworkCalculator（型枠数量算出）設計メモ
+
+### 概要
+構造要素の各面を分類して型枠が必要な面を判定し、面積を自動算出するコマンド。接触面の自動控除（Full + Partial）を含む。
+
+詳細は `Commands/FormworkCalculator/HANDOFF.md` 参照（最新の API 知見・残課題・将来拡張方針を集約）。
+
+### 対象カテゴリ（現状）
+構造柱・構造フレーム・壁・床・構造基礎・階段の6カテゴリ。`Models/FormworkSettings.cs` の `IncludedCategories` で管理。
+
+### 自動作成物
+- DirectShape の色付き型枠オブジェクト（OST_GenericModel）
+- 解析3Dビュー「型枠分析」（再実行で上書き、視点はアクティブ3Dビューを継承）
+- 集計表「型枠数量集計」（レベル → 部位 → タイプ名で階層グループ化）
+- Excel ファイル（任意）
+
+### 処理パイプライン（3 Pass）
+```
+Pass 1: 要素毎に Solid 取得 → FaceClassifier で分類
+Pass 2: ContactFaceDetector で接触面を DeductedContact に変更（Full + Partial 両対応）
+Pass 3: 開口加算 + ElementResult 作成 + Aggregate
+```
+
+### 開発で得た重要な API 知見
+
+#### Revit 2022 では `ScheduleField.HasTotals` が存在しない
+- 当初リフレクションで `HasTotals = true` を試みていたが、Revit 2022 の API には公開プロパティとして存在しない（プロパティ取得結果が null）
+- **正解 API**: `ScheduleField.DisplayType = ScheduleFieldDisplayType.Totals`
+- `ScheduleFieldDisplayType` enum 値は Revit 2021-2026 全バージョンで利用可能（リフレクション不要）
+
+| 値 | UI ラベル |
+|---|---|
+| `Standard` (0) | 計算しない |
+| `Totals` (1) | 合計を計算 |
+| `MinMax` (2) | 最小値と最大値を計算 |
+| `Max` (3) | 最大値を計算 |
+| `Min` (4) | 最小値を計算 |
+
+#### View3D の視点コピー
+```csharp
+if (sourceView is View3D src)
+    targetView.SetOrientation(src.GetOrientation());
+```
+ソースが3Dビューでない場合は何もせず、既定のアイソメトリックを維持する。
+
+#### 解析3Dビューで非表示にすべきカテゴリ
+- `OST_SectionBox`（切断ボックスのアウトライン）
+- `OST_Levels`（レベル線）
+- `view.SetCategoryHidden(catId, true)` で非表示化（事前に `CanCategoryBeHidden` でガード）
+
+#### DirectShape を他ビューから一括非表示
+解析専用 DirectShape が他ビュー（平面・断面・既存3D）に出ると邪魔になるので、`View.HideElements()` で全ビューから一括非表示。集計表・凡例ビューは除外。
+
+### 共有パラメータ（OST_GenericModel にバインド）
+- `28Tools_FormworkMarker` (Text): 識別用 = `"28Tools_Formwork"`
+- `28Tools_Formwork_部位` (Text): 柱/梁/壁/スラブ/基礎/階段
+- `28Tools_Formwork_レベル` (Text): 参照レベル名
+- `28Tools_Formwork_区分` (Text): 色分けグループキー
+- `28Tools_Formwork_面積` (Area): 面積 (㎡)
+- `28Tools_Formwork_部分接触` (Text "Yes"/"No"): 一部消されている面の識別
+
+### デバッグログ
+- 出力先: `C:\temp\Formwork_debug.txt`
+- 制御: `FormworkSettings.EnableDebugLog`（デフォルト `true`、UI 非露出）
+- 上限 200,000 行（超えたら `... truncated` で停止）
+- **リリース時は `false` に変更すること**
+
+### 🎯 今後の機能拡張: マテリアルベース算出
+
+現在は「カテゴリ」（柱・梁・壁等）を判定軸にして対象要素を絞っているが、実プロジェクトでは:
+- 同じカテゴリでも材料が違う（RC柱 vs 鉄骨柱、RC壁 vs ALC壁）
+- ALC・乾式間仕切は型枠不要だが、現状はカテゴリ単位なので対象になってしまう
+
+**拡張方針**: 要素のマテリアル（材料）を判定軸に変更／併用できるようにする。
+
+- ダイアログにマテリアル一覧（複数選択）を追加
+- 「カテゴリで絞る」「マテリアルで絞る」「両方を AND/OR で組合せる」を切替可能に
+- マテリアル取得の優先順位:
+  1. `Element.StructuralMaterialId`（柱・梁・基礎の構造材）
+  2. 複合構造の主構造層（Core）のマテリアル（壁・床）
+  3. タイプの `Material` パラメータ（`MATERIAL_ID_PARAM`）
+  4. インスタンスのマテリアル指定
+  5. ジオメトリ Solid の `Face.MaterialElementId`（最終手段）
+- 集計表のグループ化階層に「マテリアル」を追加できるように
+- 色分け基準にも「マテリアル別」を追加（既存の Category/Zone/FormworkType に並べる）
+- 既存の `IncludedCategories` 設定は維持し、マテリアル機能はオプトインの新規フィールドとして追加（後方互換）
+
+詳細な実装見積りは `HANDOFF.md` 参照。
+
+### 現在のステータス
+- **機能実装**: 完了（接触検出 Phase 1+2、3D視覚化、集計表、Excel出力、視点継承）
+- **動作確認**: Revit 2022 で確認済み
+- **既知の課題**: 一部の特殊形状で接触面検出に漏れあり（Join Geometry で複雑結合された要素・曲面など）
+- **アイコン**: `formwork_32.png` / `formwork_96.png`
+- **リボン登録**: 構造パネルに登録済み
+
 ## 多言語UI（Localization）設計メモ
 
 ### 概要
