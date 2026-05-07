@@ -370,7 +370,9 @@ namespace Tools28.Localization
             { "Formwork.Fatal", "型枠数量算出中に致命的なエラーが発生しました。\n{0}" },
             { "Formwork.ShapesCreated", "型枠面オブジェクト: {0} 個を作成（他ビューでは自動的に非表示）" },
             { "Formwork.ScheduleCreated", "集計表「型枠数量集計」を作成しました" },
-            { "Formwork.SteelExcluded", "鉄骨部材 {0} 個を型枠不要として除外しました（解析ビュー上ではオレンジ色で表示）" },
+            { "Formwork.SteelExcluded", "鉄骨部材 {0} 個を型枠不要として除外しました" },
+            { "Formwork.DeckSlabExcluded", "デッキスラブ {0} 個を型枠不要として除外しました（タイプ名に \"DS\" を含む床）" },
+            { "Formwork.ExcludedFilterNote", "（除外要素は解析3Dビューの「型枠_除外」フィルタで非表示。表示 ON で確認可能）" },
         };
     }
 }

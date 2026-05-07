@@ -8,22 +8,23 @@ namespace Tools28.Commands.FormworkCalculator.Engine
     internal static class ElementCollector
     {
         /// <summary>
-        /// 鉄骨と判定されて除外された要素 1 件分の情報。
+        /// 型枠不要として除外された要素 1 件分の情報。
         /// </summary>
-        internal class ExcludedSteelEntry
+        internal class ExcludedEntry
         {
             public Element Element;
-            public SteelMemberDetector.DetectionLayer Layer;
+            public ExclusionKind Kind;
+            public string Layer = string.Empty;
             public string Reason = string.Empty;
         }
 
         /// <summary>
-        /// 要素収集結果。型枠算出対象の Targets と、鉄骨として除外された ExcludedSteel の 2 リスト。
+        /// 要素収集結果。型枠算出対象の Targets と、除外された Excluded の 2 リスト。
         /// </summary>
         internal class CollectionResult
         {
             public List<Element> Targets = new List<Element>();
-            public List<ExcludedSteelEntry> ExcludedSteel = new List<ExcludedSteelEntry>();
+            public List<ExcludedEntry> Excluded = new List<ExcludedEntry>();
         }
 
         private static readonly Dictionary<string, BuiltInCategory> _nameToCat
@@ -45,41 +46,67 @@ namespace Tools28.Commands.FormworkCalculator.Engine
 
             bool exclude = settings?.ExcludeSteelMembers ?? true;
 
-            FormworkDebugLog.Section("Steel Member Detection");
+            FormworkDebugLog.Section("Exclusion Detection (Steel + DeckSlab)");
             int steelCount = 0;
+            int deckCount = 0;
             foreach (var elem in raw)
             {
-                bool isCheckTarget = exclude && IsSteelDetectionTarget(elem);
-                if (isCheckTarget)
+                if (exclude)
                 {
-                    var det = SteelMemberDetector.Detect(elem, doc);
-                    if (det != null && det.IsSteel)
+                    // 構造柱・構造フレーム → 鉄骨判定
+                    if (IsSteelDetectionTarget(elem))
                     {
-                        cr.ExcludedSteel.Add(new ExcludedSteelEntry
+                        var det = SteelMemberDetector.Detect(elem, doc);
+                        if (det != null && det.IsSteel)
                         {
-                            Element = elem,
-                            Layer = det.Layer,
-                            Reason = det.Reason ?? string.Empty,
-                        });
-                        FormworkDebugLog.Log(
-                            $"  [SteelExclude] E{elem.Id.IntegerValue} " +
-                            $"Cat={elem.Category?.Name} Name='{elem.Name}' " +
-                            $"L={det.Layer} reason={det.Reason}");
-                        steelCount++;
-                        continue;
+                            cr.Excluded.Add(new ExcludedEntry
+                            {
+                                Element = elem,
+                                Kind = ExclusionKind.Steel,
+                                Layer = det.Layer.ToString(),
+                                Reason = det.Reason ?? string.Empty,
+                            });
+                            FormworkDebugLog.Log(
+                                $"  [SteelExclude] E{elem.Id.IntegerValue} " +
+                                $"Cat={elem.Category?.Name} Name='{elem.Name}' " +
+                                $"L={det.Layer} reason={det.Reason}");
+                            steelCount++;
+                            continue;
+                        }
+                        else if (det != null && FormworkDebugLog.Enabled)
+                        {
+                            FormworkDebugLog.Log(
+                                $"  [SteelKeep]    E{elem.Id.IntegerValue} " +
+                                $"Cat={elem.Category?.Name} Name='{elem.Name}' " +
+                                $"reason={det.Reason}");
+                        }
                     }
-                    else if (det != null && FormworkDebugLog.Enabled)
+
+                    // 床カテゴリ → デッキスラブ判定 (タイプ名/要素名に "DS" を含む)
+                    if (IsDeckSlabDetectionTarget(elem))
                     {
-                        FormworkDebugLog.Log(
-                            $"  [SteelKeep]    E{elem.Id.IntegerValue} " +
-                            $"Cat={elem.Category?.Name} Name='{elem.Name}' " +
-                            $"reason={det.Reason}");
+                        if (DeckSlabDetector.IsDeckSlab(elem, doc, out string deckReason))
+                        {
+                            cr.Excluded.Add(new ExcludedEntry
+                            {
+                                Element = elem,
+                                Kind = ExclusionKind.DeckSlab,
+                                Layer = "NamePattern",
+                                Reason = deckReason,
+                            });
+                            FormworkDebugLog.Log(
+                                $"  [DeckSlabExclude] E{elem.Id.IntegerValue} " +
+                                $"Cat={elem.Category?.Name} reason={deckReason}");
+                            deckCount++;
+                            continue;
+                        }
                     }
                 }
                 cr.Targets.Add(elem);
             }
             FormworkDebugLog.Log(
-                $"  Steel detection: target={raw.Count} excluded={steelCount} kept={cr.Targets.Count}");
+                $"  Exclusion detection: total={raw.Count} steelExcluded={steelCount} " +
+                $"deckSlabExcluded={deckCount} kept={cr.Targets.Count}");
             FormworkDebugLog.Flush();
 
             return cr;
@@ -94,6 +121,15 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             int catId = elem.Category.Id.IntegerValue;
             return catId == (int)BuiltInCategory.OST_StructuralColumns
                 || catId == (int)BuiltInCategory.OST_StructuralFraming;
+        }
+
+        /// <summary>
+        /// デッキスラブ検出の対象カテゴリ判定。床のみ対象とする。
+        /// </summary>
+        private static bool IsDeckSlabDetectionTarget(Element elem)
+        {
+            if (elem?.Category == null) return false;
+            return elem.Category.Id.IntegerValue == (int)BuiltInCategory.OST_Floors;
         }
 
         internal static List<Element> Collect(Document doc, FormworkSettings settings, View activeView)

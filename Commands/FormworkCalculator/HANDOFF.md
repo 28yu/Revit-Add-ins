@@ -5,6 +5,30 @@
 
 ---
 
+## 2026-05-07 セッション後半: デッキスラブ除外と除外フィルタ既定非表示
+
+- 床カテゴリのうち**タイプ名に "DS" を含む**ものをデッキスラブとして自動除外
+  - `Engine/DeckSlabDetector.cs`（`Floor.GetTypeId() → ElementType.Name` を検査、半角 "DS" / 全角 "ＤＳ"）
+- 解析3Dビューの**除外フィルタは既定で非表示**（チェック OFF）
+  - `FormworkFilterManager.ApplyColorFilters` で `key == ExcludedGroupKey` のときのみ `SetFilterVisibility(false)`
+  - ユーザーが手動で ON にすると除外要素のオレンジ表示を確認できる
+- 除外概念を一般化（鉄骨専用 → 鉄骨＋デッキスラブ）
+  - `ExcludedSteelResult` → `ExcludedResult` に名称変更（`Kind` enum を追加: `Steel` / `DeckSlab`）
+  - `MarkerValueSteel` → `MarkerValueExcluded` (`28Tools_Formwork_Excluded`)
+  - `SteelExcludedGroupKey` → `ExcludedGroupKey` (値: `"除外"`、フィルタ名 `"型枠_除外"`)
+  - 部位ラベルは Kind 別: `SteelExcludedLabel = "鉄骨(除外)"` / `DeckSlabExcludedLabel = "デッキスラブ(除外)"`
+- `CleanupExistingFormworkShapes` を `StartsWith("28Tools_Formwork")` ベースに変更
+  （旧 `28Tools_Formwork_Steel` マーカーも自動回収）
+- 完了ダイアログを多項目化（鉄骨件数 / デッキスラブ件数 / フィルタ説明）
+
+### 検出パターン (デッキスラブ)
+- `Floor.GetTypeId()` → `ElementType.Name` をチェック
+- ヒット条件: 半角 "DS" を **`Contains`** で検出（"DS150"・"Deck-DS"・"ALC-DS" 等を全て拾う）
+- 全角 "ＤＳ" もカバー
+- 大文字限定（"ds" は対象外）
+
+---
+
 ## 2026-05-07 セッション: 鉄骨部材の自動除外を追加
 
 構造柱・構造フレームの中から、型枠不要な鉄骨部材

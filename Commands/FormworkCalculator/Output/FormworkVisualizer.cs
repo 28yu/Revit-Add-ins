@@ -37,8 +37,8 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 { CategoryGroup.Other,      (180, 180, 180) },
             };
 
-        // 鉄骨除外要素のオレンジ系統色 (躯体グレー・型枠色と区別)
-        private static readonly (byte R, byte G, byte B) _steelExcludedColor = (255, 145, 30);
+        // 型枠不要として除外された要素のオレンジ系統色 (躯体グレー・型枠色と区別)
+        private static readonly (byte R, byte G, byte B) _excludedColor = (255, 145, 30);
 
         private static readonly (byte R, byte G, byte B)[] _autoPalette = new (byte, byte, byte)[]
         {
@@ -93,9 +93,9 @@ namespace Tools28.Commands.FormworkCalculator.Output
             if (settings.ShowDeductedFaces)
                 keyAssignment["控除面"] = (180, 180, 180);
 
-            // 鉄骨除外要素がある場合、オレンジ系のキーを追加（View Filter で色付け）
-            if (result.ExcludedSteelResults != null && result.ExcludedSteelResults.Count > 0)
-                keyAssignment[FormworkParameterManager.SteelExcludedGroupKey] = _steelExcludedColor;
+            // 除外要素がある場合、オレンジ系のキーを追加（View Filter で色付け、既定で非表示）
+            if (result.ExcludedResults != null && result.ExcludedResults.Count > 0)
+                keyAssignment[FormworkParameterManager.ExcludedGroupKey] = _excludedColor;
 
             vr.KeyColors = new Dictionary<string, (byte, byte, byte)>(keyAssignment);
 
@@ -230,8 +230,8 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 }
             }
 
-            // 鉄骨除外要素を別マーカーの DirectShape として作成（オレンジで色分け）
-            CreateExcludedSteelShapes(doc, result, vr);
+            // 除外要素 (鉄骨・デッキスラブ) を別マーカーの DirectShape として作成（オレンジ）
+            CreateExcludedShapes(doc, result, vr);
 
             // View Filter による色分けを適用（個別要素オーバーライドは使わない）
             try
@@ -244,20 +244,21 @@ namespace Tools28.Commands.FormworkCalculator.Output
         }
 
         /// <summary>
-        /// 鉄骨と判定されて除外された要素の DirectShape を作成する。
+        /// 型枠不要として除外された要素 (鉄骨・デッキスラブ) の DirectShape を作成する。
         /// 元要素の Solid をそのまま流用してオレンジ色で表示する。
         /// 集計表からは別マーカー値で除外される (ScheduleCreator のフィルタが MarkerValue のみ通す)。
+        /// View Filter は既定で非表示なので、ユーザーが手動で ON にしないと見えない。
         /// </summary>
-        private static void CreateExcludedSteelShapes(
+        private static void CreateExcludedShapes(
             Document doc,
             FormworkResult result,
             VisualizerResult vr)
         {
-            if (result.ExcludedSteelResults == null || result.ExcludedSteelResults.Count == 0)
+            if (result.ExcludedResults == null || result.ExcludedResults.Count == 0)
                 return;
 
             int created = 0;
-            foreach (var ex in result.ExcludedSteelResults)
+            foreach (var ex in result.ExcludedResults)
             {
                 Element src = null;
                 try { src = doc.GetElement(new ElementId(ex.ElementId)); } catch { }
@@ -273,6 +274,8 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 string levelName = string.Empty;
                 try { levelName = Engine.ElementCollector.GetElementLevelName(src); } catch { }
 
+                string label = ExcludedKindLabel(ex.Kind);
+
                 bool firstShape = true;
                 foreach (var solid in emit)
                 {
@@ -281,17 +284,17 @@ namespace Tools28.Commands.FormworkCalculator.Output
                         var catOst = new ElementId(BuiltInCategory.OST_GenericModel);
                         var ds = DirectShape.CreateElement(doc, catOst);
                         ds.ApplicationId = "Tools28";
-                        ds.ApplicationDataId = "FormworkSteel";
+                        ds.ApplicationDataId = "FormworkExcluded";
                         ds.SetShape(new GeometryObject[] { solid });
 
                         try
                         {
                             FormworkParameterManager.SetInstanceValues(
                                 ds,
-                                FormworkParameterManager.MarkerValueSteel,
-                                FormworkParameterManager.SteelExcludedLabel,
+                                FormworkParameterManager.MarkerValueExcluded,
+                                label,
                                 levelName,
-                                FormworkParameterManager.SteelExcludedGroupKey,
+                                FormworkParameterManager.ExcludedGroupKey,
                                 0.0,
                                 false);
                         }
@@ -305,7 +308,17 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 }
             }
 
-            FormworkDebugLog.Log($"  [SteelShapes] excluded element shapes created: {created}");
+            FormworkDebugLog.Log($"  [ExcludedShapes] excluded element shapes created: {created}");
+        }
+
+        private static string ExcludedKindLabel(ExclusionKind kind)
+        {
+            switch (kind)
+            {
+                case ExclusionKind.Steel: return FormworkParameterManager.SteelExcludedLabel;
+                case ExclusionKind.DeckSlab: return FormworkParameterManager.DeckSlabExcludedLabel;
+                default: return FormworkParameterManager.SteelExcludedLabel;
+            }
         }
 
         /// <summary>
@@ -472,8 +485,8 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 XYZ minP = null, maxP = null;
                 var ids = new List<int>();
                 foreach (var er in result.ElementResults) ids.Add(er.ElementId);
-                if (result.ExcludedSteelResults != null)
-                    foreach (var ex in result.ExcludedSteelResults) ids.Add(ex.ElementId);
+                if (result.ExcludedResults != null)
+                    foreach (var ex in result.ExcludedResults) ids.Add(ex.ElementId);
 
                 foreach (var id in ids)
                 {
@@ -514,9 +527,9 @@ namespace Tools28.Commands.FormworkCalculator.Output
         }
 
         /// <summary>
-        /// 28Tools_FormworkMarker パラメータに "28Tools_Formwork" または
-        /// "28Tools_Formwork_Steel" の値を持つ既存 DirectShape を全て削除する
-        /// （再実行時の累積を防ぐ）。
+        /// 28Tools_FormworkMarker が "28Tools_Formwork" で始まる既存 DirectShape を全て削除する
+        /// （再実行時の累積を防ぐ）。MarkerValue / MarkerValueExcluded / 旧バージョンの
+        /// "28Tools_Formwork_Steel" 等を全てカバーする。
         /// </summary>
         private static void CleanupExistingFormworkShapes(Document doc)
         {
@@ -532,8 +545,8 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     if (p != null && p.StorageType == StorageType.String)
                     {
                         string val = p.AsString();
-                        if (val == FormworkParameterManager.MarkerValue ||
-                            val == FormworkParameterManager.MarkerValueSteel)
+                        if (!string.IsNullOrEmpty(val) &&
+                            val.StartsWith(FormworkParameterManager.MarkerValue))
                         {
                             toDelete.Add(e.Id);
                         }

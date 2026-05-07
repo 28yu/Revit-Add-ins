@@ -20,15 +20,18 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         public const string ParamPartialContact = "28Tools_Formwork_部分接触"; // "Yes"/"No" - T字結合等で主面の一部が他要素に接触
 
         public const string MarkerValue = "28Tools_Formwork";
-        // 鉄骨除外用 DirectShape のマーカー値。集計表は MarkerValue のみを対象とし、
-        // この値を持つ DirectShape は集計から除外される。クリーンアップは両方を削除する。
-        public const string MarkerValueSteel = "28Tools_Formwork_Steel";
+        // 型枠不要として除外された要素 DirectShape のマーカー値。集計表は MarkerValue のみを
+        // 対象とし、この値を持つ DirectShape は集計から除外される。
+        // クリーンアップは "28Tools_Formwork" で始まる全マーカーを対象とする。
+        public const string MarkerValueExcluded = "28Tools_Formwork_Excluded";
 
-        // 集計表で表示する鉄骨除外要素の部位ラベル
+        // 部位ラベル（種別ごと）。集計表に表示される（ただし現状は MarkerValue でフィルタされ非表示）。
         public const string SteelExcludedLabel = "鉄骨(除外)";
+        public const string DeckSlabExcludedLabel = "デッキスラブ(除外)";
 
-        // View Filter のグループキー（FormworkVisualizer の AssignColors から参照）
-        public const string SteelExcludedGroupKey = "鉄骨除外";
+        // View Filter のグループキー。除外要素は全て同じキー・色・フィルタを共有し、
+        // 解析ビュー上では既定で非表示（ユーザーが手動で ON にすると確認可能）。
+        public const string ExcludedGroupKey = "除外";
 
         private const string SharedParamGroupName = "Tools28_Formwork";
         private const string SharedParamFileName = "Tools28_Formwork.txt";

@@ -65,7 +65,7 @@ namespace Tools28.Commands.FormworkCalculator
                 }
 
                 if (result == null ||
-                    (result.ProcessedElementCount == 0 && result.ExcludedSteelResults.Count == 0))
+                    (result.ProcessedElementCount == 0 && result.ExcludedResults.Count == 0))
                 {
                     TaskDialog.Show(Loc.S("Common.Warning"), Loc.S("Formwork.NoElements"));
                     return Result.Cancelled;
@@ -179,9 +179,20 @@ namespace Tools28.Commands.FormworkCalculator
                 if (scheduleViewId != null)
                     summary += "\n" + Loc.S("Formwork.ScheduleCreated");
 
-                if (result.ExcludedSteelResults != null && result.ExcludedSteelResults.Count > 0)
-                    summary += "\n\n" + string.Format(
-                        Loc.S("Formwork.SteelExcluded"), result.ExcludedSteelResults.Count);
+                if (result.ExcludedResults != null && result.ExcludedResults.Count > 0)
+                {
+                    int steelN = 0, deckN = 0;
+                    foreach (var ex in result.ExcludedResults)
+                    {
+                        if (ex.Kind == ExclusionKind.Steel) steelN++;
+                        else if (ex.Kind == ExclusionKind.DeckSlab) deckN++;
+                    }
+                    if (steelN > 0)
+                        summary += "\n\n" + string.Format(Loc.S("Formwork.SteelExcluded"), steelN);
+                    if (deckN > 0)
+                        summary += "\n" + string.Format(Loc.S("Formwork.DeckSlabExcluded"), deckN);
+                    summary += "\n" + Loc.S("Formwork.ExcludedFilterNote");
+                }
 
                 if (result.Errors.Count > 0)
                     summary += "\n\n" + string.Format(Loc.S("Formwork.ErrorCount"), result.Errors.Count);

@@ -79,7 +79,10 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                     ogs.SetSurfaceBackgroundPatternVisible(false);
 
                     view.SetFilterOverrides(filter.Id, ogs);
-                    view.SetFilterVisibility(filter.Id, true);
+
+                    // 除外フィルタは既定で非表示（ユーザーが手動で ON にすると確認可能）。
+                    bool defaultVisible = key != FormworkParameterManager.ExcludedGroupKey;
+                    view.SetFilterVisibility(filter.Id, defaultVisible);
                 }
                 catch { }
             }

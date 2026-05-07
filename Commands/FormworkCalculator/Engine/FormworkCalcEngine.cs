@@ -49,19 +49,20 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             result.ProcessedElementCount = elements.Count;
             FormworkDebugLog.Log(
                 $"Collected elements: targets={elements.Count} " +
-                $"excludedSteel={collection.ExcludedSteel.Count}");
+                $"excluded={collection.Excluded.Count}");
 
-            // 鉄骨除外要素を ExcludedSteelResult として記録 (集計には含めない)
-            foreach (var ex in collection.ExcludedSteel)
+            // 除外要素を ExcludedResult として記録 (集計には含めない)
+            foreach (var ex in collection.Excluded)
             {
                 var e = ex.Element;
-                result.ExcludedSteelResults.Add(new ExcludedSteelResult
+                result.ExcludedResults.Add(new ExcludedResult
                 {
                     ElementId = e.Id.IntegerValue,
                     ElementName = e.Name ?? string.Empty,
                     Category = ElementCollector.ToCategoryGroup(e),
                     CategoryName = e.Category?.Name ?? string.Empty,
-                    DetectionLayer = ex.Layer.ToString(),
+                    Kind = ex.Kind,
+                    DetectionLayer = ex.Layer,
                     DetectionReason = ex.Reason,
                 });
             }
