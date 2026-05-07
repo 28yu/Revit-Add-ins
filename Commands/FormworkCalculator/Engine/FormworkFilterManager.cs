@@ -27,11 +27,19 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             };
 
             ElementId solidFillId = GetDraftingSolidFillPatternId(doc);
+            Engine.FormworkDebugLog.Log(
+                $"  [Filter] solidFillPatternId={(solidFillId != null && solidFillId != ElementId.InvalidElementId ? solidFillId.IntegerValue.ToString() : "INVALID")}");
 
             // 区分パラメータの ElementId を取得（DirectShape から）
             ElementId paramElemId = GetSharedParameterIdFromDirectShape(
                 doc, FormworkParameterManager.ParamGroupKey);
-            if (paramElemId == null) return;
+            if (paramElemId == null)
+            {
+                Engine.FormworkDebugLog.Log("  [Filter] paramElemId is null - filters cannot be created");
+                return;
+            }
+            Engine.FormworkDebugLog.Log(
+                $"  [Filter] paramElemId={paramElemId.IntegerValue} (28Tools_Formwork_区分)");
 
             // 既存の型枠_* フィルタをビューから外して再作成
             RemoveExistingFiltersFromView(doc, view);
@@ -77,6 +85,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                         ogs.SetSurfaceForegroundPatternId(solidFillId);
                     ogs.SetSurfaceForegroundPatternVisible(true);
                     ogs.SetSurfaceBackgroundPatternVisible(false);
+                    ogs.SetSurfaceTransparency(0); // formwork は完全不透明で表示
 
                     view.SetFilterOverrides(filter.Id, ogs);
 

@@ -80,6 +80,24 @@ namespace Tools28.Commands.FormworkCalculator.Output
             }
             try { view.DetailLevel = ViewDetailLevel.Fine; } catch { }
 
+            // OST_GenericModel (DirectShape のカテゴリ) を明示的に表示状態にする。
+            // ビューテンプレートやデフォルト設定で非表示になっている場合への防御。
+            try
+            {
+                var gmCatId = new ElementId(BuiltInCategory.OST_GenericModel);
+                if (view.CanCategoryBeHidden(gmCatId))
+                {
+                    bool wasHidden = view.GetCategoryHidden(gmCatId);
+                    view.SetCategoryHidden(gmCatId, false);
+                    FormworkDebugLog.Log(
+                        $"  [Visual] OST_GenericModel category was hidden={wasHidden} → set visible");
+                }
+            }
+            catch (Exception ex)
+            {
+                FormworkDebugLog.Log($"  [Visual] OST_GenericModel category set EX: {ex.Message}");
+            }
+
             // ソースが 3D ビューなら視点（カメラの向き）を継承する
             CopyOrientationIfPossible(sourceView, view);
 
@@ -605,7 +623,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
             {
                 var gray = new Color(94, 94, 94);
                 var ogs = new OverrideGraphicSettings();
-                ogs.SetSurfaceTransparency(20);
+                ogs.SetSurfaceTransparency(50);  // formwork が前景で目立つよう半透明
                 ogs.SetSurfaceForegroundPatternColor(gray);
                 ogs.SetSurfaceBackgroundPatternColor(gray);
                 ogs.SetProjectionLineColor(gray);
@@ -672,7 +690,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 XYZ n = fi.Normal?.Normalize();
                 if (n == null) return null;
 
-                double thickness = 0.03;  // 約 10mm
+                double thickness = 0.05;  // 約 15mm (視認性向上のため厚めに)
                 try
                 {
                     return GeometryCreationUtilities.CreateExtrusionGeometry(edges, n, thickness);
