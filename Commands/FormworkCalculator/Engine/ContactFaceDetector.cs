@@ -280,8 +280,9 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 sb.Append(" uv=").Append(FmtUV(uv));
                 sb.Append(" overlap=");
                 if (overlapRatio >= 0) sb.Append(Fmt(overlapRatio, 3));
-                else if (overlapFailReason != null) sb.Append("-(").Append(overlapFailReason).Append(")");
                 else sb.Append("-");
+                if (overlapFailReason != null)
+                    sb.Append("(").Append(overlapFailReason).Append(")");
                 if (stage1Accepted)
                 {
                     sb.Append(" FULL_CONTACT");
@@ -384,46 +385,71 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             failReason = null;
             if (bbA == null || bbB == null) { failReason = "bb-null"; return -1; }
 
-            // a の 4 隅を b に投影 → b の UV 系での AABB を取得
-            // (ProjectBCornersToA は「第3引数の UV 隅を、第2引数の面で評価して、
-            //  第1引数の面に投影する」関数なので、a の隅 → b に投影するには
-            //  ProjectBCornersToA(b, a, bbA) と呼ぶ)
-            int okCount;
-            BoundingBoxUV bbAonB = ProjectBCornersToA(b, a, bbA, out okCount);
-            if (bbAonB == null)
+            // a の 4 隅を b に投影 (ProjectBCornersToA(b, a, bbA) で a の隅を b に投影)。
+            // okCount       = 投影距離 ≤ tol で「b 面上にある」と判定された隅数
+            // offFaceCount  = 投影は成功したが距離 > tol (b 面の外側にはみ出している)
+            // exceptionCount= Evaluate/Project が例外/null (curved face 等の API 失敗)
+            int okCount, offFaceCount, exceptionCount;
+            BoundingBoxUV bbAonB = ProjectBCornersToA(
+                b, a, bbA, out okCount, out offFaceCount, out exceptionCount);
+
+            // 例外が 2 件以上発生 = データ不安定 → 既存ロジック (中心投影 + 面積比) を信頼
+            if (exceptionCount >= 2)
             {
-                failReason = "proj-fail-ok=" + okCount;
+                failReason = "ex=" + exceptionCount;
                 return -1;
             }
 
-            double aBBuv = (bbAonB.Max.U - bbAonB.Min.U) * (bbAonB.Max.V - bbAonB.Min.V);
-            if (aBBuv <= 1e-9) { failReason = "abb-zero"; return -1; }
+            // 4 隅すべてが b 面上 → AABB 交差で精密判定
+            if (okCount == 4 && bbAonB != null)
+            {
+                double aBBuv = (bbAonB.Max.U - bbAonB.Min.U) * (bbAonB.Max.V - bbAonB.Min.V);
+                if (aBBuv <= 1e-9) { failReason = "abb-zero"; return -1; }
 
-            double iuMin = Math.Max(bbAonB.Min.U, bbB.Min.U);
-            double ivMin = Math.Max(bbAonB.Min.V, bbB.Min.V);
-            double iuMax = Math.Min(bbAonB.Max.U, bbB.Max.U);
-            double ivMax = Math.Min(bbAonB.Max.V, bbB.Max.V);
+                double iuMin = Math.Max(bbAonB.Min.U, bbB.Min.U);
+                double ivMin = Math.Max(bbAonB.Min.V, bbB.Min.V);
+                double iuMax = Math.Min(bbAonB.Max.U, bbB.Max.U);
+                double ivMax = Math.Min(bbAonB.Max.V, bbB.Max.V);
 
-            if (iuMax <= iuMin || ivMax <= ivMin) return 0;
+                if (iuMax <= iuMin || ivMax <= ivMin) return 0;
 
-            double overlapUV = (iuMax - iuMin) * (ivMax - ivMin);
-            return overlapUV / aBBuv;
+                double overlapUV = (iuMax - iuMin) * (ivMax - ivMin);
+                return overlapUV / aBBuv;
+            }
+
+            // 一部の隅が b の外 (= a が b より広く露出している)
+            // 保守的に「on-face 隅の割合」を重なり比として返す
+            //   okCount=0 → 0 (重なりほぼなし)
+            //   okCount=1 → 0.25
+            //   okCount=2 → 0.50
+            //   okCount=3 → 0.75
+            // これで閾値 0.95 を確実に下回り Stage 2 (Partial) にフォールスルーする。
+            failReason = "ok=" + okCount + "/off=" + offFaceCount;
+            return okCount / 4.0;
         }
 
         private static BoundingBoxUV ProjectBCornersToA(Face a, Face b, BoundingBoxUV bbB)
         {
-            int _;
-            return ProjectBCornersToA(a, b, bbB, out _);
+            int _, __, ___;
+            return ProjectBCornersToA(a, b, bbB, out _, out __, out ___);
         }
 
         /// <summary>
         /// 面 b の 4 隅 (BoundingBoxUV の 4 隅) を面 a に投影し、
         /// 投影先 UV を囲む AABB (Axis-Aligned Bounding Box in UV) を返す。
         /// 投影失敗や全て境界外の場合は null を返す (→ Phase 2 フォールバック)。
+        ///
+        /// `okCount`        = 投影距離 ≤ tol で「a 面上にある」と判定された隅数
+        /// `offFaceCount`   = 投影成功したが距離 > tol (a 面から外にはみ出している)
+        /// `exceptionCount` = Evaluate / Project が例外 / null (curved face 等の API 失敗)
         /// </summary>
-        private static BoundingBoxUV ProjectBCornersToA(Face a, Face b, BoundingBoxUV bbB, out int okCount)
+        private static BoundingBoxUV ProjectBCornersToA(
+            Face a, Face b, BoundingBoxUV bbB,
+            out int okCount, out int offFaceCount, out int exceptionCount)
         {
             okCount = 0;
+            offFaceCount = 0;
+            exceptionCount = 0;
             var corners = new UV[]
             {
                 new UV(bbB.Min.U, bbB.Min.V),
@@ -438,13 +464,18 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             foreach (var c in corners)
             {
                 XYZ p;
-                try { p = b.Evaluate(c); } catch { continue; }
-                if (p == null) continue;
+                try { p = b.Evaluate(c); } catch { exceptionCount++; continue; }
+                if (p == null) { exceptionCount++; continue; }
 
                 IntersectionResult proj;
-                try { proj = a.Project(p); } catch { continue; }
-                if (proj == null || proj.UVPoint == null) continue;
-                if (proj.Distance > CoincidenceTolFeet * 2) continue; // 許容 2倍
+                try { proj = a.Project(p); } catch { exceptionCount++; continue; }
+                if (proj == null || proj.UVPoint == null) { exceptionCount++; continue; }
+
+                if (proj.Distance > CoincidenceTolFeet * 2)
+                {
+                    offFaceCount++;
+                    continue;
+                }
 
                 var uv = proj.UVPoint;
                 if (uv.U < uMin) uMin = uv.U;
