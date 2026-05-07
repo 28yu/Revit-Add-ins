@@ -357,9 +357,9 @@ namespace Tools28.Commands.FormworkCalculator.Output
         }
 
         /// <summary>
-        /// 集計表の列ヘッダー (Body 行 0) を太字・赤字・薄黄背景でスタイル設定する。
-        /// Revit API は Body 行 0 (列ヘッダー) のスタイル変更のみを許可するため、
-        /// 動的な値の直上に styled なラベルを置くのに使う。
+        /// 集計表の列ヘッダー (Body 行 0) を太字・赤字・薄黄背景でスタイル設定し、
+        /// 列幅を広く確保してタイトル「&lt;型枠数量集計_合計&gt;」が改行しないようにする。
+        /// データ行のフォントサイズも可能な限り拡大する。
         /// </summary>
         private static void StyleColumnHeaders(ViewSchedule schedule)
         {
@@ -377,35 +377,158 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     $"  [Sched:Summary] body rows={rowCount} cols={colCount}");
                 if (colCount <= 0 || rowCount <= 0) return;
 
-                var style = new TableCellStyle
+                // 列幅を広く設定 (タイトル「<型枠数量集計_合計>」が改行しない総幅を確保)。
+                // Revit 内部単位は feet。0.5 ft ≈ 152mm。
+                for (int c = 0; c < colCount; c++)
+                {
+                    try
+                    {
+                        body.SetColumnWidth(c, 0.5);
+                        FormworkDebugLog.Log($"  [Sched:Summary] col {c} width=0.5 ft");
+                    }
+                    catch (Exception ex)
+                    {
+                        FormworkDebugLog.Log(
+                            $"  [Sched:Summary] SetColumnWidth col={c} EX: {ex.Message}");
+                    }
+                }
+
+                // 列ヘッダー (Body 行 0) のスタイル: 太字・赤字・薄黄背景・大きめフォント
+                // Revit 内部単位 (feet): デフォルト ≈ 0.0104 ft。0.0208 ft ≈ 倍 (16pt 相当)。
+                var headerStyle = new TableCellStyle
                 {
                     BackgroundColor = new Color(255, 240, 200), // 薄い黄色
                     TextColor = new Color(192, 0, 0),           // 赤
                     IsFontBold = true,
+                    FontHorizontalAlignment = HorizontalAlignmentStyle.Center,
                 };
-                var ov = style.GetCellStyleOverrideOptions();
+                // FontSize はバージョンによっては存在しない可能性があるため try で
+                TrySetTableCellStyleFontSize(headerStyle, 0.0208);
+
+                var ov = headerStyle.GetCellStyleOverrideOptions();
                 ov.BackgroundColor = true;
                 ov.FontColor = true;
                 ov.Bold = true;
-                style.SetCellStyleOverrideOptions(ov);
+                TrySetOverrideOption(ov, "FontSize", true);
+                TrySetOverrideOption(ov, "HorizontalAlignment", true);
+                headerStyle.SetCellStyleOverrideOptions(ov);
 
-                // Body 行 0 = 列ヘッダー
                 for (int c = 0; c < colCount; c++)
                 {
-                    try { body.SetCellStyle(0, c, style); }
+                    try { body.SetCellStyle(0, c, headerStyle); }
                     catch (Exception ex)
                     {
                         FormworkDebugLog.Log(
                             $"  [Sched:Summary] SetCellStyle col={c} EX: {ex.Message}");
                     }
                 }
-                FormworkDebugLog.Log("  [Sched:Summary] column headers styled");
+                FormworkDebugLog.Log(
+                    "  [Sched:Summary] column headers styled (bold/red/yellow, large font)");
+
+                // データ行のフォントも拡大 (リフレクションで複数候補を試す)
+                TryEnlargeDataFont(schedule, 0.0156);
             }
             catch (Exception ex)
             {
                 FormworkDebugLog.Log(
                     $"  [Sched:Summary] StyleColumnHeaders EX: {ex.GetType().Name}: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// データ行 (Body 行 1+) のフォントサイズを拡大する。
+        /// ScheduleField の CellStyle / SetStyle をリフレクションで試行。
+        /// </summary>
+        private static void TryEnlargeDataFont(ViewSchedule schedule, double fontSize)
+        {
+            if (schedule == null) return;
+            try
+            {
+                var def = schedule.Definition;
+                int fc = def.GetFieldCount();
+                for (int i = 0; i < fc; i++)
+                {
+                    ScheduleField field = null;
+                    try { field = def.GetField(i); } catch { }
+                    if (field == null) continue;
+                    try { if (field.IsHidden) continue; } catch { }
+
+                    var dataStyle = new TableCellStyle();
+                    TrySetTableCellStyleFontSize(dataStyle, fontSize);
+                    var ov = dataStyle.GetCellStyleOverrideOptions();
+                    TrySetOverrideOption(ov, "FontSize", true);
+                    dataStyle.SetCellStyleOverrideOptions(ov);
+
+                    var t = field.GetType();
+                    bool applied = false;
+
+                    // 候補 1: プロパティ "CellStyle" の setter
+                    try
+                    {
+                        var prop = t.GetProperty("CellStyle");
+                        if (prop != null && prop.CanWrite &&
+                            prop.PropertyType == typeof(TableCellStyle))
+                        {
+                            prop.SetValue(field, dataStyle);
+                            applied = true;
+                            FormworkDebugLog.Log($"  [Sched:Summary] field[{i}] CellStyle set");
+                        }
+                    }
+                    catch (Exception ex) { LogReflEx($"field[{i}].CellStyle", ex); }
+
+                    // 候補 2: メソッド "SetStyle(TableCellStyle)"
+                    if (!applied)
+                    {
+                        try
+                        {
+                            var m = t.GetMethod("SetStyle", new[] { typeof(TableCellStyle) });
+                            if (m != null)
+                            {
+                                m.Invoke(field, new object[] { dataStyle });
+                                applied = true;
+                                FormworkDebugLog.Log($"  [Sched:Summary] field[{i}] SetStyle invoked");
+                            }
+                        }
+                        catch (Exception ex) { LogReflEx($"field[{i}].SetStyle", ex); }
+                    }
+
+                    if (!applied)
+                        FormworkDebugLog.Log($"  [Sched:Summary] field[{i}] no font API found");
+                }
+            }
+            catch (Exception ex)
+            {
+                FormworkDebugLog.Log(
+                    $"  [Sched:Summary] TryEnlargeDataFont EX: {ex.GetType().Name}: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// TableCellStyle.FontSize プロパティを安全に設定する (バージョン差吸収)。
+        /// </summary>
+        private static void TrySetTableCellStyleFontSize(TableCellStyle style, double sizeFeet)
+        {
+            try
+            {
+                var p = style.GetType().GetProperty("FontSize");
+                if (p != null && p.CanWrite)
+                    p.SetValue(style, sizeFeet);
+            }
+            catch (Exception ex) { LogReflEx("TableCellStyle.FontSize", ex); }
+        }
+
+        /// <summary>
+        /// TableCellStyleOverrideOptions の bool プロパティを安全に設定 (バージョン差吸収)。
+        /// </summary>
+        private static void TrySetOverrideOption(TableCellStyleOverrideOptions ov, string name, bool value)
+        {
+            try
+            {
+                var p = ov.GetType().GetProperty(name);
+                if (p != null && p.CanWrite && p.PropertyType == typeof(bool))
+                    p.SetValue(ov, value);
+            }
+            catch (Exception ex) { LogReflEx($"override.{name}", ex); }
         }
 
         private static void LogDef(ScheduleDefinition def, string stage)
