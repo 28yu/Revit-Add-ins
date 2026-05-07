@@ -231,7 +231,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     var cell = ws.Cell(row, col);
                     string s;
                     try { s = cell.GetFormattedString(); }
-                    catch { s = cell.Value?.ToString() ?? string.Empty; }
+                    catch { s = cell.Value.ToString() ?? string.Empty; }
                     if (string.IsNullOrEmpty(s)) continue;
 
                     // セル内改行は最長行で計測
