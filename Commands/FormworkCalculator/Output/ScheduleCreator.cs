@@ -120,6 +120,10 @@ namespace Tools28.Commands.FormworkCalculator.Output
             // FieldId で再取得して設定（古い参照では Revit 内部状態と同期していない可能性）。
             try { def.IsItemized = true; } catch (Exception ex) { LogEx("IsItemized=true (after)", ex); }
             try { def.ShowGrandTotal = true; } catch { }
+
+            // 総合計タイトルを「型枠面積(合計)」に設定し、Excel 総括表との対応を明確化。
+            // Revit バージョンによりプロパティ名が異なる可能性があるためリフレクションで安全に設定。
+            SetGrandTotalTitle(def, "型枠面積(合計)");
             if (areaField != null)
             {
                 try
@@ -176,6 +180,43 @@ namespace Tools28.Commands.FormworkCalculator.Output
         {
             if (!FormworkDebugLog.Enabled) return;
             FormworkDebugLog.Log($"  [Sched:EX] {action}: {ex.GetType().Name}: {ex.Message}");
+        }
+
+        /// <summary>
+        /// ScheduleDefinition の総合計タイトルを設定する。Revit のバージョンによって
+        /// プロパティ名が異なる可能性があるため、リフレクションで複数候補を試す。
+        /// </summary>
+        private static void SetGrandTotalTitle(ScheduleDefinition def, string title)
+        {
+            if (def == null || string.IsNullOrEmpty(title)) return;
+            var t = def.GetType();
+            // 1. プロパティ "GrandTotalTitle" を試す
+            try
+            {
+                var prop = t.GetProperty("GrandTotalTitle");
+                if (prop != null && prop.CanWrite && prop.PropertyType == typeof(string))
+                {
+                    prop.SetValue(def, title);
+                    FormworkDebugLog.Log($"  [Sched] GrandTotalTitle set via property: '{title}'");
+                    return;
+                }
+            }
+            catch (Exception ex) { LogEx("GrandTotalTitle property", ex); }
+
+            // 2. メソッド "SetGrandTotalTitle(string)" を試す
+            try
+            {
+                var method = t.GetMethod("SetGrandTotalTitle", new[] { typeof(string) });
+                if (method != null)
+                {
+                    method.Invoke(def, new object[] { title });
+                    FormworkDebugLog.Log($"  [Sched] GrandTotalTitle set via method: '{title}'");
+                    return;
+                }
+            }
+            catch (Exception ex) { LogEx("SetGrandTotalTitle method", ex); }
+
+            FormworkDebugLog.Log("  [Sched] GrandTotalTitle API not found in this Revit version");
         }
 
         /// <summary>

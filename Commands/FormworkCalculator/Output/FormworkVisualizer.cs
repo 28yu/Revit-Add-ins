@@ -134,6 +134,11 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 }
                 catch { }
 
+                // 集計表の総合計が Excel 総括表と一致するよう、要素の最終 FormworkArea
+                // (開口控除・開口端面加算を反映済み) を最初の FormworkRequired DirectShape
+                // ひとつにまとめて持たせる。残りの DirectShape は面積 0 とする。
+                bool elementAreaAssigned = false;
+
                 foreach (var fi in faces)
                 {
                     bool visible =
@@ -172,18 +177,8 @@ namespace Tools28.Commands.FormworkCalculator.Output
                         partSolids = new List<Solid> { thin };
                     }
 
-                    // 部分接触面の控除後面積 (DirectShape ひとつに集約する場合用)
-                    double effectiveFeetSq = fi.Area;
-                    if (faceHasPartialContact)
-                    {
-                        double partial = 0;
-                        foreach (var pc in fi.PartialContacts) partial += pc.ContactArea;
-                        effectiveFeetSq = Math.Max(0, fi.Area - partial);
-                    }
+                    bool isFormworkRequired = (fi.FaceType == FaceType.FormworkRequired);
 
-                    // 複数 Solid に分割する場合は、全体の面積を Solid 数で均等に配分しない。
-                    // 代わりに最初の DirectShape に控除後面積を全て乗せる (集計側では要素毎に合算される)。
-                    bool firstShape = true;
                     foreach (var solid in partSolids)
                     {
                         ElementId dsId = null;
@@ -202,9 +197,15 @@ namespace Tools28.Commands.FormworkCalculator.Output
 
                             try
                             {
-                                double areaM2 = firstShape
-                                    ? UnitUtils.ConvertFromInternalUnits(effectiveFeetSq, UnitTypeId.SquareMeters)
-                                    : 0.0;
+                                // 要素単位の最終面積を最初の FormworkRequired DirectShape
+                                // のみに乗せる。残りは 0 m²。これにより集計表の総合計が
+                                // Excel 総括表 (er.FormworkArea の総和) と一致する。
+                                double areaM2 = 0.0;
+                                if (isFormworkRequired && !elementAreaAssigned)
+                                {
+                                    areaM2 = er.FormworkArea;
+                                    elementAreaAssigned = true;
+                                }
                                 string filterKey = IsDeducted(fi.FaceType) ? "控除面" : key;
                                 FormworkParameterManager.SetInstanceValues(
                                     ds, catLabel, levelName, filterKey, areaM2, faceHasPartialContact);
@@ -225,7 +226,6 @@ namespace Tools28.Commands.FormworkCalculator.Output
                                 try { ApplyPartialContactOverride(view, dsId); } catch { }
                             }
                         }
-                        firstShape = false;
                     }
                 }
             }

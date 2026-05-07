@@ -168,7 +168,8 @@ namespace Tools28.Commands.FormworkCalculator.Output
             }
             ws.SheetView.FreezeRows(1);
             ws.RangeUsed()?.SetAutoFilter();
-            AutoFitColumns(ws);
+            // オートフィルタの矢印 (約 3 文字幅) を考慮して余白を多めに取る
+            AutoFitColumns(ws, padding: 5.0);
         }
 
         private static void WriteErrors(XLWorkbook wb, FormworkResult result)
