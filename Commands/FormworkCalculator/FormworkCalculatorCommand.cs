@@ -85,6 +85,7 @@ namespace Tools28.Commands.FormworkCalculator
                 }
 
                 ElementId scheduleViewId = null;
+                ElementId summaryScheduleId = null;
                 ElementId view3DId = null;
                 List<ElementId> createdShapeIds = null;
 
@@ -122,6 +123,8 @@ namespace Tools28.Commands.FormworkCalculator
                             if (settings.CreateSchedule)
                             {
                                 scheduleViewId = ScheduleCreator.CreateSchedule(doc, result);
+                                // 動的合計サマリ集計表 (IsItemized=false で 1 行で全件集約)
+                                summaryScheduleId = ScheduleCreator.CreateSummarySchedule(doc);
                             }
 
                             t.Commit();
@@ -152,12 +155,31 @@ namespace Tools28.Commands.FormworkCalculator
                     }
                 }
 
-                // 自動作成した 3D ビューをアクティブ化
+                // ビュータブを順に開く (最後にアクティブ化されたものが前面に来る)。
+                // 1. 3D ビュー (タブを開いておく) 2. 集計表 3. サマリ集計表 (最終アクティブ)
                 if (view3DId != null && view3DId != ElementId.InvalidElementId)
                 {
                     try
                     {
                         var v = doc.GetElement(view3DId) as View;
+                        if (v != null) uidoc.ActiveView = v;
+                    }
+                    catch { }
+                }
+                if (scheduleViewId != null && scheduleViewId != ElementId.InvalidElementId)
+                {
+                    try
+                    {
+                        var v = doc.GetElement(scheduleViewId) as View;
+                        if (v != null) uidoc.ActiveView = v;
+                    }
+                    catch { }
+                }
+                if (summaryScheduleId != null && summaryScheduleId != ElementId.InvalidElementId)
+                {
+                    try
+                    {
+                        var v = doc.GetElement(summaryScheduleId) as View;
                         if (v != null) uidoc.ActiveView = v;
                     }
                     catch { }
@@ -178,6 +200,8 @@ namespace Tools28.Commands.FormworkCalculator
 
                 if (scheduleViewId != null)
                     summary += "\n" + Loc.S("Formwork.ScheduleCreated");
+                if (summaryScheduleId != null)
+                    summary += "\n" + Loc.S("Formwork.SummaryScheduleCreated");
 
                 if (result.ExcludedResults != null && result.ExcludedResults.Count > 0)
                 {

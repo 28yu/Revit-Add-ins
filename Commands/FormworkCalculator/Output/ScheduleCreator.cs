@@ -23,6 +23,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
     internal static class ScheduleCreator
     {
         internal const string ScheduleName = "型枠数量集計";
+        internal const string SummaryScheduleName = "型枠数量集計_合計";
 
         internal static ElementId CreateSchedule(Document doc, FormworkResult result = null)
         {
@@ -151,30 +152,19 @@ namespace Tools28.Commands.FormworkCalculator.Output
         /// <summary>
         /// 集計表の総合計を視覚的に強調する。
         /// Revit API は Body の総合計行へのスタイル変更を許可しないため、
-        /// Header セクションに styled な独立行を追加する。
-        /// 加えて View 名にも合計値を含める (Project Browser 表示用)。
+        /// Header セクションに「型枠面積(合計)」のラベルを styled な独立行として追加する。
+        /// 値は Body 側の総合計行 (Revit が自動再計算) に任せ、ここではラベルのみとする
+        /// （Header テキストは静的なので値を含めると DirectShape 削除時に追従しないため）。
         /// </summary>
         private static void EmphasizeGrandTotal(ViewSchedule schedule, FormworkResult result)
         {
             if (schedule == null) return;
-            double totalM2 = result?.TotalFormworkArea ?? 0;
-            string text = string.Format("型枠面積(合計): {0:F2} ㎡", totalM2);
+            // ラベルのみ。値は body の総合計行 (Revit auto-updated) で見せる。
+            string labelText = "型枠面積(合計) ↓";
 
-            // 1. Header セクションに styled な行を追加 (Revit 公式に許可されているセクション)
-            bool added = TryAddStyledHeaderRow(schedule, text);
+            bool added = TryAddStyledHeaderRow(schedule, labelText);
             if (!added)
-                FormworkDebugLog.Log("  [Sched:Style] Header row addition failed - falling back to schedule name only");
-
-            // 2. View 名にも合計値を含める (Project Browser での識別性向上)
-            try
-            {
-                schedule.Name = ScheduleName + string.Format(" - 合計 {0:F2} ㎡", totalM2);
-                FormworkDebugLog.Log($"  [Sched:Style] schedule name updated: '{schedule.Name}'");
-            }
-            catch (Exception ex)
-            {
-                FormworkDebugLog.Log($"  [Sched:Style] schedule rename failed: {ex.Message}");
-            }
+                FormworkDebugLog.Log("  [Sched:Style] Header row addition failed");
         }
 
         /// <summary>
@@ -273,6 +263,86 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     $"  [Sched:Style] EmphasizeGrandTotal Header EX: {ex.GetType().Name}: {ex.Message}");
                 return false;
             }
+        }
+
+        /// <summary>
+        /// 「型枠数量集計_合計」サマリ集計表を作成する。
+        /// IsItemized=false により、フィルタ条件に合致する全 DirectShape が
+        /// 1 行に集約され、面積の合計値が動的に表示される
+        /// (DirectShape を手動削除すると Revit が自動再計算)。
+        /// Header にラベル「型枠面積(合計)」を太字・赤字・薄黄背景で配置。
+        /// </summary>
+        internal static ElementId CreateSummarySchedule(Document doc)
+        {
+            DeleteScheduleByName(doc, SummaryScheduleName);
+
+            ViewSchedule schedule;
+            try
+            {
+                schedule = ViewSchedule.CreateSchedule(
+                    doc, new ElementId(BuiltInCategory.OST_GenericModel));
+            }
+            catch
+            {
+                return null;
+            }
+            if (schedule == null) return null;
+
+            try { schedule.Name = SummaryScheduleName; } catch { }
+
+            var def = schedule.Definition;
+            var schedulable = def.GetSchedulableFields();
+            var paramIds = GetFormworkSharedParamIds(doc);
+
+            FormworkDebugLog.Section("Summary Schedule Creation");
+
+            // 件数 + 面積の 2 フィールド (面積は合計を計算)
+            var countField = AddCountField(def, schedulable);
+            var areaField = AddField(doc, def, schedulable, paramIds, FormworkParameterManager.ParamArea);
+
+            if (areaField != null)
+            {
+                try { areaField.DisplayType = ScheduleFieldDisplayType.Totals; }
+                catch (Exception ex) { LogEx("summary areaField.DisplayType=Totals", ex); }
+            }
+
+            // マーカーフィルタ (鉄骨除外を集計に含めない)
+            var markerField = AddField(doc, def, schedulable, paramIds, FormworkParameterManager.ParamMarker);
+            if (markerField != null)
+            {
+                try { markerField.IsHidden = true; } catch { }
+                try
+                {
+                    var filter = new ScheduleFilter(
+                        markerField.FieldId,
+                        ScheduleFilterType.Equal,
+                        FormworkParameterManager.MarkerValue);
+                    def.AddFilter(filter);
+                }
+                catch (Exception ex) { LogEx("summary marker filter", ex); }
+            }
+
+            // 集計モード: アイテム別表示無効 + 総合計行は不要 (1 行で全件集計するため)
+            try { def.IsItemized = false; }
+            catch (Exception ex) { LogEx("summary IsItemized=false", ex); }
+            try { def.ShowGrandTotal = false; } catch { }
+
+            // フィールド追加後に再設定 (Revit が状態を上書きする場合の保険)
+            if (areaField != null)
+            {
+                try
+                {
+                    var fresh = def.GetField(areaField.FieldId);
+                    if (fresh != null) fresh.DisplayType = ScheduleFieldDisplayType.Totals;
+                }
+                catch { }
+            }
+
+            // ヘッダーに styled な「型枠面積(合計)」ラベル行を追加
+            TryAddStyledHeaderRow(schedule, "型枠面積(合計)");
+
+            FormworkDebugLog.Log($"  [Sched:Summary] created: '{schedule.Name}'");
+            return schedule.Id;
         }
 
         private static void LogDef(ScheduleDefinition def, string stage)

@@ -370,6 +370,7 @@ namespace Tools28.Localization
             { "Formwork.Fatal", "A fatal error occurred during formwork quantity calculation.\n{0}" },
             { "Formwork.ShapesCreated", "Formwork face objects created: {0} (auto-hidden in other views)" },
             { "Formwork.ScheduleCreated", "Schedule \"Formwork Quantity\" has been created" },
+            { "Formwork.SummaryScheduleCreated", "Summary schedule \"Formwork Quantity_Total\" has been created (auto-updates when DirectShapes are deleted)" },
             { "Formwork.SteelExcluded", "Excluded {0} steel members (no formwork needed)" },
             { "Formwork.DeckSlabExcluded", "Excluded {0} deck slabs (floor type name contains \"DS\")" },
             { "Formwork.ExcludedFilterNote", "(Excluded elements are hidden by the \"Formwork_Excluded\" filter in the analysis 3D view. Toggle the filter ON to inspect them.)" },
