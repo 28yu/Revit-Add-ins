@@ -467,11 +467,15 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 try { p = b.Evaluate(c); } catch { exceptionCount++; continue; }
                 if (p == null) { exceptionCount++; continue; }
 
-                IntersectionResult proj;
-                try { proj = a.Project(p); } catch { exceptionCount++; continue; }
-                if (proj == null || proj.UVPoint == null) { exceptionCount++; continue; }
+                // Face.Project は「投影できない点」に対して null を返したり UVPoint=null を
+                // 返すことがある (Revit API 仕様)。これは「面の外にはみ出している」という
+                // 意味なので off-face として扱う (exception 扱いにすると fail-safe で
+                // 誤って Full Contact 受理してしまうため)。
+                IntersectionResult proj = null;
+                try { proj = a.Project(p); } catch { /* swallow → off-face */ }
 
-                if (proj.Distance > CoincidenceTolFeet * 2)
+                if (proj == null || proj.UVPoint == null
+                    || proj.Distance > CoincidenceTolFeet * 2)
                 {
                     offFaceCount++;
                     continue;
