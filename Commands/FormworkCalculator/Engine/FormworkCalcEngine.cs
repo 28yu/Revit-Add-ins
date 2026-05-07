@@ -143,8 +143,45 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 }
             }
 
+            // 壁スイープ・リビールを ElementResults から除外し ExcludedResults に移す
+            // (Pass 2 で Wall の top 面に対する contact deduction を有効化した後に実施)
+            MoveWallSweepsToExcluded(_doc, result);
+
             Aggregate(result);
             return result;
+        }
+
+        /// <summary>
+        /// WallSweep (壁スイープ・リビール) を ElementResults から ExcludedResults に移動する。
+        /// 早期除外せず Pass 1/2 に参加させる理由: Wall の top 面が reveal で切り取られた
+        /// 部分を contact detection によって DeductedContact 化するため。
+        /// </summary>
+        private static void MoveWallSweepsToExcluded(Document doc, FormworkResult result)
+        {
+            var toMove = new List<ElementResult>();
+            foreach (var er in result.ElementResults)
+            {
+                var elem = doc.GetElement(new ElementId(er.ElementId));
+                if (elem is WallSweep) toMove.Add(er);
+            }
+            if (toMove.Count == 0) return;
+
+            foreach (var er in toMove)
+            {
+                var elem = doc.GetElement(new ElementId(er.ElementId));
+                result.ElementResults.Remove(er);
+                result.ExcludedResults.Add(new ExcludedResult
+                {
+                    ElementId = er.ElementId,
+                    ElementName = er.ElementName,
+                    Category = CategoryGroup.Wall,
+                    CategoryName = elem?.Category?.Name ?? string.Empty,
+                    Kind = ExclusionKind.WallSweep,
+                    DetectionLayer = "WallSweep",
+                    DetectionReason = "壁スイープ・リビール (post-processed after contact detection)",
+                });
+            }
+            FormworkDebugLog.Log($"  Moved {toMove.Count} WallSweep elements to ExcludedResults");
         }
 
         private static void LogPass1Summary(List<ContactFaceDetector.ElementFacesContext> contexts)
