@@ -33,7 +33,11 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         }
 
         private const double CoincidenceTolFeet = 0.05;   // ≈ 15mm
-        private const double AreaRatioLimit = 1.5;
+        // Full Contact 判定の面積比上限。a の面積 ≤ b の面積 × このリミット のとき
+        // Full Contact とみなす。値が大きいと「a がやや大きくても全面接触扱い」され
+        // 過大控除になりやすいので、実際の接合パターン (柱面 vs 梁端面など) に
+        // 対しては 1.2 程度の保守的値が妥当。
+        private const double AreaRatioLimit = 1.2;
         private const double AntiParallelThreshold = -0.90;  // cos ≤ -0.9 (≈ 155°)
 
         internal static void RefineContactFaces(List<ElementFacesContext> contexts)

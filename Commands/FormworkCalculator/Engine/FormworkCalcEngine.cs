@@ -117,6 +117,10 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             _progress?.Report("Pass 2: 接触面を検出中...");
             ContactFaceDetector.RefineContactFaces(contexts);
 
+            // Pass 2b: WallSweep (スイープ・リビール) の host 壁面を直接 DeductedContact 化
+            // (Reveal 等で WallSweep 自身がソリッドを持たないケースに対応)
+            WallSweepFaceDeductor.DeductWallFacesNearSweeps(_doc, contexts);
+
             // Pass 2 完了時: 最終 FormworkRequired 面数
             LogPostPass2Summary(contexts);
 
