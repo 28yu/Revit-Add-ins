@@ -70,7 +70,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
             ws.Cell(r++, 1).Value = "控除面積（合計）"; ws.Cell(r - 1, 2).Value = Round(result.TotalDeductedArea);
             ws.Cell(r++, 1).Value = "傾斜面（計算対象外）"; ws.Cell(r - 1, 2).Value = Round(result.InclinedFaceArea);
 
-            ws.Columns().AdjustToContents();
+            AutoFitColumns(ws);
         }
 
         private static void WriteByCategory(XLWorkbook wb, FormworkResult result)
@@ -91,7 +91,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 ws.Cell(r, 4).Value = Round(c.DeductedArea);
                 r++;
             }
-            ws.Columns().AdjustToContents();
+            AutoFitColumns(ws);
         }
 
         private static void WriteByZone(XLWorkbook wb, FormworkResult result)
@@ -110,7 +110,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 ws.Cell(r, 3).Value = Round(z.FormworkArea);
                 r++;
             }
-            ws.Columns().AdjustToContents();
+            AutoFitColumns(ws);
         }
 
         private static void WriteByType(XLWorkbook wb, FormworkResult result)
@@ -129,7 +129,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 ws.Cell(r, 3).Value = Round(t.FormworkArea);
                 r++;
             }
-            ws.Columns().AdjustToContents();
+            AutoFitColumns(ws);
         }
 
         private static void WriteElementDetail(XLWorkbook wb, FormworkResult result)
@@ -168,7 +168,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
             }
             ws.SheetView.FreezeRows(1);
             ws.RangeUsed()?.SetAutoFilter();
-            ws.Columns().AdjustToContents();
+            AutoFitColumns(ws);
         }
 
         private static void WriteErrors(XLWorkbook wb, FormworkResult result)
@@ -191,7 +191,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 ws.Cell(r, 5).Value = e.Message;
                 r++;
             }
-            ws.Columns().AdjustToContents();
+            AutoFitColumns(ws);
         }
 
         private static string CategoryLabel(CategoryGroup cg)
@@ -209,5 +209,72 @@ namespace Tools28.Commands.FormworkCalculator.Output
         }
 
         private static double Round(double v) => Math.Round(v, 2);
+
+        /// <summary>
+        /// セル幅を内容に合わせて自動調整する。CJK 文字 (漢字・かな) は半角の 2 倍幅で
+        /// 計算するため ClosedXML の AdjustToContents() より日本語が見切れにくい。
+        /// </summary>
+        private static void AutoFitColumns(IXLWorksheet ws, double padding = 2.0, double minWidth = 8.0, double maxWidth = 60.0)
+        {
+            var range = ws.RangeUsed();
+            if (range == null) return;
+            int firstCol = range.FirstColumn().ColumnNumber();
+            int lastCol = range.LastColumn().ColumnNumber();
+            int firstRow = range.FirstRow().RowNumber();
+            int lastRow = range.LastRow().RowNumber();
+
+            for (int col = firstCol; col <= lastCol; col++)
+            {
+                double maxLen = 0;
+                for (int row = firstRow; row <= lastRow; row++)
+                {
+                    var cell = ws.Cell(row, col);
+                    string s;
+                    try { s = cell.GetFormattedString(); }
+                    catch { s = cell.Value?.ToString() ?? string.Empty; }
+                    if (string.IsNullOrEmpty(s)) continue;
+
+                    // セル内改行は最長行で計測
+                    foreach (var line in s.Split('\n'))
+                    {
+                        double w = MeasureWidth(line);
+                        if (w > maxLen) maxLen = w;
+                    }
+                }
+                double width = Math.Max(minWidth, Math.Min(maxWidth, maxLen + padding));
+                try { ws.Column(col).Width = width; } catch { }
+            }
+        }
+
+        /// <summary>
+        /// 文字列の表示幅を「半角=1 / 全角=2」基準で計算する。
+        /// </summary>
+        private static double MeasureWidth(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return 0;
+            double w = 0;
+            foreach (char c in s)
+            {
+                w += IsFullWidth(c) ? 2.0 : 1.1;
+            }
+            return w;
+        }
+
+        private static bool IsFullWidth(char c)
+        {
+            // CJK・かな・ハングル・全角記号などを「全角」として扱う
+            if (c >= 0x1100 && c <= 0x115F) return true; // Hangul Jamo
+            if (c >= 0x2E80 && c <= 0x303E) return true; // CJK Radicals / 句読点
+            if (c >= 0x3041 && c <= 0x33FF) return true; // ひらがな・カタカナ・CJK 記号
+            if (c >= 0x3400 && c <= 0x4DBF) return true; // CJK 拡張 A
+            if (c >= 0x4E00 && c <= 0x9FFF) return true; // CJK 統合漢字
+            if (c >= 0xA000 && c <= 0xA4CF) return true; // ヤオ文字
+            if (c >= 0xAC00 && c <= 0xD7A3) return true; // ハングル音節
+            if (c >= 0xF900 && c <= 0xFAFF) return true; // CJK 互換漢字
+            if (c >= 0xFE30 && c <= 0xFE4F) return true; // CJK 互換形
+            if (c >= 0xFF00 && c <= 0xFF60) return true; // 全角英数・記号
+            if (c >= 0xFFE0 && c <= 0xFFE6) return true; // 全角通貨記号
+            return false;
+        }
     }
 }
