@@ -151,8 +151,101 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             // (Pass 2 で Wall の top 面に対する contact deduction を有効化した後に実施)
             MoveWallSweepsToExcluded(_doc, result);
 
+            // 診断ログ: 各要素の集計結果を一覧出力 (⚠️ マーカーで疑わしい要素を強調)
+            LogElementDiagnostics(_doc, contexts, result);
+
             Aggregate(result);
             return result;
+        }
+
+        /// <summary>
+        /// 各要素の集計結果と面の状態を診断ログに出力する。
+        /// 疑わしいパターンには ⚠️ マーカーを付け、原因特定の手がかりとする。
+        /// 検索しやすいように 1 要素 1 行で出力。
+        /// </summary>
+        private static void LogElementDiagnostics(
+            Document doc,
+            List<ContactFaceDetector.ElementFacesContext> contexts,
+            FormworkResult result)
+        {
+            if (!FormworkDebugLog.Enabled) return;
+
+            var ctxById = new Dictionary<int, ContactFaceDetector.ElementFacesContext>();
+            foreach (var c in contexts) ctxById[c.ElementId] = c;
+
+            FormworkDebugLog.Section($"Element Diagnostics ({result.ElementResults.Count} elements)");
+            FormworkDebugLog.Log("  fmt: [ElemDiag] E<id> (cat) 'name' type='type' formwork=Xm² faces=R/T/B/C/B(GL)/I parts=N");
+            FormworkDebugLog.Log("       ⚠️ markers: ZERO=formwork≈0, MOSTLY_DED=控除>>formwork, ALL_PARTIAL=全FormworkRequired面が部分接触");
+
+            foreach (var er in result.ElementResults)
+            {
+                if (!ctxById.TryGetValue(er.ElementId, out var ctx)) continue;
+
+                string typeName = "?";
+                try
+                {
+                    var elem = doc.GetElement(new ElementId(er.ElementId));
+                    if (elem != null)
+                    {
+                        var t = doc.GetElement(elem.GetTypeId());
+                        typeName = t?.Name ?? "?";
+                    }
+                }
+                catch { }
+
+                int reqCount = 0, topCount = 0, botCount = 0, conCount = 0, bglCount = 0, incCount = 0;
+                int partialFaceCount = 0;
+                int allReqFaces = 0;
+                foreach (var fi in ctx.Faces)
+                {
+                    switch (fi.FaceType)
+                    {
+                        case FaceType.FormworkRequired:
+                            reqCount++;
+                            allReqFaces++;
+                            if (fi.PartialContacts.Count > 0) partialFaceCount++;
+                            break;
+                        case FaceType.DeductedTop: topCount++; break;
+                        case FaceType.DeductedBottom: botCount++; break;
+                        case FaceType.DeductedContact: conCount++; break;
+                        case FaceType.DeductedBelowGL: bglCount++; break;
+                        case FaceType.Inclined: incCount++; break;
+                    }
+                }
+
+                // ⚠️ マーカー判定
+                var marks = new List<string>();
+                double dedTotal = er.DeductedTopArea + er.DeductedBottomArea + er.DeductedContactArea;
+                if (er.FormworkArea < 0.01 && (reqCount > 0 || dedTotal > 0.5))
+                    marks.Add("⚠️ZERO");
+                if (er.FormworkArea > 0 && dedTotal > er.FormworkArea * 5)
+                    marks.Add("⚠️MOSTLY_DED");
+                if (allReqFaces > 0 && partialFaceCount == allReqFaces)
+                    marks.Add("⚠️ALL_PARTIAL");
+                string marker = marks.Count > 0 ? " " + string.Join("|", marks) : "";
+
+                string cat = CategoryShort(er.Category);
+                FormworkDebugLog.Log(
+                    $"[ElemDiag] E{er.ElementId} ({cat}) '{er.ElementName}' type='{typeName}' " +
+                    $"formwork={er.FormworkArea:F2}m² faces={reqCount}/{topCount}/{botCount}/{conCount}/{bglCount}/{incCount} " +
+                    $"parts={partialFaceCount} dedTop={er.DeductedTopArea:F2} dedBot={er.DeductedBottomArea:F2} " +
+                    $"dedCon={er.DeductedContactArea:F2}{marker}");
+            }
+            FormworkDebugLog.Flush();
+        }
+
+        private static string CategoryShort(CategoryGroup cg)
+        {
+            switch (cg)
+            {
+                case CategoryGroup.Column: return "柱";
+                case CategoryGroup.Beam: return "梁";
+                case CategoryGroup.Wall: return "壁";
+                case CategoryGroup.Slab: return "スラブ";
+                case CategoryGroup.Foundation: return "基礎";
+                case CategoryGroup.Stairs: return "階段";
+                default: return "他";
+            }
         }
 
         /// <summary>
@@ -310,6 +403,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                             // いると過大評価され、面積が 0 にクランプされてしまう。
                             // Clipper を使った 2D 矩形差分で正確な残面積を計算する。
                             double effectiveFeetSq;
+                            string clipperStatus = "no-partial";
                             if (fi.PartialContacts.Count > 0)
                             {
                                 var clip = PartialContactClipper.TryClip(fi);
@@ -320,14 +414,29 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                                     foreach (var s in clip.Solids)
                                         area += s.Volume / PartialContactClipper.ThicknessFeet;
                                     effectiveFeetSq = area;
+                                    clipperStatus = $"clipper-OK";
                                 }
                                 else
                                 {
                                     // フォールバック: naive sum + 安全キャップ (面積の 95%)
                                     double partial = 0;
                                     foreach (var pc in fi.PartialContacts) partial += pc.ContactArea;
+                                    double rawSum = partial;
                                     partial = Math.Min(partial, fi.Area * 0.95);
                                     effectiveFeetSq = Math.Max(0, fi.Area - partial);
+                                    clipperStatus = $"clipper-FAIL({clip.FailReason}) rawSum={rawSum:F4}";
+                                }
+
+                                // 部分接触の詳細をログ (問題追跡用)
+                                if (FormworkDebugLog.Enabled)
+                                {
+                                    var sb = new System.Text.StringBuilder();
+                                    sb.Append($"  [FaceDiag] E{ctx.ElementId} face[{ctx.Faces.IndexOf(fi)}] ");
+                                    sb.Append($"area={fi.Area:F4} partials={fi.PartialContacts.Count} [");
+                                    foreach (var pc in fi.PartialContacts)
+                                        sb.Append($" E{pc.OtherElementId}:a={pc.ContactArea:F4}");
+                                    sb.Append($" ] {clipperStatus} eff={effectiveFeetSq:F4}");
+                                    FormworkDebugLog.Log(sb.ToString());
                                 }
                             }
                             else
