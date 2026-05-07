@@ -185,23 +185,20 @@ namespace Tools28.Commands.FormworkCalculator.Output
         /// <summary>
         /// ScheduleDefinition の総合計タイトルを設定する。Revit のバージョンによって
         /// プロパティ名が異なる可能性があるため、リフレクションで複数候補を試す。
+        /// 失敗時は内部例外まで詳細ログに記録する。
         /// </summary>
         private static void SetGrandTotalTitle(ScheduleDefinition def, string title)
         {
             if (def == null || string.IsNullOrEmpty(title)) return;
             var t = def.GetType();
+
+            // 関連 bool プロパティが存在する場合、先に true にしておく
+            // (一部の Revit バージョンでは ShowGrandTotalTitle = true が前提条件のため)
+            TrySetBool(def, t, "ShowGrandTotalTitle", true);
+            TrySetBool(def, t, "ShowGrandTotalCount", true);
+
             // 1. プロパティ "GrandTotalTitle" を試す
-            try
-            {
-                var prop = t.GetProperty("GrandTotalTitle");
-                if (prop != null && prop.CanWrite && prop.PropertyType == typeof(string))
-                {
-                    prop.SetValue(def, title);
-                    FormworkDebugLog.Log($"  [Sched] GrandTotalTitle set via property: '{title}'");
-                    return;
-                }
-            }
-            catch (Exception ex) { LogEx("GrandTotalTitle property", ex); }
+            if (TrySetString(def, t, "GrandTotalTitle", title)) return;
 
             // 2. メソッド "SetGrandTotalTitle(string)" を試す
             try
@@ -214,9 +211,71 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     return;
                 }
             }
-            catch (Exception ex) { LogEx("SetGrandTotalTitle method", ex); }
+            catch (Exception ex) { LogReflEx("SetGrandTotalTitle method", ex); }
 
-            FormworkDebugLog.Log("  [Sched] GrandTotalTitle API not found in this Revit version");
+            // 3. 診断: ScheduleDefinition の全 settable プロパティを列挙してログに残す
+            try
+            {
+                FormworkDebugLog.Log("  [Sched] -- ScheduleDefinition settable string properties --");
+                foreach (var p in t.GetProperties())
+                {
+                    if (p.CanWrite && p.PropertyType == typeof(string))
+                        FormworkDebugLog.Log($"    propString: {p.Name}");
+                    else if (p.CanWrite && p.PropertyType == typeof(bool))
+                        FormworkDebugLog.Log($"    propBool:   {p.Name}");
+                }
+                foreach (var m in t.GetMethods())
+                {
+                    if (m.Name.StartsWith("Set") &&
+                        (m.Name.Contains("Total") || m.Name.Contains("Title")))
+                        FormworkDebugLog.Log($"    method:     {m.Name}({string.Join(",", m.GetParameters().Select(p => p.ParameterType.Name))})");
+                }
+            }
+            catch { }
+
+            FormworkDebugLog.Log("  [Sched] GrandTotalTitle could not be set in this Revit version");
+        }
+
+        private static bool TrySetString(object obj, Type t, string propName, string value)
+        {
+            try
+            {
+                var p = t.GetProperty(propName);
+                if (p != null && p.CanWrite && p.PropertyType == typeof(string))
+                {
+                    p.SetValue(obj, value);
+                    FormworkDebugLog.Log($"  [Sched] {propName} set: '{value}'");
+                    return true;
+                }
+            }
+            catch (Exception ex) { LogReflEx($"{propName} (string)", ex); }
+            return false;
+        }
+
+        private static void TrySetBool(object obj, Type t, string propName, bool value)
+        {
+            try
+            {
+                var p = t.GetProperty(propName);
+                if (p != null && p.CanWrite && p.PropertyType == typeof(bool))
+                {
+                    p.SetValue(obj, value);
+                    FormworkDebugLog.Log($"  [Sched] {propName} = {value}");
+                }
+            }
+            catch (Exception ex) { LogReflEx($"{propName} (bool)", ex); }
+        }
+
+        /// <summary>
+        /// リフレクション経由の TargetInvocationException から内部例外を取り出してログする。
+        /// </summary>
+        private static void LogReflEx(string action, Exception ex)
+        {
+            if (!FormworkDebugLog.Enabled) return;
+            var inner = (ex is System.Reflection.TargetInvocationException tie && tie.InnerException != null)
+                ? tie.InnerException : ex;
+            FormworkDebugLog.Log(
+                $"  [Sched:EX] {action}: {inner.GetType().FullName}: {inner.Message}");
         }
 
         /// <summary>
