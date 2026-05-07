@@ -300,8 +300,17 @@ namespace Tools28.Commands.FormworkCalculator.Output
             var countField = AddCountField(def, schedulable);
             var areaField = AddField(doc, def, schedulable, paramIds, FormworkParameterManager.ParamArea);
 
+            // 列ヘッダーに styled なラベルを設定 (Revit API は Body 行 0 のスタイル変更を許可)
+            // 型枠オブジェクト削除に追従する動的値は、すぐ下のデータ行 (Body 行 1) で表示される
+            if (countField != null)
+            {
+                try { countField.ColumnHeading = "件数(合計)"; }
+                catch (Exception ex) { LogEx("countField.ColumnHeading", ex); }
+            }
             if (areaField != null)
             {
+                try { areaField.ColumnHeading = "型枠面積(合計)"; }
+                catch (Exception ex) { LogEx("areaField.ColumnHeading", ex); }
                 try { areaField.DisplayType = ScheduleFieldDisplayType.Totals; }
                 catch (Exception ex) { LogEx("summary areaField.DisplayType=Totals", ex); }
             }
@@ -338,11 +347,65 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 catch { }
             }
 
-            // ヘッダーに styled な「型枠面積(合計)」ラベル行を追加
-            TryAddStyledHeaderRow(schedule, "型枠面積(合計)");
+            // ヘッダーにラベル行を追加するのではなく、Body の列ヘッダー (行 0) を styled に。
+            // これにより列ヘッダー = 動的値の直上 という視覚的関連を保ちつつ、
+            // データ行 (行 1) の値は Revit が DirectShape の追加・削除に応じて自動更新する。
+            StyleColumnHeaders(schedule);
 
             FormworkDebugLog.Log($"  [Sched:Summary] created: '{schedule.Name}'");
             return schedule.Id;
+        }
+
+        /// <summary>
+        /// 集計表の列ヘッダー (Body 行 0) を太字・赤字・薄黄背景でスタイル設定する。
+        /// Revit API は Body 行 0 (列ヘッダー) のスタイル変更のみを許可するため、
+        /// 動的な値の直上に styled なラベルを置くのに使う。
+        /// </summary>
+        private static void StyleColumnHeaders(ViewSchedule schedule)
+        {
+            if (schedule == null) return;
+            try
+            {
+                var tableData = schedule.GetTableData();
+                if (tableData == null) return;
+                var body = tableData.GetSectionData(SectionType.Body);
+                if (body == null) return;
+
+                int colCount = body.NumberOfColumns;
+                int rowCount = body.NumberOfRows;
+                FormworkDebugLog.Log(
+                    $"  [Sched:Summary] body rows={rowCount} cols={colCount}");
+                if (colCount <= 0 || rowCount <= 0) return;
+
+                var style = new TableCellStyle
+                {
+                    BackgroundColor = new Color(255, 240, 200), // 薄い黄色
+                    TextColor = new Color(192, 0, 0),           // 赤
+                    IsFontBold = true,
+                };
+                var ov = style.GetCellStyleOverrideOptions();
+                ov.BackgroundColor = true;
+                ov.FontColor = true;
+                ov.Bold = true;
+                style.SetCellStyleOverrideOptions(ov);
+
+                // Body 行 0 = 列ヘッダー
+                for (int c = 0; c < colCount; c++)
+                {
+                    try { body.SetCellStyle(0, c, style); }
+                    catch (Exception ex)
+                    {
+                        FormworkDebugLog.Log(
+                            $"  [Sched:Summary] SetCellStyle col={c} EX: {ex.Message}");
+                    }
+                }
+                FormworkDebugLog.Log("  [Sched:Summary] column headers styled");
+            }
+            catch (Exception ex)
+            {
+                FormworkDebugLog.Log(
+                    $"  [Sched:Summary] StyleColumnHeaders EX: {ex.GetType().Name}: {ex.Message}");
+            }
         }
 
         private static void LogDef(ScheduleDefinition def, string stage)
