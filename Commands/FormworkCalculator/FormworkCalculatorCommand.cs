@@ -155,7 +155,17 @@ namespace Tools28.Commands.FormworkCalculator
                     }
                 }
 
-                // サマリ集計表のみを自動オープン (3D ビュー・メイン集計表は Project Browser から手動で開く)
+                // ビュータブを順に開く: 3D ビュー (タブを開く) → サマリ集計表 (最終アクティブ)。
+                // メイン集計表は Project Browser から手動で開く。
+                if (view3DId != null && view3DId != ElementId.InvalidElementId)
+                {
+                    try
+                    {
+                        var v = doc.GetElement(view3DId) as View;
+                        if (v != null) uidoc.ActiveView = v;
+                    }
+                    catch { }
+                }
                 ElementId finalViewId =
                     (summaryScheduleId != null && summaryScheduleId != ElementId.InvalidElementId)
                         ? summaryScheduleId

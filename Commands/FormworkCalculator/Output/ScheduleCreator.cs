@@ -377,14 +377,14 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     $"  [Sched:Summary] body rows={rowCount} cols={colCount}");
                 if (colCount <= 0 || rowCount <= 0) return;
 
-                // 列幅を広く設定 (タイトル「<型枠数量集計_合計>」が改行しない総幅を確保)。
-                // Revit 内部単位は feet。0.5 ft ≈ 152mm。
+                // 列幅を設定 (タイトル「<型枠数量集計_合計>」が改行しない総幅を確保しつつ
+                // 余白過多にならないバランス)。Revit 内部単位は feet。約 50mm = 0.167 ft。
                 for (int c = 0; c < colCount; c++)
                 {
                     try
                     {
-                        body.SetColumnWidth(c, 0.5);
-                        FormworkDebugLog.Log($"  [Sched:Summary] col {c} width=0.5 ft");
+                        body.SetColumnWidth(c, 0.167);
+                        FormworkDebugLog.Log($"  [Sched:Summary] col {c} width=0.167 ft (~50mm)");
                     }
                     catch (Exception ex)
                     {
@@ -427,6 +427,11 @@ namespace Tools28.Commands.FormworkCalculator.Output
 
                 // データ行のフォントも拡大 (リフレクションで複数候補を試す)
                 TryEnlargeDataFont(schedule, 0.0156);
+
+                // Revit 2022 では TableCellStyle.FontSize が存在しないため、
+                // Schedule View の「Body text / Header text」パラメータ (TextNoteType 参照)
+                // を経由して大きめのテキストタイプを割り当てる。
+                EnlargeViewTextStyles(schedule);
             }
             catch (Exception ex)
             {
@@ -500,6 +505,100 @@ namespace Tools28.Commands.FormworkCalculator.Output
             {
                 FormworkDebugLog.Log(
                     $"  [Sched:Summary] TryEnlargeDataFont EX: {ex.GetType().Name}: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Schedule View の「Body text / Header text / Title text」パラメータに、
+        /// 既存テキストタイプの中で最も大きいフォントサイズのものを割り当てる。
+        /// これにより、TableCellStyle.FontSize が存在しない Revit 2022 環境でも
+        /// 文字を大きく表示できる。
+        /// </summary>
+        private static void EnlargeViewTextStyles(ViewSchedule schedule)
+        {
+            if (schedule == null) return;
+            try
+            {
+                var doc = schedule.Document;
+
+                // プロジェクト内の TextNoteType を全て取得し、最大フォントサイズを選択
+                ElementId largestId = ElementId.InvalidElementId;
+                double largestSize = 0;
+                foreach (TextNoteType tt in new FilteredElementCollector(doc)
+                    .OfClass(typeof(TextNoteType))
+                    .Cast<TextNoteType>())
+                {
+                    try
+                    {
+                        var p = tt.get_Parameter(BuiltInParameter.TEXT_SIZE);
+                        if (p == null || !p.HasValue) continue;
+                        double size = p.AsDouble();
+                        if (size > largestSize)
+                        {
+                            largestSize = size;
+                            largestId = tt.Id;
+                        }
+                    }
+                    catch { }
+                }
+
+                if (largestId == ElementId.InvalidElementId)
+                {
+                    FormworkDebugLog.Log("  [Sched:Summary] no TextNoteType found for enlargement");
+                    return;
+                }
+
+                FormworkDebugLog.Log(
+                    $"  [Sched:Summary] largest text type id={largestId.IntegerValue} size={largestSize:F4} ft");
+
+                // 候補となるパラメータ名 (英語版 Revit / 日本語版 Revit / 簡体中文版)
+                string[] candidateNames = new[]
+                {
+                    "Body text", "Header text", "Title text",
+                    "本体テキスト", "ヘッダー テキスト", "タイトル テキスト",
+                    "ボディ テキスト", "ヘッダーテキスト", "タイトルテキスト",
+                    "正文文字", "标题栏文字", "标题文字",
+                };
+
+                int assigned = 0;
+                foreach (var name in candidateNames)
+                {
+                    try
+                    {
+                        var p = schedule.LookupParameter(name);
+                        if (p != null && !p.IsReadOnly && p.StorageType == StorageType.ElementId)
+                        {
+                            p.Set(largestId);
+                            FormworkDebugLog.Log($"  [Sched:Summary] '{name}' = {largestId.IntegerValue}");
+                            assigned++;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        FormworkDebugLog.Log($"  [Sched:Summary] '{name}' set EX: {ex.Message}");
+                    }
+                }
+
+                // 名前で見つからない場合は全 ElementId 型パラメータをログ (デバッグ用)
+                if (assigned == 0)
+                {
+                    FormworkDebugLog.Log("  [Sched:Summary] no text-style params matched. listing schedule view ElementId params:");
+                    foreach (Parameter p in schedule.Parameters)
+                    {
+                        try
+                        {
+                            if (p.StorageType == StorageType.ElementId && !p.IsReadOnly)
+                                FormworkDebugLog.Log(
+                                    $"    paramName='{p.Definition?.Name}' value={p.AsElementId()?.IntegerValue}");
+                        }
+                        catch { }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                FormworkDebugLog.Log(
+                    $"  [Sched:Summary] EnlargeViewTextStyles EX: {ex.GetType().Name}: {ex.Message}");
             }
         }
 
