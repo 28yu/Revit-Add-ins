@@ -262,6 +262,17 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 $"  [Visual] formwork DirectShapes created: {formworkShapesCount} " +
                 $"(elements={result.ElementResults.Count})");
 
+            // 新しく作成した DirectShape のジオメトリを Revit に認識させるため Regenerate
+            try
+            {
+                doc.Regenerate();
+                FormworkDebugLog.Log("  [Visual] doc.Regenerate() called after formwork creation");
+            }
+            catch (Exception ex)
+            {
+                FormworkDebugLog.Log($"  [Visual] doc.Regenerate() EX: {ex.Message}");
+            }
+
             // 診断: 作成されたDirectShapeのカテゴリ別件数 + 先頭5個のBBox
             DiagnoseFormworkShapes(doc, vr.CreatedShapeIds, result);
 
@@ -284,8 +295,8 @@ namespace Tools28.Commands.FormworkCalculator.Output
 
         /// <summary>
         /// 作成された formwork DirectShape を診断ログに出力する:
-        /// - 区分パラメータ毎の件数 (色分けが効いているか確認)
-        /// - 先頭 5 個の BoundingBox + 区分パラメータ値 (位置と紐付けが正しいか確認)
+        /// - 区分パラメータ毎の件数
+        /// - 区分毎に 1 個サンプリングして BBox / Solid 数 / 体積をログ
         /// </summary>
         private static void DiagnoseFormworkShapes(
             Document doc, ICollection<ElementId> shapeIds, FormworkResult result)
@@ -293,7 +304,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
             try
             {
                 var byKey = new Dictionary<string, int>();
-                int idx = 0;
+                var sampledKeys = new HashSet<string>();
                 foreach (var id in shapeIds)
                 {
                     var elem = doc.GetElement(id);
@@ -309,23 +320,44 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     if (!byKey.ContainsKey(key)) byKey[key] = 0;
                     byKey[key]++;
 
-                    if (idx < 5)
+                    // 区分毎に 1 個サンプリング
+                    if (!sampledKeys.Contains(key))
                     {
+                        sampledKeys.Add(key);
                         BoundingBoxXYZ bb = null;
                         try { bb = elem.get_BoundingBox(null); } catch { }
-                        if (bb != null)
+
+                        int solidCount = 0;
+                        double totalVol = 0;
+                        try
                         {
-                            FormworkDebugLog.Log(
-                                $"  [Visual:Diag] DS#{idx} id={id.IntegerValue} key='{key}' " +
-                                $"BB.Min=({bb.Min.X:F2},{bb.Min.Y:F2},{bb.Min.Z:F2}) " +
-                                $"Max=({bb.Max.X:F2},{bb.Max.Y:F2},{bb.Max.Z:F2})");
+                            var opts = new Options
+                            {
+                                ComputeReferences = false,
+                                IncludeNonVisibleObjects = false,
+                                DetailLevel = ViewDetailLevel.Fine,
+                            };
+                            var geom = elem.get_Geometry(opts);
+                            if (geom != null)
+                            {
+                                foreach (GeometryObject obj in geom)
+                                {
+                                    if (obj is Solid s)
+                                    {
+                                        solidCount++;
+                                        totalVol += s.Volume;
+                                    }
+                                }
+                            }
                         }
-                        else
-                        {
-                            FormworkDebugLog.Log(
-                                $"  [Visual:Diag] DS#{idx} id={id.IntegerValue} key='{key}' BB=null");
-                        }
-                        idx++;
+                        catch { }
+
+                        string bbStr = bb != null
+                            ? $"BB=[{bb.Min.X:F2},{bb.Min.Y:F2},{bb.Min.Z:F2}]-[{bb.Max.X:F2},{bb.Max.Y:F2},{bb.Max.Z:F2}]"
+                            : "BB=null";
+                        FormworkDebugLog.Log(
+                            $"  [Visual:Diag] sample key='{key}' id={id.IntegerValue} {bbStr} " +
+                            $"solids={solidCount} vol={totalVol:F6}");
                     }
                 }
                 FormworkDebugLog.Log("  [Visual:Diag] DirectShapes by 区分:");
