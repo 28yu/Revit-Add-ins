@@ -17,7 +17,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
     internal static class PartialContactClipper
     {
         private const double UvEps = 1e-6;
-        private const double ThicknessFeet = 0.03;  // 約 10mm
+        internal const double ThicknessFeet = 0.03;  // 約 10mm (Solid 体積から面積を逆算するために internal)
         private const double AreaMatchTolerance = 0.02;  // Face.Area と矩形面積の許容差 ±2%
 
         internal class ClipResult

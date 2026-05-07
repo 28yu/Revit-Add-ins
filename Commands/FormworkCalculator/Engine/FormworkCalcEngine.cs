@@ -301,14 +301,39 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 {
                     case FaceType.FormworkRequired:
                         {
-                            // Phase 1: 部分接触の面積を控除する
-                            double partialContactFeetSq = 0;
-                            foreach (var pc in fi.PartialContacts)
-                                partialContactFeetSq += pc.ContactArea;
-                            double effectiveFeetSq = Math.Max(0, fi.Area - partialContactFeetSq);
+                            // 部分接触の面積を控除する。
+                            // Naive sum (ContactArea を単純合計) は接触領域同士が重なって
+                            // いると過大評価され、面積が 0 にクランプされてしまう。
+                            // Clipper を使った 2D 矩形差分で正確な残面積を計算する。
+                            double effectiveFeetSq;
+                            if (fi.PartialContacts.Count > 0)
+                            {
+                                var clip = PartialContactClipper.TryClip(fi);
+                                if (clip.Success && clip.Solids.Count > 0)
+                                {
+                                    // Clipper 成功 → 残った薄板 Solid の体積 / 厚みで正確面積算出
+                                    double area = 0;
+                                    foreach (var s in clip.Solids)
+                                        area += s.Volume / PartialContactClipper.ThicknessFeet;
+                                    effectiveFeetSq = area;
+                                }
+                                else
+                                {
+                                    // フォールバック: naive sum + 安全キャップ (面積の 95%)
+                                    double partial = 0;
+                                    foreach (var pc in fi.PartialContacts) partial += pc.ContactArea;
+                                    partial = Math.Min(partial, fi.Area * 0.95);
+                                    effectiveFeetSq = Math.Max(0, fi.Area - partial);
+                                }
+                            }
+                            else
+                            {
+                                effectiveFeetSq = fi.Area;
+                            }
                             formwork += FeetSqToM2(effectiveFeetSq);
                             // 部分接触分も控除面積として集計に加える
-                            dedContact += FeetSqToM2(partialContactFeetSq);
+                            double partialDed = Math.Max(0, fi.Area - effectiveFeetSq);
+                            dedContact += FeetSqToM2(partialDed);
                         }
                         break;
                     case FaceType.DeductedTop: dedTop += aM2; break;
