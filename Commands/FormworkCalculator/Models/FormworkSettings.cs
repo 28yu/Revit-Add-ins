@@ -17,7 +17,7 @@ namespace Tools28.Commands.FormworkCalculator.Models
 
     public class FormworkSettings
     {
-        public CalculationScope Scope { get; set; } = CalculationScope.EntireProject;
+        public CalculationScope Scope { get; set; } = CalculationScope.CurrentView;
 
         public bool GroupByCategory { get; set; } = true;
         public bool GroupByZone { get; set; }

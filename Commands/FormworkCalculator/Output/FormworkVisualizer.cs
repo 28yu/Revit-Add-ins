@@ -104,11 +104,22 @@ namespace Tools28.Commands.FormworkCalculator.Output
             // 接触検出込みで面を再計算（幾何学的検査なので rayView 不要）
             var facesByElement = FormworkCalcEngine.RecomputeFaces(doc, result, settings);
 
-            // セクションボックスを有効化（要素全体を含むよう自動フィット）
-            EnableSectionBox(doc, view, result);
+            // [3] CurrentView スコープでソースが 3D ビューの場合は、ソースの切断ボックス
+            // (位置・有効/無効) をそのまま継承する。それ以外は要素 BoundingBox から自動算出。
+            bool useSourceSectionBox =
+                settings.Scope == CalculationScope.CurrentView && sourceView is View3D;
+            if (useSourceSectionBox)
+                CopySectionBoxFromSource((View3D)sourceView, view);
+            else
+                EnableSectionBox(doc, view, result);
 
-            // セクションボックスのアウトラインとレベル線をビュー上で非表示にする
-            HideClutterCategories(view);
+            // [4] CurrentView スコープでソースビューが指定されていれば、V/G 上書き
+            // (モデル/注釈カテゴリの表示/非表示・色等) をターゲット 3D ビューに継承。
+            // それ以外はノイズになる切断ボックスのアウトラインとレベル線を非表示化。
+            if (settings.Scope == CalculationScope.CurrentView && sourceView != null)
+                CopyCategoryVisibilityAndOverrides(doc, sourceView, view);
+            else
+                HideClutterCategories(view);
 
             // 元躯体要素を 20% 透過 + RGB(94,94,94) で表示
             ApplySourceElementAppearance(doc, view, result);
@@ -593,6 +604,110 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     targetView.SetOrientation(orient);
             }
             catch { }
+        }
+
+        /// <summary>
+        /// CurrentView スコープでソースが 3D ビューのとき、ソースの切断ボックス位置と
+        /// 有効/無効状態をそのままコピーする。これによりユーザーがソースビューで設定した
+        /// 切断範囲が解析ビューに引き継がれる。
+        /// </summary>
+        private static void CopySectionBoxFromSource(View3D source, View3D target)
+        {
+            try
+            {
+                var sb = source.GetSectionBox();
+                if (sb != null)
+                {
+                    var copy = new BoundingBoxXYZ
+                    {
+                        Min = sb.Min,
+                        Max = sb.Max,
+                        Transform = sb.Transform,
+                    };
+                    target.SetSectionBox(copy);
+                }
+                target.IsSectionBoxActive = source.IsSectionBoxActive;
+            }
+            catch (Exception ex)
+            {
+                FormworkDebugLog.Log($"  [Visual] CopySectionBoxFromSource EX: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// ソースビューの V/G 上書き設定 (モデル/注釈カテゴリの表示/非表示・色) を
+        /// ターゲット 3D ビューにコピーする。ターゲットで非表示にできないカテゴリは
+        /// スキップ (例: 平面ビュー専用のカテゴリ)。
+        ///
+        /// 解析ビューに必要なカテゴリ (OST_GenericModel = DirectShape) は強制的に表示にする。
+        /// 切断ボックスのアウトライン・レベル線は視覚的ノイズなので強制非表示。
+        /// </summary>
+        private static void CopyCategoryVisibilityAndOverrides(
+            Document doc, View source, View3D target)
+        {
+            try
+            {
+                var allCategories = doc.Settings.Categories;
+                foreach (Category cat in allCategories)
+                {
+                    if (cat == null) continue;
+                    var catId = cat.Id;
+                    if (!target.CanCategoryBeHidden(catId)) continue;
+                    try
+                    {
+                        // 表示/非表示
+                        bool srcHidden = source.GetCategoryHidden(catId);
+                        target.SetCategoryHidden(catId, srcHidden);
+
+                        // V/G 上書き (色・線種・透過等)
+                        if (target.IsCategoryOverridable(catId)
+                            && source.IsCategoryOverridable(catId))
+                        {
+                            var ogs = source.GetCategoryOverrides(catId);
+                            if (ogs != null)
+                                target.SetCategoryOverrides(catId, ogs);
+                        }
+                    }
+                    catch { /* per-category failures are non-fatal */ }
+
+                    // サブカテゴリも同様にコピー
+                    foreach (Category sub in cat.SubCategories)
+                    {
+                        if (sub == null) continue;
+                        var subId = sub.Id;
+                        if (!target.CanCategoryBeHidden(subId)) continue;
+                        try
+                        {
+                            bool srcHidden = source.GetCategoryHidden(subId);
+                            target.SetCategoryHidden(subId, srcHidden);
+                            if (target.IsCategoryOverridable(subId)
+                                && source.IsCategoryOverridable(subId))
+                            {
+                                var ogs = source.GetCategoryOverrides(subId);
+                                if (ogs != null)
+                                    target.SetCategoryOverrides(subId, ogs);
+                            }
+                        }
+                        catch { }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                FormworkDebugLog.Log($"  [Visual] CopyCategoryVisibility EX: {ex.Message}");
+            }
+
+            // DirectShape (OST_GenericModel) は型枠表示の主役なので強制的に表示状態に上書き
+            try
+            {
+                var gmId = new ElementId(BuiltInCategory.OST_GenericModel);
+                if (target.CanCategoryBeHidden(gmId))
+                    target.SetCategoryHidden(gmId, false);
+            }
+            catch { }
+
+            // 切断ボックスのアウトライン・レベル線は解析ビューで邪魔なので強制非表示
+            HideClutterCategories(target);
         }
 
         /// <summary>

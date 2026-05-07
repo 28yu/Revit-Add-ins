@@ -155,28 +155,32 @@ namespace Tools28.Commands.FormworkCalculator
                     }
                 }
 
-                // ビュータブを順に開く: 3D ビュー (タブを開く) → サマリ集計表 (最終アクティブ)。
+                // ビュータブを順に開く: 集計表系 → 最後に 3D ビュー (最終アクティブ)。
+                // 3D ビューがユーザーにとってのメインビューなので、実行後はそこに遷移する。
                 // メイン集計表は Project Browser から手動で開く。
+                if (scheduleViewId != null && scheduleViewId != ElementId.InvalidElementId)
+                {
+                    try
+                    {
+                        var v = doc.GetElement(scheduleViewId) as View;
+                        if (v != null) uidoc.ActiveView = v;
+                    }
+                    catch { }
+                }
+                if (summaryScheduleId != null && summaryScheduleId != ElementId.InvalidElementId)
+                {
+                    try
+                    {
+                        var v = doc.GetElement(summaryScheduleId) as View;
+                        if (v != null) uidoc.ActiveView = v;
+                    }
+                    catch { }
+                }
                 if (view3DId != null && view3DId != ElementId.InvalidElementId)
                 {
                     try
                     {
                         var v = doc.GetElement(view3DId) as View;
-                        if (v != null) uidoc.ActiveView = v;
-                    }
-                    catch { }
-                }
-                ElementId finalViewId =
-                    (summaryScheduleId != null && summaryScheduleId != ElementId.InvalidElementId)
-                        ? summaryScheduleId
-                        : ((scheduleViewId != null && scheduleViewId != ElementId.InvalidElementId)
-                            ? scheduleViewId
-                            : view3DId);
-                if (finalViewId != null && finalViewId != ElementId.InvalidElementId)
-                {
-                    try
-                    {
-                        var v = doc.GetElement(finalViewId) as View;
                         if (v != null) uidoc.ActiveView = v;
                     }
                     catch { }

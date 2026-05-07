@@ -24,11 +24,11 @@
         <!-- 計算範囲 -->
         <GroupBox x:Name="grpScope" Header="計算範囲" Grid.Row="0" Padding="10">
             <StackPanel>
-                <RadioButton x:Name="RadioEntireProject" GroupName="Scope" IsChecked="True" Margin="0,3">
-                    <TextBlock x:Name="txtScopeProject" Text="プロジェクト全体"/>
-                </RadioButton>
-                <RadioButton x:Name="RadioCurrentView" GroupName="Scope" Margin="0,3">
+                <RadioButton x:Name="RadioCurrentView" GroupName="Scope" IsChecked="True" Margin="0,3">
                     <TextBlock x:Name="txtScopeView" Text="現在のビューに表示されている要素"/>
+                </RadioButton>
+                <RadioButton x:Name="RadioEntireProject" GroupName="Scope" Margin="0,3">
+                    <TextBlock x:Name="txtScopeProject" Text="プロジェクト全体"/>
                 </RadioButton>
             </StackPanel>
         </GroupBox>
