@@ -71,6 +71,15 @@ namespace Tools28.Commands.FormworkCalculator.Output
             try { view.Name = AnalysisViewName; } catch { }
             vr.AnalysisView = view;
 
+            // 表示スタイルを Shading に明示設定 (Realistic では OverrideGraphicSettings の
+            // 透過・色オーバーライドが期待通りに反映されない場合があるため)。
+            try { view.DisplayStyle = DisplayStyle.Shading; }
+            catch (Exception ex)
+            {
+                FormworkDebugLog.Log($"  [Visual] DisplayStyle set EX: {ex.Message}");
+            }
+            try { view.DetailLevel = ViewDetailLevel.Fine; } catch { }
+
             // ソースが 3D ビューなら視点（カメラの向き）を継承する
             CopyOrientationIfPossible(sourceView, view);
 
@@ -230,8 +239,17 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 }
             }
 
+            int formworkShapesCount = vr.CreatedShapeIds.Count;
+            FormworkDebugLog.Log(
+                $"  [Visual] formwork DirectShapes created: {formworkShapesCount} " +
+                $"(elements={result.ElementResults.Count})");
+
             // 除外要素 (鉄骨・デッキスラブ) を別マーカーの DirectShape として作成（オレンジ）
             CreateExcludedShapes(doc, result, vr);
+            int excludedShapesCount = vr.CreatedShapeIds.Count - formworkShapesCount;
+            FormworkDebugLog.Log(
+                $"  [Visual] total DirectShapes: {vr.CreatedShapeIds.Count} " +
+                $"(formwork={formworkShapesCount} excluded={excludedShapesCount})");
 
             // View Filter による色分けを適用（個別要素オーバーライドは使わない）
             try

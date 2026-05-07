@@ -558,41 +558,49 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     "本体テキスト", "ヘッダー テキスト", "タイトル テキスト",
                     "ボディ テキスト", "ヘッダーテキスト", "タイトルテキスト",
                     "正文文字", "标题栏文字", "标题文字",
+                    "タイトル", "ヘッダー", "本体",
                 };
 
-                int assigned = 0;
-                foreach (var name in candidateNames)
+                // 1. Schedule View 自身に対して試す
+                int assignedView = TrySetTextStyleParams(schedule, candidateNames, largestId, "view");
+
+                // 2. Schedule View の Type 要素に対して試す
+                //    (ログから「タイプ」パラメータでタイプ要素が参照されていることが判明)
+                int assignedType = 0;
+                ElementId typeId = ElementId.InvalidElementId;
+                try { typeId = schedule.GetTypeId(); } catch { }
+                if (typeId != null && typeId != ElementId.InvalidElementId)
                 {
-                    try
+                    var typeElem = doc.GetElement(typeId);
+                    if (typeElem != null)
                     {
-                        var p = schedule.LookupParameter(name);
-                        if (p != null && !p.IsReadOnly && p.StorageType == StorageType.ElementId)
+                        FormworkDebugLog.Log($"  [Sched:Summary] schedule type id={typeId.IntegerValue}");
+                        assignedType = TrySetTextStyleParams(typeElem, candidateNames, largestId, "type");
+
+                        // Diagnostic: type 要素の settable ElementId パラメータを全列挙
+                        FormworkDebugLog.Log("  [Sched:Summary] type element ElementId params:");
+                        foreach (Parameter p in typeElem.Parameters)
                         {
-                            p.Set(largestId);
-                            FormworkDebugLog.Log($"  [Sched:Summary] '{name}' = {largestId.IntegerValue}");
-                            assigned++;
+                            try
+                            {
+                                if (p.StorageType == StorageType.ElementId && !p.IsReadOnly)
+                                    FormworkDebugLog.Log(
+                                        $"    typeParam='{p.Definition?.Name}' value={p.AsElementId()?.IntegerValue}");
+                            }
+                            catch { }
                         }
-                    }
-                    catch (Exception ex)
-                    {
-                        FormworkDebugLog.Log($"  [Sched:Summary] '{name}' set EX: {ex.Message}");
                     }
                 }
 
-                // 名前で見つからない場合は全 ElementId 型パラメータをログ (デバッグ用)
-                if (assigned == 0)
+                int totalAssigned = assignedView + assignedType;
+                if (totalAssigned == 0)
                 {
-                    FormworkDebugLog.Log("  [Sched:Summary] no text-style params matched. listing schedule view ElementId params:");
-                    foreach (Parameter p in schedule.Parameters)
-                    {
-                        try
-                        {
-                            if (p.StorageType == StorageType.ElementId && !p.IsReadOnly)
-                                FormworkDebugLog.Log(
-                                    $"    paramName='{p.Definition?.Name}' value={p.AsElementId()?.IntegerValue}");
-                        }
-                        catch { }
-                    }
+                    FormworkDebugLog.Log("  [Sched:Summary] no text-style params matched on view or type");
+                }
+                else
+                {
+                    FormworkDebugLog.Log(
+                        $"  [Sched:Summary] text style assigned: view={assignedView} type={assignedType}");
                 }
             }
             catch (Exception ex)
@@ -600,6 +608,34 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 FormworkDebugLog.Log(
                     $"  [Sched:Summary] EnlargeViewTextStyles EX: {ex.GetType().Name}: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// 候補となるパラメータ名のいずれかに合致した ElementId 型パラメータに、
+        /// 指定の ElementId 値 (TextNoteType の Id) を設定する。
+        /// </summary>
+        private static int TrySetTextStyleParams(Element elem, string[] candidates, ElementId valueId, string label)
+        {
+            if (elem == null) return 0;
+            int count = 0;
+            foreach (var name in candidates)
+            {
+                try
+                {
+                    var p = elem.LookupParameter(name);
+                    if (p != null && !p.IsReadOnly && p.StorageType == StorageType.ElementId)
+                    {
+                        p.Set(valueId);
+                        FormworkDebugLog.Log($"  [Sched:Summary] {label}.'{name}' = {valueId.IntegerValue}");
+                        count++;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    FormworkDebugLog.Log($"  [Sched:Summary] {label}.'{name}' set EX: {ex.Message}");
+                }
+            }
+            return count;
         }
 
         /// <summary>

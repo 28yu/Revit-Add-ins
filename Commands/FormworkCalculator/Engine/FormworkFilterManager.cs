@@ -83,9 +83,18 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                     // 除外フィルタは既定で非表示（ユーザーが手動で ON にすると確認可能）。
                     bool defaultVisible = key != FormworkParameterManager.ExcludedGroupKey;
                     view.SetFilterVisibility(filter.Id, defaultVisible);
+
+                    Engine.FormworkDebugLog.Log(
+                        $"  [Filter] '{filterName}' rule=区分=='{key}' color=({r},{g},{b}) " +
+                        $"visible={defaultVisible}");
                 }
-                catch { }
+                catch (System.Exception ex)
+                {
+                    Engine.FormworkDebugLog.Log($"  [Filter] '{filterName}' apply EX: {ex.Message}");
+                }
             }
+            Engine.FormworkDebugLog.Log(
+                $"  [Filter] applied {keyColors.Count} filters to view '{view.Name}'");
         }
 
         private static void RemoveExistingFiltersFromView(Document doc, View view)
