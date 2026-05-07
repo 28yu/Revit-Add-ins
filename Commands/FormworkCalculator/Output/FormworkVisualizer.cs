@@ -262,6 +262,9 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 $"  [Visual] formwork DirectShapes created: {formworkShapesCount} " +
                 $"(elements={result.ElementResults.Count})");
 
+            // 診断: 作成されたDirectShapeのカテゴリ別件数 + 先頭5個のBBox
+            DiagnoseFormworkShapes(doc, vr.CreatedShapeIds, result);
+
             // 除外要素 (鉄骨・デッキスラブ) を別マーカーの DirectShape として作成（オレンジ）
             CreateExcludedShapes(doc, result, vr);
             int excludedShapesCount = vr.CreatedShapeIds.Count - formworkShapesCount;
@@ -277,6 +280,62 @@ namespace Tools28.Commands.FormworkCalculator.Output
             catch { }
 
             return vr;
+        }
+
+        /// <summary>
+        /// 作成された formwork DirectShape を診断ログに出力する:
+        /// - 区分パラメータ毎の件数 (色分けが効いているか確認)
+        /// - 先頭 5 個の BoundingBox + 区分パラメータ値 (位置と紐付けが正しいか確認)
+        /// </summary>
+        private static void DiagnoseFormworkShapes(
+            Document doc, ICollection<ElementId> shapeIds, FormworkResult result)
+        {
+            try
+            {
+                var byKey = new Dictionary<string, int>();
+                int idx = 0;
+                foreach (var id in shapeIds)
+                {
+                    var elem = doc.GetElement(id);
+                    if (elem == null) continue;
+                    string key = "";
+                    try
+                    {
+                        var p = elem.LookupParameter(FormworkParameterManager.ParamGroupKey);
+                        if (p != null && p.StorageType == StorageType.String)
+                            key = p.AsString() ?? "";
+                    }
+                    catch { }
+                    if (!byKey.ContainsKey(key)) byKey[key] = 0;
+                    byKey[key]++;
+
+                    if (idx < 5)
+                    {
+                        BoundingBoxXYZ bb = null;
+                        try { bb = elem.get_BoundingBox(null); } catch { }
+                        if (bb != null)
+                        {
+                            FormworkDebugLog.Log(
+                                $"  [Visual:Diag] DS#{idx} id={id.IntegerValue} key='{key}' " +
+                                $"BB.Min=({bb.Min.X:F2},{bb.Min.Y:F2},{bb.Min.Z:F2}) " +
+                                $"Max=({bb.Max.X:F2},{bb.Max.Y:F2},{bb.Max.Z:F2})");
+                        }
+                        else
+                        {
+                            FormworkDebugLog.Log(
+                                $"  [Visual:Diag] DS#{idx} id={id.IntegerValue} key='{key}' BB=null");
+                        }
+                        idx++;
+                    }
+                }
+                FormworkDebugLog.Log("  [Visual:Diag] DirectShapes by 区分:");
+                foreach (var kv in byKey.OrderBy(k => k.Key))
+                    FormworkDebugLog.Log($"    '{kv.Key}': {kv.Value}");
+            }
+            catch (Exception ex)
+            {
+                FormworkDebugLog.Log($"  [Visual:Diag] EX: {ex.GetType().Name}: {ex.Message}");
+            }
         }
 
         /// <summary>
