@@ -121,7 +121,7 @@ namespace Tools28.Commands.FormworkCalculator
 
                             if (settings.CreateSchedule)
                             {
-                                scheduleViewId = ScheduleCreator.CreateSchedule(doc);
+                                scheduleViewId = ScheduleCreator.CreateSchedule(doc, result);
                             }
 
                             t.Commit();

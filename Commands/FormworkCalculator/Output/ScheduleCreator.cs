@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Autodesk.Revit.DB;
 using Tools28.Commands.FormworkCalculator.Engine;
+using Tools28.Commands.FormworkCalculator.Models;
 
 namespace Tools28.Commands.FormworkCalculator.Output
 {
@@ -23,7 +24,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
     {
         internal const string ScheduleName = "型枠数量集計";
 
-        internal static ElementId CreateSchedule(Document doc)
+        internal static ElementId CreateSchedule(Document doc, FormworkResult result = null)
         {
             DeleteScheduleByName(doc, ScheduleName);
 
@@ -139,61 +140,138 @@ namespace Tools28.Commands.FormworkCalculator.Output
             }
             LogDef(def, "FINAL");
 
-            // 総合計行を太字・赤字 + 薄黄背景で目立たせる (Excel 総括表との対応を明確化)
-            StyleGrandTotalRow(schedule);
+            // Body の総合計行は API でスタイル変更できない (Revit の制約)。
+            // 代わりに Header セクションに強調表示用の「型枠面積(合計): X.XX ㎡」行を追加し、
+            // 集計表名にも合計値を含めて Project Browser での識別性も向上させる。
+            EmphasizeGrandTotal(schedule, result);
 
             return schedule.Id;
         }
 
         /// <summary>
-        /// 集計表の総合計行 (最終行) を太字・赤字 + 薄黄背景で目立たせる。
-        /// schedule.GetTableData() は同じトランザクション内で取得・編集可能。
+        /// 集計表の総合計を視覚的に強調する。
+        /// Revit API は Body の総合計行へのスタイル変更を許可しないため、
+        /// Header セクションに styled な独立行を追加する。
+        /// 加えて View 名にも合計値を含める (Project Browser 表示用)。
         /// </summary>
-        private static void StyleGrandTotalRow(ViewSchedule schedule)
+        private static void EmphasizeGrandTotal(ViewSchedule schedule, FormworkResult result)
         {
             if (schedule == null) return;
+            double totalM2 = result?.TotalFormworkArea ?? 0;
+            string text = string.Format("型枠面積(合計): {0:F2} ㎡", totalM2);
+
+            // 1. Header セクションに styled な行を追加 (Revit 公式に許可されているセクション)
+            bool added = TryAddStyledHeaderRow(schedule, text);
+            if (!added)
+                FormworkDebugLog.Log("  [Sched:Style] Header row addition failed - falling back to schedule name only");
+
+            // 2. View 名にも合計値を含める (Project Browser での識別性向上)
+            try
+            {
+                schedule.Name = ScheduleName + string.Format(" - 合計 {0:F2} ㎡", totalM2);
+                FormworkDebugLog.Log($"  [Sched:Style] schedule name updated: '{schedule.Name}'");
+            }
+            catch (Exception ex)
+            {
+                FormworkDebugLog.Log($"  [Sched:Style] schedule rename failed: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Header セクションに「型枠面積(合計): X.XX ㎡」の強調表示行を追加する。
+        /// 列が不足していたら追加し、既存ヘッダー行の下に挿入してから
+        /// セル結合・スタイル設定を行う。
+        /// </summary>
+        private static bool TryAddStyledHeaderRow(ViewSchedule schedule, string text)
+        {
             try
             {
                 var tableData = schedule.GetTableData();
-                if (tableData == null) return;
-                var body = tableData.GetSectionData(SectionType.Body);
-                if (body == null) return;
+                if (tableData == null) return false;
+                var header = tableData.GetSectionData(SectionType.Header);
+                if (header == null) return false;
 
-                int rowCount = body.NumberOfRows;
-                int colCount = body.NumberOfColumns;
-                FormworkDebugLog.Log($"  [Sched:Style] body rows={rowCount} cols={colCount}");
-                if (rowCount <= 0 || colCount <= 0) return;
+                int initRows = header.NumberOfRows;
+                int initCols = header.NumberOfColumns;
+                FormworkDebugLog.Log(
+                    $"  [Sched:Style] Header initial rows={initRows} cols={initCols}");
 
-                int targetRow = rowCount - 1; // 最終行が総合計行
+                // 列が無ければ 1 列追加
+                if (initCols == 0)
+                {
+                    try { header.InsertColumn(0); }
+                    catch (Exception ex)
+                    {
+                        FormworkDebugLog.Log($"  [Sched:Style] Header InsertColumn EX: {ex.Message}");
+                        return false;
+                    }
+                }
 
+                // 既存ヘッダー行の最後に新しい行を追加 (一番下 = body の真上)
+                int insertAt = header.NumberOfRows;
+                try { header.InsertRow(insertAt); }
+                catch (Exception ex)
+                {
+                    FormworkDebugLog.Log($"  [Sched:Style] Header InsertRow at {insertAt} EX: {ex.Message}");
+                    return false;
+                }
+
+                int newRow = insertAt;
+                int colCount = header.NumberOfColumns;
+
+                // セル結合 (新規行を全列にまたいで 1 セルに)
+                if (colCount > 1)
+                {
+                    try
+                    {
+                        var merge = new TableMergedCell(newRow, 0, newRow, colCount - 1);
+                        header.MergeCells(merge);
+                    }
+                    catch (Exception ex)
+                    {
+                        FormworkDebugLog.Log($"  [Sched:Style] Header MergeCells EX: {ex.Message}");
+                    }
+                }
+
+                // テキスト設定
+                try { header.SetCellText(newRow, 0, text); }
+                catch (Exception ex)
+                {
+                    FormworkDebugLog.Log($"  [Sched:Style] Header SetCellText EX: {ex.Message}");
+                    return false;
+                }
+
+                // スタイル設定 (太字・赤字・薄黄背景)
                 var style = new TableCellStyle
                 {
                     BackgroundColor = new Color(255, 240, 200), // 薄い黄色
                     TextColor = new Color(192, 0, 0),           // 赤
                     IsFontBold = true,
                 };
-                // どのプロパティをオーバーライドするか指定
-                var overrides = style.GetCellStyleOverrideOptions();
-                overrides.BackgroundColor = true;
-                overrides.FontColor = true;
-                overrides.Bold = true;
-                style.SetCellStyleOverrideOptions(overrides);
+                var ov = style.GetCellStyleOverrideOptions();
+                ov.BackgroundColor = true;
+                ov.FontColor = true;
+                ov.Bold = true;
+                style.SetCellStyleOverrideOptions(ov);
 
-                for (int c = 0; c < colCount; c++)
+                try
                 {
-                    try { body.SetCellStyle(targetRow, c, style); }
-                    catch (Exception ex)
-                    {
-                        FormworkDebugLog.Log(
-                            $"  [Sched:Style] SetCellStyle row={targetRow} col={c} EX: " +
-                            $"{ex.GetType().Name}: {ex.Message}");
-                    }
+                    header.SetCellStyle(newRow, 0, style);
+                    FormworkDebugLog.Log(
+                        $"  [Sched:Style] Header row {newRow} added & styled: '{text}'");
+                    return true;
                 }
-                FormworkDebugLog.Log($"  [Sched:Style] grand total row {targetRow} styled");
+                catch (Exception ex)
+                {
+                    FormworkDebugLog.Log($"  [Sched:Style] Header SetCellStyle EX: {ex.Message}");
+                    return false;
+                }
             }
             catch (Exception ex)
             {
-                FormworkDebugLog.Log($"  [Sched:Style] {ex.GetType().Name}: {ex.Message}");
+                FormworkDebugLog.Log(
+                    $"  [Sched:Style] EmphasizeGrandTotal Header EX: {ex.GetType().Name}: {ex.Message}");
+                return false;
             }
         }
 
