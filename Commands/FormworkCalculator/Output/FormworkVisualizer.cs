@@ -161,10 +161,18 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 }
                 catch { }
 
-                // 集計表の総合計が Excel 総括表と一致するよう、要素の最終 FormworkArea
-                // (開口控除・開口端面加算を反映済み) を最初の FormworkRequired DirectShape
-                // ひとつにまとめて持たせる。残りの DirectShape は面積 0 とする。
-                bool elementAreaAssigned = false;
+                // 各 FormworkRequired 面の有効面積 (fi.EffectiveAreaM2) を、その面に対応する
+                // DirectShape (Clipper 分割なら最初の 1 個) に割り当てる。
+                // これにより、ユーザーが個々の DirectShape を選択しても正しい面積が表示される。
+                //
+                // 開口部の調整 (OpeningEdgeAreaAdded - OpeningAreaDeducted) は要素単位の値で
+                // 面単位に分配できないため、最初の FormworkRequired DirectShape に乗せる。
+                // 結果として:
+                //   sum(全 DirectShape の面積) = sum(fi.EffectiveAreaM2) + 開口調整
+                //                              = er.FormworkArea
+                // 集計表の総合計は維持される。
+                double openingDelta = er.OpeningEdgeAreaAdded - er.OpeningAreaDeducted;
+                bool firstFormworkAssigned = false;
 
                 foreach (var fi in faces)
                 {
@@ -205,6 +213,8 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     }
 
                     bool isFormworkRequired = (fi.FaceType == FaceType.FormworkRequired);
+                    // 同一面の中で最初のピース (Clipper 分割時の先頭) のみに面積を乗せる
+                    bool firstPieceForThisFace = true;
 
                     foreach (var solid in partSolids)
                     {
@@ -224,14 +234,19 @@ namespace Tools28.Commands.FormworkCalculator.Output
 
                             try
                             {
-                                // 要素単位の最終面積を最初の FormworkRequired DirectShape
-                                // のみに乗せる。残りは 0 m²。これにより集計表の総合計が
-                                // Excel 総括表 (er.FormworkArea の総和) と一致する。
+                                // 面単位の有効面積を、その面の最初の DirectShape ピースに割り当てる。
+                                // Clipper 分割で複数ピースになった場合、2 個目以降は 0。
+                                // 開口調整は要素全体の最初の FormworkRequired DirectShape に乗せる。
                                 double areaM2 = 0.0;
-                                if (isFormworkRequired && !elementAreaAssigned)
+                                if (isFormworkRequired && firstPieceForThisFace)
                                 {
-                                    areaM2 = er.FormworkArea;
-                                    elementAreaAssigned = true;
+                                    areaM2 = fi.EffectiveAreaM2;
+                                    if (!firstFormworkAssigned)
+                                    {
+                                        areaM2 += openingDelta;
+                                        firstFormworkAssigned = true;
+                                    }
+                                    firstPieceForThisFace = false;
                                 }
                                 string filterKey = IsDeducted(fi.FaceType) ? "控除面" : key;
                                 FormworkParameterManager.SetInstanceValues(

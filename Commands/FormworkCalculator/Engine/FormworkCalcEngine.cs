@@ -461,7 +461,9 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                             {
                                 effectiveFeetSq = fi.Area;
                             }
-                            formwork += FeetSqToM2(effectiveFeetSq);
+                            // 面単位の有効面積を保存 (DirectShape の面積パラメータに使用)
+                            fi.EffectiveAreaM2 = FeetSqToM2(effectiveFeetSq);
+                            formwork += fi.EffectiveAreaM2;
                             // 部分接触分も控除面積として集計に加える
                             double partialDed = Math.Max(0, fi.Area - effectiveFeetSq);
                             dedContact += FeetSqToM2(partialDed);

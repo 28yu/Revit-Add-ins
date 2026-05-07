@@ -29,6 +29,13 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             public FaceType FaceType;
 
             /// <summary>
+            /// この面が型枠に寄与する実効面積 (㎡)。
+            /// FormworkRequired のみ意味があり、部分接触控除を反映済み。
+            /// BuildElementResult で計算され、DirectShape の面積パラメータに使用される。
+            /// </summary>
+            public double EffectiveAreaM2 = 0.0;
+
+            /// <summary>
             /// 部分接触の記録。FaceType が FormworkRequired のまま残る面について、
             /// 他要素の面と部分的に接触している領域を追跡する。
             /// BuildElementResult で面積を控除するのに使う。
