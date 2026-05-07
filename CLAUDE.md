@@ -1099,10 +1099,18 @@ Commands/FireProtection/
 構造柱・構造フレーム・壁・床・構造基礎・階段の6カテゴリ。`Models/FormworkSettings.cs` の `IncludedCategories` で管理。
 
 ### 自動作成物
-- DirectShape の色付き型枠オブジェクト（OST_GenericModel）
+- DirectShape の色付き型枠オブジェクト（OST_GenericModel、厚み 0.05ft≈15mm）
 - 解析3Dビュー「型枠分析」（再実行で上書き、視点はアクティブ3Dビューを継承）
 - 集計表「型枠数量集計」（レベル → 部位 → タイプ名で階層グループ化）
+- **サマリ集計表「型枠数量集計_合計」**（IsItemized=false、列ヘッダーを赤字・太字・薄黄背景でスタイル、Body 1 行で全件集約 → DirectShape 削除に動的追従）
 - Excel ファイル（任意）
+
+### 鉄骨・デッキスラブの自動除外
+- 構造柱・構造フレームから鉄骨部材（H鋼・角形鋼管・CFT 等）を 4 層判定で自動除外
+  （`SteelMemberDetector`: StructuralMaterialType → 断面形状 → MaterialClass → 名前パターン）
+- 床のタイプ名に "DS" を含むものをデッキスラブとして自動除外（`DeckSlabDetector`）
+- 除外要素はオレンジ色 DirectShape として可視化（解析ビュー上のフィルタ「型枠_除外」は既定で非表示）
+- 集計から除外（マーカー値 `28Tools_Formwork_Excluded` でスケジュールフィルタ外）
 
 ### 処理パイプライン（3 Pass）
 ```
@@ -1112,6 +1120,51 @@ Pass 3: 開口加算 + ElementResult 作成 + Aggregate
 ```
 
 ### 開発で得た重要な API 知見
+
+#### ⚠️ Revit 2022 Schedule API の制約まとめ（2026-05-07 セッション知見）
+
+##### 1. `TableSectionData.SetCellStyle` は限定的
+スタイル上書き許可セル:
+- ✓ Header セクションの全セル
+- ✓ Body セクションの **行 0（列ヘッダー）のみ**
+- ✗ Body のデータ行・グループフッタ・**総合計行はスタイル変更不可**
+
+エラー: `ArgumentException: Only allow to override cell style for header section or column header in body section.`
+
+##### 2. `TableCellStyle.FontSize` は Revit 2022 に存在しない
+- Revit 2024+ で追加。リフレクションで設定しても silently fail
+- Schedule View にも Type 要素にも "Body text / Header text / Title text" 相当のテキストスタイル参照パラメータが存在しない
+- → **Revit 2022 ではプログラム経由でスケジュールフォントサイズ変更は不可能**
+- 手動: プロジェクトのテキストタイプの「文字サイズ」を変更
+
+##### 3. `ScheduleDefinition.GrandTotalTitle` 設定の前提条件
+- Revit 2022 でも property 自体は存在
+- ただし `ShowGrandTotalTitle = true` を**先に設定しないと setter が TargetInvocationException を投げる**
+- リフレクションで InnerException を取得すると原因特定可能
+
+##### 4. ⚠️ `doc.Regenerate()` を呼ばないと新規 DirectShape のジオメトリは認識されない（重要な落とし穴）
+- `DirectShape.SetShape` 直後の `get_BoundingBox(null)` は `null`、`get_Geometry(opts)` は Solid 数 0
+- 結果として **3D ビューに描画されない**
+- 対策: 全 DirectShape 作成後に `doc.Regenerate()` を必ず呼ぶ（同じトランザクション内 OK）
+
+##### 5. `TableSectionData.SetColumnWidth` の単位
+- Revit 内部単位 = feet
+- `0.167 ft ≈ 50mm`、`0.5 ft ≈ 152mm`
+- 列幅が広いほど Body 全体が広がり、その上の Header (schedule title) も広がる → タイトル改行を解消できる
+
+##### 6. 動的合計表示パターン
+集計表の Body 総合計行はスタイル変更不可なので、動的追従する styled な合計を実現するには:
+- 別途サマリ集計表を作成し `IsItemized = false`
+- 件数 + 面積（`DisplayType=Totals`）の 2 フィールド
+- マーカーフィルタで対象を絞る
+- **Body 行 0（列ヘッダー）の各セルにスタイル設定** → ラベルは静的だが、その直下の値（Body 行 1）は Revit が自動再計算
+- 列幅は 0.167 ft 程度、`view.DisplayStyle = Shading` を明示
+
+##### 7. ClosedXML CJK 文字幅
+- `Column.AdjustToContents()` は半角換算でしか計算せず日本語が見切れる
+- 自前で `MeasureWidth(string)` を実装（CJK 全角=2.0、半角=1.1）して `Column.Width` を直接設定
+- オートフィルタ列はドロップダウン矢印分の余白 +5～8 文字必要
+- `cell.Value` は `XLCellValue` (構造体) なので `?.` 演算子使用不可、`.ToString()` を使う
 
 #### Revit 2022 では `ScheduleField.HasTotals` が存在しない
 - 当初リフレクションで `HasTotals = true` を試みていたが、Revit 2022 の API には公開プロパティとして存在しない（プロパティ取得結果が null）
@@ -1142,12 +1195,23 @@ if (sourceView is View3D src)
 解析専用 DirectShape が他ビュー（平面・断面・既存3D）に出ると邪魔になるので、`View.HideElements()` で全ビューから一括非表示。集計表・凡例ビューは除外。
 
 ### 共有パラメータ（OST_GenericModel にバインド）
-- `28Tools_FormworkMarker` (Text): 識別用 = `"28Tools_Formwork"`
-- `28Tools_Formwork_部位` (Text): 柱/梁/壁/スラブ/基礎/階段
+- `28Tools_FormworkMarker` (Text): 識別用
+  - 通常 formwork: `"28Tools_Formwork"`
+  - 除外 (鉄骨・デッキスラブ): `"28Tools_Formwork_Excluded"`
+  - クリーンアップは `StartsWith("28Tools_Formwork")` で両方カバー
+- `28Tools_Formwork_部位` (Text): 柱/梁/壁/スラブ/基礎/階段/鉄骨(除外)/デッキスラブ(除外)
 - `28Tools_Formwork_レベル` (Text): 参照レベル名
-- `28Tools_Formwork_区分` (Text): 色分けグループキー
+- `28Tools_Formwork_区分` (Text): 色分けグループキー（`"柱"`, `"除外"` 等）
 - `28Tools_Formwork_面積` (Area): 面積 (㎡)
+  - 要素単位の最終 FormworkArea（開口控除・端面加算反映）を最初の FormworkRequired DirectShape ひとつにまとめて持たせる。残りは 0 ㎡
+  - これにより集計表の総合計が Excel 総括表と完全一致
 - `28Tools_Formwork_部分接触` (Text "Yes"/"No"): 一部消されている面の識別
+
+### マーカー値・グループキー定数
+- `MarkerValue = "28Tools_Formwork"` (通常)
+- `MarkerValueExcluded = "28Tools_Formwork_Excluded"` (除外)
+- `ExcludedGroupKey = "除外"` (View Filter キー)
+- `SteelExcludedLabel = "鉄骨(除外)"`、`DeckSlabExcludedLabel = "デッキスラブ(除外)"`
 
 ### デバッグログ
 - 出力先: `C:\temp\Formwork_debug.txt`
@@ -1155,27 +1219,11 @@ if (sourceView is View3D src)
 - 上限 200,000 行（超えたら `... truncated` で停止）
 - **リリース時は `false` に変更すること**
 
-### 🎯 今後の機能拡張: マテリアルベース算出
+### 🎯 今後の機能拡張: マテリアルベース算出 — **中止**
 
-現在は「カテゴリ」（柱・梁・壁等）を判定軸にして対象要素を絞っているが、実プロジェクトでは:
-- 同じカテゴリでも材料が違う（RC柱 vs 鉄骨柱、RC壁 vs ALC壁）
-- ALC・乾式間仕切は型枠不要だが、現状はカテゴリ単位なので対象になってしまう
+2026-05-07 セッションで検討の結果、**中止**となった。
 
-**拡張方針**: 要素のマテリアル（材料）を判定軸に変更／併用できるようにする。
-
-- ダイアログにマテリアル一覧（複数選択）を追加
-- 「カテゴリで絞る」「マテリアルで絞る」「両方を AND/OR で組合せる」を切替可能に
-- マテリアル取得の優先順位:
-  1. `Element.StructuralMaterialId`（柱・梁・基礎の構造材）
-  2. 複合構造の主構造層（Core）のマテリアル（壁・床）
-  3. タイプの `Material` パラメータ（`MATERIAL_ID_PARAM`）
-  4. インスタンスのマテリアル指定
-  5. ジオメトリ Solid の `Face.MaterialElementId`（最終手段）
-- 集計表のグループ化階層に「マテリアル」を追加できるように
-- 色分け基準にも「マテリアル別」を追加（既存の Category/Zone/FormworkType に並べる）
-- 既存の `IncludedCategories` 設定は維持し、マテリアル機能はオプトインの新規フィールドとして追加（後方互換）
-
-詳細な実装見積りは `HANDOFF.md` 参照。
+**中止理由**: マテリアル単独では SRC/CFT を区別できない（CFT を Concrete マテリアルで作るケースがあるため、マテリアル属性だけでは型枠要否を判断不可）。代わりに **鉄骨除外** (`SteelMemberDetector` の 4 層判定) と **デッキスラブ除外** (`DeckSlabDetector`) で実用上の課題は解消した。
 
 ### 現在のステータス
 - **機能実装**: 完了（接触検出 Phase 1+2、3D視覚化、集計表、Excel出力、視点継承）

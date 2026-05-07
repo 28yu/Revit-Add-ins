@@ -5,6 +5,144 @@
 
 ---
 
+## 2026-05-07 セッション最終 (本日のまとめ): 重要な API 知見と最終仕様
+
+### ⚠️ Revit 2022 Schedule API の重要な制約（再現したい場合の参考）
+
+#### 1. `TableSectionData.SetCellStyle` は限定的
+スタイルを上書きできるのは:
+- ✓ Header セクションの全セル
+- ✓ Body セクションの **行 0（列ヘッダー）のみ**
+- ✗ Body セクションのデータ行・グループフッタ・**総合計行はスタイル変更不可**
+
+エラーメッセージ:
+```
+ArgumentException: Only allow to override cell style for header section or
+column header in body section.
+```
+
+#### 2. `TableCellStyle.FontSize` は Revit 2022 に存在しない
+- Revit 2024+ で追加された
+- リフレクションで設定しようとしても silently fail
+- Revit 2022 でフォントサイズをプログラム経由で変更することは API 制約上**不可能**
+
+#### 3. Schedule View にテキストスタイル参照パラメータが存在しない (Revit 2022)
+- "Body text" / "Header text" / "Title text" 相当のパラメータは
+  Schedule View にも、その Type 要素にも存在しない
+- 確認方法: 全 ElementId 型パラメータを列挙しても "新しいビューに適用される
+  ビューテンプレート" のみ
+- → スケジュールのフォントサイズ変更は手動 (プロジェクトのテキストタイプ
+  「文字サイズ」を変更) でのみ可能
+
+#### 4. `ScheduleDefinition.GrandTotalTitle` は **存在するが要前提条件**
+- Revit 2022 でも property は存在
+- ただし `ShowGrandTotalTitle = true` を**先に設定しないと setter が
+  TargetInvocationException を投げる**
+- リフレクションで InnerException を取得して原因特定可能
+
+#### 5. ⚠️ `doc.Regenerate()` を呼ばないと新規 DirectShape のジオメトリは認識されない
+- 大きな落とし穴。`DirectShape.SetShape` 直後に `get_BoundingBox(null)` を
+  呼んでも `null` が返る
+- `Element.get_Geometry(opts)` も Solid 数 0 を返す
+- 結果として **3D ビューに描画されない**
+- 対策: 全 DirectShape 作成後に **`doc.Regenerate()`** を必ず呼ぶ
+- 同じトランザクション内で OK
+
+#### 6. `TableSectionData.SetColumnWidth` の単位は **feet (内部単位)**
+- `0.167 ft ≈ 50mm`、`0.5 ft ≈ 152mm`
+- タイトル「<…>」の改行は body 全体の幅で決まるため、列幅を広げると
+  タイトルも改行しなくなる
+
+#### 7. `ScheduleSheetInstance` ではなく `ViewSchedule.GetTableData()` 経由
+- セクションデータは `tableData.GetSectionData(SectionType.Header/Body/Footer)`
+
+---
+
+### 動的合計サマリ集計表のパターン
+ユーザー操作 (DirectShape 削除) に追従する合計値を styled に表示するレシピ:
+
+1. メイン集計表とは別に「型枠数量集計_合計」を新設
+2. `IsItemized = false` で全件を 1 行に集約
+3. 件数 + 面積（`DisplayType=Totals`）の 2 フィールド
+4. マーカーフィルタ (Equal MarkerValue) で formwork のみ
+5. **Body 行 0（列ヘッダー）の各セルにスタイル設定** (赤字・太字・薄黄背景)
+   ← 動的に追従する値の直上にラベルを置く構図
+6. データ行 (Body 行 1) は Revit が DirectShape の追加・削除に応じて自動再計算
+7. 列幅は 0.167 ft 程度に絞ってタイトル改行を防ぐ
+
+→ ラベルは静的だが、その直下の値はリアルタイム追従する
+
+---
+
+### Excel 出力の CJK 対応
+`ClosedXML.AdjustToContents()` は半角文字を 1 として幅計算するため、
+日本語が見切れる。対策:
+- `MeasureWidth(string)` ヘルパー: CJK 全角を 2.0、半角を 1.1 でカウント
+- 各列の最大幅を直接 `Column.Width` にセット
+- オートフィルタ付きシート (要素明細) は padding +5～8 文字必要
+  （ドロップダウン矢印 ≈ 17px = 約 2.5 文字幅 + 余白）
+
+`cell.Value` は `XLCellValue` (構造体) なので `?.` 演算子使用不可。
+`cell.Value.ToString()` を使う。
+
+---
+
+### パラメータ自動候補 ComboBox（工区別・型枠種別）
+`Engine/ParameterCandidateScanner.cs`:
+- ParameterBindings (プロジェクト/共有パラメータ) + 主要カテゴリの先頭
+  3 件のインスタンス・タイプから収集
+- キーワード:
+  - 工区: `工区 / ゾーン / Zone / エリア / Area / ブロック / Block / 区分 / Section / 範囲 / Phase`
+  - 型枠種別: `型枠 / 種別 / Formwork / Type / パターン / Pattern / 仕様 / Spec`
+- ComboBox は `IsEditable="True"` で手入力もサポート
+
+---
+
+### 鉄骨除外の 4 層フォールバック判定 (確定仕様)
+`Engine/SteelMemberDetector.cs`:
+
+| Layer | 判定 | 例 |
+|---|---|---|
+| L1 | `FamilyInstance.StructuralMaterialType == Steel` | 標準ファミリ |
+| L2 | 断面形状分析（中空 or 充実率<0.5） | CFT、H形鋼 |
+| L3 | 構造材マテリアル名 (Steel/鋼/鉄/Metal) | マテリアルのみ正設定 |
+| L4 | ファミリ・タイプ名キーワード | 古いファミリ、CFT- 等 |
+
+- 対象: 構造柱・構造フレームのみ
+- SRC柱は中実・凸で保持、CFT柱は中空または "CFT" 名で除外
+- 検出失敗時は **保持側にフェイルセーフ** (誤除外回避)
+- 暗黙挙動 (UI 非露出)
+
+### デッキスラブ除外
+`Engine/DeckSlabDetector.cs`:
+- 床のタイプ名 (`ElementType.Name`) または要素名に "DS" / "ＤＳ" を含めば除外
+- `Contains` ベース（"DS150"・"ALC-DS" 等を拾う）
+- 大文字のみ ("ds" は除外しない）
+
+---
+
+### 視覚化の最終仕様
+- formwork DirectShape 厚み: **0.05 ft（≈15mm）**
+- 元躯体: **50% 透過 + RGB(94,94,94) グレー**
+- View Filter で色分け（区分パラメータベース）
+- 除外フィルタは既定で非表示（V/G で手動 ON で確認）
+- `OST_GenericModel` カテゴリは明示的に表示状態に設定
+- `View3D.DisplayStyle = Shading` を明示
+- formwork DirectShape は `SurfaceTransparency = 0` で完全不透明
+
+### DirectShape の面積パラメータ集約 (Excel 総括表との一致)
+- 要素単位の最終 `er.FormworkArea` (開口控除・端面加算反映) を最初の
+  **FormworkRequired** DirectShape 一つにまとめて持たせる
+- 残りの DirectShape は面積 0 m²
+- 集計表の総合計 = Excel 総括表の合計 と完全一致
+
+### 完了時のビュータブ展開
+1. 3D ビュー (タブを開く)
+2. サマリ集計表 (最終アクティブ → フォアグラウンド)
+- メイン集計表は Project Browser から手動で開く
+
+---
+
 ## 2026-05-07 セッション後半: デッキスラブ除外と除外フィルタ既定非表示
 
 - 床カテゴリのうち**タイプ名に "DS" を含む**ものをデッキスラブとして自動除外
