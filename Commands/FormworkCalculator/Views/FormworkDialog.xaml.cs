@@ -1,4 +1,7 @@
+using System.Collections.Generic;
 using System.Windows;
+using Autodesk.Revit.DB;
+using Tools28.Commands.FormworkCalculator.Engine;
 using Tools28.Commands.FormworkCalculator.Models;
 using Tools28.Localization;
 
@@ -8,10 +11,14 @@ namespace Tools28.Commands.FormworkCalculator.Views
     {
         public FormworkSettings Settings { get; private set; }
 
-        public FormworkDialog(FormworkSettings defaults = null)
+        private readonly Document _doc;
+
+        public FormworkDialog(Document doc = null, FormworkSettings defaults = null)
         {
+            _doc = doc;
             InitializeComponent();
             ApplyLocalization();
+            PopulateParameterCandidates();
             Load(defaults ?? new FormworkSettings());
         }
 
@@ -48,6 +55,29 @@ namespace Tools28.Commands.FormworkCalculator.Views
             btnCancel.Content = Loc.S("Common.Cancel");
         }
 
+        /// <summary>
+        /// 工区別・型枠種別のパラメータ候補を ComboBox に投入する。
+        /// 名前にキーワード (工区/Zone/型枠/Type 等) を含むパラメータを自動検出。
+        /// </summary>
+        private void PopulateParameterCandidates()
+        {
+            if (_doc == null) return;
+            try
+            {
+                List<string> zoneCands = ParameterCandidateScanner.FindCandidates(
+                    _doc, ParameterCandidateScanner.ZoneKeywords);
+                CmbZoneParam.ItemsSource = zoneCands;
+            }
+            catch { }
+            try
+            {
+                List<string> typeCands = ParameterCandidateScanner.FindCandidates(
+                    _doc, ParameterCandidateScanner.FormworkTypeKeywords);
+                CmbTypeParam.ItemsSource = typeCands;
+            }
+            catch { }
+        }
+
         private void Load(FormworkSettings s)
         {
             if (s.Scope == CalculationScope.EntireProject)
@@ -58,8 +88,8 @@ namespace Tools28.Commands.FormworkCalculator.Views
             ChkByCategory.IsChecked = s.GroupByCategory;
             ChkByZone.IsChecked = s.GroupByZone;
             ChkByType.IsChecked = s.GroupByFormworkType;
-            TxtZoneParam.Text = s.ZoneParameterName ?? string.Empty;
-            TxtTypeParam.Text = s.FormworkTypeParameterName ?? string.Empty;
+            CmbZoneParam.Text = s.ZoneParameterName ?? string.Empty;
+            CmbTypeParam.Text = s.FormworkTypeParameterName ?? string.Empty;
 
             ChkExportExcel.IsChecked = s.ExportToExcel;
             ChkCreateSchedule.IsChecked = s.CreateSchedule;
@@ -85,9 +115,9 @@ namespace Tools28.Commands.FormworkCalculator.Views
                     ? CalculationScope.EntireProject : CalculationScope.CurrentView,
                 GroupByCategory = ChkByCategory.IsChecked == true,
                 GroupByZone = ChkByZone.IsChecked == true,
-                ZoneParameterName = TxtZoneParam.Text?.Trim() ?? string.Empty,
+                ZoneParameterName = CmbZoneParam.Text?.Trim() ?? string.Empty,
                 GroupByFormworkType = ChkByType.IsChecked == true,
-                FormworkTypeParameterName = TxtTypeParam.Text?.Trim() ?? string.Empty,
+                FormworkTypeParameterName = CmbTypeParam.Text?.Trim() ?? string.Empty,
                 ExportToExcel = ChkExportExcel.IsChecked == true,
                 CreateSchedule = ChkCreateSchedule.IsChecked == true,
                 Create3DView = ChkCreate3DView.IsChecked == true,

@@ -139,7 +139,62 @@ namespace Tools28.Commands.FormworkCalculator.Output
             }
             LogDef(def, "FINAL");
 
+            // 総合計行を太字・赤字 + 薄黄背景で目立たせる (Excel 総括表との対応を明確化)
+            StyleGrandTotalRow(schedule);
+
             return schedule.Id;
+        }
+
+        /// <summary>
+        /// 集計表の総合計行 (最終行) を太字・赤字 + 薄黄背景で目立たせる。
+        /// schedule.GetTableData() は同じトランザクション内で取得・編集可能。
+        /// </summary>
+        private static void StyleGrandTotalRow(ViewSchedule schedule)
+        {
+            if (schedule == null) return;
+            try
+            {
+                var tableData = schedule.GetTableData();
+                if (tableData == null) return;
+                var body = tableData.GetSectionData(SectionType.Body);
+                if (body == null) return;
+
+                int rowCount = body.NumberOfRows;
+                int colCount = body.NumberOfColumns;
+                FormworkDebugLog.Log($"  [Sched:Style] body rows={rowCount} cols={colCount}");
+                if (rowCount <= 0 || colCount <= 0) return;
+
+                int targetRow = rowCount - 1; // 最終行が総合計行
+
+                var style = new TableCellStyle
+                {
+                    BackgroundColor = new Color(255, 240, 200), // 薄い黄色
+                    TextColor = new Color(192, 0, 0),           // 赤
+                    IsFontBold = true,
+                };
+                // どのプロパティをオーバーライドするか指定
+                var overrides = style.GetCellStyleOverrideOptions();
+                overrides.BackgroundColor = true;
+                overrides.FontColor = true;
+                overrides.Bold = true;
+                style.SetCellStyleOverrideOptions(overrides);
+
+                for (int c = 0; c < colCount; c++)
+                {
+                    try { body.SetCellStyle(targetRow, c, style); }
+                    catch (Exception ex)
+                    {
+                        FormworkDebugLog.Log(
+                            $"  [Sched:Style] SetCellStyle row={targetRow} col={c} EX: " +
+                            $"{ex.GetType().Name}: {ex.Message}");
+                    }
+                }
+                FormworkDebugLog.Log($"  [Sched:Style] grand total row {targetRow} styled");
+            }
+            catch (Exception ex)
+            {
+                FormworkDebugLog.Log($"  [Sched:Style] {ex.GetType().Name}: {ex.Message}");
+            }
         }
 
         private static void LogDef(ScheduleDefinition def, string stage)

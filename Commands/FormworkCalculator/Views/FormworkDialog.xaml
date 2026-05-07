@@ -49,7 +49,7 @@
                         <TextBlock x:Name="txtByZone" Text="工区別" Margin="0,0,10,0"/>
                     </CheckBox>
                     <TextBlock x:Name="lblZoneParam" Grid.Column="1" Text="パラメータ名:" VerticalAlignment="Center" Margin="10,0,5,0"/>
-                    <TextBox x:Name="TxtZoneParam" Grid.Column="2" Height="22"/>
+                    <ComboBox x:Name="CmbZoneParam" Grid.Column="2" Height="22" IsEditable="True"/>
                 </Grid>
                 <Grid Margin="0,3">
                     <Grid.ColumnDefinitions>
@@ -61,7 +61,7 @@
                         <TextBlock x:Name="txtByType" Text="型枠種別" Margin="0,0,10,0"/>
                     </CheckBox>
                     <TextBlock x:Name="lblTypeParam" Grid.Column="1" Text="パラメータ名:" VerticalAlignment="Center" Margin="10,0,5,0"/>
-                    <TextBox x:Name="TxtTypeParam" Grid.Column="2" Height="22"/>
+                    <ComboBox x:Name="CmbTypeParam" Grid.Column="2" Height="22" IsEditable="True"/>
                 </Grid>
             </StackPanel>
         </GroupBox>

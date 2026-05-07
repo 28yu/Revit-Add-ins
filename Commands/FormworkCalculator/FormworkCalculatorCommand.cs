@@ -30,7 +30,7 @@ namespace Tools28.Commands.FormworkCalculator
 
             try
             {
-                var dialog = new FormworkDialog();
+                var dialog = new FormworkDialog(doc);
                 if (dialog.ShowDialog() != true)
                     return Result.Cancelled;
 
