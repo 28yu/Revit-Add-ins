@@ -420,49 +420,21 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                             // Naive sum (ContactArea を単純合計) は接触領域同士が重なって
                             // いると過大評価され、面積が 0 にクランプされてしまう。
                             // Clipper を使った 2D 矩形差分で正確な残面積を計算する。
-                            double effectiveFeetSq;
-                            string clipperStatus = "no-partial";
-                            if (fi.PartialContacts.Count > 0)
-                            {
-                                var clip = PartialContactClipper.TryClip(fi);
-                                if (clip.Success && clip.Solids.Count > 0)
-                                {
-                                    // Clipper 成功 → 残った薄板 Solid の体積 / 厚みで正確面積算出
-                                    double area = 0;
-                                    foreach (var s in clip.Solids)
-                                        area += s.Volume / PartialContactClipper.ThicknessFeet;
-                                    effectiveFeetSq = area;
-                                    clipperStatus = $"clipper-OK";
-                                }
-                                else
-                                {
-                                    // フォールバック: naive sum + 安全キャップ (面積の 95%)
-                                    double partial = 0;
-                                    foreach (var pc in fi.PartialContacts) partial += pc.ContactArea;
-                                    double rawSum = partial;
-                                    partial = Math.Min(partial, fi.Area * 0.95);
-                                    effectiveFeetSq = Math.Max(0, fi.Area - partial);
-                                    clipperStatus = $"clipper-FAIL({clip.FailReason}) rawSum={rawSum:F4}";
-                                }
+                            string clipperStatus;
+                            double effectiveFeetSq = ComputeAndSetEffectiveArea(fi, out clipperStatus);
 
-                                // 部分接触の詳細をログ (問題追跡用)
-                                if (FormworkDebugLog.Enabled)
-                                {
-                                    var sb = new System.Text.StringBuilder();
-                                    sb.Append($"  [FaceDiag] E{ctx.ElementId} face[{ctx.Faces.IndexOf(fi)}] ");
-                                    sb.Append($"area={fi.Area:F4} partials={fi.PartialContacts.Count} [");
-                                    foreach (var pc in fi.PartialContacts)
-                                        sb.Append($" E{pc.OtherElementId}:a={pc.ContactArea:F4}");
-                                    sb.Append($" ] {clipperStatus} eff={effectiveFeetSq:F4}");
-                                    FormworkDebugLog.Log(sb.ToString());
-                                }
-                            }
-                            else
+                            // 部分接触の詳細をログ (問題追跡用)
+                            if (fi.PartialContacts.Count > 0 && FormworkDebugLog.Enabled)
                             {
-                                effectiveFeetSq = fi.Area;
+                                var sb = new System.Text.StringBuilder();
+                                sb.Append($"  [FaceDiag] E{ctx.ElementId} face[{ctx.Faces.IndexOf(fi)}] ");
+                                sb.Append($"area={fi.Area:F4} partials={fi.PartialContacts.Count} [");
+                                foreach (var pc in fi.PartialContacts)
+                                    sb.Append($" E{pc.OtherElementId}:a={pc.ContactArea:F4}");
+                                sb.Append($" ] {clipperStatus} eff={effectiveFeetSq:F4}");
+                                FormworkDebugLog.Log(sb.ToString());
                             }
-                            // 面単位の有効面積を保存 (DirectShape の面積パラメータに使用)
-                            fi.EffectiveAreaM2 = FeetSqToM2(effectiveFeetSq);
+
                             formwork += fi.EffectiveAreaM2;
                             // 部分接触分も控除面積として集計に加える
                             double partialDed = Math.Max(0, fi.Area - effectiveFeetSq);
@@ -583,10 +555,57 @@ namespace Tools28.Commands.FormworkCalculator.Engine
 
             ContactFaceDetector.RefineContactFaces(contexts);
 
+            // 各面の有効面積を計算して FaceInfo に保存。
+            // RecomputeFaces は新しい FaceInfo インスタンスを作るため、BuildElementResult
+            // 側で設定した EffectiveAreaM2 はここには来ない。可視化で使うために再計算する。
             foreach (var ctx in contexts)
+            {
+                foreach (var fi in ctx.Faces)
+                {
+                    if (fi.FaceType == FaceType.FormworkRequired)
+                    {
+                        string _;
+                        ComputeAndSetEffectiveArea(fi, out _);
+                    }
+                }
                 map[ctx.ElementId] = ctx.Faces;
+            }
 
             return map;
+        }
+
+        /// <summary>
+        /// FormworkRequired 面の有効面積 (部分接触控除後) を計算し、fi.EffectiveAreaM2 に保存する。
+        /// 戻り値は feet² 単位の有効面積 (ログ出力用)、out clipperStatus は診断文字列。
+        /// </summary>
+        private static double ComputeAndSetEffectiveArea(
+            FaceClassifier.FaceInfo fi, out string clipperStatus)
+        {
+            clipperStatus = "no-partial";
+            double effectiveFeetSq = fi.Area;
+            if (fi.PartialContacts.Count > 0)
+            {
+                var clip = PartialContactClipper.TryClip(fi);
+                if (clip.Success && clip.Solids.Count > 0)
+                {
+                    double area = 0;
+                    foreach (var s in clip.Solids)
+                        area += s.Volume / PartialContactClipper.ThicknessFeet;
+                    effectiveFeetSq = area;
+                    clipperStatus = "clipper-OK";
+                }
+                else
+                {
+                    double partial = 0;
+                    foreach (var pc in fi.PartialContacts) partial += pc.ContactArea;
+                    double rawSum = partial;
+                    partial = Math.Min(partial, fi.Area * 0.95);
+                    effectiveFeetSq = Math.Max(0, fi.Area - partial);
+                    clipperStatus = $"clipper-FAIL({clip.FailReason}) rawSum={rawSum:F4}";
+                }
+            }
+            fi.EffectiveAreaM2 = FeetSqToM2(effectiveFeetSq);
+            return effectiveFeetSq;
         }
 
         private static string NormalizeParamValue(string s)
