@@ -202,16 +202,19 @@ namespace Tools28.Commands.FormworkCalculator
 
                 if (result.ExcludedResults != null && result.ExcludedResults.Count > 0)
                 {
-                    int steelN = 0, deckN = 0;
+                    int steelN = 0, deckN = 0, sweepN = 0;
                     foreach (var ex in result.ExcludedResults)
                     {
                         if (ex.Kind == ExclusionKind.Steel) steelN++;
                         else if (ex.Kind == ExclusionKind.DeckSlab) deckN++;
+                        else if (ex.Kind == ExclusionKind.WallSweep) sweepN++;
                     }
                     if (steelN > 0)
                         summary += "\n\n" + string.Format(Loc.S("Formwork.SteelExcluded"), steelN);
                     if (deckN > 0)
                         summary += "\n" + string.Format(Loc.S("Formwork.DeckSlabExcluded"), deckN);
+                    if (sweepN > 0)
+                        summary += "\n" + string.Format(Loc.S("Formwork.WallSweepExcluded"), sweepN);
                     summary += "\n" + Loc.S("Formwork.ExcludedFilterNote");
                 }
 

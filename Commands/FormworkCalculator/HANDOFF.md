@@ -119,6 +119,12 @@ column header in body section.
 - `Contains` ベース（"DS150"・"ALC-DS" 等を拾う）
 - 大文字のみ ("ds" は除外しない）
 
+### 壁スイープ・リビール除外
+`Engine/ElementCollector.cs` (CollectAndClassify):
+- `WallSweep` クラスのインスタンス（壁スイープ・リビール両方を含む）を一律除外
+- 壁の天端付帯部 (コーピング・水切り等) は別工法で施工されることが多く型枠不要
+- ラベル: `WallSweepExcludedLabel = "壁スイープ(除外)"`
+
 ---
 
 ### 視覚化の最終仕様

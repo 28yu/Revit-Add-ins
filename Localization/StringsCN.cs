@@ -373,6 +373,7 @@ namespace Tools28.Localization
             { "Formwork.SummaryScheduleCreated", "已创建汇总明细表「模板数量汇总_合计」（构件删除时自动更新）" },
             { "Formwork.SteelExcluded", "已排除 {0} 个钢构件（无需模板）" },
             { "Formwork.DeckSlabExcluded", "已排除 {0} 个压型钢板楼板（类型名称包含 \"DS\"）" },
+            { "Formwork.WallSweepExcluded", "已排除 {0} 个墙饰条/凹槽（无需模板）" },
             { "Formwork.ExcludedFilterNote", "（排除的构件在分析三维视图中由「型枠_除外」过滤器隐藏，开启过滤器即可查看）" },
         };
     }

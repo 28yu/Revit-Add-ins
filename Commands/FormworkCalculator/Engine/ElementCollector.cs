@@ -46,13 +46,31 @@ namespace Tools28.Commands.FormworkCalculator.Engine
 
             bool exclude = settings?.ExcludeSteelMembers ?? true;
 
-            FormworkDebugLog.Section("Exclusion Detection (Steel + DeckSlab)");
+            FormworkDebugLog.Section("Exclusion Detection (Steel + DeckSlab + WallSweep)");
             int steelCount = 0;
             int deckCount = 0;
+            int sweepCount = 0;
             foreach (var elem in raw)
             {
                 if (exclude)
                 {
+                    // 壁スイープ・リビール → 形状を変える付帯部なので型枠不要
+                    if (elem is WallSweep)
+                    {
+                        cr.Excluded.Add(new ExcludedEntry
+                        {
+                            Element = elem,
+                            Kind = ExclusionKind.WallSweep,
+                            Layer = "WallSweep",
+                            Reason = "WallSweep element (sweep or reveal)",
+                        });
+                        FormworkDebugLog.Log(
+                            $"  [WallSweepExclude] E{elem.Id.IntegerValue} " +
+                            $"Cat={elem.Category?.Name} Name='{elem.Name}'");
+                        sweepCount++;
+                        continue;
+                    }
+
                     // 構造柱・構造フレーム → 鉄骨判定
                     if (IsSteelDetectionTarget(elem))
                     {
@@ -106,7 +124,8 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             }
             FormworkDebugLog.Log(
                 $"  Exclusion detection: total={raw.Count} steelExcluded={steelCount} " +
-                $"deckSlabExcluded={deckCount} kept={cr.Targets.Count}");
+                $"deckSlabExcluded={deckCount} wallSweepExcluded={sweepCount} " +
+                $"kept={cr.Targets.Count}");
             FormworkDebugLog.Flush();
 
             return cr;

@@ -28,6 +28,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         // 部位ラベル（種別ごと）。集計表に表示される（ただし現状は MarkerValue でフィルタされ非表示）。
         public const string SteelExcludedLabel = "鉄骨(除外)";
         public const string DeckSlabExcludedLabel = "デッキスラブ(除外)";
+        public const string WallSweepExcludedLabel = "壁スイープ(除外)";
 
         // View Filter のグループキー。除外要素は全て同じキー・色・フィルタを共有し、
         // 解析ビュー上では既定で非表示（ユーザーが手動で ON にすると確認可能）。

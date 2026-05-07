@@ -97,6 +97,7 @@ namespace Tools28.Commands.FormworkCalculator.Models
     {
         Steel,      // 鉄骨部材 (H形鋼・角形鋼管・CFT 等)
         DeckSlab,   // デッキスラブ (タイプ名に "DS" を含む床)
+        WallSweep,  // 壁スイープ・リビール (壁の天端や面に付帯する成形)
     }
 
     /// <summary>

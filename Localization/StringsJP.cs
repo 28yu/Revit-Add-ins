@@ -373,6 +373,7 @@ namespace Tools28.Localization
             { "Formwork.SummaryScheduleCreated", "サマリ集計表「型枠数量集計_合計」を作成しました（要素削除に追従）" },
             { "Formwork.SteelExcluded", "鉄骨部材 {0} 個を型枠不要として除外しました" },
             { "Formwork.DeckSlabExcluded", "デッキスラブ {0} 個を型枠不要として除外しました（タイプ名に \"DS\" を含む床）" },
+            { "Formwork.WallSweepExcluded", "壁スイープ・リビール {0} 個を型枠不要として除外しました" },
             { "Formwork.ExcludedFilterNote", "（除外要素は解析3Dビューの「型枠_除外」フィルタで非表示。表示 ON で確認可能）" },
         };
     }

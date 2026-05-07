@@ -444,6 +444,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
             {
                 case ExclusionKind.Steel: return FormworkParameterManager.SteelExcludedLabel;
                 case ExclusionKind.DeckSlab: return FormworkParameterManager.DeckSlabExcludedLabel;
+                case ExclusionKind.WallSweep: return FormworkParameterManager.WallSweepExcludedLabel;
                 default: return FormworkParameterManager.SteelExcludedLabel;
             }
         }
