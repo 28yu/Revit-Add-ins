@@ -42,7 +42,12 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         // Stage 1 強化: a の 4 隅を b に投影した UV 矩形と b の UV 矩形の重なり比が
         // この値未満なら Full Contact を否定し Stage 2 評価へ流す。中心 1 点投影だけ
         // では co-planar な隣接面 (Join Geometry の影響等) を弾けないための補強。
-        private const double OverlapRatioMin = 0.8;
+        //
+        // 0.95 の根拠: a がやや大きく、b が a に完全包含されるケースでも、
+        // overlap ratio = bArea / aArea。AreaRatioLimit=1.2 のとき最悪ケースで
+        // 1/1.2 ≈ 0.83 まで下がる。0.8 では co-planar 隣接面を弾けないので
+        // 0.95 に厳格化し、わずかでも露出があれば Partial Contact 扱いにする。
+        private const double OverlapRatioMin = 0.95;
 
         internal static void RefineContactFaces(List<ElementFacesContext> contexts)
         {
@@ -204,6 +209,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             bool stage1Accepted = false;
             string stage1Reason = null;
             double overlapRatio = -1;
+            string overlapFailReason = null;
             if (!cond2Area) stage1Reason = "cond2-area-zero";
             else if (aArea > bArea * AreaRatioLimit) stage1Reason = "cond2-area-ratio";
             else if (bbA == null) stage1Reason = "cond3-bbA-null";
@@ -218,8 +224,14 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             {
                 // Stage 1 強化: a の 4 隅を b に投影した UV 矩形と b の UV 矩形の
                 // 重なり比をチェック。中心 1 点投影だけでは co-planar な隣接面を弾けない。
-                overlapRatio = EstimateOverlapRatioAonB(a.Face, b.Face, bbA, bbB);
-                if (overlapRatio >= 0 && overlapRatio < OverlapRatioMin)
+                overlapRatio = EstimateOverlapRatioAonB(
+                    a.Face, b.Face, bbA, bbB, out overlapFailReason);
+                if (overlapRatio < 0)
+                {
+                    // 投影失敗: 既存ロジック (中心投影 + 面積比) を信頼して Full 受理
+                    stage1Accepted = true;
+                }
+                else if (overlapRatio < OverlapRatioMin)
                 {
                     stage1Reason = "cond5-overlap-insufficient";
                 }
@@ -266,7 +278,10 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 sb.Append(" bArea=").Append(Fmt(bArea, 4));
                 sb.Append(" d=").Append(proj != null ? Fmt(proj.Distance, 4) : "-");
                 sb.Append(" uv=").Append(FmtUV(uv));
-                sb.Append(" overlap=").Append(overlapRatio >= 0 ? Fmt(overlapRatio, 3) : "-");
+                sb.Append(" overlap=");
+                if (overlapRatio >= 0) sb.Append(Fmt(overlapRatio, 3));
+                else if (overlapFailReason != null) sb.Append("-(").Append(overlapFailReason).Append(")");
+                else sb.Append("-");
                 if (stage1Accepted)
                 {
                     sb.Append(" FULL_CONTACT");
@@ -353,21 +368,36 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         ///
         /// 平面同士の場合は UV ≈ world 座標 (ft) なので世界面積比とほぼ等価。
         /// 中心 1 点投影だけでは弾けない co-planar 隣接面を識別するために使用。
+        ///
+        /// `failReason` には -1 を返した理由が入る (投影失敗の切り分け用)。
         /// </summary>
         private static double EstimateOverlapRatioAonB(
             Face a, Face b, BoundingBoxUV bbA, BoundingBoxUV bbB)
         {
-            if (bbA == null || bbB == null) return -1;
+            string _;
+            return EstimateOverlapRatioAonB(a, b, bbA, bbB, out _);
+        }
+
+        private static double EstimateOverlapRatioAonB(
+            Face a, Face b, BoundingBoxUV bbA, BoundingBoxUV bbB, out string failReason)
+        {
+            failReason = null;
+            if (bbA == null || bbB == null) { failReason = "bb-null"; return -1; }
 
             // a の 4 隅を b に投影 → b の UV 系での AABB を取得
             // (ProjectBCornersToA は「第3引数の UV 隅を、第2引数の面で評価して、
             //  第1引数の面に投影する」関数なので、a の隅 → b に投影するには
             //  ProjectBCornersToA(b, a, bbA) と呼ぶ)
-            BoundingBoxUV bbAonB = ProjectBCornersToA(b, a, bbA);
-            if (bbAonB == null) return -1;
+            int okCount;
+            BoundingBoxUV bbAonB = ProjectBCornersToA(b, a, bbA, out okCount);
+            if (bbAonB == null)
+            {
+                failReason = "proj-fail-ok=" + okCount;
+                return -1;
+            }
 
             double aBBuv = (bbAonB.Max.U - bbAonB.Min.U) * (bbAonB.Max.V - bbAonB.Min.V);
-            if (aBBuv <= 1e-9) return -1;
+            if (aBBuv <= 1e-9) { failReason = "abb-zero"; return -1; }
 
             double iuMin = Math.Max(bbAonB.Min.U, bbB.Min.U);
             double ivMin = Math.Max(bbAonB.Min.V, bbB.Min.V);
@@ -380,13 +410,20 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             return overlapUV / aBBuv;
         }
 
+        private static BoundingBoxUV ProjectBCornersToA(Face a, Face b, BoundingBoxUV bbB)
+        {
+            int _;
+            return ProjectBCornersToA(a, b, bbB, out _);
+        }
+
         /// <summary>
         /// 面 b の 4 隅 (BoundingBoxUV の 4 隅) を面 a に投影し、
         /// 投影先 UV を囲む AABB (Axis-Aligned Bounding Box in UV) を返す。
         /// 投影失敗や全て境界外の場合は null を返す (→ Phase 2 フォールバック)。
         /// </summary>
-        private static BoundingBoxUV ProjectBCornersToA(Face a, Face b, BoundingBoxUV bbB)
+        private static BoundingBoxUV ProjectBCornersToA(Face a, Face b, BoundingBoxUV bbB, out int okCount)
         {
+            okCount = 0;
             var corners = new UV[]
             {
                 new UV(bbB.Min.U, bbB.Min.V),
@@ -397,7 +434,6 @@ namespace Tools28.Commands.FormworkCalculator.Engine
 
             double uMin = double.MaxValue, vMin = double.MaxValue;
             double uMax = double.MinValue, vMax = double.MinValue;
-            int okCount = 0;
 
             foreach (var c in corners)
             {
