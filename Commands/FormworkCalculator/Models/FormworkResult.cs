@@ -90,6 +90,20 @@ namespace Tools28.Commands.FormworkCalculator.Models
         public string Message { get; set; } = string.Empty;
     }
 
+    /// <summary>
+    /// 鉄骨部材として識別されて型枠算出から除外された要素の情報。
+    /// 集計には含まれないが、解析3Dビュー上では別色 DirectShape として可視化する。
+    /// </summary>
+    public class ExcludedSteelResult
+    {
+        public int ElementId { get; set; }
+        public string ElementName { get; set; } = string.Empty;
+        public CategoryGroup Category { get; set; }
+        public string CategoryName { get; set; } = string.Empty;
+        public string DetectionLayer { get; set; } = string.Empty;
+        public string DetectionReason { get; set; } = string.Empty;
+    }
+
     public class FormworkResult
     {
         public double TotalFormworkArea { get; set; }
@@ -103,5 +117,7 @@ namespace Tools28.Commands.FormworkCalculator.Models
         public List<FormworkTypeResult> TypeResults { get; set; } = new List<FormworkTypeResult>();
         public List<FaceAnalysisResult> FaceResults { get; set; } = new List<FaceAnalysisResult>();
         public List<ErrorLogEntry> Errors { get; set; } = new List<ErrorLogEntry>();
+        public List<ExcludedSteelResult> ExcludedSteelResults { get; set; }
+            = new List<ExcludedSteelResult>();
     }
 }

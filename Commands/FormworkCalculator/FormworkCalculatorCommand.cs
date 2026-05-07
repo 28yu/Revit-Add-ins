@@ -64,7 +64,8 @@ namespace Tools28.Commands.FormworkCalculator
                     return Result.Failed;
                 }
 
-                if (result == null || result.ProcessedElementCount == 0)
+                if (result == null ||
+                    (result.ProcessedElementCount == 0 && result.ExcludedSteelResults.Count == 0))
                 {
                     TaskDialog.Show(Loc.S("Common.Warning"), Loc.S("Formwork.NoElements"));
                     return Result.Cancelled;
@@ -177,6 +178,10 @@ namespace Tools28.Commands.FormworkCalculator
 
                 if (scheduleViewId != null)
                     summary += "\n" + Loc.S("Formwork.ScheduleCreated");
+
+                if (result.ExcludedSteelResults != null && result.ExcludedSteelResults.Count > 0)
+                    summary += "\n\n" + string.Format(
+                        Loc.S("Formwork.SteelExcluded"), result.ExcludedSteelResults.Count);
 
                 if (result.Errors.Count > 0)
                     summary += "\n\n" + string.Format(Loc.S("Formwork.ErrorCount"), result.Errors.Count);

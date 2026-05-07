@@ -1,7 +1,64 @@
 # 型枠数量算出アドイン 開発状況ハンドオフ
 
-**最終更新**: 2026-04-27
+**最終更新**: 2026-05-07
 **開発用 Revit**: 2022 (`dev-config.json`)
+
+---
+
+## 2026-05-07 セッション: 鉄骨部材の自動除外を追加
+
+構造柱・構造フレームの中から、型枠不要な鉄骨部材
+（H形鋼・角形/円形鋼管・溝形鋼・山形鋼・CFT 等）を自動識別して除外する機能を追加。
+
+### 識別ロジック (4 層フォールバック)
+`Engine/SteelMemberDetector.cs`
+
+| Layer | 内容 | 想定ヒット例 |
+|---|---|---|
+| L1 | `FamilyInstance.StructuralMaterialType == Steel` | 標準鋼材ファミリ |
+| L2 | 断面形状分析 (`ExtrusionAnalyzer`) | CFT (中空)、H形鋼 (充実率<0.5) |
+| L3 | 構造材マテリアル名 / `MaterialClass` に Steel/鋼/鉄/Metal | マテリアルだけ正しく設定された要素 |
+| L4 | ファミリ名 / タイプ名のキーワードマッチ | 古い独自ファミリ、CFT-□400 等 |
+
+- SRC柱は L2 で「中実・凸 (ratio≥0.5)」として保持される（型枠必要）
+- CFT柱は L2 (中空モデリング時) または L4 ("CFT") で除外される
+- 検出失敗時は保持側 (フェイルセーフ)
+- 暗黙挙動として常に ON (`FormworkSettings.ExcludeSteelMembers = true`)、UI 露出なし
+
+### データフロー
+- `ElementCollector.CollectAndClassify` が `Targets` と `ExcludedSteel` の 2 リストを返す
+- `FormworkResult.ExcludedSteelResults` に除外要素を記録（集計には含めない）
+- `FormworkVisualizer.CreateExcludedSteelShapes` が元 Solid から DirectShape を作成
+  - マーカー値 = `28Tools_Formwork_Steel`（通常マーカー `28Tools_Formwork` と区別）
+  - 区分 = `鉄骨除外` (View Filter キー)
+  - 部位 = `鉄骨(除外)`
+  - 面積 = 0 ㎡
+
+### 色分け
+オレンジ系 `RGB(255, 145, 30)` を `_steelExcludedColor` で固定。
+View Filter `型枠_鉄骨除外` でこの色を適用。
+
+### 集計表からの除外
+`ScheduleCreator` の Filter は `Equal MarkerValue` (`28Tools_Formwork`) のみ通すため、
+鉄骨除外 DirectShape (`MarkerValueSteel`) は集計表に表示されない。
+
+### クリーンアップ
+`CleanupExistingFormworkShapes` は両方のマーカー値を持つ DirectShape を削除する
+（再実行時の累積を防ぐ）。
+
+### デバッグログ
+`C:\temp\Formwork_debug.txt` に各要素の判定結果を出力:
+```
+---- Steel Member Detection ----
+  [SteelExclude] E12345 Cat=構造柱 Name='H300x300' L=StructuralMaterialType reason=...
+  [SteelKeep]    E12346 Cat=構造柱 Name='C700' reason=solid convex profile (areaRatio=0.987)
+  Steel detection: target=42 excluded=8 kept=34
+```
+
+### 動作確認待ち
+- 動作確認用モデルに RC 丸柱をモデリングして Layer 2 の誤検出がないか確認予定（ユーザー側）
+
+---
 
 ---
 

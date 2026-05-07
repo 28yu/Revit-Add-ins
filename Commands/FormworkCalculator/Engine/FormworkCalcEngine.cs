@@ -44,9 +44,28 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         private FormworkResult RunCore(FormworkResult result)
         {
             _progress?.Report("要素を収集中...");
-            var elements = ElementCollector.Collect(_doc, _settings, _activeView);
+            var collection = ElementCollector.CollectAndClassify(_doc, _settings, _activeView);
+            var elements = collection.Targets;
             result.ProcessedElementCount = elements.Count;
-            FormworkDebugLog.Log($"Collected elements: {elements.Count}");
+            FormworkDebugLog.Log(
+                $"Collected elements: targets={elements.Count} " +
+                $"excludedSteel={collection.ExcludedSteel.Count}");
+
+            // 鉄骨除外要素を ExcludedSteelResult として記録 (集計には含めない)
+            foreach (var ex in collection.ExcludedSteel)
+            {
+                var e = ex.Element;
+                result.ExcludedSteelResults.Add(new ExcludedSteelResult
+                {
+                    ElementId = e.Id.IntegerValue,
+                    ElementName = e.Name ?? string.Empty,
+                    Category = ElementCollector.ToCategoryGroup(e),
+                    CategoryName = e.Category?.Name ?? string.Empty,
+                    DetectionLayer = ex.Layer.ToString(),
+                    DetectionReason = ex.Reason,
+                });
+            }
+
             if (elements.Count == 0) return result;
 
             double? glFeet = null;

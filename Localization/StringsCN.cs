@@ -370,6 +370,7 @@ namespace Tools28.Localization
             { "Formwork.Fatal", "模板数量计算时发生严重错误。\n{0}" },
             { "Formwork.ShapesCreated", "已创建模板面对象: {0} 个（在其他视图中自动隐藏）" },
             { "Formwork.ScheduleCreated", "已创建明细表「模板数量汇总」" },
+            { "Formwork.SteelExcluded", "已排除 {0} 个钢构件（无需模板），在分析视图中以橙色显示。" },
         };
     }
 }

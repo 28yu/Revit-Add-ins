@@ -37,6 +37,9 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 { CategoryGroup.Other,      (180, 180, 180) },
             };
 
+        // 鉄骨除外要素のオレンジ系統色 (躯体グレー・型枠色と区別)
+        private static readonly (byte R, byte G, byte B) _steelExcludedColor = (255, 145, 30);
+
         private static readonly (byte R, byte G, byte B)[] _autoPalette = new (byte, byte, byte)[]
         {
             (230, 80, 80),   (80, 160, 230), (60, 200, 100), (240, 200, 60),
@@ -89,6 +92,10 @@ namespace Tools28.Commands.FormworkCalculator.Output
             // 控除面表示時は「控除面」キーを追加（単色グレー）
             if (settings.ShowDeductedFaces)
                 keyAssignment["控除面"] = (180, 180, 180);
+
+            // 鉄骨除外要素がある場合、オレンジ系のキーを追加（View Filter で色付け）
+            if (result.ExcludedSteelResults != null && result.ExcludedSteelResults.Count > 0)
+                keyAssignment[FormworkParameterManager.SteelExcludedGroupKey] = _steelExcludedColor;
 
             vr.KeyColors = new Dictionary<string, (byte, byte, byte)>(keyAssignment);
 
@@ -223,6 +230,9 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 }
             }
 
+            // 鉄骨除外要素を別マーカーの DirectShape として作成（オレンジで色分け）
+            CreateExcludedSteelShapes(doc, result, vr);
+
             // View Filter による色分けを適用（個別要素オーバーライドは使わない）
             try
             {
@@ -231,6 +241,71 @@ namespace Tools28.Commands.FormworkCalculator.Output
             catch { }
 
             return vr;
+        }
+
+        /// <summary>
+        /// 鉄骨と判定されて除外された要素の DirectShape を作成する。
+        /// 元要素の Solid をそのまま流用してオレンジ色で表示する。
+        /// 集計表からは別マーカー値で除外される (ScheduleCreator のフィルタが MarkerValue のみ通す)。
+        /// </summary>
+        private static void CreateExcludedSteelShapes(
+            Document doc,
+            FormworkResult result,
+            VisualizerResult vr)
+        {
+            if (result.ExcludedSteelResults == null || result.ExcludedSteelResults.Count == 0)
+                return;
+
+            int created = 0;
+            foreach (var ex in result.ExcludedSteelResults)
+            {
+                Element src = null;
+                try { src = doc.GetElement(new ElementId(ex.ElementId)); } catch { }
+                if (src == null) continue;
+
+                var solids = SolidUnionProcessor.GetSolids(src);
+                if (solids.Count == 0) continue;
+
+                // Union を試みる（複数 Solid を 1 シェイプにまとめる）。失敗時は個別に出す。
+                var unioned = SolidUnionProcessor.Union(solids);
+                var emit = unioned != null ? new List<Solid> { unioned } : solids;
+
+                string levelName = string.Empty;
+                try { levelName = Engine.ElementCollector.GetElementLevelName(src); } catch { }
+
+                bool firstShape = true;
+                foreach (var solid in emit)
+                {
+                    try
+                    {
+                        var catOst = new ElementId(BuiltInCategory.OST_GenericModel);
+                        var ds = DirectShape.CreateElement(doc, catOst);
+                        ds.ApplicationId = "Tools28";
+                        ds.ApplicationDataId = "FormworkSteel";
+                        ds.SetShape(new GeometryObject[] { solid });
+
+                        try
+                        {
+                            FormworkParameterManager.SetInstanceValues(
+                                ds,
+                                FormworkParameterManager.MarkerValueSteel,
+                                FormworkParameterManager.SteelExcludedLabel,
+                                levelName,
+                                FormworkParameterManager.SteelExcludedGroupKey,
+                                0.0,
+                                false);
+                        }
+                        catch { }
+
+                        vr.CreatedShapeIds.Add(ds.Id);
+                        if (firstShape) created++;
+                        firstShape = false;
+                    }
+                    catch { }
+                }
+            }
+
+            FormworkDebugLog.Log($"  [SteelShapes] excluded element shapes created: {created}");
         }
 
         /// <summary>
@@ -395,9 +470,14 @@ namespace Tools28.Commands.FormworkCalculator.Output
             try
             {
                 XYZ minP = null, maxP = null;
-                foreach (var er in result.ElementResults)
+                var ids = new List<int>();
+                foreach (var er in result.ElementResults) ids.Add(er.ElementId);
+                if (result.ExcludedSteelResults != null)
+                    foreach (var ex in result.ExcludedSteelResults) ids.Add(ex.ElementId);
+
+                foreach (var id in ids)
                 {
-                    var elem = doc.GetElement(new ElementId(er.ElementId));
+                    var elem = doc.GetElement(new ElementId(id));
                     if (elem == null) continue;
                     BoundingBoxXYZ bb = null;
                     try { bb = elem.get_BoundingBox(null); } catch { }
@@ -434,8 +514,9 @@ namespace Tools28.Commands.FormworkCalculator.Output
         }
 
         /// <summary>
-        /// 28Tools_FormworkMarker パラメータに "28Tools_Formwork" 値を持つ
-        /// 既存 DirectShape を全て削除する（再実行時の累積を防ぐ）。
+        /// 28Tools_FormworkMarker パラメータに "28Tools_Formwork" または
+        /// "28Tools_Formwork_Steel" の値を持つ既存 DirectShape を全て削除する
+        /// （再実行時の累積を防ぐ）。
         /// </summary>
         private static void CleanupExistingFormworkShapes(Document doc)
         {
@@ -448,10 +529,14 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 try
                 {
                     var p = e.LookupParameter(FormworkParameterManager.ParamMarker);
-                    if (p != null && p.StorageType == StorageType.String &&
-                        p.AsString() == FormworkParameterManager.MarkerValue)
+                    if (p != null && p.StorageType == StorageType.String)
                     {
-                        toDelete.Add(e.Id);
+                        string val = p.AsString();
+                        if (val == FormworkParameterManager.MarkerValue ||
+                            val == FormworkParameterManager.MarkerValueSteel)
+                        {
+                            toDelete.Add(e.Id);
+                        }
                     }
                 }
                 catch { }

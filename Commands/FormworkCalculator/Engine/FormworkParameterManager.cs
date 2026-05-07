@@ -20,6 +20,15 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         public const string ParamPartialContact = "28Tools_Formwork_部分接触"; // "Yes"/"No" - T字結合等で主面の一部が他要素に接触
 
         public const string MarkerValue = "28Tools_Formwork";
+        // 鉄骨除外用 DirectShape のマーカー値。集計表は MarkerValue のみを対象とし、
+        // この値を持つ DirectShape は集計から除外される。クリーンアップは両方を削除する。
+        public const string MarkerValueSteel = "28Tools_Formwork_Steel";
+
+        // 集計表で表示する鉄骨除外要素の部位ラベル
+        public const string SteelExcludedLabel = "鉄骨(除外)";
+
+        // View Filter のグループキー（FormworkVisualizer の AssignColors から参照）
+        public const string SteelExcludedGroupKey = "鉄骨除外";
 
         private const string SharedParamGroupName = "Tools28_Formwork";
         private const string SharedParamFileName = "Tools28_Formwork.txt";
@@ -66,7 +75,15 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             Element ds, string categoryLabel, string levelName, string groupKey, double areaM2,
             bool hasPartialContact = false)
         {
-            SetString(ds, ParamMarker, MarkerValue);
+            SetInstanceValues(ds, MarkerValue, categoryLabel, levelName, groupKey, areaM2, hasPartialContact);
+        }
+
+        internal static void SetInstanceValues(
+            Element ds, string markerValue,
+            string categoryLabel, string levelName, string groupKey, double areaM2,
+            bool hasPartialContact = false)
+        {
+            SetString(ds, ParamMarker, markerValue ?? MarkerValue);
             SetString(ds, ParamCategory, categoryLabel ?? string.Empty);
             SetString(ds, ParamLevel, levelName ?? string.Empty);
             SetString(ds, ParamGroupKey, groupKey ?? string.Empty);

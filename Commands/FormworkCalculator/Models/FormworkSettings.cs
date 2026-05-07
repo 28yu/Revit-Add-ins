@@ -39,6 +39,10 @@ namespace Tools28.Commands.FormworkCalculator.Models
         // リリース時は false に変更すること
         public bool EnableDebugLog { get; set; } = true;
 
+        // 構造柱・構造フレームから鉄骨部材 (H鋼・角形鋼管・CFT等) を自動除外する。
+        // 暗黙挙動として常に true。デバッグ時のみ false にできる (UI には露出しない)。
+        public bool ExcludeSteelMembers { get; set; } = true;
+
         public List<string> IncludedCategories { get; set; } = new List<string>
         {
             "StructuralColumns",
