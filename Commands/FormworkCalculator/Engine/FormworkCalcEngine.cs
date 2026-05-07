@@ -213,21 +213,39 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                     }
                 }
 
-                // ⚠️ マーカー判定
+                // ⚠️ マーカー判定 (見やすくするため絞り込み)
                 var marks = new List<string>();
-                double dedTotal = er.DeductedTopArea + er.DeductedBottomArea + er.DeductedContactArea;
-                if (er.FormworkArea < 0.01 && (reqCount > 0 || dedTotal > 0.5))
+                // CONTACT_HEAVY: dedTop/dedBot は基礎・スラブで自然に大きいため除外し、
+                //                純粋な contact 控除 (dedCon) が formwork の 3 倍以上の場合のみ警告
+                if (er.FormworkArea > 0 && er.DeductedContactArea > er.FormworkArea * 3)
+                    marks.Add("⚠️CONTACT_HEAVY");
+                // ZERO: FormworkRequired 面が無く、contact 面が多い (柱の埋め込み等)
+                if (er.FormworkArea < 0.01 && conCount >= 4)
+                    marks.Add("⚠️ZERO_EMBEDDED");
+                else if (er.FormworkArea < 0.01 && reqCount > 0)
                     marks.Add("⚠️ZERO");
-                if (er.FormworkArea > 0 && dedTotal > er.FormworkArea * 5)
-                    marks.Add("⚠️MOSTLY_DED");
                 if (allReqFaces > 0 && partialFaceCount == allReqFaces)
                     marks.Add("⚠️ALL_PARTIAL");
                 string marker = marks.Count > 0 ? " " + string.Join("|", marks) : "";
 
+                // 寸法情報 (BB から要素の概算寸法を算出)
+                string dim = "?";
+                try
+                {
+                    if (ctx.BB != null)
+                    {
+                        double lx = (ctx.BB.Max.X - ctx.BB.Min.X) * 304.8;  // ft → mm
+                        double ly = (ctx.BB.Max.Y - ctx.BB.Min.Y) * 304.8;
+                        double lz = (ctx.BB.Max.Z - ctx.BB.Min.Z) * 304.8;
+                        dim = $"{lx:F0}x{ly:F0}x{lz:F0}";
+                    }
+                }
+                catch { }
+
                 string cat = CategoryShort(er.Category);
                 FormworkDebugLog.Log(
                     $"[ElemDiag] E{er.ElementId} ({cat}) '{er.ElementName}' type='{typeName}' " +
-                    $"formwork={er.FormworkArea:F2}m² faces={reqCount}/{topCount}/{botCount}/{conCount}/{bglCount}/{incCount} " +
+                    $"dim={dim}mm formwork={er.FormworkArea:F2}m² faces={reqCount}/{topCount}/{botCount}/{conCount}/{bglCount}/{incCount} " +
                     $"parts={partialFaceCount} dedTop={er.DeductedTopArea:F2} dedBot={er.DeductedBottomArea:F2} " +
                     $"dedCon={er.DeductedContactArea:F2}{marker}");
             }
