@@ -383,18 +383,27 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             BoundingBoxUV uvOnA = ProjectBCornersToA(a.Face, b.Face, bbB);
             string uvOnAMethod = uvOnA != null ? "strict" : null;
 
-            // Fallback 1: 厳格な投影 (ok<3) が失敗した場合、距離制限なしで投影する。
-            // b の隅が a の境界外にはみ出していても a.Project が返す境界上の最近点 UV を
-            // 使って接触範囲の UV AABB を推定する。b は a に接触していることが確認済みなので
-            // 境界外の隅はそのまま面境界にスナップされ、PartialContactClipper でクランプされる。
-            // → EstimateUvOnAFromBSize (UV 軸の回転を考慮しない) より正確な位置・形状になる。
+            // Fallback 1: a が PlanarFace なら XVector/YVector で平面方程式から直接 UV 計算。
+            // Face.Project と異なり境界外でも正確な UV を返す（境界スナップなし）。
+            // a の UV 軸を直接使うため、a と b の UV 軸の相対回転も自動的に解消される。
+            // → relaxed/estimate より優先する最も正確な方法。
+            if (uvOnA == null)
+            {
+                uvOnA = ProjectBCornersToAViaPlane(a.Face, b.Face, bbB);
+                if (uvOnA != null) uvOnAMethod = "via-plane";
+            }
+
+            // Fallback 2: 非平面 (CylindricalFace 等) の場合、距離制限なしで Face.Project する。
+            // b の隅が a の境界外にはみ出していると a.Project は境界上の最近点 UV にスナップする。
+            // PartialContactClipper でクランプされる前提のため位置精度は落ちるが via-plane が
+            // 使えない場合のフォールバック。
             if (uvOnA == null)
             {
                 uvOnA = ProjectBCornersToARelaxed(a.Face, b.Face, bbB);
                 if (uvOnA != null) uvOnAMethod = "relaxed";
             }
 
-            // Fallback 2: 寛容な投影も null の場合 (a.Project が全て null 等)、
+            // Fallback 3: 寛容な投影も null の場合 (a.Project が全て null 等)、
             // b の UV 寸法を使って `uv` 中心の矩形を構築する。
             // a と b の UV 軸の相対回転が大きい場合はずれが生じるが最後の手段として使用。
             if (uvOnA == null)
@@ -435,7 +444,75 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         }
 
         /// <summary>
-        /// Phase 2 Fallback 1 用: b の 4 隅を a の面に「寛容な投影」で投影し、UV AABB を返す。
+        /// Phase 2 Fallback 1 用: a が PlanarFace の場合、XVector/YVector を使って
+        /// b の 4 隅を a の UV 系に「平面方程式から直接」変換する。
+        ///
+        /// PlanarFace の UV パラメタリゼーション:
+        ///   p = Origin + u * XVector + v * YVector
+        /// 逆変換 (XVector, YVector が単位ベクトルの場合):
+        ///   u = dot(p - Origin, XVector)
+        ///   v = dot(p - Origin, YVector)
+        ///
+        /// Face.Project と異なり境界外でも正確な UV を返す (境界スナップなし)。
+        /// a が PlanarFace でない場合は null を返し、relaxed フォールバックに任せる。
+        /// </summary>
+        private static BoundingBoxUV ProjectBCornersToAViaPlane(Face a, Face b, BoundingBoxUV bbB)
+        {
+            if (bbB == null) return null;
+            var pf = a as PlanarFace;
+            if (pf == null) return null;
+
+            XYZ origin = pf.Origin;
+            XYZ xVec = pf.XVector;
+            XYZ yVec = pf.YVector;
+            if (origin == null || xVec == null || yVec == null) return null;
+
+            double xLen2 = xVec.DotProduct(xVec);
+            double yLen2 = yVec.DotProduct(yVec);
+            if (xLen2 < 1e-12 || yLen2 < 1e-12) return null;
+
+            // 通常 Revit の PlanarFace.XVector/YVector は unit vector だが、
+            // 念のため正規化しておく。
+            XYZ xN = xVec.Normalize();
+            XYZ yN = yVec.Normalize();
+
+            var corners = new UV[]
+            {
+                new UV(bbB.Min.U, bbB.Min.V),
+                new UV(bbB.Max.U, bbB.Min.V),
+                new UV(bbB.Max.U, bbB.Max.V),
+                new UV(bbB.Min.U, bbB.Max.V),
+            };
+
+            double uMin = double.MaxValue, vMin = double.MaxValue;
+            double uMax = double.MinValue, vMax = double.MinValue;
+            int successCount = 0;
+
+            foreach (var c in corners)
+            {
+                XYZ p;
+                try { p = b.Evaluate(c); } catch { continue; }
+                if (p == null) continue;
+
+                XYZ d = p - origin;
+                double u = d.DotProduct(xN);
+                double v = d.DotProduct(yN);
+
+                if (u < uMin) uMin = u;
+                if (v < vMin) vMin = v;
+                if (u > uMax) uMax = u;
+                if (v > vMax) vMax = v;
+                successCount++;
+            }
+
+            if (successCount < 3) return null;
+            if (uMax <= uMin || vMax <= vMin) return null;
+
+            return new BoundingBoxUV(uMin, vMin, uMax, vMax);
+        }
+
+        /// <summary>
+        /// Phase 2 Fallback 2 用: b の 4 隅を a の面に「寛容な投影」で投影し、UV AABB を返す。
         /// ProjectBCornersToA と異なり Distance の上限チェックを行わない。
         /// b の隅が a の境界外にある場合、a.Project は境界上の最近点 UV を返すため、
         /// 接触範囲の UV AABB を面境界にスナップした形で推定できる。
