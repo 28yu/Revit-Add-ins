@@ -273,8 +273,11 @@ namespace Tools28.Commands.FormworkCalculator.Output
                         {
                             vr.CreatedShapeIds.Add(dsId);
                             // Clipper でクリップ済みなら形状が既に正確なので半透明不要。
-                            // フォールバック時のみ半透明で「一部控除されている」ことを視覚化。
-                            if (faceHasPartialContact && !clipperUsed)
+                            // Clipper 失敗時のみ「一部控除されている」ことを視覚化するが、
+                            // 部分接触の合計面積が面全体の 5% 以下なら誤差として無視し、
+                            // 半透明にしない (ユーザー視点で「ほぼ全面が型枠」のため)。
+                            if (faceHasPartialContact && !clipperUsed
+                                && IsSignificantPartialContact(fi))
                             {
                                 try { ApplyPartialContactOverride(view, dsId); } catch { }
                             }
@@ -880,6 +883,22 @@ namespace Tools28.Commands.FormworkCalculator.Output
             var ogs = new OverrideGraphicSettings();
             ogs.SetSurfaceTransparency(50);
             view.SetElementOverrides(dsId, ogs);
+        }
+
+        /// <summary>
+        /// 部分接触の合計面積が面全体の 5% を超えるかを判定する。
+        /// 5% 以下なら誤差として扱い、半透明オーバーライドを適用しない
+        /// (ほぼ全面が型枠なのに 1 面だけ半透明だとユーザーが混乱するため)。
+        /// </summary>
+        private static bool IsSignificantPartialContact(FaceClassifier.FaceInfo fi)
+        {
+            if (fi == null || fi.Face == null || fi.PartialContacts == null
+                || fi.PartialContacts.Count == 0) return false;
+            double faceArea = fi.Area;
+            if (faceArea <= 1e-6) return false;
+            double partialSum = 0;
+            foreach (var pc in fi.PartialContacts) partialSum += pc.ContactArea;
+            return (partialSum / faceArea) > 0.05;
         }
 
         private static ElementId GetDraftingSolidFillPatternId(Document doc)

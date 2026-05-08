@@ -352,6 +352,16 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             // Phase 2: b の 4 隅を a に投影した UV 矩形を算出
             BoundingBoxUV uvOnA = ProjectBCornersToA(a.Face, b.Face, bbB);
 
+            // Fallback: 4 隅投影が失敗した場合、b の UV 寸法を使って `uv` 中心の矩形を構築する。
+            // a と b は反平行・co-planar なので、平面同士なら UV スケールは world 座標 (ft) と
+            // 一致する。a と b の UV 軸の相対回転は不明だが、矩形なので寸法の半分を u/v 各方向
+            // に広げれば実用上十分 (90°回転していても近似的にカバーできる)。
+            // この fallback により Clipper が成功し半透明オーバーライドが減る。
+            if (uvOnA == null)
+            {
+                uvOnA = EstimateUvOnAFromBSize(bbA, bbB, uv);
+            }
+
             return new ContactResult
             {
                 Kind = ContactKind.Partial,
@@ -359,6 +369,23 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 UvBounds = bbB,
                 UvBoundsOnA = uvOnA,
             };
+        }
+
+        /// <summary>
+        /// 4 隅投影が失敗したときの保守的な UvBoundsOnA 推定。
+        /// b の UV 矩形寸法を a の UV 系に流用し、`uv` を中心とする矩形を返す。
+        /// a の境界外にはみ出る分は呼び出し側 (PartialContactClipper) でクランプされる。
+        /// </summary>
+        private static BoundingBoxUV EstimateUvOnAFromBSize(
+            BoundingBoxUV bbA, BoundingBoxUV bbB, UV centerOnA)
+        {
+            if (bbA == null || bbB == null || centerOnA == null) return null;
+            double halfU = (bbB.Max.U - bbB.Min.U) * 0.5;
+            double halfV = (bbB.Max.V - bbB.Min.V) * 0.5;
+            if (halfU <= 1e-6 || halfV <= 1e-6) return null;
+            return new BoundingBoxUV(
+                centerOnA.U - halfU, centerOnA.V - halfV,
+                centerOnA.U + halfU, centerOnA.V + halfV);
         }
 
         /// <summary>
