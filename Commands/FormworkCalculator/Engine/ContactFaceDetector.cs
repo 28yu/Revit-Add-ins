@@ -381,15 +381,31 @@ namespace Tools28.Commands.FormworkCalculator.Engine
 
             // Phase 2: b の 4 隅を a に投影した UV 矩形を算出
             BoundingBoxUV uvOnA = ProjectBCornersToA(a.Face, b.Face, bbB);
+            string uvOnAMethod = uvOnA != null ? "strict" : null;
 
-            // Fallback: 4 隅投影が失敗した場合、b の UV 寸法を使って `uv` 中心の矩形を構築する。
-            // a と b は反平行・co-planar なので、平面同士なら UV スケールは world 座標 (ft) と
-            // 一致する。a と b の UV 軸の相対回転は不明だが、矩形なので寸法の半分を u/v 各方向
-            // に広げれば実用上十分 (90°回転していても近似的にカバーできる)。
-            // この fallback により Clipper が成功し半透明オーバーライドが減る。
+            // Fallback 1: 厳格な投影 (ok<3) が失敗した場合、距離制限なしで投影する。
+            // b の隅が a の境界外にはみ出していても a.Project が返す境界上の最近点 UV を
+            // 使って接触範囲の UV AABB を推定する。b は a に接触していることが確認済みなので
+            // 境界外の隅はそのまま面境界にスナップされ、PartialContactClipper でクランプされる。
+            // → EstimateUvOnAFromBSize (UV 軸の回転を考慮しない) より正確な位置・形状になる。
+            if (uvOnA == null)
+            {
+                uvOnA = ProjectBCornersToARelaxed(a.Face, b.Face, bbB);
+                if (uvOnA != null) uvOnAMethod = "relaxed";
+            }
+
+            // Fallback 2: 寛容な投影も null の場合 (a.Project が全て null 等)、
+            // b の UV 寸法を使って `uv` 中心の矩形を構築する。
+            // a と b の UV 軸の相対回転が大きい場合はずれが生じるが最後の手段として使用。
             if (uvOnA == null)
             {
                 uvOnA = EstimateUvOnAFromBSize(bbA, bbB, uv);
+                if (uvOnA != null) uvOnAMethod = "estimate";
+            }
+
+            if (FormworkDebugLog.Enabled && uvOnAMethod != null)
+            {
+                FormworkDebugLog.Log($"    s2-uvOnA method={uvOnAMethod} bounds={FmtUVBounds(uvOnA)}");
             }
 
             return new ContactResult
@@ -416,6 +432,53 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             return new BoundingBoxUV(
                 centerOnA.U - halfU, centerOnA.V - halfV,
                 centerOnA.U + halfU, centerOnA.V + halfV);
+        }
+
+        /// <summary>
+        /// Phase 2 Fallback 1 用: b の 4 隅を a の面に「寛容な投影」で投影し、UV AABB を返す。
+        /// ProjectBCornersToA と異なり Distance の上限チェックを行わない。
+        /// b の隅が a の境界外にある場合、a.Project は境界上の最近点 UV を返すため、
+        /// 接触範囲の UV AABB を面境界にスナップした形で推定できる。
+        /// </summary>
+        private static BoundingBoxUV ProjectBCornersToARelaxed(Face a, Face b, BoundingBoxUV bbB)
+        {
+            if (bbB == null) return null;
+            var corners = new UV[]
+            {
+                new UV(bbB.Min.U, bbB.Min.V),
+                new UV(bbB.Max.U, bbB.Min.V),
+                new UV(bbB.Max.U, bbB.Max.V),
+                new UV(bbB.Min.U, bbB.Max.V),
+            };
+
+            double uMin = double.MaxValue, vMin = double.MaxValue;
+            double uMax = double.MinValue, vMax = double.MinValue;
+            int successCount = 0;
+
+            foreach (var c in corners)
+            {
+                XYZ p;
+                try { p = b.Evaluate(c); } catch { continue; }
+                if (p == null) continue;
+
+                // 距離制限なし: face 境界外の点は境界上の最近点 UV に収束する。
+                // b は a に接触していることが確認済みなので距離チェックは不要。
+                IntersectionResult proj = null;
+                try { proj = a.Project(p); } catch { }
+                if (proj == null || proj.UVPoint == null) continue;
+
+                var uv = proj.UVPoint;
+                if (uv.U < uMin) uMin = uv.U;
+                if (uv.V < vMin) vMin = uv.V;
+                if (uv.U > uMax) uMax = uv.U;
+                if (uv.V > vMax) vMax = uv.V;
+                successCount++;
+            }
+
+            if (successCount < 2) return null;
+            if (uMax <= uMin || vMax <= vMin) return null;
+
+            return new BoundingBoxUV(uMin, vMin, uMax, vMax);
         }
 
         /// <summary>
@@ -561,6 +624,12 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         {
             if (uv == null) return "-";
             return "(" + Fmt(uv.U, 3) + "," + Fmt(uv.V, 3) + ")";
+        }
+
+        private static string FmtUVBounds(BoundingBoxUV bb)
+        {
+            if (bb == null) return "null";
+            return $"[U:{Fmt(bb.Min.U, 3)}..{Fmt(bb.Max.U, 3)},V:{Fmt(bb.Min.V, 3)}..{Fmt(bb.Max.V, 3)}]";
         }
     }
 }
