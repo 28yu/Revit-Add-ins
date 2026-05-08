@@ -59,6 +59,8 @@
         <option value="beam_top_level">beam_top_level (梁天端色分け)</option>
         <option value="excel_export">excel_export (Excel エクスポート)</option>
         <option value="excel_import">excel_import (Excel インポート)</option>
+        <option value="fire_protection">fire_protection (耐火被覆色分け)</option>
+        <option value="formwork">formwork (型枠数量算出)</option>
       </select>
       <button class="primary" onclick="runCode()">▶ 描画実行</button>
       <button onclick="downloadPNG()">💾 PNG保存</button>
@@ -776,37 +778,41 @@ ctx.strokeRect(s(4), s(9), s(14), s(10));
 `;
 
 PRESETS.cropbox_copy = `
-// トリミング領域コピー (オレンジ)
-const ORANGE = '#FF9900';
-const LW = s(1);
+// トリミング領域コピー (青・実線 + 白丸ハンドル)
+const BLUE = '#0066CC';
 
-ctx.strokeStyle = ORANGE;
-ctx.lineWidth = LW;
+ctx.strokeStyle = BLUE;
+ctx.lineWidth = s(1.2);
 ctx.strokeRect(s(5), s(5), s(22), s(22));
 
-// Corner + midpoint handles
-const hs = s(2);
+// Hollow circle handles (copy = open circles)
+const hr = s(2);
 const pts = [
   [5,5],[16,5],[27,5],
   [5,16],[27,16],
   [5,27],[16,27],[27,27]
 ];
-ctx.fillStyle = ORANGE;
 pts.forEach(([x,y]) => {
-  ctx.fillRect(s(x)-hs, s(y)-hs, hs*2, hs*2);
+  ctx.beginPath();
+  ctx.arc(s(x), s(y), hr, 0, Math.PI * 2);
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fill();
+  ctx.strokeStyle = BLUE;
+  ctx.lineWidth = s(1.0);
+  ctx.stroke();
 });
 `;
 
 PRESETS.cropbox_paste = `
-// トリミング領域ペースト (ブルー)
+// トリミング領域ペースト (青・実線 + 塗潰し丸ハンドル)
 const BLUE = '#0066CC';
-const LW = s(1);
 
 ctx.strokeStyle = BLUE;
-ctx.lineWidth = LW;
+ctx.lineWidth = s(1.2);
 ctx.strokeRect(s(5), s(5), s(22), s(22));
 
-const hs = s(2);
+// Filled circle handles (paste = filled circles)
+const hr = s(2);
 const pts = [
   [5,5],[16,5],[27,5],
   [5,16],[27,16],
@@ -814,7 +820,9 @@ const pts = [
 ];
 ctx.fillStyle = BLUE;
 pts.forEach(([x,y]) => {
-  ctx.fillRect(s(x)-hs, s(y)-hs, hs*2, hs*2);
+  ctx.beginPath();
+  ctx.arc(s(x), s(y), hr, 0, Math.PI * 2);
+  ctx.fill();
 });
 `;
 
@@ -912,6 +920,82 @@ ctx.lineTo(s(23.5), s(21));
 ctx.lineTo(s(30.5), s(21));
 ctx.closePath();
 ctx.fill();
+`;
+
+PRESETS.fire_protection = `
+// 耐火被覆: 外周矩形(被覆) + I型梁断面 + 右側3色ブロック
+const DARK = '#323232';
+const COVER = '#C8C8C8';   // fire protection material (light gray)
+const BEAM = '#505050';    // I-beam body (dark gray)
+const PINK = [255,128,148];
+const YELLOW = [218,185,47];
+const BLUE_C = [30,144,255];
+
+// Outer rectangle filled with cover material
+ctx.fillStyle = COVER;
+ctx.fillRect(s(1), s(1), s(18), s(30));
+ctx.strokeStyle = DARK;
+ctx.lineWidth = s(1.2);
+ctx.strokeRect(s(1), s(1), s(18), s(30));
+
+// I-beam cross section (drawn on top of cover)
+ctx.fillStyle = BEAM;
+// Top flange
+ctx.fillRect(s(2.5), s(4), s(15), s(4.5));
+// Web
+ctx.fillRect(s(7.5), s(8.5), s(5), s(15));
+// Bottom flange
+ctx.fillRect(s(2.5), s(23.5), s(15), s(4.5));
+
+// 3 color blocks on right
+const bx = s(21), bw = s(9), bh = s(8);
+[[PINK,2],[YELLOW,12],[BLUE_C,22]].forEach(([c, y]) => {
+  ctx.fillStyle = 'rgb('+c.join(',')+')';
+  ctx.fillRect(bx, s(y), bw, bh);
+});
+`;
+
+PRESETS.formwork = `
+// 型枠: コンクリート面 + 寸法矢印 + 右側色分けブロック
+const DARK = '#323232';
+const CONCRETE = '#8B6914'; // concrete/brown color
+const ARROW = '#3388CC';
+const PINK = [255,128,148];
+const YELLOW = [218,185,47];
+const BLUE_C = [30,144,255];
+
+// Large concrete face (main element)
+ctx.fillStyle = CONCRETE;
+ctx.fillRect(s(1), s(5), s(19), s(24));
+ctx.strokeStyle = DARK;
+ctx.lineWidth = s(0.8);
+ctx.strokeRect(s(1), s(5), s(19), s(24));
+
+// Double-headed arrow (width indicator)
+ctx.strokeStyle = ARROW;
+ctx.lineWidth = s(1.0);
+ctx.beginPath();
+ctx.moveTo(s(3.5), s(2.5)); ctx.lineTo(s(17.5), s(2.5));
+ctx.stroke();
+ctx.fillStyle = ARROW;
+// Left arrowhead
+ctx.beginPath();
+ctx.moveTo(s(1), s(2.5)); ctx.lineTo(s(4), s(1)); ctx.lineTo(s(4), s(4)); ctx.closePath();
+ctx.fill();
+// Right arrowhead
+ctx.beginPath();
+ctx.moveTo(s(20), s(2.5)); ctx.lineTo(s(17), s(1)); ctx.lineTo(s(17), s(4)); ctx.closePath();
+ctx.fill();
+
+// Color classification blocks on right
+const bx = s(21), bw = s(9), bh = s(7);
+[[PINK,4],[YELLOW,13],[BLUE_C,22]].forEach(([c, y]) => {
+  ctx.fillStyle = 'rgb('+c.join(',')+')';
+  ctx.fillRect(bx, s(y), bw, bh);
+  ctx.strokeStyle = DARK;
+  ctx.lineWidth = s(0.4);
+  ctx.strokeRect(bx, s(y), bw, bh);
+});
 `;
 
 // Preset selection handler

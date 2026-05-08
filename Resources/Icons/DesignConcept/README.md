@@ -170,29 +170,33 @@
 
 ## 作業進捗状況
 
-### 完了済み（デザイン確定・プレビュー確認済み）
+### 完了済み（HTMLプリセット確定・96px PNG配置済み）
 - [x] `both` — 通り芯両端
 - [x] `left` — 通り芯左端
 - [x] `right` — 通り芯右端
 - [x] `sheet_creation` — シート一括作成（A版比率・表題欄追加）
 - [x] `viewport_copy` — ビューポート位置コピー（A版比率・表題欄・破線）
 - [x] `viewport_paste` — ビューポート位置ペースト（A版比率・表題欄・実線）
+- [x] `view_copy` — 3Dビューコピー（アイソメ立方体・淡色）
+- [x] `view_paste` — 3Dビューペースト（アイソメ立方体・濃色）
+- [x] `sectionbox_copy` — セクションボックスコピー（破線枠＋小立方体）
+- [x] `sectionbox_paste` — セクションボックスペースト（実線枠＋小立方体）
+- [x] `cropbox_copy` — トリミング領域コピー（青実線＋白丸ハンドル）
+- [x] `cropbox_paste` — トリミング領域ペースト（青実線＋塗潰し丸ハンドル）
+- [x] `room_tag` — 部屋タグ一括配置（表形式グリッド）
+- [x] `filled_region` — 塗潰し領域 分割・統合（ハッチング矩形＋矢印）
+- [x] `beam_under_level` — 梁下端色分け（I梁＋上矢印＋FL線＋3色）
+- [x] `beam_top_level` — 梁天端色分け（FL線＋下矢印＋I梁＋3色）
+- [x] `excel_export` — EXCELエクスポート（Excelアイコン＋上矢印）
+- [x] `excel_import` — EXCELインポート（Excelアイコン＋下矢印）
+- [x] `fire_protection` — 耐火被覆色分け（外周矩形＋I梁断面＋3色）
+- [x] `formwork` — 型枠数量算出（コンクリート面＋寸法矢印＋3色）
 
-### 未レビュー（`Tools/IconGenerator96.html` でのプレビュー確認が必要）
-- [ ] `view_copy` — 3Dビューコピー
-- [ ] `view_paste` — 3Dビューペースト
-- [ ] `sectionbox_copy` — セクションボックスコピー
-- [ ] `sectionbox_paste` — セクションボックスペースト
-- [ ] `cropbox_copy` — トリミング領域コピー
-- [ ] `cropbox_paste` — トリミング領域ペースト
-- [ ] `room_tag` — 部屋タグ一括配置
-- [ ] `filled_region` — 塗潰し領域 分割・統合
-- [ ] `beam_under_level` — 梁下端色分け
-- [ ] `beam_top_level` — 梁天端色分け
-- [ ] `excel_export` — EXCELエクスポート
-- [ ] `excel_import` — EXCELインポート
-- [ ] `fire_protection` — 耐火被覆色分け
-- [ ] `formwork` — 型枠数量算出
+### 修正履歴
+- `cropbox_copy`: オレンジ+四角ハンドル → 青+白丸ハンドル（元画像に合わせて修正）
+- `cropbox_paste`: 四角ハンドル → 塗潰し丸ハンドル（元画像に合わせて修正）
+- `fire_protection`: HTMLプリセット追加（外周矩形＋I梁断面＋グレー被覆＋3色ブロック）
+- `formwork`: HTMLプリセット追加（コンクリート面＋双方向矢印＋3色ブロック）
 
 ### PNG 書き出し・配置が必要（デザイン確定後）
 全アイコンのプレビュー確認完了後、以下を実施:
