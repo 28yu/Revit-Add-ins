@@ -1069,32 +1069,45 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 }
                 else
                 {
-                    // 非 PlanarFace: 最初のループの先頭頂点を平面原点とする
                     XYZ first = null;
                     foreach (CurveLoop l in srcLoops)
                     {
                         foreach (Curve c in l) { first = c.GetEndPoint(0); break; }
                         if (first != null) break;
                     }
-                    if (first == null) return null;
+                    if (first == null)
+                    {
+                        FormworkDebugLog.Log($"      [Rebuild] null: no-first-point");
+                        return null;
+                    }
                     planeOrigin = first;
                 }
 
                 var result = new List<CurveLoop>();
+                int li = 0;
                 foreach (CurveLoop loop in srcLoops)
                 {
                     var pts = new List<XYZ>();
+                    int ci = 0;
                     foreach (Curve c in loop)
                     {
                         IList<XYZ> tess;
-                        try { tess = c.Tessellate(); } catch { tess = null; }
-                        if (tess == null || tess.Count < 2) return null;
-                        // 始点から終点-1までを追加 (次のカーブの始点と重複回避)
+                        try { tess = c.Tessellate(); } catch (Exception ex) { tess = null; FormworkDebugLog.Log($"      [Rebuild] tess-ex loop={li} curve={ci} ex={ex.Message}"); }
+                        if (tess == null || tess.Count < 2)
+                        {
+                            FormworkDebugLog.Log($"      [Rebuild] null: tess-fail loop={li} curve={ci} tess={tess?.Count}");
+                            return null;
+                        }
                         for (int i = 0; i < tess.Count - 1; i++) pts.Add(tess[i]);
+                        ci++;
                     }
-                    if (pts.Count < 3) return null;
+                    FormworkDebugLog.Log($"      [Rebuild] loop={li} pts={pts.Count} pf={pf != null} origin=({planeOrigin.X:F3},{planeOrigin.Y:F3},{planeOrigin.Z:F3})");
+                    if (pts.Count < 3)
+                    {
+                        FormworkDebugLog.Log($"      [Rebuild] null: pts<3");
+                        return null;
+                    }
 
-                    // 平面に投影 (距離 = (p - origin)·n) を引く
                     var snapped = new List<XYZ>(pts.Count);
                     foreach (XYZ p in pts)
                     {
@@ -1102,7 +1115,6 @@ namespace Tools28.Commands.FormworkCalculator.Output
                         snapped.Add(p - n * d);
                     }
 
-                    // 連続する同一点・微小エッジを除去 (トレランス 0.001 ft ≈ 0.3mm)
                     const double tol = 0.001;
                     var cleaned = new List<XYZ>();
                     cleaned.Add(snapped[0]);
@@ -1111,13 +1123,17 @@ namespace Tools28.Commands.FormworkCalculator.Output
                         if (snapped[i].DistanceTo(cleaned[cleaned.Count - 1]) > tol)
                             cleaned.Add(snapped[i]);
                     }
-                    // 最後と最初がほぼ同じなら最後を削除 (CurveLoop は閉じるため不要)
                     while (cleaned.Count >= 2 &&
                         cleaned[cleaned.Count - 1].DistanceTo(cleaned[0]) <= tol)
                     {
                         cleaned.RemoveAt(cleaned.Count - 1);
                     }
-                    if (cleaned.Count < 3) return null;
+                    FormworkDebugLog.Log($"      [Rebuild] loop={li} cleaned={cleaned.Count}");
+                    if (cleaned.Count < 3)
+                    {
+                        FormworkDebugLog.Log($"      [Rebuild] null: cleaned<3");
+                        return null;
+                    }
 
                     var lines = new List<Curve>();
                     for (int i = 0; i < cleaned.Count; i++)
@@ -1126,19 +1142,35 @@ namespace Tools28.Commands.FormworkCalculator.Output
                         XYZ p1 = cleaned[(i + 1) % cleaned.Count];
                         if (p0.DistanceTo(p1) <= tol) continue;
                         try { lines.Add(Line.CreateBound(p0, p1)); }
-                        catch { return null; }
+                        catch (Exception ex)
+                        {
+                            FormworkDebugLog.Log($"      [Rebuild] null: line-create-ex i={i} ex={ex.Message}");
+                            return null;
+                        }
                     }
-                    if (lines.Count < 3) return null;
+                    FormworkDebugLog.Log($"      [Rebuild] loop={li} lines={lines.Count}");
+                    if (lines.Count < 3)
+                    {
+                        FormworkDebugLog.Log($"      [Rebuild] null: lines<3");
+                        return null;
+                    }
 
                     CurveLoop newLoop;
                     try { newLoop = CurveLoop.Create(lines); }
-                    catch { return null; }
+                    catch (Exception ex)
+                    {
+                        FormworkDebugLog.Log($"      [Rebuild] null: CurveLoop.Create-ex ex={ex.Message}");
+                        return null;
+                    }
                     result.Add(newLoop);
+                    li++;
                 }
+                if (result.Count == 0) FormworkDebugLog.Log($"      [Rebuild] null: result-empty");
                 return result.Count > 0 ? result : null;
             }
-            catch
+            catch (Exception ex)
             {
+                FormworkDebugLog.Log($"      [Rebuild] null: outer-catch ex={ex.Message}");
                 return null;
             }
         }
