@@ -723,23 +723,28 @@ const MID = '#5C5C5C';
 const BLUE = '#4A90D9';
 const LW = s(1);
 
-// シート外枠
+// シート外枠（A版縦横比 √2:1 ≒ 31:22）
 ctx.fillStyle = '#FFFFFF';
-ctx.fillRect(s(0.5), s(1), s(31), s(30));
+ctx.fillRect(s(0.5), s(5), s(31), s(22));
 ctx.strokeStyle = DARK;
 ctx.lineWidth = LW;
-ctx.strokeRect(s(0.5), s(1), s(31), s(30));
+ctx.strokeRect(s(0.5), s(5), s(31), s(22));
 
 // 図枠線
 ctx.strokeStyle = MID;
 ctx.lineWidth = s(0.6);
-ctx.strokeRect(s(2.5), s(3), s(27), s(26));
+ctx.strokeRect(s(2.5), s(7), s(27), s(18));
+
+// 右下の表題欄
+ctx.strokeStyle = DARK;
+ctx.lineWidth = s(0.6);
+ctx.strokeRect(s(19), s(20), s(10.5), s(5));
 
 // 青破線ビューポート（コピー = 破線）
 ctx.strokeStyle = BLUE;
 ctx.lineWidth = s(1.2);
 ctx.setLineDash([s(2.5), s(1.5)]);
-ctx.strokeRect(s(6), s(7), s(20), s(17));
+ctx.strokeRect(s(5), s(9), s(18), s(12));
 ctx.setLineDash([]);
 `;
 
@@ -750,22 +755,27 @@ const MID = '#5C5C5C';
 const BLUE = '#4A90D9';
 const LW = s(1);
 
-// シート外枠
+// シート外枠（A版縦横比 √2:1 ≒ 31:22）
 ctx.fillStyle = '#FFFFFF';
-ctx.fillRect(s(0.5), s(1), s(31), s(30));
+ctx.fillRect(s(0.5), s(5), s(31), s(22));
 ctx.strokeStyle = DARK;
 ctx.lineWidth = LW;
-ctx.strokeRect(s(0.5), s(1), s(31), s(30));
+ctx.strokeRect(s(0.5), s(5), s(31), s(22));
 
 // 図枠線
 ctx.strokeStyle = MID;
 ctx.lineWidth = s(0.6);
-ctx.strokeRect(s(2.5), s(3), s(27), s(26));
+ctx.strokeRect(s(2.5), s(7), s(27), s(18));
 
-// 青実線ビューポート（ペースト = 実線）
+// 右下の表題欄
+ctx.strokeStyle = DARK;
+ctx.lineWidth = s(0.6);
+ctx.strokeRect(s(19), s(20), s(10.5), s(5));
+
+// 青実線ビューポート（ペースト = 実線、コピーと同じ太さ）
 ctx.strokeStyle = BLUE;
-ctx.lineWidth = s(1.8);
-ctx.strokeRect(s(6), s(7), s(20), s(17));
+ctx.lineWidth = s(1.2);
+ctx.strokeRect(s(5), s(9), s(18), s(12));
 `;
 
 PRESETS.cropbox_copy = `
