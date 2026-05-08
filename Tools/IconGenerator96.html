@@ -644,102 +644,98 @@ face([Vtr, Vbr, Vb, Vc], RIGHT);
 `;
 
 PRESETS.sectionbox_copy = `
-// 切断ボックス コピー: 青破線アイソメ立方体枠 + 内部小立方体 [2]
-// [4] 外枠・内部ともに元デザインの向き(top+left+right面)・比率に準拠
+// 切断ボックス コピー: 四角を右上に押し出した直方体ワイヤーフレーム [2][4]
+// キャビネット投影: 前面正方形(左側) + 奥行き線(右上45°) + 後面正方形
 const BLUE = '#0066CC';
 const EDGE = '#3C3C3C';
 
-// === 外枠: 青破線アイソメ立方体ワイヤーフレーム (9辺) ===
-// cx=16,cy=16,dx=12,dy=7 → y=2〜30, x=4〜28 (元の正方形枠と同じ領域)
-const cx = s(16), cy = s(16), dx = s(12), dy = s(7);
-const Vt  = [cx,    cy-2*dy];
-const Vtr = [cx+dx, cy-dy];
-const Vtl = [cx-dx, cy-dy];
-const Vc  = [cx,    cy];
-const Vbr = [cx+dx, cy+dy];
-const Vbl = [cx-dx, cy+dy];
-const Vb  = [cx,    cy+2*dy];
+// 前面: (1,8)-(21,28) = 20×20 正方形、奥行きオフセット: (+9,-9)
+const fx1=1, fy1=8, fx2=21, fy2=28, dox=9, doy=-9;
+const bx1=fx1+dox, by1=fy1+doy, bx2=fx2+dox, by2=fy2+doy;
 
 ctx.strokeStyle = BLUE;
 ctx.lineWidth = s(1.5);
 ctx.setLineDash([s(2.5), s(1.5)]);
-function edge(p1, p2) {
-  ctx.beginPath(); ctx.moveTo(p1[0],p1[1]); ctx.lineTo(p2[0],p2[1]); ctx.stroke();
+
+function ln(x1,y1,x2,y2) {
+  ctx.beginPath(); ctx.moveTo(s(x1),s(y1)); ctx.lineTo(s(x2),s(y2)); ctx.stroke();
 }
-edge(Vt,Vtr); edge(Vtr,Vc); edge(Vc,Vtl); edge(Vtl,Vt);
-edge(Vtl,Vbl); edge(Vbl,Vb); edge(Vb,Vc);
-edge(Vtr,Vbr); edge(Vbr,Vb);
+// 前面 4辺
+ln(fx1,fy1, fx2,fy1); ln(fx2,fy1, fx2,fy2);
+ln(fx2,fy2, fx1,fy2); ln(fx1,fy2, fx1,fy1);
+// 後面 4辺
+ln(bx1,by1, bx2,by1); ln(bx2,by1, bx2,by2);
+ln(bx2,by2, bx1,by2); ln(bx1,by2, bx1,by1);
+// 奥行き線 4辺
+ln(fx1,fy1, bx1,by1); ln(fx2,fy1, bx2,by1);
+ln(fx2,fy2, bx2,by2); ln(fx1,fy2, bx1,by2);
+
 ctx.setLineDash([]);
 
-// === 内部小立方体: 元プリセットの比率(dx=7,dy=4.5,cy=17)に準拠 ===
-const scx = s(16), scy = s(17), sdx = s(7), sdy = s(4.5);
-const SVt  = [scx,     scy-2*sdy];
-const SVtr = [scx+sdx, scy-sdy];
-const SVtl = [scx-sdx, scy-sdy];
-const SVc  = [scx,     scy];
-const SVbr = [scx+sdx, scy+sdy];
-const SVbl = [scx-sdx, scy+sdy];
-const SVb  = [scx,     scy+2*sdy];
+// 内部小直方体: 同じキャビネット投影、前面(5,13)-(14,22)、奥行き(+6,-6)
+const cf={x1:5,y1:13,x2:14,y2:22}, cd={x:6,y:-6};
+const cb={x1:cf.x1+cd.x,y1:cf.y1+cd.y,x2:cf.x2+cd.x,y2:cf.y2+cd.y};
 
-function face(pts, fill) {
+function poly(pts, fill) {
   ctx.beginPath();
-  ctx.moveTo(pts[0][0], pts[0][1]);
-  for (let i=1; i<pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+  ctx.moveTo(s(pts[0][0]),s(pts[0][1]));
+  for(let i=1;i<pts.length;i++) ctx.lineTo(s(pts[i][0]),s(pts[i][1]));
   ctx.closePath();
-  ctx.fillStyle = fill; ctx.fill();
-  ctx.strokeStyle = EDGE; ctx.lineWidth = s(0.7); ctx.stroke();
+  ctx.fillStyle=fill; ctx.fill();
+  ctx.strokeStyle=EDGE; ctx.lineWidth=s(0.7); ctx.stroke();
 }
-face([SVt, SVtr, SVc, SVtl], '#C8D8E0');
-face([SVtl, SVc, SVb, SVbl], '#98AABB');
-face([SVtr, SVbr, SVb, SVc], '#80909E');
+// 上面 (前面上辺 → 後面上辺)
+poly([[cf.x1,cf.y1],[cf.x2,cf.y1],[cb.x2,cb.y1],[cb.x1,cb.y1]], '#A8B8C8');
+// 右面 (前面右辺 → 後面右辺)
+poly([[cf.x2,cf.y1],[cb.x2,cb.y1],[cb.x2,cb.y2],[cf.x2,cf.y2]], '#7A8A9A');
+// 前面
+poly([[cf.x1,cf.y1],[cf.x2,cf.y1],[cf.x2,cf.y2],[cf.x1,cf.y2]], '#B8C8D8');
 `;
 
 PRESETS.sectionbox_paste = `
-// 切断ボックス ペースト: 青実線アイソメ立方体枠 + 内部小立方体 [2]
-// [4] 外枠・内部ともに元デザインの向き(top+left+right面)・比率に準拠
+// 切断ボックス ペースト: 四角を右上に押し出した直方体ワイヤーフレーム [2][4][8]
+// キャビネット投影: 前面正方形(左側) + 奥行き線(右上45°) + 後面正方形 (実線)
 const BLUE = '#2288DD';
 const EDGE = '#3C3C3C';
 
-// === 外枠: 青実線アイソメ立方体ワイヤーフレーム (9辺) ===
-const cx = s(16), cy = s(16), dx = s(12), dy = s(7);
-const Vt  = [cx,    cy-2*dy];
-const Vtr = [cx+dx, cy-dy];
-const Vtl = [cx-dx, cy-dy];
-const Vc  = [cx,    cy];
-const Vbr = [cx+dx, cy+dy];
-const Vbl = [cx-dx, cy+dy];
-const Vb  = [cx,    cy+2*dy];
+// 前面: (1,8)-(21,28) = 20×20 正方形、奥行きオフセット: (+9,-9)
+const fx1=1, fy1=8, fx2=21, fy2=28, dox=9, doy=-9;
+const bx1=fx1+dox, by1=fy1+doy, bx2=fx2+dox, by2=fy2+doy;
 
 ctx.strokeStyle = BLUE;
 ctx.lineWidth = s(2.0);
-function edge(p1, p2) {
-  ctx.beginPath(); ctx.moveTo(p1[0],p1[1]); ctx.lineTo(p2[0],p2[1]); ctx.stroke();
+
+function ln(x1,y1,x2,y2) {
+  ctx.beginPath(); ctx.moveTo(s(x1),s(y1)); ctx.lineTo(s(x2),s(y2)); ctx.stroke();
 }
-edge(Vt,Vtr); edge(Vtr,Vc); edge(Vc,Vtl); edge(Vtl,Vt);
-edge(Vtl,Vbl); edge(Vbl,Vb); edge(Vb,Vc);
-edge(Vtr,Vbr); edge(Vbr,Vb);
+// 前面 4辺
+ln(fx1,fy1, fx2,fy1); ln(fx2,fy1, fx2,fy2);
+ln(fx2,fy2, fx1,fy2); ln(fx1,fy2, fx1,fy1);
+// 後面 4辺
+ln(bx1,by1, bx2,by1); ln(bx2,by1, bx2,by2);
+ln(bx2,by2, bx1,by2); ln(bx1,by2, bx1,by1);
+// 奥行き線 4辺
+ln(fx1,fy1, bx1,by1); ln(fx2,fy1, bx2,by1);
+ln(fx2,fy2, bx2,by2); ln(fx1,fy2, bx1,by2);
 
-// === 内部小立方体: 元プリセットの比率(dx=7,dy=4.5,cy=17)に準拠 ===
-const scx = s(16), scy = s(17), sdx = s(7), sdy = s(4.5);
-const SVt  = [scx,     scy-2*sdy];
-const SVtr = [scx+sdx, scy-sdy];
-const SVtl = [scx-sdx, scy-sdy];
-const SVc  = [scx,     scy];
-const SVbr = [scx+sdx, scy+sdy];
-const SVbl = [scx-sdx, scy+sdy];
-const SVb  = [scx,     scy+2*sdy];
+// 内部小直方体: 同じキャビネット投影、前面(5,13)-(14,22)、奥行き(+6,-6)
+const cf={x1:5,y1:13,x2:14,y2:22}, cd={x:6,y:-6};
+const cb={x1:cf.x1+cd.x,y1:cf.y1+cd.y,x2:cf.x2+cd.x,y2:cf.y2+cd.y};
 
-function face(pts, fill) {
+function poly(pts, fill) {
   ctx.beginPath();
-  ctx.moveTo(pts[0][0], pts[0][1]);
-  for (let i=1; i<pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+  ctx.moveTo(s(pts[0][0]),s(pts[0][1]));
+  for(let i=1;i<pts.length;i++) ctx.lineTo(s(pts[i][0]),s(pts[i][1]));
   ctx.closePath();
-  ctx.fillStyle = fill; ctx.fill();
-  ctx.strokeStyle = EDGE; ctx.lineWidth = s(0.7); ctx.stroke();
+  ctx.fillStyle=fill; ctx.fill();
+  ctx.strokeStyle=EDGE; ctx.lineWidth=s(0.7); ctx.stroke();
 }
-face([SVt, SVtr, SVc, SVtl], '#5090D0');
-face([SVtl, SVc, SVb, SVbl], '#2870B0');
-face([SVtr, SVbr, SVb, SVc], '#1860A0');
+// 上面 (前面上辺 → 後面上辺): 青濃色
+poly([[cf.x1,cf.y1],[cf.x2,cf.y1],[cb.x2,cb.y1],[cb.x1,cb.y1]], '#5090D0');
+// 右面 (前面右辺 → 後面右辺): 青中色
+poly([[cf.x2,cf.y1],[cb.x2,cb.y1],[cb.x2,cb.y2],[cf.x2,cf.y2]], '#2870B0');
+// 前面: 青明色
+poly([[cf.x1,cf.y1],[cf.x2,cf.y1],[cf.x2,cf.y2],[cf.x1,cf.y2]], '#70B0E0');
 `;
 
 PRESETS.viewport_copy = `
@@ -806,7 +802,7 @@ PRESETS.cropbox_copy = `
 // トリミング領域コピー: 通り芯(both)ベース + 青破線矩形 [3]
 const DARK = '#323232';
 const BLUE = '#0066CC';
-const R = 3;
+const R = 2;
 
 // === Step1: 通り芯グリッド線 ===
 ctx.strokeStyle = DARK;
@@ -831,12 +827,12 @@ bubble(4,22); bubble(28,22);
 bubble(10,28); bubble(22,28);
 
 // === Step3: 青破線矩形（トリミング領域・コピー）===
-// [5] バブル内縁(R=3, 位置x=4/28,y=4/28)より内側: x=8〜24, y=8〜24
+// [5] バブル内縁(R=2, 位置x=4/28,y=4/28)より内側: x=7〜25, y=7〜25
 // [6] 線幅を細く
 ctx.strokeStyle = BLUE;
 ctx.lineWidth = s(0.8);
 ctx.setLineDash([s(2.5), s(1.5)]);
-ctx.strokeRect(s(8), s(8), s(16), s(16));
+ctx.strokeRect(s(7), s(7), s(18), s(18));
 ctx.setLineDash([]);
 `;
 
@@ -844,7 +840,7 @@ PRESETS.cropbox_paste = `
 // トリミング領域ペースト: 通り芯(both)ベース + 青実線矩形 [3]
 const DARK = '#323232';
 const BLUE = '#2288DD';
-const R = 3;
+const R = 2;
 
 // === Step1: 通り芯グリッド線 ===
 ctx.strokeStyle = DARK;
@@ -869,10 +865,10 @@ bubble(4,22); bubble(28,22);
 bubble(10,28); bubble(22,28);
 
 // === Step3: 青実線矩形（トリミング領域・ペースト）===
-// [5] バブル内縁より内側、[6] 細い線
+// [5] バブル内縁(R=2)より内側、[6] 細い線
 ctx.strokeStyle = BLUE;
 ctx.lineWidth = s(1.0);
-ctx.strokeRect(s(8), s(8), s(16), s(16));
+ctx.strokeRect(s(7), s(7), s(18), s(18));
 `;
 
 PRESETS.excel_export = `
