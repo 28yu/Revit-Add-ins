@@ -895,47 +895,47 @@ const WHITE = '#FFFFFF';
 const BLUE  = '#0066CC';
 const LW    = s(0.9);
 
-// --- 書類本体: 五角形 (3,1)-(15,1)-(20,6)-(20,31)-(3,31) ---
+// --- 書類本体: (3,1)-(16,1)-(21,7)-(21,31)-(3,31) ---
 ctx.beginPath();
 ctx.moveTo(s(3), s(1));
-ctx.lineTo(s(15), s(1));
-ctx.lineTo(s(20), s(6));
-ctx.lineTo(s(20), s(31));
+ctx.lineTo(s(16), s(1));
+ctx.lineTo(s(21), s(7));
+ctx.lineTo(s(21), s(31));
 ctx.lineTo(s(3), s(31));
 ctx.closePath();
 ctx.fillStyle = DOC; ctx.fill();
 ctx.strokeStyle = DARK; ctx.lineWidth = LW; ctx.stroke();
 
-// --- 折り角: (15,1)-(20,1)-(20,6) ---
+// --- 折り角: (16,1)-(21,1)-(21,7) ---
 ctx.beginPath();
-ctx.moveTo(s(15), s(1));
-ctx.lineTo(s(20), s(1));
-ctx.lineTo(s(20), s(6));
+ctx.moveTo(s(16), s(1));
+ctx.lineTo(s(21), s(1));
+ctx.lineTo(s(21), s(7));
 ctx.closePath();
 ctx.fillStyle = FOLD; ctx.fill();
 ctx.strokeStyle = DARK; ctx.lineWidth = LW; ctx.stroke();
 
-// --- 緑四角: x=1..13, y=9..27 ---
+// --- 緑四角: x=1..14, y=11..24 (13×13 正方形) ---
 ctx.fillStyle = GREEN;
-ctx.fillRect(s(1), s(9), s(12), s(18));
+ctx.fillRect(s(1), s(11), s(13), s(13));
 
-// --- 白X (round caps) ---
+// --- 白X (butt caps = 角ばった端) ---
 ctx.strokeStyle = WHITE;
 ctx.lineWidth = s(2.4);
-ctx.lineCap = 'round';
-ctx.beginPath();
-ctx.moveTo(s(3.5), s(11.5)); ctx.lineTo(s(10.5), s(24.5));
-ctx.moveTo(s(10.5), s(11.5)); ctx.lineTo(s(3.5), s(24.5));
-ctx.stroke();
 ctx.lineCap = 'butt';
+ctx.beginPath();
+ctx.moveTo(s(3.5), s(13));   ctx.lineTo(s(11), s(22));
+ctx.moveTo(s(11),  s(13));   ctx.lineTo(s(3.5), s(22));
+ctx.stroke();
 
-// --- 横線 3ペア (書類右側) ---
+// --- 横線 2ペア (書類右側: 上組・下組) ---
 ctx.strokeStyle = GREEN;
-ctx.lineWidth = s(0.9);
-[[s(14), s(16)], [s(18), s(20)], [s(22), s(24)]].forEach(([y1, y2]) => {
+ctx.lineWidth = s(1.0);
+ctx.lineCap = 'butt';
+[[s(6), s(8.5)], [s(26), s(28.5)]].forEach(([y1, y2]) => {
   ctx.beginPath();
-  ctx.moveTo(s(15), y1); ctx.lineTo(s(19.5), y1);
-  ctx.moveTo(s(15), y2); ctx.lineTo(s(19.5), y2);
+  ctx.moveTo(s(15.5), y1); ctx.lineTo(s(20), y1);
+  ctx.moveTo(s(15.5), y2); ctx.lineTo(s(20), y2);
   ctx.stroke();
 });
 
@@ -964,47 +964,47 @@ const WHITE = '#FFFFFF';
 const BLUE  = '#0066CC';
 const LW    = s(0.9);
 
-// --- 書類本体 ---
+// --- 書類本体: (3,1)-(16,1)-(21,7)-(21,31)-(3,31) ---
 ctx.beginPath();
 ctx.moveTo(s(3), s(1));
-ctx.lineTo(s(15), s(1));
-ctx.lineTo(s(20), s(6));
-ctx.lineTo(s(20), s(31));
+ctx.lineTo(s(16), s(1));
+ctx.lineTo(s(21), s(7));
+ctx.lineTo(s(21), s(31));
 ctx.lineTo(s(3), s(31));
 ctx.closePath();
 ctx.fillStyle = DOC; ctx.fill();
 ctx.strokeStyle = DARK; ctx.lineWidth = LW; ctx.stroke();
 
-// --- 折り角 ---
+// --- 折り角: (16,1)-(21,1)-(21,7) ---
 ctx.beginPath();
-ctx.moveTo(s(15), s(1));
-ctx.lineTo(s(20), s(1));
-ctx.lineTo(s(20), s(6));
+ctx.moveTo(s(16), s(1));
+ctx.lineTo(s(21), s(1));
+ctx.lineTo(s(21), s(7));
 ctx.closePath();
 ctx.fillStyle = FOLD; ctx.fill();
 ctx.strokeStyle = DARK; ctx.lineWidth = LW; ctx.stroke();
 
-// --- 緑四角 ---
+// --- 緑四角: x=1..14, y=11..24 (13×13 正方形) ---
 ctx.fillStyle = GREEN;
-ctx.fillRect(s(1), s(9), s(12), s(18));
+ctx.fillRect(s(1), s(11), s(13), s(13));
 
-// --- 白X ---
+// --- 白X (butt caps = 角ばった端) ---
 ctx.strokeStyle = WHITE;
 ctx.lineWidth = s(2.4);
-ctx.lineCap = 'round';
-ctx.beginPath();
-ctx.moveTo(s(3.5), s(11.5)); ctx.lineTo(s(10.5), s(24.5));
-ctx.moveTo(s(10.5), s(11.5)); ctx.lineTo(s(3.5), s(24.5));
-ctx.stroke();
 ctx.lineCap = 'butt';
+ctx.beginPath();
+ctx.moveTo(s(3.5), s(13));   ctx.lineTo(s(11), s(22));
+ctx.moveTo(s(11),  s(13));   ctx.lineTo(s(3.5), s(22));
+ctx.stroke();
 
-// --- 横線 3ペア ---
+// --- 横線 2ペア (書類右側: 上組・下組) ---
 ctx.strokeStyle = GREEN;
-ctx.lineWidth = s(0.9);
-[[s(14), s(16)], [s(18), s(20)], [s(22), s(24)]].forEach(([y1, y2]) => {
+ctx.lineWidth = s(1.0);
+ctx.lineCap = 'butt';
+[[s(6), s(8.5)], [s(26), s(28.5)]].forEach(([y1, y2]) => {
   ctx.beginPath();
-  ctx.moveTo(s(15), y1); ctx.lineTo(s(19.5), y1);
-  ctx.moveTo(s(15), y2); ctx.lineTo(s(19.5), y2);
+  ctx.moveTo(s(15.5), y1); ctx.lineTo(s(20), y1);
+  ctx.moveTo(s(15.5), y2); ctx.lineTo(s(20), y2);
   ctx.stroke();
 });
 
