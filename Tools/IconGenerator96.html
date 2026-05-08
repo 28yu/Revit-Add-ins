@@ -735,16 +735,16 @@ ctx.strokeStyle = MID;
 ctx.lineWidth = s(0.6);
 ctx.strokeRect(s(2.5), s(7), s(27), s(18));
 
-// 右下の表題欄
-ctx.strokeStyle = DARK;
+// 右下の表題欄（図枠線と同色・同太さ）
+ctx.strokeStyle = MID;
 ctx.lineWidth = s(0.6);
-ctx.strokeRect(s(19), s(20), s(10.5), s(5));
+ctx.strokeRect(s(21), s(21), s(8.5), s(4));
 
-// 青破線ビューポート（コピー = 破線）
+// 青破線ビューポート（コピー = 破線）右端18<表題欄x21で重複なし
 ctx.strokeStyle = BLUE;
 ctx.lineWidth = s(1.2);
 ctx.setLineDash([s(2.5), s(1.5)]);
-ctx.strokeRect(s(5), s(9), s(18), s(12));
+ctx.strokeRect(s(4), s(9), s(14), s(10));
 ctx.setLineDash([]);
 `;
 
@@ -767,15 +767,15 @@ ctx.strokeStyle = MID;
 ctx.lineWidth = s(0.6);
 ctx.strokeRect(s(2.5), s(7), s(27), s(18));
 
-// 右下の表題欄
-ctx.strokeStyle = DARK;
+// 右下の表題欄（図枠線と同色・同太さ）
+ctx.strokeStyle = MID;
 ctx.lineWidth = s(0.6);
-ctx.strokeRect(s(19), s(20), s(10.5), s(5));
+ctx.strokeRect(s(21), s(21), s(8.5), s(4));
 
-// 青実線ビューポート（ペースト = 実線、コピーと同じ太さ）
+// 青実線ビューポート（ペースト = 実線）右端18<表題欄x21で重複なし
 ctx.strokeStyle = BLUE;
 ctx.lineWidth = s(1.2);
-ctx.strokeRect(s(5), s(9), s(18), s(12));
+ctx.strokeRect(s(4), s(9), s(14), s(10));
 `;
 
 PRESETS.cropbox_copy = `
