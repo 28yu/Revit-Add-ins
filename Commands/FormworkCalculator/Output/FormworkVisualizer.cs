@@ -1115,7 +1115,9 @@ namespace Tools28.Commands.FormworkCalculator.Output
                         snapped.Add(p - n * d);
                     }
 
-                    const double tol = 0.001;
+                    // Revit の ShortCurveTolerance (≈0.00256 ft) より大きく取る必要あり。
+                    // 0.003 ft ≈ 0.9mm で Line.CreateBound 拒否を回避。
+                    const double tol = 0.003;
                     var cleaned = new List<XYZ>();
                     cleaned.Add(snapped[0]);
                     for (int i = 1; i < snapped.Count; i++)
