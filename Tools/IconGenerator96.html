@@ -645,11 +645,13 @@ face([Vtr, Vbr, Vb, Vc], RIGHT);
 
 PRESETS.sectionbox_copy = `
 // 切断ボックス コピー: 青破線アイソメ立方体枠 + 内部小立方体 [2]
+// [4] 外枠・内部ともに元デザインの向き(top+left+right面)・比率に準拠
 const BLUE = '#0066CC';
 const EDGE = '#3C3C3C';
 
 // === 外枠: 青破線アイソメ立方体ワイヤーフレーム (9辺) ===
-const cx = s(16), cy = s(15), dx = s(11), dy = s(7);
+// cx=16,cy=16,dx=12,dy=7 → y=2〜30, x=4〜28 (元の正方形枠と同じ領域)
+const cx = s(16), cy = s(16), dx = s(12), dy = s(7);
 const Vt  = [cx,    cy-2*dy];
 const Vtr = [cx+dx, cy-dy];
 const Vtl = [cx-dx, cy-dy];
@@ -669,8 +671,8 @@ edge(Vtl,Vbl); edge(Vbl,Vb); edge(Vb,Vc);
 edge(Vtr,Vbr); edge(Vbr,Vb);
 ctx.setLineDash([]);
 
-// === 内部小立方体 (グレー塗潰し) ===
-const scx = s(16), scy = s(16), sdx = s(6), sdy = s(4);
+// === 内部小立方体: 元プリセットの比率(dx=7,dy=4.5,cy=17)に準拠 ===
+const scx = s(16), scy = s(17), sdx = s(7), sdy = s(4.5);
 const SVt  = [scx,     scy-2*sdy];
 const SVtr = [scx+sdx, scy-sdy];
 const SVtl = [scx-sdx, scy-sdy];
@@ -694,11 +696,12 @@ face([SVtr, SVbr, SVb, SVc], '#80909E');
 
 PRESETS.sectionbox_paste = `
 // 切断ボックス ペースト: 青実線アイソメ立方体枠 + 内部小立方体 [2]
+// [4] 外枠・内部ともに元デザインの向き(top+left+right面)・比率に準拠
 const BLUE = '#2288DD';
 const EDGE = '#3C3C3C';
 
 // === 外枠: 青実線アイソメ立方体ワイヤーフレーム (9辺) ===
-const cx = s(16), cy = s(15), dx = s(11), dy = s(7);
+const cx = s(16), cy = s(16), dx = s(12), dy = s(7);
 const Vt  = [cx,    cy-2*dy];
 const Vtr = [cx+dx, cy-dy];
 const Vtl = [cx-dx, cy-dy];
@@ -716,8 +719,8 @@ edge(Vt,Vtr); edge(Vtr,Vc); edge(Vc,Vtl); edge(Vtl,Vt);
 edge(Vtl,Vbl); edge(Vbl,Vb); edge(Vb,Vc);
 edge(Vtr,Vbr); edge(Vbr,Vb);
 
-// === 内部小立方体 (グレー塗潰し) ===
-const scx = s(16), scy = s(16), sdx = s(6), sdy = s(4);
+// === 内部小立方体: 元プリセットの比率(dx=7,dy=4.5,cy=17)に準拠 ===
+const scx = s(16), scy = s(17), sdx = s(7), sdy = s(4.5);
 const SVt  = [scx,     scy-2*sdy];
 const SVtr = [scx+sdx, scy-sdy];
 const SVtl = [scx-sdx, scy-sdy];
@@ -828,10 +831,12 @@ bubble(4,22); bubble(28,22);
 bubble(10,28); bubble(22,28);
 
 // === Step3: 青破線矩形（トリミング領域・コピー）===
+// [5] バブル内縁(R=3, 位置x=4/28,y=4/28)より内側: x=8〜24, y=8〜24
+// [6] 線幅を細く
 ctx.strokeStyle = BLUE;
-ctx.lineWidth = s(1.5);
+ctx.lineWidth = s(0.8);
 ctx.setLineDash([s(2.5), s(1.5)]);
-ctx.strokeRect(s(5), s(5), s(22), s(22));
+ctx.strokeRect(s(8), s(8), s(16), s(16));
 ctx.setLineDash([]);
 `;
 
@@ -864,9 +869,10 @@ bubble(4,22); bubble(28,22);
 bubble(10,28); bubble(22,28);
 
 // === Step3: 青実線矩形（トリミング領域・ペースト）===
+// [5] バブル内縁より内側、[6] 細い線
 ctx.strokeStyle = BLUE;
-ctx.lineWidth = s(2.0);
-ctx.strokeRect(s(5), s(5), s(22), s(22));
+ctx.lineWidth = s(1.0);
+ctx.strokeRect(s(8), s(8), s(16), s(16));
 `;
 
 PRESETS.excel_export = `
