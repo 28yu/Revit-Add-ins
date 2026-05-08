@@ -262,13 +262,11 @@ const LINE_W = s(2);
 ctx.strokeStyle = DARK;
 ctx.lineWidth = LINE_W;
 
-// Vertical lines
 ctx.beginPath();
-ctx.moveTo(s(9.5), 0); ctx.lineTo(s(9.5), s(32));
-ctx.moveTo(s(22.5), 0); ctx.lineTo(s(22.5), s(32));
-// Horizontal lines
-ctx.moveTo(0, s(9.5)); ctx.lineTo(s(32), s(9.5));
-ctx.moveTo(0, s(22.5)); ctx.lineTo(s(32), s(22.5));
+ctx.moveTo(s(10), 0); ctx.lineTo(s(10), s(32));
+ctx.moveTo(s(22), 0); ctx.lineTo(s(22), s(32));
+ctx.moveTo(0, s(10)); ctx.lineTo(s(32), s(10));
+ctx.moveTo(0, s(22)); ctx.lineTo(s(32), s(22));
 ctx.stroke();
 
 // Bubbles at line ends
@@ -282,19 +280,19 @@ function drawBubble(cx, cy, r) {
   ctx.stroke();
 }
 
-const R = 3.2;
+const R = 3;
 // Top bubbles
-drawBubble(9.5, 3, R);
-drawBubble(22.5, 3, R);
+drawBubble(10, 4, R);
+drawBubble(22, 4, R);
 // Bottom bubbles
-drawBubble(9.5, 29, R);
-drawBubble(22.5, 29, R);
+drawBubble(10, 28, R);
+drawBubble(22, 28, R);
 // Left bubbles
-drawBubble(3, 9.5, R);
-drawBubble(3, 22.5, R);
+drawBubble(4, 10, R);
+drawBubble(4, 22, R);
 // Right bubbles
-drawBubble(29, 9.5, R);
-drawBubble(29, 22.5, R);
+drawBubble(28, 10, R);
+drawBubble(28, 22, R);
 `;
 
 PRESETS.left = `
@@ -306,10 +304,10 @@ ctx.strokeStyle = DARK;
 ctx.lineWidth = LINE_W;
 
 ctx.beginPath();
-ctx.moveTo(s(9.5), 0); ctx.lineTo(s(9.5), s(26));
-ctx.moveTo(s(22.5), 0); ctx.lineTo(s(22.5), s(26));
-ctx.moveTo(0, s(9.5)); ctx.lineTo(s(26), s(9.5));
-ctx.moveTo(0, s(22.5)); ctx.lineTo(s(26), s(22.5));
+ctx.moveTo(s(10), 0); ctx.lineTo(s(10), s(26));
+ctx.moveTo(s(22), 0); ctx.lineTo(s(22), s(26));
+ctx.moveTo(0, s(10)); ctx.lineTo(s(26), s(10));
+ctx.moveTo(0, s(22)); ctx.lineTo(s(26), s(22));
 ctx.stroke();
 
 function drawBubble(cx, cy, r) {
@@ -322,11 +320,11 @@ function drawBubble(cx, cy, r) {
   ctx.stroke();
 }
 
-const R = 3.2;
-drawBubble(9.5, 3, R);
-drawBubble(22.5, 3, R);
-drawBubble(3, 9.5, R);
-drawBubble(3, 22.5, R);
+const R = 3;
+drawBubble(10, 4, R);
+drawBubble(22, 4, R);
+drawBubble(4, 10, R);
+drawBubble(4, 22, R);
 `;
 
 PRESETS.right = `
@@ -338,10 +336,10 @@ ctx.strokeStyle = DARK;
 ctx.lineWidth = LINE_W;
 
 ctx.beginPath();
-ctx.moveTo(s(9.5), s(6)); ctx.lineTo(s(9.5), s(32));
-ctx.moveTo(s(22.5), s(6)); ctx.lineTo(s(22.5), s(32));
-ctx.moveTo(s(6), s(9.5)); ctx.lineTo(s(32), s(9.5));
-ctx.moveTo(s(6), s(22.5)); ctx.lineTo(s(32), s(22.5));
+ctx.moveTo(s(10), s(6)); ctx.lineTo(s(10), s(32));
+ctx.moveTo(s(22), s(6)); ctx.lineTo(s(22), s(32));
+ctx.moveTo(s(6), s(10)); ctx.lineTo(s(32), s(10));
+ctx.moveTo(s(6), s(22)); ctx.lineTo(s(32), s(22));
 ctx.stroke();
 
 function drawBubble(cx, cy, r) {
@@ -354,11 +352,11 @@ function drawBubble(cx, cy, r) {
   ctx.stroke();
 }
 
-const R = 3.2;
-drawBubble(9.5, 29, R);
-drawBubble(22.5, 29, R);
-drawBubble(29, 9.5, R);
-drawBubble(29, 22.5, R);
+const R = 3;
+drawBubble(10, 28, R);
+drawBubble(22, 28, R);
+drawBubble(28, 10, R);
+drawBubble(28, 22, R);
 `;
 
 PRESETS.room_tag = `
