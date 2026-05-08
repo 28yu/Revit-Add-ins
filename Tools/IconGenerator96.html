@@ -387,36 +387,45 @@ ctx.stroke();
 
 PRESETS.filled_region = `
 // 塗潰し領域 分割・統合
+// 左矩形: クロスハッチ(＼＋／)、右矩形: 単方向斜め線(＼)
+// clip() で矩形内にハッチングを収める
 const GRAY = '#646464';
-const LW = s(0.8);
-ctx.strokeStyle = GRAY;
-ctx.lineWidth = LW;
 
-// Left rectangle with crosshatch
-ctx.strokeRect(s(1.5), s(1.5), s(12), s(22));
-// Hatch pattern (left)
-ctx.beginPath();
-for (let i = -24; i < 36; i += 3) {
-  const y0 = s(1.5) + s(i);
-  const y1 = y0 + s(12);
-  ctx.moveTo(s(1.5), Math.max(s(1.5), y0));
-  ctx.lineTo(Math.min(s(13.5), s(1.5) + Math.min(s(12), y1 - s(1.5))), Math.min(s(23.5), y1));
+function hatchRect(rx, ry, rw, rh, lineW, step, cross) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(s(rx), s(ry), s(rw), s(rh));
+  ctx.clip();
+  ctx.strokeStyle = GRAY;
+  ctx.lineWidth = s(lineW);
+  ctx.beginPath();
+  // \\ diagonal lines (top-left to bottom-right)
+  for (let d = -rh; d <= rw; d += step) {
+    ctx.moveTo(s(rx + d),      s(ry));
+    ctx.lineTo(s(rx + d + rh), s(ry + rh));
+  }
+  if (cross) {
+    // / diagonal lines (top-right to bottom-left)
+    for (let d = 0; d <= rw + rh; d += step) {
+      ctx.moveTo(s(rx + d),      s(ry));
+      ctx.lineTo(s(rx + d - rh), s(ry + rh));
+    }
+  }
+  ctx.stroke();
+  ctx.restore();
+  // Border on top of hatch
+  ctx.strokeStyle = GRAY;
+  ctx.lineWidth = s(0.8);
+  ctx.strokeRect(s(rx), s(ry), s(rw), s(rh));
 }
-ctx.stroke();
 
-// Right rectangle with crosshatch (diagonal other direction)
-ctx.strokeRect(s(18.5), s(1.5), s(12), s(22));
-ctx.beginPath();
-for (let i = -24; i < 36; i += 2.5) {
-  const x0 = s(18.5);
-  const y0 = s(1.5) + s(i);
-  const len = s(12);
-  ctx.moveTo(x0, Math.max(s(1.5), y0));
-  ctx.lineTo(Math.min(s(30.5), x0 + len), Math.min(s(23.5), y0 + len));
-}
-ctx.stroke();
+// Left: cross-hatch (元の2×2チェッカー模様に対応)
+hatchRect(1.5, 1.5, 12, 22, 0.8, 4, true);
+// Right: single \\ diagonal (元の単方向斜め線に対応)
+hatchRect(18.5, 1.5, 12, 22, 0.7, 4, false);
 
 // Split/merge arrows at bottom
+ctx.strokeStyle = GRAY;
 ctx.lineWidth = s(0.7);
 ctx.beginPath();
 const ay = s(27);

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Generate redesigned icon PNGs for Tools28 Revit add-in.
-Targets: sectionbox_copy, sectionbox_paste, cropbox_copy, cropbox_paste
+Targets: sectionbox_copy, sectionbox_paste, cropbox_copy, cropbox_paste, filled_region
 Output: Resources/Icons/*_96.png (96x96, DPI=288)
 """
 
@@ -245,10 +245,67 @@ def make_cropbox_paste():
     save_icon(img, 'cropbox_paste')
 
 # ─────────────────────────────────────────
+# filled_region
+# ─────────────────────────────────────────
+def make_filled_region():
+    img = new_canvas()
+    draw = ImageDraw.Draw(img)
+
+    GRAY = hex_rgba('#646464')
+
+    def hatch_rect(rx, ry, rw, rh, line_w, step, cross):
+        """Draw hatched rectangle with clip using Pillow (mask approach).
+        All parameters in 32-coord space."""
+        hatch = Image.new('RGBA', img.size, (0, 0, 0, 0))
+        hd = ImageDraw.Draw(hatch)
+        lw = iw(s(line_w))
+        # \ diagonal lines: d steps in 32-coord space
+        d = -rh
+        while d <= rw:
+            hd.line([(s(rx + d), s(ry)), (s(rx + d + rh), s(ry + rh))],
+                    fill=GRAY, width=lw)
+            d += step
+        if cross:
+            # / diagonal lines
+            d = 0
+            while d <= rw + rh:
+                hd.line([(s(rx + d), s(ry)), (s(rx + d - rh), s(ry + rh))],
+                        fill=GRAY, width=lw)
+                d += step
+        # Clip to rectangle using mask
+        mask = Image.new('L', img.size, 0)
+        md = ImageDraw.Draw(mask)
+        md.rectangle([s(rx), s(ry), s(rx + rw), s(ry + rh)], fill=255)
+        img.paste(hatch, mask=mask)
+        # Border on top
+        draw.rectangle([s(rx), s(ry), s(rx + rw), s(ry + rh)],
+                       outline=GRAY, width=iw(s(0.8)))
+
+    # Left: cross-hatch (\ + /), step=4 in 32-coord
+    hatch_rect(1.5, 1.5, 12, 22, 0.8, 4, True)
+    # Right: single \ diagonal, step=4 in 32-coord
+    hatch_rect(18.5, 1.5, 12, 22, 0.7, 4, False)
+
+    # Arrows at bottom
+    ay = s(27)
+    aw = iw(s(0.7))
+    # Left arrow <
+    draw.line([(s(12), s(24.5)), (s(8), ay)], fill=GRAY, width=aw)
+    draw.line([(s(8), ay), (s(12), s(29.5))], fill=GRAY, width=aw)
+    # Right arrow >
+    draw.line([(s(20), s(24.5)), (s(24), ay)], fill=GRAY, width=aw)
+    draw.line([(s(24), ay), (s(20), s(29.5))], fill=GRAY, width=aw)
+    # Connecting line
+    draw.line([(s(8), ay), (s(24), ay)], fill=GRAY, width=aw)
+
+    save_icon(img, 'filled_region')
+
+# ─────────────────────────────────────────
 if __name__ == '__main__':
     print('Generating icons...')
     make_sectionbox_copy()
     make_sectionbox_paste()
     make_cropbox_copy()
     make_cropbox_paste()
+    make_filled_region()
     print('Done.')
