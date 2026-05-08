@@ -272,10 +272,16 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             string stage2Reason = null;
             if (!stage1Accepted)
             {
-                // Stage 1 が「面積比」または「重なり不足」で否定された場合のみ
-                // Stage 2 (Partial Contact) を試す
+                // Stage 1 が以下の理由で否定された場合のみ Stage 2 (Partial Contact) を試す:
+                // - cond2-area-ratio: a >> b で面積比制約に引っかかった
+                // - cond5-overlap-insufficient: a の corner が b 上に乗り切らない
+                // - cond3-project-null: a の中心を b に投影できない (a が b より遥かに広く、
+                //   a の中心が b の範囲外に位置するケース。意味的には cond2-area-ratio と
+                //   同類。例: slab 下面 (15.2m²) と foundation 上面 (12.9m²) で slab 中心が
+                //   foundation 範囲外に来て Project が null を返す)
                 if (stage1Reason == "cond2-area-ratio" ||
-                    stage1Reason == "cond5-overlap-insufficient")
+                    stage1Reason == "cond5-overlap-insufficient" ||
+                    stage1Reason == "cond3-project-null")
                 {
                     stage2 = EvaluatePartialBToA(a, b, out stage2Reason);
                 }
