@@ -578,143 +578,175 @@ const bx = s(22), bw = s(8), bh = s(8);
 
 PRESETS.view_copy = `
 // 3Dビュー コピー (アイソメトリック立方体・淡色)
+// 6頂点定義: Vt=頂上, Vtr=右上, Vtl=左上, Vc=前中心, Vbr=右下, Vbl=左下, Vb=底
 const TOP = '#E0EEF8';
-const LEFT = '#B8D4EC';
-const RIGHT = '#9CC0DE';
-const EDGE = '#3C3C3C';
+const LEFT = '#B0CCE0';
+const RIGHT = '#88B0CC';
+const EDGE = '#2A4A6A';
 
-const cx = s(16), cy = s(16);
-const dx = s(11), dy = s(7);
+const cx = s(16), cy = s(15), dx = s(12), dy = s(7);
+const Vt  = [cx,    cy-2*dy];
+const Vtr = [cx+dx, cy-dy];
+const Vtl = [cx-dx, cy-dy];
+const Vc  = [cx,    cy];
+const Vbr = [cx+dx, cy+dy];
+const Vbl = [cx-dx, cy+dy];
+const Vb  = [cx,    cy+2*dy];
 
-// Face vertices
-const top = [[cx,cy-dy-s(3)],[cx+dx,cy-s(3)],[cx,cy+dy-s(3)],[cx-dx,cy-s(3)]];
-const left = [[cx-dx,cy-s(3)],[cx,cy+dy-s(3)],[cx,cy+dy+dy-s(3)],[cx-dx,cy+dy-s(3)]];
-const right = [[cx,cy+dy-s(3)],[cx+dx,cy-s(3)],[cx+dx,cy+dy-s(3)],[cx,cy+dy+dy-s(3)]];
-
-function drawFace(pts, fill) {
+function face(pts, fill) {
   ctx.beginPath();
   ctx.moveTo(pts[0][0], pts[0][1]);
-  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+  for (let i=1; i<pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
   ctx.closePath();
   ctx.fillStyle = fill;
   ctx.fill();
   ctx.strokeStyle = EDGE;
-  ctx.lineWidth = s(0.7);
+  ctx.lineWidth = s(0.8);
   ctx.stroke();
 }
 
-drawFace(left, LEFT);
-drawFace(right, RIGHT);
-drawFace(top, TOP);
+face([Vt, Vtr, Vc, Vtl], TOP);   // 上面
+face([Vtl, Vc, Vb, Vbl], LEFT);  // 左面
+face([Vtr, Vbr, Vb, Vc], RIGHT); // 右面
 `;
 
 PRESETS.view_paste = `
 // 3Dビュー ペースト (アイソメトリック立方体・濃色)
-const TOP = '#66A3E0';
-const LEFT = '#3380CC';
-const RIGHT = '#1A66B3';
-const EDGE = '#3C3C3C';
+const TOP = '#5FA8D8';
+const LEFT = '#2A7AB8';
+const RIGHT = '#145890';
+const EDGE = '#0A2040';
 
-const cx = s(16), cy = s(16);
-const dx = s(11), dy = s(7);
+const cx = s(16), cy = s(15), dx = s(12), dy = s(7);
+const Vt  = [cx,    cy-2*dy];
+const Vtr = [cx+dx, cy-dy];
+const Vtl = [cx-dx, cy-dy];
+const Vc  = [cx,    cy];
+const Vbr = [cx+dx, cy+dy];
+const Vbl = [cx-dx, cy+dy];
+const Vb  = [cx,    cy+2*dy];
 
-const top = [[cx,cy-dy-s(3)],[cx+dx,cy-s(3)],[cx,cy+dy-s(3)],[cx-dx,cy-s(3)]];
-const left = [[cx-dx,cy-s(3)],[cx,cy+dy-s(3)],[cx,cy+dy+dy-s(3)],[cx-dx,cy+dy-s(3)]];
-const right = [[cx,cy+dy-s(3)],[cx+dx,cy-s(3)],[cx+dx,cy+dy-s(3)],[cx,cy+dy+dy-s(3)]];
-
-function drawFace(pts, fill) {
+function face(pts, fill) {
   ctx.beginPath();
   ctx.moveTo(pts[0][0], pts[0][1]);
-  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+  for (let i=1; i<pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
   ctx.closePath();
   ctx.fillStyle = fill;
   ctx.fill();
   ctx.strokeStyle = EDGE;
-  ctx.lineWidth = s(0.7);
+  ctx.lineWidth = s(0.8);
   ctx.stroke();
 }
 
-drawFace(left, LEFT);
-drawFace(right, RIGHT);
-drawFace(top, TOP);
+face([Vt, Vtr, Vc, Vtl], TOP);
+face([Vtl, Vc, Vb, Vbl], LEFT);
+face([Vtr, Vbr, Vb, Vc], RIGHT);
 `;
 
 PRESETS.sectionbox_copy = `
-// 切断ボックスコピー: 破線枠 + 小さい立方体
+// 切断ボックス コピー: 通り芯(both)ベース + 青破線アイソメ立方体枠
+// [3] 符号ON/OFFの両端アイコンをベースに青破線立方体を重ねる
+const DARK = '#323232';
 const BLUE = '#0066CC';
-const EDGE = '#3C3C3C';
-const LW = s(0.8);
+const R = 3;
 
-// Dashed border
-ctx.setLineDash([s(3), s(2)]);
+// === Step1: 通り芯グリッド線 ===
+ctx.strokeStyle = DARK;
+ctx.lineWidth = s(1);
+ctx.beginPath();
+ctx.moveTo(s(10), s(4+R)); ctx.lineTo(s(10), s(28-R));
+ctx.moveTo(s(22), s(4+R)); ctx.lineTo(s(22), s(28-R));
+ctx.moveTo(s(4+R), s(10)); ctx.lineTo(s(28-R), s(10));
+ctx.moveTo(s(4+R), s(22)); ctx.lineTo(s(28-R), s(22));
+ctx.stroke();
+
+// === Step2: 青破線アイソメ立方体ワイヤーフレーム (9辺) ===
+// 頂点: Vt=頂上, Vtr=右上, Vtl=左上, Vc=前中心, Vbr=右下, Vbl=左下, Vb=底
+const cx = s(16), cy = s(15), dx = s(11), dy = s(7);
+const Vt  = [cx,    cy-2*dy];
+const Vtr = [cx+dx, cy-dy];
+const Vtl = [cx-dx, cy-dy];
+const Vc  = [cx,    cy];
+const Vbr = [cx+dx, cy+dy];
+const Vbl = [cx-dx, cy+dy];
+const Vb  = [cx,    cy+2*dy];
+
 ctx.strokeStyle = BLUE;
-ctx.lineWidth = s(1.2);
-ctx.strokeRect(s(2), s(2), s(28), s(28));
+ctx.lineWidth = s(1.5);
+ctx.setLineDash([s(2.5), s(1.5)]);
+function edge(p1, p2) {
+  ctx.beginPath(); ctx.moveTo(p1[0],p1[1]); ctx.lineTo(p2[0],p2[1]); ctx.stroke();
+}
+// 上面 (4辺)
+edge(Vt,Vtr); edge(Vtr,Vc); edge(Vc,Vtl); edge(Vtl,Vt);
+// 左面 追加 (3辺)
+edge(Vtl,Vbl); edge(Vbl,Vb); edge(Vb,Vc);
+// 右面 追加 (2辺)
+edge(Vtr,Vbr); edge(Vbr,Vb);
 ctx.setLineDash([]);
 
-// Small cube in center
-const cx = s(16), cy = s(17);
-const dx = s(7), dy = s(4.5);
-const TOP = '#C8D8E8';
-const LEFT = '#98B0C8';
-const RIGHT = '#7898B0';
-
-function drawFace(pts, fill) {
+// === Step3: バブル (上に描画して視認性確保) ===
+function bubble(x, y) {
   ctx.beginPath();
-  ctx.moveTo(pts[0][0], pts[0][1]);
-  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
-  ctx.closePath();
-  ctx.fillStyle = fill;
-  ctx.fill();
-  ctx.strokeStyle = EDGE;
-  ctx.lineWidth = LW;
-  ctx.stroke();
+  ctx.arc(s(x), s(y), s(R), 0, Math.PI*2);
+  ctx.fillStyle = '#FFFFFF'; ctx.fill();
+  ctx.strokeStyle = DARK; ctx.lineWidth = s(1.2); ctx.stroke();
 }
-
-const top = [[cx,cy-dy-s(2)],[cx+dx,cy-s(2)],[cx,cy+dy-s(2)],[cx-dx,cy-s(2)]];
-const left = [[cx-dx,cy-s(2)],[cx,cy+dy-s(2)],[cx,cy+dy+dy-s(2)],[cx-dx,cy+dy-s(2)]];
-const right = [[cx,cy+dy-s(2)],[cx+dx,cy-s(2)],[cx+dx,cy+dy-s(2)],[cx,cy+dy+dy-s(2)]];
-drawFace(left, LEFT);
-drawFace(right, RIGHT);
-drawFace(top, TOP);
+bubble(10,4); bubble(22,4);
+bubble(4,10); bubble(28,10);
+bubble(4,22); bubble(28,22);
+bubble(10,28); bubble(22,28);
 `;
 
 PRESETS.sectionbox_paste = `
-// 切断ボックスペースト: 実線枠 + 小さい立方体
-const BLUE = '#3399FF';
-const EDGE = '#3C3C3C';
-const LW = s(0.8);
+// 切断ボックス ペースト: 通り芯(both)ベース + 青実線アイソメ立方体枠
+const DARK = '#323232';
+const BLUE = '#2288DD';
+const R = 3;
 
-// Solid border
+// === Step1: 通り芯グリッド線 ===
+ctx.strokeStyle = DARK;
+ctx.lineWidth = s(1);
+ctx.beginPath();
+ctx.moveTo(s(10), s(4+R)); ctx.lineTo(s(10), s(28-R));
+ctx.moveTo(s(22), s(4+R)); ctx.lineTo(s(22), s(28-R));
+ctx.moveTo(s(4+R), s(10)); ctx.lineTo(s(28-R), s(10));
+ctx.moveTo(s(4+R), s(22)); ctx.lineTo(s(28-R), s(22));
+ctx.stroke();
+
+// === Step2: 青実線アイソメ立方体ワイヤーフレーム (9辺) ===
+const cx = s(16), cy = s(15), dx = s(11), dy = s(7);
+const Vt  = [cx,    cy-2*dy];
+const Vtr = [cx+dx, cy-dy];
+const Vtl = [cx-dx, cy-dy];
+const Vc  = [cx,    cy];
+const Vbr = [cx+dx, cy+dy];
+const Vbl = [cx-dx, cy+dy];
+const Vb  = [cx,    cy+2*dy];
+
 ctx.strokeStyle = BLUE;
-ctx.lineWidth = s(2);
-ctx.strokeRect(s(2), s(2), s(28), s(28));
-
-// Small cube in center
-const cx = s(16), cy = s(17);
-const dx = s(7), dy = s(4.5);
-const TOP = '#5090D0';
-const LEFT = '#2870B0';
-const RIGHT = '#1860A0';
-
-function drawFace(pts, fill) {
-  ctx.beginPath();
-  ctx.moveTo(pts[0][0], pts[0][1]);
-  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
-  ctx.closePath();
-  ctx.fillStyle = fill;
-  ctx.fill();
-  ctx.strokeStyle = EDGE;
-  ctx.lineWidth = LW;
-  ctx.stroke();
+ctx.lineWidth = s(2.0);
+function edge(p1, p2) {
+  ctx.beginPath(); ctx.moveTo(p1[0],p1[1]); ctx.lineTo(p2[0],p2[1]); ctx.stroke();
 }
+// 上面 (4辺)
+edge(Vt,Vtr); edge(Vtr,Vc); edge(Vc,Vtl); edge(Vtl,Vt);
+// 左面 追加 (3辺)
+edge(Vtl,Vbl); edge(Vbl,Vb); edge(Vb,Vc);
+// 右面 追加 (2辺)
+edge(Vtr,Vbr); edge(Vbr,Vb);
 
-const top = [[cx,cy-dy-s(2)],[cx+dx,cy-s(2)],[cx,cy+dy-s(2)],[cx-dx,cy-s(2)]];
-const left = [[cx-dx,cy-s(2)],[cx,cy+dy-s(2)],[cx,cy+dy+dy-s(2)],[cx-dx,cy+dy-s(2)]];
-const right = [[cx,cy+dy-s(2)],[cx+dx,cy-s(2)],[cx+dx,cy+dy-s(2)],[cx,cy+dy+dy-s(2)]];
-drawFace(left, LEFT);
-drawFace(right, RIGHT);
-drawFace(top, TOP);
+// === Step3: バブル ===
+function bubble(x, y) {
+  ctx.beginPath();
+  ctx.arc(s(x), s(y), s(R), 0, Math.PI*2);
+  ctx.fillStyle = '#FFFFFF'; ctx.fill();
+  ctx.strokeStyle = DARK; ctx.lineWidth = s(1.2); ctx.stroke();
+}
+bubble(10,4); bubble(22,4);
+bubble(4,10); bubble(28,10);
+bubble(4,22); bubble(28,22);
+bubble(10,28); bubble(22,28);
 `;
 
 PRESETS.viewport_copy = `
