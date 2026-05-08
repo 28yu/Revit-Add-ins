@@ -644,38 +644,33 @@ face([Vtr, Vbr, Vb, Vc], RIGHT);
 `;
 
 PRESETS.sectionbox_copy = `
-// 切断ボックス コピー: キャビネット投影 (前面正方形 + 右上方向に押し出し) [2][4][8]
-// 赤線ガイド準拠: 前面20×20、奥行き(+9,-7)でcanvasほぼ全体を使用
+// 切断ボックス コピー: キャビネット投影 [2][4][8]
+// 描画順: 後面+奥行き線 → 内部ソリッド → 前面(最前面)
 const BLUE = '#0066CC';
 const EDGE = '#3C3C3C';
 
-// 前面: (1,8)-(21,28) = 20×20、奥行き: (+9,-7)
-// 後面: (10,1)-(30,21) — canvas全体スパン x=1-30, y=1-28
-const fx1=1, fy1=8, fx2=21, fy2=28, dox=9, doy=-7;
+// 前面を右下へシフト: (4,11)-(25,30)=21×19、奥行き: (+6,-9)
+// 後面: (10,2)-(31,21) — canvas内に収まる
+const fx1=4, fy1=11, fx2=25, fy2=30, dox=6, doy=-9;
 const bx1=fx1+dox, by1=fy1+doy, bx2=fx2+dox, by2=fy2+doy;
-
-ctx.strokeStyle = BLUE;
-ctx.lineWidth = s(1.5);
-ctx.setLineDash([s(2.5), s(1.5)]);
 
 function ln(x1,y1,x2,y2) {
   ctx.beginPath(); ctx.moveTo(s(x1),s(y1)); ctx.lineTo(s(x2),s(y2)); ctx.stroke();
 }
-// 前面 4辺
-ln(fx1,fy1, fx2,fy1); ln(fx2,fy1, fx2,fy2);
-ln(fx2,fy2, fx1,fy2); ln(fx1,fy2, fx1,fy1);
-// 後面 4辺
+
+// === Step1: 後面4辺 + 奥行き線4辺 (破線青) ===
+ctx.strokeStyle = BLUE;
+ctx.lineWidth = s(1.5);
+ctx.setLineDash([s(2.5), s(1.5)]);
 ln(bx1,by1, bx2,by1); ln(bx2,by1, bx2,by2);
 ln(bx2,by2, bx1,by2); ln(bx1,by2, bx1,by1);
-// 奥行き線 4辺
 ln(fx1,fy1, bx1,by1); ln(fx2,fy1, bx2,by1);
 ln(fx2,fy2, bx2,by2); ln(fx1,fy2, bx1,by2);
-
 ctx.setLineDash([]);
 
-// 内部小直方体: 前面(8,13)-(17,22)=9×9、奥行き(+6,-5)
-// 合成視覚中央: ((8+23)/2,(8+22)/2)=(15.5,15) ≈ 全体中央(15.5,14.5) ✓
-const cf={x1:8,y1:13,x2:17,y2:22}, cd={x:6,y:-5};
+// === Step2: 内部小直方体 (前面の前に描画) ===
+// 前面(10,14)-(19,23)=9×9、奥行き(+5,-5) → 合成中央(17.5,15.5)≈全体中央✓
+const cf={x1:10,y1:14,x2:19,y2:23}, cd={x:5,y:-5};
 const cb={x1:cf.x1+cd.x,y1:cf.y1+cd.y,x2:cf.x2+cd.x,y2:cf.y2+cd.y};
 
 function poly(pts, fill) {
@@ -686,12 +681,17 @@ function poly(pts, fill) {
   ctx.fillStyle=fill; ctx.fill();
   ctx.strokeStyle=EDGE; ctx.lineWidth=s(0.7); ctx.stroke();
 }
-// 上面
-poly([[cf.x1,cf.y1],[cf.x2,cf.y1],[cb.x2,cb.y1],[cb.x1,cb.y1]], '#A8B8C8');
-// 右面
-poly([[cf.x2,cf.y1],[cb.x2,cb.y1],[cb.x2,cb.y2],[cf.x2,cf.y2]], '#7A8A9A');
-// 前面
-poly([[cf.x1,cf.y1],[cf.x2,cf.y1],[cf.x2,cf.y2],[cf.x1,cf.y2]], '#B8C8D8');
+poly([[cf.x1,cf.y1],[cf.x2,cf.y1],[cb.x2,cb.y1],[cb.x1,cb.y1]], '#A8B8C8'); // 上面
+poly([[cf.x2,cf.y1],[cb.x2,cb.y1],[cb.x2,cb.y2],[cf.x2,cf.y2]], '#7A8A9A'); // 右面
+poly([[cf.x1,cf.y1],[cf.x2,cf.y1],[cf.x2,cf.y2],[cf.x1,cf.y2]], '#B8C8D8'); // 前面
+
+// === Step3: 前面4辺 (最前面に描画 → ソリッドより手前に出る) ===
+ctx.strokeStyle = BLUE;
+ctx.lineWidth = s(1.5);
+ctx.setLineDash([s(2.5), s(1.5)]);
+ln(fx1,fy1, fx2,fy1); ln(fx2,fy1, fx2,fy2);
+ln(fx2,fy2, fx1,fy2); ln(fx1,fy2, fx1,fy1);
+ctx.setLineDash([]);
 `;
 
 PRESETS.sectionbox_paste = `
@@ -700,30 +700,26 @@ PRESETS.sectionbox_paste = `
 const BLUE = '#2288DD';
 const EDGE = '#3C3C3C';
 
-// 前面: (1,8)-(21,28) = 20×20、奥行き: (+9,-7)
-// 後面: (10,1)-(30,21)
-const fx1=1, fy1=8, fx2=21, fy2=28, dox=9, doy=-7;
+// 前面を右下へシフト: (4,11)-(25,30)=21×19、奥行き: (+6,-9)
+// 後面: (10,2)-(31,21) — canvas内に収まる
+const fx1=4, fy1=11, fx2=25, fy2=30, dox=6, doy=-9;
 const bx1=fx1+dox, by1=fy1+doy, bx2=fx2+dox, by2=fy2+doy;
-
-ctx.strokeStyle = BLUE;
-ctx.lineWidth = s(2.0);
 
 function ln(x1,y1,x2,y2) {
   ctx.beginPath(); ctx.moveTo(s(x1),s(y1)); ctx.lineTo(s(x2),s(y2)); ctx.stroke();
 }
-// 前面 4辺
-ln(fx1,fy1, fx2,fy1); ln(fx2,fy1, fx2,fy2);
-ln(fx2,fy2, fx1,fy2); ln(fx1,fy2, fx1,fy1);
-// 後面 4辺
+
+// === Step1: 後面4辺 + 奥行き線4辺 (実線青) ===
+ctx.strokeStyle = BLUE;
+ctx.lineWidth = s(2.0);
 ln(bx1,by1, bx2,by1); ln(bx2,by1, bx2,by2);
 ln(bx2,by2, bx1,by2); ln(bx1,by2, bx1,by1);
-// 奥行き線 4辺
 ln(fx1,fy1, bx1,by1); ln(fx2,fy1, bx2,by1);
 ln(fx2,fy2, bx2,by2); ln(fx1,fy2, bx1,by2);
 
-// 内部小直方体: 前面(8,13)-(17,22)=9×9、奥行き(+6,-5) — 青濃色3面
-// 合成視覚中央: ((8+23)/2,(8+22)/2)=(15.5,15) ✓
-const cf={x1:8,y1:13,x2:17,y2:22}, cd={x:6,y:-5};
+// === Step2: 内部小直方体 (前面の前に描画) ===
+// 前面(10,14)-(19,23)=9×9、奥行き(+5,-5)
+const cf={x1:10,y1:14,x2:19,y2:23}, cd={x:5,y:-5};
 const cb={x1:cf.x1+cd.x,y1:cf.y1+cd.y,x2:cf.x2+cd.x,y2:cf.y2+cd.y};
 
 function poly(pts, fill) {
@@ -734,12 +730,15 @@ function poly(pts, fill) {
   ctx.fillStyle=fill; ctx.fill();
   ctx.strokeStyle=EDGE; ctx.lineWidth=s(0.7); ctx.stroke();
 }
-// 上面: 青濃色
-poly([[cf.x1,cf.y1],[cf.x2,cf.y1],[cb.x2,cb.y1],[cb.x1,cb.y1]], '#5090D0');
-// 右面: 青中色
-poly([[cf.x2,cf.y1],[cb.x2,cb.y1],[cb.x2,cb.y2],[cf.x2,cf.y2]], '#2870B0');
-// 前面: 青明色
-poly([[cf.x1,cf.y1],[cf.x2,cf.y1],[cf.x2,cf.y2],[cf.x1,cf.y2]], '#70B0E0');
+poly([[cf.x1,cf.y1],[cf.x2,cf.y1],[cb.x2,cb.y1],[cb.x1,cb.y1]], '#5090D0'); // 上面
+poly([[cf.x2,cf.y1],[cb.x2,cb.y1],[cb.x2,cb.y2],[cf.x2,cf.y2]], '#2870B0'); // 右面
+poly([[cf.x1,cf.y1],[cf.x2,cf.y1],[cf.x2,cf.y2],[cf.x1,cf.y2]], '#70B0E0'); // 前面
+
+// === Step3: 前面4辺 (最前面に描画 → ソリッドより手前に出る) ===
+ctx.strokeStyle = BLUE;
+ctx.lineWidth = s(2.0);
+ln(fx1,fy1, fx2,fy1); ln(fx2,fy1, fx2,fy2);
+ln(fx2,fy2, fx1,fy2); ln(fx1,fy2, fx1,fy1);
 `;
 
 PRESETS.viewport_copy = `
