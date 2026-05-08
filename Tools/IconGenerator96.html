@@ -717,82 +717,55 @@ drawFace(top, TOP);
 `;
 
 PRESETS.viewport_copy = `
-// ビューポート位置コピー
+// ビューポート位置コピー（シート1枚 + 青破線ビューポート）
 const DARK = '#323232';
 const MID = '#5C5C5C';
-const LIGHT = '#ADADAD';
-const VLIGHT = '#F0F0F0';
-const ACCENT = '#7FB2E5';
+const BLUE = '#4A90D9';
 const LW = s(1);
 
-// Outer frame
+// シート外枠
+ctx.fillStyle = '#FFFFFF';
+ctx.fillRect(s(0.5), s(1), s(31), s(30));
 ctx.strokeStyle = DARK;
 ctx.lineWidth = LW;
-ctx.fillStyle = '#FFFFFF';
-ctx.fillRect(s(1.5), s(5), s(29), s(22));
-ctx.strokeRect(s(1.5), s(5), s(29), s(22));
+ctx.strokeRect(s(0.5), s(1), s(31), s(30));
 
-// Title bar
-ctx.fillStyle = VLIGHT;
-ctx.fillRect(s(2.5), s(6), s(27), s(4));
-ctx.beginPath();
-ctx.moveTo(s(1.5), s(10)); ctx.lineTo(s(30.5), s(10));
-ctx.strokeStyle = DARK;
-ctx.stroke();
-
-// Content lines
-ctx.strokeStyle = ACCENT;
+// 図枠線
+ctx.strokeStyle = MID;
 ctx.lineWidth = s(0.6);
-[14, 17, 20].forEach(y => {
-  ctx.beginPath();
-  ctx.moveTo(s(5), s(y)); ctx.lineTo(s(18), s(y));
-  ctx.stroke();
-});
+ctx.strokeRect(s(2.5), s(3), s(27), s(26));
 
-// Small viewport box (bottom-right)
-ctx.strokeStyle = DARK;
-ctx.lineWidth = LW;
-ctx.fillStyle = '#FFFFFF';
-ctx.fillRect(s(19), s(18.5), s(9), s(6));
-ctx.strokeRect(s(19), s(18.5), s(9), s(6));
+// 青破線ビューポート（コピー = 破線）
+ctx.strokeStyle = BLUE;
+ctx.lineWidth = s(1.2);
+ctx.setLineDash([s(2.5), s(1.5)]);
+ctx.strokeRect(s(6), s(7), s(20), s(17));
+ctx.setLineDash([]);
 `;
 
 PRESETS.viewport_paste = `
-// ビューポート位置ペースト
+// ビューポート位置ペースト（シート1枚 + 青実線ビューポート）
 const DARK = '#323232';
-const BLUE = '#3399FF';
-const LIGHT_BLUE = '#99CCFF';
-const VLIGHT = '#F0F0F0';
+const MID = '#5C5C5C';
+const BLUE = '#4A90D9';
 const LW = s(1);
 
+// シート外枠
+ctx.fillStyle = '#FFFFFF';
+ctx.fillRect(s(0.5), s(1), s(31), s(30));
 ctx.strokeStyle = DARK;
 ctx.lineWidth = LW;
-ctx.fillStyle = '#FFFFFF';
-ctx.fillRect(s(1.5), s(5), s(29), s(22));
-ctx.strokeRect(s(1.5), s(5), s(29), s(22));
+ctx.strokeRect(s(0.5), s(1), s(31), s(30));
 
-ctx.fillStyle = VLIGHT;
-ctx.fillRect(s(2.5), s(6), s(27), s(4));
-ctx.beginPath();
-ctx.moveTo(s(1.5), s(10)); ctx.lineTo(s(30.5), s(10));
-ctx.strokeStyle = DARK;
-ctx.stroke();
-
-// Content lines (blue-tinted)
-ctx.strokeStyle = LIGHT_BLUE;
+// 図枠線
+ctx.strokeStyle = MID;
 ctx.lineWidth = s(0.6);
-[14, 17, 20].forEach(y => {
-  ctx.beginPath();
-  ctx.moveTo(s(5), s(y)); ctx.lineTo(s(18), s(y));
-  ctx.stroke();
-});
+ctx.strokeRect(s(2.5), s(3), s(27), s(26));
 
-// Viewport box with blue accent
+// 青実線ビューポート（ペースト = 実線）
 ctx.strokeStyle = BLUE;
-ctx.lineWidth = s(1.2);
-ctx.fillStyle = '#FFFFFF';
-ctx.fillRect(s(19), s(18.5), s(9), s(6));
-ctx.strokeRect(s(19), s(18.5), s(9), s(6));
+ctx.lineWidth = s(1.8);
+ctx.strokeRect(s(6), s(7), s(20), s(17));
 `;
 
 PRESETS.cropbox_copy = `
