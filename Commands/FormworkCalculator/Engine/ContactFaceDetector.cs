@@ -49,6 +49,14 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         // 0.95 に厳格化し、わずかでも露出があれば Partial Contact 扱いにする。
         private const double OverlapRatioMin = 0.95;
 
+        // a が b より十分小さい (a/b ≤ SmallAreaRatio) ときの緩和した閾値。
+        // a が小さく b が大きい場合、a's corners は基本的に全部 b 上にあるはずだが、
+        // b の Join Geometry の notch のせいで一部の corner が off-face と判定される
+        // ことがある。0.25 (= 1/4 隅) で Full 受理することで「a の中心は b 上、
+        // 距離 0」だが「b 側の複雑形状で corner check が信頼できない」ケースを救済。
+        private const double SmallAreaRatio = 0.3;
+        private const double OverlapRatioMinSmallA = 0.25;
+
         internal static void RefineContactFaces(List<ElementFacesContext> contexts)
         {
             int n = contexts.Count;
@@ -226,12 +234,28 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 // 重なり比をチェック。中心 1 点投影だけでは co-planar な隣接面を弾けない。
                 overlapRatio = EstimateOverlapRatioAonB(
                     a.Face, b.Face, bbA, bbB, out overlapFailReason);
+
+                // a が b より十分小さい場合 (a/b ≤ 0.3) は閾値を緩和する。
+                // 理由: a が小さく b が大きい場合、a's corners は基本的にすべて b 内に
+                // 入るはずだが、b の Join Geometry による notch / 穴のせいで一部 corner
+                // が off-face と判定されることがある。これは a の overhang ではなく
+                // b 側の複雑形状が原因なので、閾値を下げて 1 隅でも乗っていれば Full
+                // 扱いにする (a の中心は cond4 で b 上にあると確認済み)。
+                //
+                // 例: 直交梁の端面 (17.58 ft²) がホスト梁側面 (163.95 ft²) に接触する
+                //    ケース。a/b = 0.107、okCount=3/4 (1 隅が b の notch にハマる)。
+                //    旧 0.95 閾値だと REJECTED → Stage 2 も失敗 → 端面型枠が残る不具合。
+                double areaRatio = aArea / Math.Max(bArea, 1e-9);
+                double overlapThreshold = areaRatio <= SmallAreaRatio
+                    ? OverlapRatioMinSmallA
+                    : OverlapRatioMin;
+
                 if (overlapRatio < 0)
                 {
                     // 投影失敗: 既存ロジック (中心投影 + 面積比) を信頼して Full 受理
                     stage1Accepted = true;
                 }
-                else if (overlapRatio < OverlapRatioMin)
+                else if (overlapRatio < overlapThreshold)
                 {
                     stage1Reason = "cond5-overlap-insufficient";
                 }
