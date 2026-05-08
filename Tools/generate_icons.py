@@ -412,72 +412,61 @@ def make_beam_top_level():
 # ─────────────────────────────────────────
 # excel_export / excel_import
 # ─────────────────────────────────────────
-def _draw_excel_icon(img):
-    """Draw the Excel rounded-rect icon (green 3-band + white X) onto img using a mask."""
-    from PIL import ImageFilter
-
-    # Colors
-    G1 = hex_rgba('#107C41')  # darkest (left band)
-    G2 = hex_rgba('#21A366')  # mid
-    G3 = hex_rgba('#33B87A')  # lightest (right band)
+def _draw_excel_file_icon(img):
+    """Draw the Excel file icon (white document + fold + green square + white X + green lines)."""
+    draw = ImageDraw.Draw(img)
+    DARK  = (26, 26, 26, 255)
     WHITE = (255, 255, 255, 255)
+    FOLD  = (200, 200, 200, 255)
+    GREEN = hex_rgba('#217346')
+    lw = iw(s(0.9))
 
-    # Icon area in 32-coord space: x=0.5..20.5, y=1.5..28.5 (20×27), radius=3
-    rx, ry, rw, rh, radius = 0.5, 1.5, 20.0, 27.0, 3.0
+    # Document body: pentagon (3,1)-(15,1)-(20,6)-(20,31)-(3,31)
+    doc_poly = [
+        (s(3),  s(1)),
+        (s(15), s(1)),
+        (s(20), s(6)),
+        (s(20), s(31)),
+        (s(3),  s(31)),
+    ]
+    draw.polygon(doc_poly, fill=WHITE, outline=DARK, width=lw)
 
-    # Build rounded-rect mask
-    mask_img = Image.new('L', img.size, 0)
-    mask_draw = ImageDraw.Draw(mask_img)
-    # Approximate rounded rect with a large-radius ellipse at corners
-    # Use polygon of the 4 arc segments via pieslice workaround:
-    # Pillow doesn't have arcTo, so use a two-step: fill rect + fill 4 corner ellipses
-    px0, py0 = s(rx), s(ry)
-    px1, py1 = s(rx + rw), s(ry + rh)
-    pr = s(radius)
-    mask_draw.rectangle([px0 + pr, py0, px1 - pr, py1], fill=255)
-    mask_draw.rectangle([px0, py0 + pr, px1, py1 - pr], fill=255)
-    mask_draw.ellipse([px0, py0, px0 + 2*pr, py0 + 2*pr], fill=255)
-    mask_draw.ellipse([px1 - 2*pr, py0, px1, py0 + 2*pr], fill=255)
-    mask_draw.ellipse([px0, py1 - 2*pr, px0 + 2*pr, py1], fill=255)
-    mask_draw.ellipse([px1 - 2*pr, py1 - 2*pr, px1, py1], fill=255)
+    # Fold triangle: (15,1)-(20,1)-(20,6)
+    fold_poly = [
+        (s(15), s(1)),
+        (s(20), s(1)),
+        (s(20), s(6)),
+    ]
+    draw.polygon(fold_poly, fill=FOLD, outline=DARK, width=lw)
 
-    # Draw the 3 bands on a separate layer
-    layer = Image.new('RGBA', img.size, (0, 0, 0, 0))
-    ld = ImageDraw.Draw(layer)
-    # G1: full background
-    ld.rectangle([px0, py0, px1, py1], fill=G1)
-    # G2: center band from x=7.2
-    ld.rectangle([s(7.2), py0, px1, py1], fill=G2)
-    # G3: right band from x=14
-    ld.rectangle([s(14), py0, px1, py1], fill=G3)
+    # Green square: x=1..13, y=9..27
+    draw.rectangle([s(1), s(9), s(13), s(27)], fill=GREEN)
 
-    # White X using thick line segments (approximate round caps with circles at endpoints)
-    x_w = iw(s(2.8))
-    xa1, ya1 = s(3.0),  s(6.5)
-    xa2, ya2 = s(17.5), s(23.5)
-    xb1, yb1 = s(17.5), s(6.5)
-    xb2, yb2 = s(3.0),  s(23.5)
-    ld.line([(xa1, ya1), (xa2, ya2)], fill=WHITE, width=x_w)
-    ld.line([(xb1, yb1), (xb2, yb2)], fill=WHITE, width=x_w)
-    # Round caps
-    cr = x_w // 2
+    # White X with round caps
+    x_lw = iw(s(2.4))
+    xa1, ya1 = s(3.5),  s(11.5)
+    xa2, ya2 = s(10.5), s(24.5)
+    xb1, yb1 = s(10.5), s(11.5)
+    xb2, yb2 = s(3.5),  s(24.5)
+    draw.line([(xa1, ya1), (xa2, ya2)], fill=WHITE, width=x_lw)
+    draw.line([(xb1, yb1), (xb2, yb2)], fill=WHITE, width=x_lw)
+    cr = x_lw // 2
     for cx, cy in [(xa1,ya1),(xa2,ya2),(xb1,yb1),(xb2,yb2)]:
-        ld.ellipse([cx-cr, cy-cr, cx+cr, cy+cr], fill=WHITE)
+        draw.ellipse([cx-cr, cy-cr, cx+cr, cy+cr], fill=WHITE)
 
-    # Composite layer onto img using mask
-    img.paste(layer, mask=mask_img)
+    # Horizontal lines on document right side: 3 pairs
+    line_lw = iw(s(0.9))
+    for y1_32, y2_32 in [(14, 16), (18, 20), (22, 24)]:
+        draw.line([(s(15), s(y1_32)), (s(19.5), s(y1_32))], fill=GREEN, width=line_lw)
+        draw.line([(s(15), s(y2_32)), (s(19.5), s(y2_32))], fill=GREEN, width=line_lw)
 
 
 def make_excel_export():
     img = new_canvas()
+    _draw_excel_file_icon(img)
     draw = ImageDraw.Draw(img)
 
-    _draw_excel_icon(img)
-
-    # Re-create draw after paste
-    draw = ImageDraw.Draw(img)
-
-    # Blue up arrow: shaft y=8→22, triangle tip at y=6
+    # Blue up arrow: shaft y=8→22, tip at y=6
     BLUE = (0, 102, 204, 255)
     lw = iw(s(1.2))
     draw.line([(s(27), s(8)), (s(27), s(22))], fill=BLUE, width=lw)
@@ -492,13 +481,10 @@ def make_excel_export():
 
 def make_excel_import():
     img = new_canvas()
+    _draw_excel_file_icon(img)
     draw = ImageDraw.Draw(img)
 
-    _draw_excel_icon(img)
-
-    draw = ImageDraw.Draw(img)
-
-    # Blue down arrow: shaft y=8→22, triangle tip at y=26
+    # Blue down arrow: shaft y=8→22, tip at y=26
     BLUE = (0, 102, 204, 255)
     lw = iw(s(1.2))
     draw.line([(s(27), s(8)), (s(27), s(22))], fill=BLUE, width=lw)

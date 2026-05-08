@@ -886,52 +886,58 @@ ctx.strokeRect(s(8), s(8), s(16), s(16));
 `;
 
 PRESETS.excel_export = `
-// Excel エクスポート: 角丸四角+縦帯グラデーション(暗→明)+白X+青上矢印
-const G1    = '#107C41';   // 左帯 (最暗)
-const G2    = '#21A366';   // 中帯 (標準)
-const G3    = '#33B87A';   // 右帯 (明)
+// Excel エクスポート: ファイルアイコン(書類+折り角)+緑四角+白X+横線+青上矢印
+const DARK  = '#1A1A1A';
+const DOC   = '#FFFFFF';
+const FOLD  = '#C8C8C8';
+const GREEN = '#217346';
 const WHITE = '#FFFFFF';
 const BLUE  = '#0066CC';
+const LW    = s(0.9);
 
-// 角丸矩形ヘルパー
-function rr(x,y,w,h,r) {
-  ctx.beginPath();
-  ctx.moveTo(s(x+r), s(y));
-  ctx.arcTo(s(x+w), s(y),   s(x+w), s(y+h), s(r));
-  ctx.arcTo(s(x+w), s(y+h), s(x),   s(y+h), s(r));
-  ctx.arcTo(s(x),   s(y+h), s(x),   s(y),   s(r));
-  ctx.arcTo(s(x),   s(y),   s(x+w), s(y),   s(r));
-  ctx.closePath();
-}
+// --- 書類本体: 五角形 (3,1)-(15,1)-(20,6)-(20,31)-(3,31) ---
+ctx.beginPath();
+ctx.moveTo(s(3), s(1));
+ctx.lineTo(s(15), s(1));
+ctx.lineTo(s(20), s(6));
+ctx.lineTo(s(20), s(31));
+ctx.lineTo(s(3), s(31));
+ctx.closePath();
+ctx.fillStyle = DOC; ctx.fill();
+ctx.strokeStyle = DARK; ctx.lineWidth = LW; ctx.stroke();
 
-// === Excel icon: x=0.5..20.5, y=1.5..28.5 (20×27) ===
-// 背景 (最暗色)
-rr(0.5, 1.5, 20, 27, 3);
-ctx.fillStyle = G1;
-ctx.fill();
+// --- 折り角: (15,1)-(20,1)-(20,6) ---
+ctx.beginPath();
+ctx.moveTo(s(15), s(1));
+ctx.lineTo(s(20), s(1));
+ctx.lineTo(s(20), s(6));
+ctx.closePath();
+ctx.fillStyle = FOLD; ctx.fill();
+ctx.strokeStyle = DARK; ctx.lineWidth = LW; ctx.stroke();
 
-// 角丸でクリップして縦帯+白Xを描画
-ctx.save();
-rr(0.5, 1.5, 20, 27, 3);
-ctx.clip();
+// --- 緑四角: x=1..13, y=9..27 ---
+ctx.fillStyle = GREEN;
+ctx.fillRect(s(1), s(9), s(12), s(18));
 
-// 中帯 (中央)
-ctx.fillStyle = G2;
-ctx.fillRect(s(7.2), s(1.5), s(6.8), s(27));
-// 右帯 (最明)
-ctx.fillStyle = G3;
-ctx.fillRect(s(14), s(1.5), s(7), s(27));
-
-// 白X (round caps, 太め)
+// --- 白X (round caps) ---
 ctx.strokeStyle = WHITE;
-ctx.lineWidth = s(2.8);
+ctx.lineWidth = s(2.4);
 ctx.lineCap = 'round';
 ctx.beginPath();
-ctx.moveTo(s(3),    s(6.5)); ctx.lineTo(s(17.5), s(23.5));
-ctx.moveTo(s(17.5), s(6.5)); ctx.lineTo(s(3),    s(23.5));
+ctx.moveTo(s(3.5), s(11.5)); ctx.lineTo(s(10.5), s(24.5));
+ctx.moveTo(s(10.5), s(11.5)); ctx.lineTo(s(3.5), s(24.5));
 ctx.stroke();
 ctx.lineCap = 'butt';
-ctx.restore();
+
+// --- 横線 3ペア (書類右側) ---
+ctx.strokeStyle = GREEN;
+ctx.lineWidth = s(0.9);
+[[s(14), s(16)], [s(18), s(20)], [s(22), s(24)]].forEach(([y1, y2]) => {
+  ctx.beginPath();
+  ctx.moveTo(s(15), y1); ctx.lineTo(s(19.5), y1);
+  ctx.moveTo(s(15), y2); ctx.lineTo(s(19.5), y2);
+  ctx.stroke();
+});
 
 // === Up arrow (export) ===
 ctx.fillStyle = BLUE;
@@ -949,52 +955,58 @@ ctx.fill();
 `;
 
 PRESETS.excel_import = `
-// Excel インポート: 角丸四角+縦帯グラデーション(暗→明)+白X+青下矢印
-const G1    = '#107C41';   // 左帯 (最暗)
-const G2    = '#21A366';   // 中帯 (標準)
-const G3    = '#33B87A';   // 右帯 (明)
+// Excel インポート: ファイルアイコン(書類+折り角)+緑四角+白X+横線+青下矢印
+const DARK  = '#1A1A1A';
+const DOC   = '#FFFFFF';
+const FOLD  = '#C8C8C8';
+const GREEN = '#217346';
 const WHITE = '#FFFFFF';
 const BLUE  = '#0066CC';
+const LW    = s(0.9);
 
-// 角丸矩形ヘルパー
-function rr(x,y,w,h,r) {
-  ctx.beginPath();
-  ctx.moveTo(s(x+r), s(y));
-  ctx.arcTo(s(x+w), s(y),   s(x+w), s(y+h), s(r));
-  ctx.arcTo(s(x+w), s(y+h), s(x),   s(y+h), s(r));
-  ctx.arcTo(s(x),   s(y+h), s(x),   s(y),   s(r));
-  ctx.arcTo(s(x),   s(y),   s(x+w), s(y),   s(r));
-  ctx.closePath();
-}
+// --- 書類本体 ---
+ctx.beginPath();
+ctx.moveTo(s(3), s(1));
+ctx.lineTo(s(15), s(1));
+ctx.lineTo(s(20), s(6));
+ctx.lineTo(s(20), s(31));
+ctx.lineTo(s(3), s(31));
+ctx.closePath();
+ctx.fillStyle = DOC; ctx.fill();
+ctx.strokeStyle = DARK; ctx.lineWidth = LW; ctx.stroke();
 
-// === Excel icon: x=0.5..20.5, y=1.5..28.5 (20×27) ===
-// 背景 (最暗色)
-rr(0.5, 1.5, 20, 27, 3);
-ctx.fillStyle = G1;
-ctx.fill();
+// --- 折り角 ---
+ctx.beginPath();
+ctx.moveTo(s(15), s(1));
+ctx.lineTo(s(20), s(1));
+ctx.lineTo(s(20), s(6));
+ctx.closePath();
+ctx.fillStyle = FOLD; ctx.fill();
+ctx.strokeStyle = DARK; ctx.lineWidth = LW; ctx.stroke();
 
-// 角丸でクリップして縦帯+白Xを描画
-ctx.save();
-rr(0.5, 1.5, 20, 27, 3);
-ctx.clip();
+// --- 緑四角 ---
+ctx.fillStyle = GREEN;
+ctx.fillRect(s(1), s(9), s(12), s(18));
 
-// 中帯 (中央)
-ctx.fillStyle = G2;
-ctx.fillRect(s(7.2), s(1.5), s(6.8), s(27));
-// 右帯 (最明)
-ctx.fillStyle = G3;
-ctx.fillRect(s(14), s(1.5), s(7), s(27));
-
-// 白X (round caps, 太め)
+// --- 白X ---
 ctx.strokeStyle = WHITE;
-ctx.lineWidth = s(2.8);
+ctx.lineWidth = s(2.4);
 ctx.lineCap = 'round';
 ctx.beginPath();
-ctx.moveTo(s(3),    s(6.5)); ctx.lineTo(s(17.5), s(23.5));
-ctx.moveTo(s(17.5), s(6.5)); ctx.lineTo(s(3),    s(23.5));
+ctx.moveTo(s(3.5), s(11.5)); ctx.lineTo(s(10.5), s(24.5));
+ctx.moveTo(s(10.5), s(11.5)); ctx.lineTo(s(3.5), s(24.5));
 ctx.stroke();
 ctx.lineCap = 'butt';
-ctx.restore();
+
+// --- 横線 3ペア ---
+ctx.strokeStyle = GREEN;
+ctx.lineWidth = s(0.9);
+[[s(14), s(16)], [s(18), s(20)], [s(22), s(24)]].forEach(([y1, y2]) => {
+  ctx.beginPath();
+  ctx.moveTo(s(15), y1); ctx.lineTo(s(19.5), y1);
+  ctx.moveTo(s(15), y2); ctx.lineTo(s(19.5), y2);
+  ctx.stroke();
+});
 
 // === Down arrow (import) ===
 ctx.fillStyle = BLUE;
