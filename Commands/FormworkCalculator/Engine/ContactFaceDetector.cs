@@ -357,12 +357,46 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             try { pB = b.Face.Evaluate((bbB.Min + bbB.Max) * 0.5); } catch { }
             if (pB == null) { reason = "s2-pB-null"; return none; }
 
+            // b の中心を a に投影して、距離チェックと UV 取得を行う。
+            // a.Face.Project が null を返す場合 (壁-壁 T字接合等で pB が a の UV 境界
+            // 近傍に位置するとき Revit が null を返す既知の挙動) は、a が PlanarFace なら
+            // 平面方程式で補完する。
             IntersectionResult proj = null;
             try { proj = a.Face.Project(pB); } catch { }
-            if (proj == null) { reason = "s2-project-null"; return none; }
-            if (proj.Distance > CoincidenceTolFeet) { reason = "s2-distance"; return none; }
 
-            UV uv = proj.UVPoint;
+            double projDist;
+            UV uv;
+            if (proj != null)
+            {
+                projDist = proj.Distance;
+                uv = proj.UVPoint;
+            }
+            else
+            {
+                var pfa = a.Face as PlanarFace;
+                if (pfa == null) { reason = "s2-project-null"; return none; }
+
+                XYZ xVec = pfa.XVector;
+                XYZ yVec = pfa.YVector;
+                if (xVec == null || yVec == null) { reason = "s2-project-null"; return none; }
+
+                XYZ normal = xVec.CrossProduct(yVec);
+                if (normal.GetLength() < 1e-9) { reason = "s2-project-null"; return none; }
+                normal = normal.Normalize();
+
+                XYZ d3d = pB - pfa.Origin;
+                projDist = Math.Abs(d3d.DotProduct(normal));
+
+                XYZ xN = xVec.Normalize();
+                XYZ yN = yVec.Normalize();
+                uv = new UV(d3d.DotProduct(xN), d3d.DotProduct(yN));
+
+                if (FormworkDebugLog.Enabled)
+                    FormworkDebugLog.Log($"    s2-via-plane planeDist={projDist:F6} uv={FmtUV(uv)}");
+            }
+
+            if (projDist > CoincidenceTolFeet) { reason = "s2-distance"; return none; }
+
             BoundingBoxUV bbA = null;
             try { bbA = a.Face.GetBoundingBox(); } catch { }
             if (uv == null || bbA == null) { reason = "s2-uv-null"; return none; }
