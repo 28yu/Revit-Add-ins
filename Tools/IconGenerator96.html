@@ -256,20 +256,21 @@ const PRESETS = {};
 PRESETS.both = `
 // 通り芯・レベル 両端表示
 const DARK = '#323232';
-const LINE_W = s(2);
+const R = 3;
 
-// Grid lines (2 vertical + 2 horizontal)
+// Lines: bubble center to bubble center only (no overhang)
 ctx.strokeStyle = DARK;
-ctx.lineWidth = LINE_W;
+ctx.lineWidth = s(1);
 
 ctx.beginPath();
-ctx.moveTo(s(10), 0); ctx.lineTo(s(10), s(32));
-ctx.moveTo(s(22), 0); ctx.lineTo(s(22), s(32));
-ctx.moveTo(0, s(10)); ctx.lineTo(s(32), s(10));
-ctx.moveTo(0, s(22)); ctx.lineTo(s(32), s(22));
+// Vertical lines (top bubble bottom → bottom bubble top)
+ctx.moveTo(s(10), s(4+R)); ctx.lineTo(s(10), s(28-R));
+ctx.moveTo(s(22), s(4+R)); ctx.lineTo(s(22), s(28-R));
+// Horizontal lines (left bubble right → right bubble left)
+ctx.moveTo(s(4+R), s(10)); ctx.lineTo(s(28-R), s(10));
+ctx.moveTo(s(4+R), s(22)); ctx.lineTo(s(28-R), s(22));
 ctx.stroke();
 
-// Bubbles at line ends
 function drawBubble(cx, cy, r) {
   ctx.beginPath();
   ctx.arc(s(cx), s(cy), s(r), 0, Math.PI * 2);
@@ -280,17 +281,12 @@ function drawBubble(cx, cy, r) {
   ctx.stroke();
 }
 
-const R = 3;
-// Top bubbles
 drawBubble(10, 4, R);
 drawBubble(22, 4, R);
-// Bottom bubbles
 drawBubble(10, 28, R);
 drawBubble(22, 28, R);
-// Left bubbles
 drawBubble(4, 10, R);
 drawBubble(4, 22, R);
-// Right bubbles
 drawBubble(28, 10, R);
 drawBubble(28, 22, R);
 `;
@@ -298,16 +294,18 @@ drawBubble(28, 22, R);
 PRESETS.left = `
 // 通り芯・レベル 左端のみ
 const DARK = '#323232';
-const LINE_W = s(2);
+const R = 3;
 
 ctx.strokeStyle = DARK;
-ctx.lineWidth = LINE_W;
+ctx.lineWidth = s(1);
 
 ctx.beginPath();
-ctx.moveTo(s(10), 0); ctx.lineTo(s(10), s(26));
-ctx.moveTo(s(22), 0); ctx.lineTo(s(22), s(26));
-ctx.moveTo(0, s(10)); ctx.lineTo(s(26), s(10));
-ctx.moveTo(0, s(22)); ctx.lineTo(s(26), s(22));
+// Vertical lines: top bubble → bottom of canvas (no bottom bubble)
+ctx.moveTo(s(10), s(4+R)); ctx.lineTo(s(10), s(28));
+ctx.moveTo(s(22), s(4+R)); ctx.lineTo(s(22), s(28));
+// Horizontal lines: left bubble → right of canvas (no right bubble)
+ctx.moveTo(s(4+R), s(10)); ctx.lineTo(s(28), s(10));
+ctx.moveTo(s(4+R), s(22)); ctx.lineTo(s(28), s(22));
 ctx.stroke();
 
 function drawBubble(cx, cy, r) {
@@ -320,7 +318,6 @@ function drawBubble(cx, cy, r) {
   ctx.stroke();
 }
 
-const R = 3;
 drawBubble(10, 4, R);
 drawBubble(22, 4, R);
 drawBubble(4, 10, R);
@@ -330,16 +327,18 @@ drawBubble(4, 22, R);
 PRESETS.right = `
 // 通り芯・レベル 右端のみ
 const DARK = '#323232';
-const LINE_W = s(2);
+const R = 3;
 
 ctx.strokeStyle = DARK;
-ctx.lineWidth = LINE_W;
+ctx.lineWidth = s(1);
 
 ctx.beginPath();
-ctx.moveTo(s(10), s(6)); ctx.lineTo(s(10), s(32));
-ctx.moveTo(s(22), s(6)); ctx.lineTo(s(22), s(32));
-ctx.moveTo(s(6), s(10)); ctx.lineTo(s(32), s(10));
-ctx.moveTo(s(6), s(22)); ctx.lineTo(s(32), s(22));
+// Vertical lines: top of canvas → bottom bubble top
+ctx.moveTo(s(10), s(4)); ctx.lineTo(s(10), s(28-R));
+ctx.moveTo(s(22), s(4)); ctx.lineTo(s(22), s(28-R));
+// Horizontal lines: left of canvas → right bubble left
+ctx.moveTo(s(4), s(10)); ctx.lineTo(s(28-R), s(10));
+ctx.moveTo(s(4), s(22)); ctx.lineTo(s(28-R), s(22));
 ctx.stroke();
 
 function drawBubble(cx, cy, r) {
@@ -352,7 +351,6 @@ function drawBubble(cx, cy, r) {
   ctx.stroke();
 }
 
-const R = 3;
 drawBubble(10, 28, R);
 drawBubble(22, 28, R);
 drawBubble(28, 10, R);
