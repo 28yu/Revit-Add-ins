@@ -669,8 +669,8 @@ ln(fx2,fy2, bx2,by2); ln(fx1,fy2, bx1,by2);
 ctx.setLineDash([]);
 
 // === Step2: 内部小直方体 ===
-// 前面(9,14)-(18,23)=9×9、奥行き(+5,-5) → 構図中央(16,16)✓
-const cf={x1:9,y1:14,x2:18,y2:23}, cd={x:5,y:-5};
+// 前面(9,14)-(18,23)=9×9、奥行き(+4,-4)
+const cf={x1:9,y1:14,x2:18,y2:23}, cd={x:4,y:-4};
 const cb={x1:cf.x1+cd.x,y1:cf.y1+cd.y,x2:cf.x2+cd.x,y2:cf.y2+cd.y};
 
 function poly(pts, fill) {
@@ -718,8 +718,8 @@ ln(fx1,fy1, bx1,by1); ln(fx2,fy1, bx2,by1);
 ln(fx2,fy2, bx2,by2); ln(fx1,fy2, bx1,by2);
 
 // === Step2: 内部小直方体 ===
-// 前面(9,14)-(18,23)=9×9、奥行き(+5,-5) — 青濃色3面
-const cf={x1:9,y1:14,x2:18,y2:23}, cd={x:5,y:-5};
+// 前面(9,14)-(18,23)=9×9、奥行き(+4,-4) — 青濃色3面
+const cf={x1:9,y1:14,x2:18,y2:23}, cd={x:4,y:-4};
 const cb={x1:cf.x1+cd.x,y1:cf.y1+cd.y,x2:cf.x2+cd.x,y2:cf.y2+cd.y};
 
 function poly(pts, fill) {
