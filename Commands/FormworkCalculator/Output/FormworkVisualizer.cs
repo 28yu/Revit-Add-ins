@@ -1010,15 +1010,135 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     catch (Exception ex4) { ex4Msg = ex4.Message; }
                 }
 
+                // フォールバック5/6: エッジを Tessellate で点列化し、PlanarFace 平面に
+                // スナップした直線ポリラインで CurveLoop を再構築。
+                // - extrudeProj 失敗 (微小な曲線/トレランス不整合)
+                // - Non-planar CurveLoop (浮動小数点誤差で平面外)
+                // の両方を救済。
+                string ex5Msg = null, ex6Msg = null;
+                List<CurveLoop> rebuilt = TryRebuildLoopsAsPolyline(edges, fi.Face as PlanarFace, n);
+                if (rebuilt != null && rebuilt.Count > 0)
+                {
+                    try
+                    {
+                        return GeometryCreationUtilities.CreateExtrusionGeometry(rebuilt, n, thickness);
+                    }
+                    catch (Exception ex5) { ex5Msg = ex5.Message; }
+
+                    try
+                    {
+                        return GeometryCreationUtilities.CreateExtrusionGeometry(rebuilt, n.Negate(), thickness);
+                    }
+                    catch (Exception ex6) { ex6Msg = ex6.Message; }
+                }
+                else
+                {
+                    ex5Msg = "rebuild-null";
+                }
+
                 FormworkDebugLog.Log(
                     $"    [ThinSolid] EXTRUDE_FAIL area={fi.Area:F4} loops={edges.Count} " +
                     $"n=({n.X:F3},{n.Y:F3},{n.Z:F3}) " +
-                    $"ex1={ex1Msg} ex2={ex2Msg} ex3={ex3Msg} ex4={ex4Msg}");
+                    $"ex1={ex1Msg} ex2={ex2Msg} ex3={ex3Msg} ex4={ex4Msg} ex5={ex5Msg} ex6={ex6Msg}");
                 return null;
             }
             catch (Exception ex)
             {
                 FormworkDebugLog.Log($"    [ThinSolid] OUTER_EX area={fi?.Area:F4} ex={ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// CurveLoop を Tessellate で点列化し、PlanarFace 平面 (pf != null の場合)
+        /// にスナップした直線ポリラインで再構築する。
+        /// 微小な曲線・浮動小数点誤差で extrudeProj が失敗するケースの最終救済策。
+        /// pf == null (非PlanarFace) でも、点列を tangent plane (normal n) に投影して
+        /// 平面性を強制する。
+        /// </summary>
+        private static List<CurveLoop> TryRebuildLoopsAsPolyline(
+            IList<CurveLoop> srcLoops, PlanarFace pf, XYZ n)
+        {
+            if (srcLoops == null || n == null) return null;
+            try
+            {
+                XYZ planeOrigin;
+                if (pf != null && pf.Origin != null)
+                {
+                    planeOrigin = pf.Origin;
+                }
+                else
+                {
+                    // 非 PlanarFace: 最初のループの先頭頂点を平面原点とする
+                    XYZ first = null;
+                    foreach (CurveLoop l in srcLoops)
+                    {
+                        foreach (Curve c in l) { first = c.GetEndPoint(0); break; }
+                        if (first != null) break;
+                    }
+                    if (first == null) return null;
+                    planeOrigin = first;
+                }
+
+                var result = new List<CurveLoop>();
+                foreach (CurveLoop loop in srcLoops)
+                {
+                    var pts = new List<XYZ>();
+                    foreach (Curve c in loop)
+                    {
+                        IList<XYZ> tess;
+                        try { tess = c.Tessellate(); } catch { tess = null; }
+                        if (tess == null || tess.Count < 2) return null;
+                        // 始点から終点-1までを追加 (次のカーブの始点と重複回避)
+                        for (int i = 0; i < tess.Count - 1; i++) pts.Add(tess[i]);
+                    }
+                    if (pts.Count < 3) return null;
+
+                    // 平面に投影 (距離 = (p - origin)·n) を引く
+                    var snapped = new List<XYZ>(pts.Count);
+                    foreach (XYZ p in pts)
+                    {
+                        double d = (p - planeOrigin).DotProduct(n);
+                        snapped.Add(p - n * d);
+                    }
+
+                    // 連続する同一点・微小エッジを除去 (トレランス 0.001 ft ≈ 0.3mm)
+                    const double tol = 0.001;
+                    var cleaned = new List<XYZ>();
+                    cleaned.Add(snapped[0]);
+                    for (int i = 1; i < snapped.Count; i++)
+                    {
+                        if (snapped[i].DistanceTo(cleaned[cleaned.Count - 1]) > tol)
+                            cleaned.Add(snapped[i]);
+                    }
+                    // 最後と最初がほぼ同じなら最後を削除 (CurveLoop は閉じるため不要)
+                    while (cleaned.Count >= 2 &&
+                        cleaned[cleaned.Count - 1].DistanceTo(cleaned[0]) <= tol)
+                    {
+                        cleaned.RemoveAt(cleaned.Count - 1);
+                    }
+                    if (cleaned.Count < 3) return null;
+
+                    var lines = new List<Curve>();
+                    for (int i = 0; i < cleaned.Count; i++)
+                    {
+                        XYZ p0 = cleaned[i];
+                        XYZ p1 = cleaned[(i + 1) % cleaned.Count];
+                        if (p0.DistanceTo(p1) <= tol) continue;
+                        try { lines.Add(Line.CreateBound(p0, p1)); }
+                        catch { return null; }
+                    }
+                    if (lines.Count < 3) return null;
+
+                    CurveLoop newLoop;
+                    try { newLoop = CurveLoop.Create(lines); }
+                    catch { return null; }
+                    result.Add(newLoop);
+                }
+                return result.Count > 0 ? result : null;
+            }
+            catch
+            {
                 return null;
             }
         }
