@@ -577,6 +577,9 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         /// <summary>
         /// FormworkRequired 面の有効面積 (部分接触控除後) を計算し、fi.EffectiveAreaM2 に保存する。
         /// 戻り値は feet² 単位の有効面積 (ログ出力用)、out clipperStatus は診断文字列。
+        ///
+        /// 残面積が face 全体の 1% 未満になった場合は FaceType を DeductedContact に降格する
+        /// (FormworkVisualizer はこれを見て DirectShape を作らない)。
         /// </summary>
         private static double ComputeAndSetEffectiveArea(
             FaceClassifier.FaceInfo fi, out string clipperStatus)
@@ -594,8 +597,19 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                     effectiveFeetSq = area;
                     clipperStatus = "clipper-OK";
                 }
+                else if (fi.PartialContacts.Count == 1)
+                {
+                    // 単一 partial の場合は ContactArea をそのまま信頼 (95% cap は不要)。
+                    // 95% cap は複数 partial の naive sum 過大評価対策のため。
+                    var pc = fi.PartialContacts[0];
+                    effectiveFeetSq = Math.Max(0, fi.Area - pc.ContactArea);
+                    clipperStatus = $"single-partial(partial={pc.ContactArea:F4}";
+                    if (clip.FailReason != null) clipperStatus += $",clipper-FAIL={clip.FailReason}";
+                    clipperStatus += ")";
+                }
                 else
                 {
+                    // 複数 partial: naive sum + 95% cap (重なり過大評価対策)
                     double partial = 0;
                     foreach (var pc in fi.PartialContacts) partial += pc.ContactArea;
                     double rawSum = partial;
@@ -604,6 +618,18 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                     clipperStatus = $"clipper-FAIL({clip.FailReason}) rawSum={rawSum:F4}";
                 }
             }
+
+            // 残面積が face 全体の 1% 未満なら接触面として完全控除に降格する。
+            // 例: スラブに梁が完全埋もれている場合、Partial が face をほぼ覆い、残面積は
+            // 計算誤差レベルになる。これを「ほぼ全面接触 = DeductedContact」として扱い、
+            // 不要な型枠 DirectShape の作成を防ぐ。
+            if (fi.PartialContacts.Count > 0 && effectiveFeetSq < fi.Area * 0.01)
+            {
+                effectiveFeetSq = 0;
+                fi.FaceType = FaceType.DeductedContact;
+                clipperStatus += " demoted-to-contact(<1%)";
+            }
+
             fi.EffectiveAreaM2 = FeetSqToM2(effectiveFeetSq);
             return effectiveFeetSq;
         }
