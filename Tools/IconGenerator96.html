@@ -886,48 +886,60 @@ ctx.strokeRect(s(8), s(8), s(16), s(16));
 `;
 
 PRESETS.excel_export = `
-// Excel エクスポート
-const GREEN_DARK = '#1C643C';
-const GREEN = '#217346';
-const BLUE = '#0066CC';
+// Excel エクスポート: 角丸四角+縦帯グラデーション(暗→明)+白X+青上矢印
+const G1    = '#107C41';   // 左帯 (最暗)
+const G2    = '#21A366';   // 中帯 (標準)
+const G3    = '#33B87A';   // 右帯 (明)
 const WHITE = '#FFFFFF';
-const LW = s(1);
+const BLUE  = '#0066CC';
 
-// Excel document body
-ctx.fillStyle = GREEN;
-ctx.fillRect(s(0), s(5), s(22), s(23));
-ctx.fillStyle = GREEN_DARK;
-ctx.fillRect(s(0), s(5), s(22), s(2));
+// 角丸矩形ヘルパー
+function rr(x,y,w,h,r) {
+  ctx.beginPath();
+  ctx.moveTo(s(x+r), s(y));
+  ctx.arcTo(s(x+w), s(y),   s(x+w), s(y+h), s(r));
+  ctx.arcTo(s(x+w), s(y+h), s(x),   s(y+h), s(r));
+  ctx.arcTo(s(x),   s(y+h), s(x),   s(y),   s(r));
+  ctx.arcTo(s(x),   s(y),   s(x+w), s(y),   s(r));
+  ctx.closePath();
+}
 
-// White area (spreadsheet)
-ctx.fillStyle = WHITE;
-ctx.fillRect(s(3), s(8), s(16), s(17));
+// === Excel icon: x=0.5..20.5, y=1.5..28.5 (20×27) ===
+// 背景 (最暗色)
+rr(0.5, 1.5, 20, 27, 3);
+ctx.fillStyle = G1;
+ctx.fill();
 
-// X mark
-ctx.strokeStyle = GREEN_DARK;
-ctx.lineWidth = s(1.8);
+// 角丸でクリップして縦帯+白Xを描画
+ctx.save();
+rr(0.5, 1.5, 20, 27, 3);
+ctx.clip();
+
+// 中帯 (中央)
+ctx.fillStyle = G2;
+ctx.fillRect(s(7.2), s(1.5), s(6.8), s(27));
+// 右帯 (最明)
+ctx.fillStyle = G3;
+ctx.fillRect(s(14), s(1.5), s(7), s(27));
+
+// 白X (round caps, 太め)
+ctx.strokeStyle = WHITE;
+ctx.lineWidth = s(2.8);
+ctx.lineCap = 'round';
 ctx.beginPath();
-ctx.moveTo(s(6), s(11)); ctx.lineTo(s(16), s(22));
-ctx.moveTo(s(16), s(11)); ctx.lineTo(s(6), s(22));
+ctx.moveTo(s(3),    s(6.5)); ctx.lineTo(s(17.5), s(23.5));
+ctx.moveTo(s(17.5), s(6.5)); ctx.lineTo(s(3),    s(23.5));
 ctx.stroke();
+ctx.lineCap = 'butt';
+ctx.restore();
 
-// Grid lines
-ctx.strokeStyle = GREEN;
-ctx.lineWidth = s(0.5);
-ctx.beginPath();
-ctx.moveTo(s(11), s(8)); ctx.lineTo(s(11), s(25));
-ctx.moveTo(s(3), s(16)); ctx.lineTo(s(19), s(16));
-ctx.stroke();
-
-// Up arrow (export)
+// === Up arrow (export) ===
 ctx.fillStyle = BLUE;
 ctx.strokeStyle = BLUE;
 ctx.lineWidth = s(1.2);
-// Shaft
 ctx.beginPath();
 ctx.moveTo(s(27), s(8)); ctx.lineTo(s(27), s(22));
 ctx.stroke();
-// Head
 ctx.beginPath();
 ctx.moveTo(s(27), s(6));
 ctx.lineTo(s(23.5), s(11));
@@ -937,41 +949,59 @@ ctx.fill();
 `;
 
 PRESETS.excel_import = `
-// Excel インポート
-const GREEN_DARK = '#1C643C';
-const GREEN = '#217346';
-const BLUE = '#0066CC';
+// Excel インポート: 角丸四角+縦帯グラデーション(暗→明)+白X+青下矢印
+const G1    = '#107C41';   // 左帯 (最暗)
+const G2    = '#21A366';   // 中帯 (標準)
+const G3    = '#33B87A';   // 右帯 (明)
 const WHITE = '#FFFFFF';
-const LW = s(1);
+const BLUE  = '#0066CC';
 
-ctx.fillStyle = GREEN;
-ctx.fillRect(s(0), s(5), s(22), s(23));
-ctx.fillStyle = GREEN_DARK;
-ctx.fillRect(s(0), s(5), s(22), s(2));
+// 角丸矩形ヘルパー
+function rr(x,y,w,h,r) {
+  ctx.beginPath();
+  ctx.moveTo(s(x+r), s(y));
+  ctx.arcTo(s(x+w), s(y),   s(x+w), s(y+h), s(r));
+  ctx.arcTo(s(x+w), s(y+h), s(x),   s(y+h), s(r));
+  ctx.arcTo(s(x),   s(y+h), s(x),   s(y),   s(r));
+  ctx.arcTo(s(x),   s(y),   s(x+w), s(y),   s(r));
+  ctx.closePath();
+}
 
-ctx.fillStyle = WHITE;
-ctx.fillRect(s(3), s(8), s(16), s(17));
+// === Excel icon: x=0.5..20.5, y=1.5..28.5 (20×27) ===
+// 背景 (最暗色)
+rr(0.5, 1.5, 20, 27, 3);
+ctx.fillStyle = G1;
+ctx.fill();
 
-ctx.strokeStyle = GREEN_DARK;
-ctx.lineWidth = s(1.8);
+// 角丸でクリップして縦帯+白Xを描画
+ctx.save();
+rr(0.5, 1.5, 20, 27, 3);
+ctx.clip();
+
+// 中帯 (中央)
+ctx.fillStyle = G2;
+ctx.fillRect(s(7.2), s(1.5), s(6.8), s(27));
+// 右帯 (最明)
+ctx.fillStyle = G3;
+ctx.fillRect(s(14), s(1.5), s(7), s(27));
+
+// 白X (round caps, 太め)
+ctx.strokeStyle = WHITE;
+ctx.lineWidth = s(2.8);
+ctx.lineCap = 'round';
 ctx.beginPath();
-ctx.moveTo(s(6), s(11)); ctx.lineTo(s(16), s(22));
-ctx.moveTo(s(16), s(11)); ctx.lineTo(s(6), s(22));
+ctx.moveTo(s(3),    s(6.5)); ctx.lineTo(s(17.5), s(23.5));
+ctx.moveTo(s(17.5), s(6.5)); ctx.lineTo(s(3),    s(23.5));
 ctx.stroke();
+ctx.lineCap = 'butt';
+ctx.restore();
 
-ctx.strokeStyle = GREEN;
-ctx.lineWidth = s(0.5);
-ctx.beginPath();
-ctx.moveTo(s(11), s(8)); ctx.lineTo(s(11), s(25));
-ctx.moveTo(s(3), s(16)); ctx.lineTo(s(19), s(16));
-ctx.stroke();
-
-// Down arrow (import)
+// === Down arrow (import) ===
 ctx.fillStyle = BLUE;
 ctx.strokeStyle = BLUE;
 ctx.lineWidth = s(1.2);
 ctx.beginPath();
-ctx.moveTo(s(27), s(10)); ctx.lineTo(s(27), s(24));
+ctx.moveTo(s(27), s(8)); ctx.lineTo(s(27), s(22));
 ctx.stroke();
 ctx.beginPath();
 ctx.moveTo(s(27), s(26));
