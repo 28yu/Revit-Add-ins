@@ -1,73 +1,86 @@
 # 型枠数量算出アドイン 開発状況ハンドオフ
 
-**最終更新**: 2026-05-07
+**最終更新**: 2026-05-08
 **開発用 Revit**: 2022 (`dev-config.json`)
 
 ---
 
-## 🎯 次セッションへの引き継ぎ事項（2026-05-07 終了時点）
+## 🎯 次セッションへの引き継ぎ事項（2026-05-08 終了時点）
 
 ### 動作確認済み・本番投入可能な機能
 1. 6 カテゴリ（柱・梁・壁・床・基礎・階段）の型枠面積算出
 2. 鉄骨部材の自動除外（4 層フォールバック判定）
 3. デッキスラブの自動除外（タイプ名 "DS" 検出）
-4. 壁スイープ・リビールの自動除外（contact detection 後に Excluded へ移動 + WallSweepFaceDeductor で host 壁面を直接控除）
+4. 壁スイープ・リビールの自動除外
 5. 集計表「型枠数量集計」 + 動的合計サマリ「型枠数量集計_合計」
 6. Excel 出力（CJK 対応）+ 解析 3D ビュー
-7. 鉄骨除外 / デッキスラブ除外 / 壁スイープの可視化（オレンジ色 DirectShape、フィルタ既定 OFF）
-8. パラメータ自動候補 ComboBox（工区・型枠種別）
+7. **[53] 柱全面 Full Contact 誤判定の修正**: `Face.Project` null → offFace 扱い + `OverlapRatioMin=0.95` の 4 隅投影チェック
+8. **[6] スラブ埋まり梁への型枠誤生成の修正**: partialSum ≥ 95% で DeductedContact に降格
+9. **[7] 非矩形面の型枠が半透明問題の修正**: Clipper 失敗時に 3D Boolean Difference fallback
+10. **[8] 直交梁端部型枠が省かれない問題の修正**: SmallAreaRatio=0.3 / OverlapRatioMinSmallA=0.25 で小さな a の閾値緩和
+11. **[9] 構造基礎×スラブ重なり検出**: `cond3-project-null` も Stage 2 トリガーに追加
 
 ### ⚠️ 未解決の課題（次セッションで取り組む）
 
-#### [53] ContactFaceDetector の精度問題
-ユーザー報告の症状（ログから具体例 E3280907, E3280909, E3707261 等を確認済み）:
+#### [10] 構造基礎 E3733292 の梁接触面に「変な空白」
 
-1. **柱の一部接触で全面除外** (E3280907 等) — Stage 1 が過大マッチ
-2. **構造フレームの T 字接合で接触部が省かれない** — Stage 2 検出漏れ
-3. **構造基礎の床接触面が残る** — contact detection 漏れ
-4. **構造基礎の梁接触が半透明だが面積が引かれない** — Partial 検出は OK だが Clipper 失敗
-5. **部分接触 Yes で面積 0** — Clipper 失敗時の naive sum 過大評価（5% キャップで暫定対処済みだが根本解決ではない）
+**症状**: 基礎側面 (face[3]) の部分接触は clipper-OK（面積値は正しい）だが、視覚的に空白/くり抜きが間違った位置にある。
 
-**最重要ケース**: 柱 E3280907 (950×950×940mm = 高さ 940mm のスタブ柱)
-- 4 側面 (各 0.89 m²) が梁 E3286646 の側面 (各 0.77 m²) と Stage 1 (Full Contact) マッチ
-- 面積比 1.16 < 1.2 (`AreaRatioLimit` 厳格化後でもまだ通る)
-- 距離 d = 0 (中心投影が距離 0)
-- ペアログ抜粋:
+**ログ（確認済み）**:
 ```
-[Pair E3280907(Column) x E3286646(Beam)]
-  f1->f1 dot=-1.000 aArea=9.6122 bArea=8.2828 d=0.0000 uv=(1.542,1.558) FULL_CONTACT
-  f2->f5 ... d=0.0000 ... FULL_CONTACT
-  f3->f6 ... d=0.0000 ... FULL_CONTACT
-  f4->f7 ... d=0.0000 ... FULL_CONTACT
+[FaceDiag] face[3] area=41.4411 partials=1 [ E3286572:a=10.7273 ] clipper-OK eff=30.7137
+
+[Pair E3286572(Beam) x E3733292(Foundation)]
+  f1->f3 dot=... overlap=0.500(ok=2/off=2) FULL_CONTACT  ← 梁端面が基礎側面に Full 受理
+
+[Pair E3733292(Foundation) x E3286572(Beam)]
+  f3->f1 dot=... cond2-area-ratio → Stage 2 → PARTIAL_CONTACT area=10.7273
 ```
-スクリーンショットでは梁の上に乗る短いスタブ柱で、4 側面は本来露出 (formwork 必要) のはず。
-誤判定の仮説: **梁が L 字 / U 字でスタブ柱を 4 方向から囲んでいる** か、**Revit Join Geometry の影響で柱側面と梁側面が幾何的に「距離 0」になっている**。
 
-**修正方針候補（次セッションで検討・実装）**:
-- Stage 1 の判定強化: 距離 0 + 面積比だけでなく、a / b の UV 投影**重なり領域**もチェック
-  - 例: a の 4 隅を b に投影して、b 内に何点入るか。3-4 点入った場合のみ Full Contact
-  - 既に `ProjectBCornersToA` という関数で b → a の投影は行っているので、対称的に a → b も実装
-- それでも誤検出する場合: 体積 (Solid Volume) 比較で「片方が他方に内包されているか」を確認
-- スタブ柱と梁の組合わせは特殊ケースなので、専用ロジックの可能性も
+**根本原因**:
+- 逆方向（基礎 f3 を a、梁 f1 を b）の Stage 2 `EvaluatePartialBToA` で `ProjectBCornersToA` が ok=2/off=2 → null
+- fallback の `EstimateUvOnAFromBSize` が梁の UV 寸法を基礎の UV 軸に当てはめるため、接触矩形の**位置は正しいが形状・向きがずれる**
+- → Clipper が面の誤った位置を削り、視覚的空白が間違った場所に出る
 
-#### [52-1] 壁の天端リビール切り取り箇所
-- `WallSweepFaceDeductor` で host 壁面を BB 内中心点判定で `DeductedContact` 化済み
-- ユーザーは「まだ改善されていない」と報告 (要再確認、もしかすると修正後のビルド未反映状態だった可能性)
+**2026-05-08 で実装した改善（未確認）**:
+`ProjectBCornersToARelaxed` を新規追加し、UvBoundsOnA 算出を 3 段階 fallback に変更:
+1. strict: `ProjectBCornersToA` (ok≥3 必要)
+2. **relaxed** (新規): 距離制限なし投影 → 境界外の隅は境界上の最近点 UV にスナップ
+3. estimate: `EstimateUvOnAFromBSize` (UV 軸回転無視・最終手段)
+
+デバッグログに `s2-uvOnA method=relaxed/strict/estimate` が出るので確認できる。
+
+**次セッションでの確認手順**:
+1. ビルドして Revit で再実行
+2. `C:\temp\Formwork_debug.txt` で `s2-uvOnA method=` を確認 → `relaxed` になっているか
+3. `[Clipper] subtract E3286572/f1 raw=... clipped=...` で UvBoundsOnA の位置が正しいか確認
+   - 基礎側面 (2200×1750mm) 上で、梁端面の当たっている位置 (隅 or 辺側) に対応した UV 矩形か
+4. 視覚的に空白が正しい位置に移ったか確認
+
+**もし relaxed でも改善されない場合の次の手**:
+
+方針 A: `Face.Project` を使わず、基礎面の **法線 + 原点からの平面方程式** で梁の隅を手動投影する。`PlanarFace` なら `face.ComputeNormal(UV.Zero)` と `face.Origin` (またはコーナー1点) から平面を構築し、梁の隅 3D 点をその平面に投影して UV を算出。API に依存せず確実に機能する。
+
+方針 B: `[Clipper] subtract` ログの raw UV を分析し、実際の梁の位置と対応しているか検証。ずれのパターン（回転?スケール?オフセット?）を特定してから対処。
 
 ### 直近の修正コミット (順)
 | 日時 | 内容 |
 |---|---|
+| 2026-05-08 | [10] ProjectBCornersToARelaxed 追加 (3段階 fallback UvBoundsOnA) |
+| 2026-05-08 | [9] cond3-project-null を Stage 2 トリガーに追加 |
+| 2026-05-08 | [8] SmallAreaRatio=0.3 / OverlapRatioMinSmallA=0.25 で閾値動的切替 |
+| 2026-05-08 | [7] TryBuildCarvedFaceSolid: Clipper 失敗時に 3D Boolean Difference fallback |
+| 2026-05-08 | [6] partialSum ≥ 95% で DeductedContact 降格 |
+| 2026-05-08 | [53] Face.Project null → offFace 扱い (exceptionCount 増やさない) |
 | 2026-05-07 | 鉄骨除外 (4層判定) |
 | 2026-05-07 | デッキスラブ除外 + 除外フィルタ既定非表示 |
 | 2026-05-07 | Excel CJK 対応列幅 |
-| 2026-05-07 | 集計表総合計を Excel と一致 (DirectShape area 要素単位集約) |
-| 2026-05-07 | 動的合計サマリ集計表 + 集計後の自動アクティブ化 |
+| 2026-05-07 | 集計表総合計を Excel と一致 |
+| 2026-05-07 | 動的合計サマリ集計表 |
 | 2026-05-07 | doc.Regenerate() で 3D ビュー描画問題解決 |
-| 2026-05-07 | 壁スイープ除外 (contact detection 参加 → 後段で除外) |
+| 2026-05-07 | 壁スイープ除外 |
 | 2026-05-07 | 部分接触の Clipper ベース面積計算 |
-| 2026-05-07 | WallSweepFaceDeductor + Stage 1 area ratio 1.5→1.2 |
 | 2026-05-07 | ElemDiag / FaceDiag 詳細診断ログ追加 |
-| 2026-05-07 | ElemDiag マーカー精緻化 + 寸法情報追加 |
 
 ### 診断ログの読み方
 `C:\temp\Formwork_debug.txt` 内：
@@ -86,6 +99,143 @@
   - `REJECTED(s1=理由,s2=理由)` で除外条件を確認
 
 ユーザーが疑わしい要素 ID を `grep "⚠️"` で抽出 → `grep "Pair E<id>"` でペア評価を確認可能。
+
+---
+
+## 2026-05-08 セッション: ContactFaceDetector 精度改善 [53][6][7][8][9][10]
+
+### 解決した課題と実装内容
+
+#### [53] 柱 E3280907 — 4 側面が全面 Full Contact に誤判定
+
+**原因**: `ProjectBCornersToA` 内で `Face.Project` が null を返したとき、旧コードは `exceptionCount++` していた。`exceptionCount ≥ 2` で `return -1 (fail-safe → Full Contact 受理)` されるため、null を多く返す面（Join Geometry の複合面など）で誤って Full Contact 受理されていた。
+
+**修正**: `proj == null || proj.UVPoint == null` のとき `offFaceCount++` に変更（null = 面外 = 重なっていない）。これで `overlapRatio = okCount/4.0` が正しく計算され、0.95 閾値で REJECTED → Stage 2 へフォールスルーする。
+
+```csharp
+// Before (ContactFaceDetector.cs ProjectBCornersToA)
+IntersectionResult proj = null;
+try { proj = a.Project(p); } catch { exceptionCount++; continue; }
+if (proj == null || proj.UVPoint == null || ...) { exceptionCount++; continue; }
+
+// After
+try { proj = a.Project(p); } catch { /* swallow → off-face */ }
+if (proj == null || proj.UVPoint == null || ...) { offFaceCount++; continue; }
+```
+
+**知見**: `Face.Project` は境界外の点で null を返すことがある（例外ではなく正常な off-face の意味）。exception と off-face を区別することが重要。
+
+---
+
+#### [6] スラブに埋まった梁に型枠_スラブが誤生成
+
+**原因**: スラブ下面に梁上面が複数 Partial Contact → 各 pc.ContactArea はそれぞれ小さいが、合計すると面積の 95%+ を覆っていた。Clipper は全減算後の tiny な残り矩形から Solid を作ってしまっていた。
+
+**修正**: `FormworkCalcEngine.ComputeAndSetEffectiveArea` 内で:
+```csharp
+double partialSum = fi.PartialContacts.Sum(pc => pc.ContactArea);
+bool nearFullCoverage = partialSum >= fi.Area * 0.95;
+bool tinyResidual = effectiveFeetSq < fi.Area * 0.01;
+if (tinyResidual || nearFullCoverage) {
+    fi.FaceType = FaceType.DeductedContact;  // 完全接触扱いに降格
+    effectiveFeetSq = 0;
+}
+```
+
+---
+
+#### [7] 非矩形面（Clipper 失敗）の型枠が半透明
+
+**原因**: Clipper は矩形面専用。非矩形面（TriangleFace・L字面など）は `clipper-fail:not-rectangular` になり、半透明 DirectShape になっていた。
+
+**修正**: `FormworkVisualizer.TryBuildCarvedFaceSolid` を新規追加:
+1. まず Clipper を試行
+2. 失敗したら 3D Boolean Difference fallback:
+   - 元面の Solid を薄板に押し出す
+   - 各 PartialContact の UvBoundsOnA から「貫通する角材 Solid」を作成 (`BuildCutterFromUvRect`)
+   - `BooleanOperationsUtils.ExecuteBooleanOperation(…Difference)` で削り取る
+
+`BuildCutterFromUvRect`: `prePad=0.10`, `thickness=0.20` で外向きに貫通させることで、法線方向の符号不一致でも切削できる。
+
+---
+
+#### [8] 直交梁の端部型枠が省かれない
+
+**原因**: 梁端面（小さい a）がホスト梁側面（大きい b）に接触するとき、b の Join Geometry の notch で一部の隅が off-face と判定 → `okCount=3, overlap=0.75 < 0.95` → REJECTED。
+
+**修正**: 面積比が小さい（a/b ≤ 0.3）ときは閾値を緩和:
+```csharp
+private const double SmallAreaRatio = 0.3;
+private const double OverlapRatioMinSmallA = 0.25;
+
+double areaRatio = aArea / Math.Max(bArea, 1e-9);
+double overlapThreshold = areaRatio <= SmallAreaRatio
+    ? OverlapRatioMinSmallA   // = 0.25 (1/4 隅でOK)
+    : OverlapRatioMin;        // = 0.95 (通常)
+```
+
+**根拠**: a が b より十分小さい場合、a の中心が b 上にあること（cond4 で確認済み）を優先し、notch による corner 外れは b 側の複雑形状のせいとして許容する。
+
+---
+
+#### [9] 構造基礎×スラブの重なり型枠（JG 未適用が原因と最初判明、その後 contact detection 漏れも確認）
+
+**原因 (最終判明)**: スラブ下面が非常に広く、その中心が基礎上面の範囲外に位置する → `a.Face.Project(pA)` が null を返す → Stage 1 失敗理由 `cond3-project-null`。旧コードはこの理由では Stage 2 を試みなかった。
+
+**修正**: Stage 2 トリガー条件に `cond3-project-null` を追加:
+```csharp
+if (stage1Reason == "cond2-area-ratio" ||
+    stage1Reason == "cond5-overlap-insufficient" ||
+    stage1Reason == "cond3-project-null")  // ← 追加
+{
+    stage2 = EvaluatePartialBToA(a, b, out stage2Reason);
+}
+```
+
+**意味**: a の中心が b の範囲外 = a >> b という状況は `cond2-area-ratio` と意味的に同じ。大面 a に小面 b が部分接触しているケースとして Stage 2 で評価する。
+
+---
+
+#### EffectiveAreaM2 が DirectShape に伝播しない問題（[7] 修正時に発見）
+
+**原因**: `FormworkCalcEngine.BuildElementResult` と `RecomputeFaces` が別々に `FaceInfo` を処理していたが、`EffectiveAreaM2` の計算（Clipper 呼び出し）が一方にしかなかった。`RecomputeFaces` 経由の場合は 0 のまま。
+
+**修正**: `ComputeAndSetEffectiveArea(fi, out string clipperStatus)` ヘルパーに切り出し、両パスから呼び出す。このヘルパーが `fi.EffectiveAreaM2` を設定し、`FormworkVisualizer` がそれを DirectShape の厚み計算に使う。
+
+---
+
+### ContactFaceDetector の現在の定数一覧（2026-05-08 時点）
+
+| 定数 | 値 | 意味 |
+|---|---|---|
+| `CoincidenceTolFeet` | 0.05 ft (≈15mm) | 接触面の許容距離 |
+| `AreaRatioLimit` | 1.2 | Stage 1 の a/b 面積比上限 |
+| `AntiParallelThreshold` | -0.90 | 法線の反平行判定 (cos ≤ -0.9) |
+| `OverlapRatioMin` | 0.95 | Stage 1 の 4 隅重なり比閾値（通常） |
+| `SmallAreaRatio` | 0.3 | a/b ≤ この値のとき「小面」扱い |
+| `OverlapRatioMinSmallA` | 0.25 | 小面のときの緩和閾値 |
+
+### EvaluatePartialBToA の UvBoundsOnA 3 段階 fallback（2026-05-08 実装）
+
+```
+1. ProjectBCornersToA(a, b, bbB)          → strict: ok≥3 隅が距離内
+2. ProjectBCornersToARelaxed(a, b, bbB)   → relaxed: 距離制限なし (境界外→境界UV)
+3. EstimateUvOnAFromBSize(bbA, bbB, uv)   → estimate: b の UV 寸法を a の軸に流用
+```
+
+ログで `s2-uvOnA method=strict/relaxed/estimate` として判定経路が確認できる。
+
+### Clipper のデバッグログで UvBoundsOnA を確認する方法
+
+`C:\temp\Formwork_debug.txt` で:
+```
+[Clipper] subtract E3286572/f1 raw=[U:1.23..2.45,V:0.11..1.34] clipped=[U:1.23..2.45,V:0.11..1.34]
+```
+- `raw` = UvBoundsOnA（クランプ前）
+- `clipped` = 面の境界内にクランプ後
+
+これを見て、実際に beam が接触している位置（基礎側面上の UV 座標）と一致しているか確認できる。
+基礎 2200×1750mm なら UV 範囲は概ね [0..7.2, 0..5.7] ft。
 
 ---
 
