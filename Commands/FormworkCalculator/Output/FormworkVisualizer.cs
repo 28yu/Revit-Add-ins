@@ -237,7 +237,13 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     if (partSolids == null)
                     {
                         Solid thin = CreateThinSolidFromFace(fi);
-                        if (thin == null) continue;
+                        if (thin == null)
+                        {
+                            FormworkDebugLog.Log(
+                                $"  [Visual] SKIP E{er.ElementId} face area={fi.Area:F4} " +
+                                $"type={fi.FaceType} (CreateThinSolid returned null)");
+                            continue;
+                        }
                         partSolids = new List<Solid> { thin };
                     }
 
@@ -944,23 +950,75 @@ namespace Tools28.Commands.FormworkCalculator.Output
             try
             {
                 var edges = fi.Face.GetEdgesAsCurveLoops();
-                if (edges == null || edges.Count == 0) return null;
+                if (edges == null || edges.Count == 0)
+                {
+                    FormworkDebugLog.Log($"    [ThinSolid] no-edges area={fi.Area:F4}");
+                    return null;
+                }
 
                 XYZ n = fi.Normal?.Normalize();
-                if (n == null) return null;
+                if (n == null)
+                {
+                    FormworkDebugLog.Log($"    [ThinSolid] no-normal area={fi.Area:F4}");
+                    return null;
+                }
 
                 double thickness = 0.05;  // 約 15mm (視認性向上のため厚めに)
+                string ex1Msg = null, ex2Msg = null, ex3Msg = null, ex4Msg = null;
+
                 try
                 {
                     return GeometryCreationUtilities.CreateExtrusionGeometry(edges, n, thickness);
                 }
-                catch
+                catch (Exception ex1) { ex1Msg = ex1.Message; }
+
+                try
                 {
                     return GeometryCreationUtilities.CreateExtrusionGeometry(edges, n.Negate(), thickness);
                 }
+                catch (Exception ex2) { ex2Msg = ex2.Message; }
+
+                // フォールバック: CurveLoop の向きを反転して再試行
+                // (Revit が GetEdgesAsCurveLoops で返した向きが face normal と
+                //  整合していないケースの救済)
+                List<CurveLoop> reversed = null;
+                try
+                {
+                    reversed = new List<CurveLoop>();
+                    foreach (CurveLoop loop in edges)
+                    {
+                        var curves = new List<Curve>();
+                        foreach (Curve c in loop) curves.Add(c.CreateReversed());
+                        curves.Reverse();
+                        reversed.Add(CurveLoop.Create(curves));
+                    }
+                }
+                catch (Exception ex) { ex3Msg = "build-reversed:" + ex.Message; }
+
+                if (reversed != null)
+                {
+                    try
+                    {
+                        return GeometryCreationUtilities.CreateExtrusionGeometry(reversed, n, thickness);
+                    }
+                    catch (Exception ex3) { ex3Msg = ex3.Message; }
+
+                    try
+                    {
+                        return GeometryCreationUtilities.CreateExtrusionGeometry(reversed, n.Negate(), thickness);
+                    }
+                    catch (Exception ex4) { ex4Msg = ex4.Message; }
+                }
+
+                FormworkDebugLog.Log(
+                    $"    [ThinSolid] EXTRUDE_FAIL area={fi.Area:F4} loops={edges.Count} " +
+                    $"n=({n.X:F3},{n.Y:F3},{n.Z:F3}) " +
+                    $"ex1={ex1Msg} ex2={ex2Msg} ex3={ex3Msg} ex4={ex4Msg}");
+                return null;
             }
-            catch
+            catch (Exception ex)
             {
+                FormworkDebugLog.Log($"    [ThinSolid] OUTER_EX area={fi?.Area:F4} ex={ex.Message}");
                 return null;
             }
         }
