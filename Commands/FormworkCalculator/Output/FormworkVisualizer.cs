@@ -196,8 +196,10 @@ namespace Tools28.Commands.FormworkCalculator.Output
                         fi.FaceType == FaceType.FormworkRequired && fi.PartialContacts.Count > 0;
 
                     // Phase 2: 部分接触がある面は矩形差分で厳密な形状を作る。
-                    //   Clipper が成功 → 半透明オーバーライドは不要 (形状が既に正確)
-                    //   Clipper が失敗 → 従来通り面全体を作成 + 半透明オーバーライド (Phase 1)
+                    //   Clipper 成功 → 半透明オーバーライドは不要 (形状が既に正確)
+                    //   Clipper 失敗 → 3D Boolean Difference fallback を試行
+                    //                 (face が非矩形/notched でも対応可能)
+                    //   両方失敗 → 従来通り面全体を作成 + 半透明オーバーライド
                     List<Solid> partSolids = null;
                     bool clipperUsed = false;
                     if (faceHasPartialContact)
@@ -210,9 +212,25 @@ namespace Tools28.Commands.FormworkCalculator.Output
                         }
                         else
                         {
-                            FormworkDebugLog.Log(
-                                $"Clipper fallback: E{er.ElementId} face type={fi.FaceType} " +
-                                $"reason={clip.FailReason}");
+                            // Clipper 失敗時の 3D Boolean Difference fallback。
+                            // 非矩形 face (interior-points / has-holes 等) や fully-clipped
+                            // ケースでも、face 薄板から PartialContact 領域を Boolean 差分で
+                            // くり抜くことで正確な形状を作れる。
+                            Solid carved = TryBuildCarvedFaceSolid(fi);
+                            if (carved != null)
+                            {
+                                partSolids = new List<Solid> { carved };
+                                clipperUsed = true;
+                                FormworkDebugLog.Log(
+                                    $"Boolean diff fallback OK: E{er.ElementId} face area={fi.Area:F4} " +
+                                    $"clipperReason={clip.FailReason}");
+                            }
+                            else
+                            {
+                                FormworkDebugLog.Log(
+                                    $"Clipper fallback: E{er.ElementId} face type={fi.FaceType} " +
+                                    $"reason={clip.FailReason}");
+                            }
                         }
                     }
 
@@ -939,6 +957,129 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 catch
                 {
                     return GeometryCreationUtilities.CreateExtrusionGeometry(edges, n.Negate(), thickness);
+                }
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Clipper が失敗したケースの 3D Boolean Difference fallback。
+        /// face 全体の薄板 Solid を作り、各 PartialContact の UvBoundsOnA を
+        /// 「貫通する角材」として Boolean 差分でくり抜く。
+        /// 非矩形 face (interior-points / has-holes) でも 3D Boolean なら対応可能。
+        ///
+        /// 1 個も差分できなかった場合 (UvBoundsOnA がすべて null 等) は null を返し、
+        /// 呼び出し側は従来の半透明 fallback に流れる。
+        /// </summary>
+        private static Solid TryBuildCarvedFaceSolid(FaceClassifier.FaceInfo fi)
+        {
+            if (fi == null || fi.Face == null || fi.Normal == null) return null;
+            if (fi.PartialContacts == null || fi.PartialContacts.Count == 0) return null;
+
+            Solid baseSolid = CreateThinSolidFromFace(fi);
+            if (baseSolid == null) return null;
+
+            XYZ normal = fi.Normal.Normalize();
+            Solid currentSolid = baseSolid;
+            int subtractCount = 0;
+
+            foreach (var pc in fi.PartialContacts)
+            {
+                if (pc.UvBoundsOnA == null) continue;
+
+                Solid cutter = BuildCutterFromUvRect(fi.Face, pc.UvBoundsOnA, normal);
+                if (cutter == null) continue;
+
+                try
+                {
+                    Solid result = BooleanOperationsUtils.ExecuteBooleanOperation(
+                        currentSolid, cutter, BooleanOperationsType.Difference);
+                    if (result != null && result.Volume > 1e-9)
+                    {
+                        currentSolid = result;
+                        subtractCount++;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    FormworkDebugLog.Log(
+                        $"  [BoolDiff] EX face area={fi.Area:F4} pc.area={pc.ContactArea:F4} ex={ex.Message}");
+                }
+            }
+
+            if (subtractCount == 0) return null;
+            if (currentSolid.Volume < 1e-9) return null;
+
+            return currentSolid;
+        }
+
+        /// <summary>
+        /// face の UV 矩形から「面の前後を貫通する」厚みのある角材 Solid を作る。
+        /// baseSolid (厚み 0.05) を確実に貫通するよう、面の前 prePad ft から
+        /// thickness ft 厚に伸ばすことで baseSolid の法線範囲 [0, 0.05] を包含する。
+        /// </summary>
+        private static Solid BuildCutterFromUvRect(Face face, BoundingBoxUV uvBounds, XYZ normal)
+        {
+            try
+            {
+                XYZ p00, p10, p11, p01;
+                try
+                {
+                    p00 = face.Evaluate(uvBounds.Min);
+                    p10 = face.Evaluate(new UV(uvBounds.Max.U, uvBounds.Min.V));
+                    p11 = face.Evaluate(uvBounds.Max);
+                    p01 = face.Evaluate(new UV(uvBounds.Min.U, uvBounds.Max.V));
+                }
+                catch { return null; }
+                if (p00 == null || p10 == null || p11 == null || p01 == null) return null;
+
+                const double minEdge = 1e-4;
+                if (p00.DistanceTo(p10) < minEdge) return null;
+                if (p10.DistanceTo(p11) < minEdge) return null;
+                if (p11.DistanceTo(p01) < minEdge) return null;
+                if (p01.DistanceTo(p00) < minEdge) return null;
+
+                // 面の前 prePad ft から後ろに thickness ft 伸ばす
+                // → 範囲 [-prePad, thickness - prePad] in normal 方向
+                // → baseSolid 範囲 [0, 0.05] を包含するため貫通する
+                const double prePad = 0.10;     // 30mm 手前から
+                const double thickness = 0.20;  // 60mm extrude
+
+                XYZ offset = normal.Multiply(-prePad);
+                XYZ q00 = p00 + offset;
+                XYZ q10 = p10 + offset;
+                XYZ q11 = p11 + offset;
+                XYZ q01 = p01 + offset;
+
+                // CCW (viewed from +normal) で CurveLoop 構築
+                var loop = new CurveLoop();
+                loop.Append(Line.CreateBound(q00, q10));
+                loop.Append(Line.CreateBound(q10, q11));
+                loop.Append(Line.CreateBound(q11, q01));
+                loop.Append(Line.CreateBound(q01, q00));
+
+                try
+                {
+                    return GeometryCreationUtilities.CreateExtrusionGeometry(
+                        new[] { loop }, normal, thickness);
+                }
+                catch
+                {
+                    // CW 方向だった場合: ループを反転して再試行
+                    try
+                    {
+                        var revLoop = new CurveLoop();
+                        revLoop.Append(Line.CreateBound(q00, q01));
+                        revLoop.Append(Line.CreateBound(q01, q11));
+                        revLoop.Append(Line.CreateBound(q11, q10));
+                        revLoop.Append(Line.CreateBound(q10, q00));
+                        return GeometryCreationUtilities.CreateExtrusionGeometry(
+                            new[] { revLoop }, normal, thickness);
+                    }
+                    catch { return null; }
                 }
             }
             catch
