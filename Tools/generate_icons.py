@@ -46,6 +46,26 @@ def dashed_line(draw, x1, y1, x2, y2, color, width, dash_len, gap_len):
         pos = end
         draw_seg = not draw_seg
 
+def dashdot_line(draw, x1, y1, x2, y2, color, width):
+    """Draw a dash-dot line (長破線・ギャップ・点・ギャップ…)."""
+    dx, dy = x2 - x1, y2 - y1
+    length = math.hypot(dx, dy)
+    if length < 0.001:
+        return
+    ux, uy = dx / length, dy / length
+    lens = [s(3), s(1.2), s(0.5), s(1.2)]  # dash, gap, dot, gap
+    w = iw(width)
+    pos, phase = 0.0, 0
+    while pos < length:
+        seg = lens[phase % 4]
+        end = min(pos + seg, length)
+        if phase % 2 == 0:  # draw segment (dash or dot)
+            p1 = (x1 + ux * pos, y1 + uy * pos)
+            p2 = (x1 + ux * end, y1 + uy * end)
+            draw.line([p1, p2], fill=color, width=w)
+        pos = end
+        phase += 1
+
 def filled_poly(draw, pts, fill, stroke, stroke_w):
     draw.polygon(pts, fill=fill)
     sw = iw(stroke_w)
@@ -327,27 +347,8 @@ def make_beam_under_level():
         (s(12.5), s(21)),  # right
     ], fill=DARK)
 
-    # Dash-dot FL line at y=27 (一点破線: 長破線・ギャップ・点・ギャップ…)
-    def dashdot_line(x1, y1, x2, y2, color, width):
-        dx, dy = x2 - x1, y2 - y1
-        length = math.hypot(dx, dy)
-        if length < 0.001:
-            return
-        ux, uy = dx / length, dy / length
-        lens = [s(3), s(1.2), s(0.5), s(1.2)]  # dash, gap, dot, gap
-        w = iw(width)
-        pos, phase = 0.0, 0
-        while pos < length:
-            seg = lens[phase % 4]
-            end = min(pos + seg, length)
-            if phase % 2 == 0:  # draw segment (dash or dot)
-                p1 = (x1 + ux * pos, y1 + uy * pos)
-                p2 = (x1 + ux * end, y1 + uy * end)
-                draw.line([p1, p2], fill=color, width=w)
-            pos = end
-            phase += 1
-
-    dashdot_line(s(1), s(27), s(20), s(27), DARK, s(0.8))
+    # Dash-dot FL line at y=27 (一点破線)
+    dashdot_line(draw, s(1), s(27), s(20), s(27), DARK, s(0.8))
 
     # ▼ Triangle: base at top (y=23), vertex at FL line (y=27)
     draw.polygon([
@@ -364,6 +365,51 @@ def make_beam_under_level():
     save_icon(img, 'beam_under_level')
 
 # ─────────────────────────────────────────
+# beam_top_level
+# ─────────────────────────────────────────
+def make_beam_top_level():
+    img = new_canvas()
+    draw = ImageDraw.Draw(img)
+
+    DARK = hex_rgba('#505050')
+    MID  = hex_rgba('#787878')
+    PINK   = (255, 128, 148, 255)
+    YELLOW = (218, 185,  47, 255)
+    BLUE_C = ( 30, 144, 255, 255)
+
+    # Dash-dot FL line at y=5 (一点破線)
+    dashdot_line(draw, s(1), s(5), s(20), s(5), DARK, s(0.8))
+
+    # ▼ Triangle: base at top (y=1), vertex (bottom) touching FL line at y=5
+    draw.polygon([
+        (s(2.5), s(1)),  # top-left
+        (s(5.5), s(1)),  # top-right
+        (s(4),   s(5)),  # bottom vertex touching FL line
+    ], fill=DARK)
+
+    # Down arrow: shaft y=7→y=11, tip at beam top (y=15)
+    lw = iw(s(0.8))
+    draw.line([(s(10), s(7)), (s(10), s(11))], fill=DARK, width=lw)
+    draw.polygon([
+        (s(10),   s(15)),  # tip touches beam top
+        (s(7.5),  s(11)),  # left base
+        (s(12.5), s(11)),  # right base
+    ], fill=DARK)
+
+    # I-beam at bottom: same shape as beam_under_level (flange3+web10+flange3)
+    # Top edge y=15, bottom edge y=31
+    draw.rectangle([s(3), s(15), s(17), s(18)], fill=MID)  # top flange
+    draw.rectangle([s(3), s(28), s(17), s(31)], fill=MID)  # bottom flange
+    draw.rectangle([s(8), s(18), s(12), s(28)], fill=MID)  # web
+
+    # 3 color blocks on right
+    bx, bw, bh = s(22), s(8), s(8)
+    for color, y in [(PINK, 1), (YELLOW, 11), (BLUE_C, 21)]:
+        draw.rectangle([bx, s(y), bx + bw, s(y) + bh], fill=color)
+
+    save_icon(img, 'beam_top_level')
+
+# ─────────────────────────────────────────
 if __name__ == '__main__':
     print('Generating icons...')
     make_sectionbox_copy()
@@ -372,4 +418,5 @@ if __name__ == '__main__':
     make_cropbox_paste()
     make_filled_region()
     make_beam_under_level()
+    make_beam_top_level()
     print('Done.')
