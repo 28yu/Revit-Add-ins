@@ -645,13 +645,13 @@ face([Vtr, Vbr, Vb, Vc], RIGHT);
 
 PRESETS.sectionbox_copy = `
 // 切断ボックス コピー: キャビネット投影 (前面正方形 + 右上方向に押し出し) [2][4][8]
-// 元デザイン準拠: 前面18×18、奥行き水平+8/垂直-6（水平やや長め）
+// 赤線ガイド準拠: 前面20×20、奥行き(+9,-7)でcanvasほぼ全体を使用
 const BLUE = '#0066CC';
 const EDGE = '#3C3C3C';
 
-// 前面: (2,8)-(20,26) = 18×18、奥行き: (+8,-6)
-// 後面: (10,2)-(28,20) — canvas内に収まる
-const fx1=2, fy1=8, fx2=20, fy2=26, dox=8, doy=-6;
+// 前面: (1,8)-(21,28) = 20×20、奥行き: (+9,-7)
+// 後面: (10,1)-(30,21) — canvas全体スパン x=1-30, y=1-28
+const fx1=1, fy1=8, fx2=21, fy2=28, dox=9, doy=-7;
 const bx1=fx1+dox, by1=fy1+doy, bx2=fx2+dox, by2=fy2+doy;
 
 ctx.strokeStyle = BLUE;
@@ -673,8 +673,9 @@ ln(fx2,fy2, bx2,by2); ln(fx1,fy2, bx1,by2);
 
 ctx.setLineDash([]);
 
-// 内部小直方体: 前面(6,12)-(15,21)=9×9、奥行き(+5,-4)
-const cf={x1:6,y1:12,x2:15,y2:21}, cd={x:5,y:-4};
+// 内部小直方体: 前面(8,13)-(17,22)=9×9、奥行き(+6,-5)
+// 合成視覚中央: ((8+23)/2,(8+22)/2)=(15.5,15) ≈ 全体中央(15.5,14.5) ✓
+const cf={x1:8,y1:13,x2:17,y2:22}, cd={x:6,y:-5};
 const cb={x1:cf.x1+cd.x,y1:cf.y1+cd.y,x2:cf.x2+cd.x,y2:cf.y2+cd.y};
 
 function poly(pts, fill) {
@@ -695,13 +696,13 @@ poly([[cf.x1,cf.y1],[cf.x2,cf.y1],[cf.x2,cf.y2],[cf.x1,cf.y2]], '#B8C8D8');
 
 PRESETS.sectionbox_paste = `
 // 切断ボックス ペースト: キャビネット投影 (実線) [2][4][8]
-// 元デザイン準拠: 前面18×18、奥行き水平+8/垂直-6
+// 赤線ガイド準拠: 前面20×20、奥行き(+9,-7)でcanvasほぼ全体を使用
 const BLUE = '#2288DD';
 const EDGE = '#3C3C3C';
 
-// 前面: (2,8)-(20,26) = 18×18、奥行き: (+8,-6)
-// 後面: (10,2)-(28,20) — canvas内に収まる
-const fx1=2, fy1=8, fx2=20, fy2=26, dox=8, doy=-6;
+// 前面: (1,8)-(21,28) = 20×20、奥行き: (+9,-7)
+// 後面: (10,1)-(30,21)
+const fx1=1, fy1=8, fx2=21, fy2=28, dox=9, doy=-7;
 const bx1=fx1+dox, by1=fy1+doy, bx2=fx2+dox, by2=fy2+doy;
 
 ctx.strokeStyle = BLUE;
@@ -720,8 +721,9 @@ ln(bx2,by2, bx1,by2); ln(bx1,by2, bx1,by1);
 ln(fx1,fy1, bx1,by1); ln(fx2,fy1, bx2,by1);
 ln(fx2,fy2, bx2,by2); ln(fx1,fy2, bx1,by2);
 
-// 内部小直方体: 前面(6,12)-(15,21)=9×9、奥行き(+5,-4) — 青濃色3面
-const cf={x1:6,y1:12,x2:15,y2:21}, cd={x:5,y:-4};
+// 内部小直方体: 前面(8,13)-(17,22)=9×9、奥行き(+6,-5) — 青濃色3面
+// 合成視覚中央: ((8+23)/2,(8+22)/2)=(15.5,15) ✓
+const cf={x1:8,y1:13,x2:17,y2:22}, cd={x:6,y:-5};
 const cb={x1:cf.x1+cd.x,y1:cf.y1+cd.y,x2:cf.x2+cd.x,y2:cf.y2+cd.y};
 
 function poly(pts, fill) {
