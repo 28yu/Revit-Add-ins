@@ -301,6 +301,69 @@ def make_filled_region():
     save_icon(img, 'filled_region')
 
 # ─────────────────────────────────────────
+# beam_under_level
+# ─────────────────────────────────────────
+def make_beam_under_level():
+    img = new_canvas()
+    draw = ImageDraw.Draw(img)
+
+    DARK = hex_rgba('#505050')
+    MID  = hex_rgba('#787878')
+    PINK   = (255, 128, 148, 255)
+    YELLOW = (218, 185,  47, 255)
+    BLUE_C = ( 30, 144, 255, 255)
+
+    # I-beam
+    draw.rectangle([s(3), s(1),  s(17), s(4)],  fill=MID)  # top flange
+    draw.rectangle([s(3), s(14), s(17), s(17)], fill=MID)  # bottom flange (bottom=y17)
+    draw.rectangle([s(8), s(4),  s(12), s(14)], fill=MID)  # web
+
+    # Up arrow: tip at y=17 (beam bottom), head base at y=21, shaft y=21→25
+    lw = iw(s(0.8))
+    draw.line([(s(10), s(21)), (s(10), s(25))], fill=DARK, width=lw)
+    draw.polygon([
+        (s(10), s(17)),    # tip
+        (s(7.5), s(21)),   # left
+        (s(12.5), s(21)),  # right
+    ], fill=DARK)
+
+    # Dash-dot FL line at y=27 (一点破線: 長破線・ギャップ・点・ギャップ…)
+    def dashdot_line(x1, y1, x2, y2, color, width):
+        dx, dy = x2 - x1, y2 - y1
+        length = math.hypot(dx, dy)
+        if length < 0.001:
+            return
+        ux, uy = dx / length, dy / length
+        lens = [s(3), s(1.2), s(0.5), s(1.2)]  # dash, gap, dot, gap
+        w = iw(width)
+        pos, phase = 0.0, 0
+        while pos < length:
+            seg = lens[phase % 4]
+            end = min(pos + seg, length)
+            if phase % 2 == 0:  # draw segment (dash or dot)
+                p1 = (x1 + ux * pos, y1 + uy * pos)
+                p2 = (x1 + ux * end, y1 + uy * end)
+                draw.line([p1, p2], fill=color, width=w)
+            pos = end
+            phase += 1
+
+    dashdot_line(s(1), s(27), s(20), s(27), DARK, s(0.8))
+
+    # ▼ Triangle: base at top (y=23), vertex at FL line (y=27)
+    draw.polygon([
+        (s(2.5), s(23)),  # top-left
+        (s(5.5), s(23)),  # top-right
+        (s(4),   s(27)),  # bottom vertex touching FL line
+    ], fill=DARK)
+
+    # 3 color blocks on right
+    bx, bw, bh = s(22), s(8), s(8)
+    for color, y in [(PINK, 1), (YELLOW, 11), (BLUE_C, 21)]:
+        draw.rectangle([bx, s(y), bx + bw, s(y) + bh], fill=color)
+
+    save_icon(img, 'beam_under_level')
+
+# ─────────────────────────────────────────
 if __name__ == '__main__':
     print('Generating icons...')
     make_sectionbox_copy()
@@ -308,4 +371,5 @@ if __name__ == '__main__':
     make_cropbox_copy()
     make_cropbox_paste()
     make_filled_region()
+    make_beam_under_level()
     print('Done.')
