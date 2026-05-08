@@ -619,15 +619,28 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 }
             }
 
-            // 残面積が face 全体の 1% 未満なら接触面として完全控除に降格する。
-            // 例: スラブに梁が完全埋もれている場合、Partial が face をほぼ覆い、残面積は
-            // 計算誤差レベルになる。これを「ほぼ全面接触 = DeductedContact」として扱い、
-            // 不要な型枠 DirectShape の作成を防ぐ。
-            if (fi.PartialContacts.Count > 0 && effectiveFeetSq < fi.Area * 0.01)
+            // 残面積が face 全体の 1% 未満、または部分接触合計が face の 95% 以上なら
+            // 「ほぼ全面接触」として接触面に降格する。
+            //
+            // 例: スラブに梁が完全埋もれている場合、Partial が複数 (主梁面積 + 微小な
+            // 残端) で合計が face にほぼ一致するケース。
+            // 既存の 95% キャップ branch だと残面積 5% (≈ 2.7 ft² ≈ 0.25m²) が残り、
+            // 不要な型枠 DirectShape として可視化されてしまう。
+            //
+            // 降格すると FormworkVisualizer は DirectShape を作らず、集計表は
+            // formwork → dedContact に振替えるため総合計は維持される。
+            if (fi.PartialContacts.Count > 0)
             {
-                effectiveFeetSq = 0;
-                fi.FaceType = FaceType.DeductedContact;
-                clipperStatus += " demoted-to-contact(<1%)";
+                double partialSum = 0;
+                foreach (var pc in fi.PartialContacts) partialSum += pc.ContactArea;
+                bool tinyResidual = effectiveFeetSq < fi.Area * 0.01;
+                bool nearFullCoverage = partialSum >= fi.Area * 0.95;
+                if (tinyResidual || nearFullCoverage)
+                {
+                    effectiveFeetSq = 0;
+                    fi.FaceType = FaceType.DeductedContact;
+                    clipperStatus += $" demoted-to-contact(partialSum={partialSum:F4}/face={fi.Area:F4})";
+                }
             }
 
             fi.EffectiveAreaM2 = FeetSqToM2(effectiveFeetSq);
