@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>96x96 HD Icon Generator - Tools28</title>
+<style>
+  body { font-family: sans-serif; margin: 20px; background: #f5f5f5; }
+  h1 { font-size: 18px; }
+  .main { display: flex; gap: 30px; flex-wrap: wrap; }
+  .panel { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.15); }
+  .preview-group { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; }
+  .preview-box { text-align: center; }
+  .preview-box canvas { border: 1px solid #ccc; }
+  .preview-box p { font-size: 11px; color: #666; margin: 4px 0 0; }
+  .bg-light { background: #f0f0f0; padding: 10px; display: inline-block; }
+  .bg-dark { background: #555; padding: 10px; display: inline-block; }
+  .bg-ribbon { background: #e3e6e8; padding: 10px 16px; display: inline-flex; flex-direction: column; align-items: center; gap: 4px; }
+  .bg-ribbon span { font-size: 10px; color: #333; }
+  canvas#main { border: 1px solid #999; background: #fff; }
+  textarea { width: 100%; height: 320px; font-family: monospace; font-size: 12px; }
+  button { padding: 6px 14px; cursor: pointer; border: 1px solid #aaa; border-radius: 4px; background: #fff; font-size: 13px; margin: 4px; }
+  button:hover { background: #e8e8e8; }
+  button.primary { background: #2563eb; color: #fff; border-color: #2563eb; }
+  button.primary:hover { background: #1d4ed8; }
+  select { font-size: 13px; padding: 4px 8px; }
+  .zoom-preview { image-rendering: pixelated; }
+  .compare-row { display: flex; gap: 16px; align-items: flex-end; margin-top: 12px; }
+  .compare-box { text-align: center; }
+  .compare-box img, .compare-box canvas { border: 1px solid #ccc; }
+  .compare-box p { font-size: 11px; color: #666; margin: 2px 0; }
+</style>
+</head>
+<body>
+
+<h1>96x96 HD Icon Generator - Tools28</h1>
+
+<div class="main">
+  <!-- Left: Code editor -->
+  <div class="panel" style="flex: 1; min-width: 500px;">
+    <div style="display:flex; gap:12px; align-items:center; margin-bottom:12px;">
+      <label>プリセット: </label>
+      <select id="presetSelect">
+        <option value="">-- 選択 --</option>
+        <option value="both">both (通り芯 両端)</option>
+        <option value="left">left (通り芯 左端)</option>
+        <option value="right">right (通り芯 右端)</option>
+        <option value="sheet_creation">sheet_creation (シート作成)</option>
+        <option value="view_copy">view_copy (3Dビュー コピー)</option>
+        <option value="view_paste">view_paste (3Dビュー ペースト)</option>
+        <option value="sectionbox_copy">sectionbox_copy (切断ボックス コピー)</option>
+        <option value="sectionbox_paste">sectionbox_paste (切断ボックス ペースト)</option>
+        <option value="viewport_copy">viewport_copy (ビューポート コピー)</option>
+        <option value="viewport_paste">viewport_paste (ビューポート ペースト)</option>
+        <option value="cropbox_copy">cropbox_copy (トリミング コピー)</option>
+        <option value="cropbox_paste">cropbox_paste (トリミング ペースト)</option>
+        <option value="room_tag">room_tag (部屋タグ)</option>
+        <option value="filled_region">filled_region (塗潰し領域)</option>
+        <option value="beam_under_level">beam_under_level (梁下端色分け)</option>
+        <option value="beam_top_level">beam_top_level (梁天端色分け)</option>
+        <option value="excel_export">excel_export (Excel エクスポート)</option>
+        <option value="excel_import">excel_import (Excel インポート)</option>
+      </select>
+      <button class="primary" onclick="runCode()">▶ 描画実行</button>
+      <button onclick="downloadPNG()">💾 PNG保存</button>
+    </div>
+    <textarea id="code" spellcheck="false"></textarea>
+    <div style="margin-top:8px; font-size:12px; color:#888;">
+      ctx = CanvasRenderingContext2D (96x96), s(v) = v * 3 でスケール変換
+    </div>
+  </div>
+
+  <!-- Right: Previews -->
+  <div class="panel" style="min-width: 340px;">
+    <h3 style="margin-top:0;">プレビュー</h3>
+
+    <!-- Main canvas (zoomed) -->
+    <div class="preview-box">
+      <canvas id="main" width="96" height="96" style="width:288px;height:288px; image-rendering: pixelated;"></canvas>
+      <p>96x96 (3倍ズーム表示)</p>
+    </div>
+
+    <!-- Simulated ribbon preview -->
+    <h4 style="margin-top:16px;">リボン表示シミュレーション</h4>
+    <div class="preview-group">
+      <div class="preview-box">
+        <div class="bg-ribbon">
+          <canvas id="ribbon32" width="96" height="96" style="width:32px;height:32px;"></canvas>
+          <span>32px表示</span>
+        </div>
+        <p>100% DPI</p>
+      </div>
+      <div class="preview-box">
+        <div class="bg-ribbon">
+          <canvas id="ribbon48" width="96" height="96" style="width:48px;height:48px;"></canvas>
+          <span>48px表示</span>
+        </div>
+        <p>150% DPI</p>
+      </div>
+      <div class="preview-box">
+        <div class="bg-ribbon">
+          <canvas id="ribbon64" width="96" height="96" style="width:64px;height:64px;"></canvas>
+          <span>64px表示</span>
+        </div>
+        <p>200% DPI</p>
+      </div>
+    </div>
+
+    <!-- Compare with original -->
+    <h4 style="margin-top:16px;">元アイコンとの比較</h4>
+    <div class="compare-row">
+      <div class="compare-box">
+        <img id="origImg" width="96" height="96" style="image-rendering: pixelated;" />
+        <p>元 (32x32 拡大)</p>
+      </div>
+      <div class="compare-box">
+        <canvas id="compareNew" width="96" height="96" style="width:96px;height:96px;"></canvas>
+        <p>新 (96x96)</p>
+      </div>
+    </div>
+
+    <!-- Background variations -->
+    <h4 style="margin-top:16px;">背景別</h4>
+    <div class="preview-group">
+      <div class="preview-box">
+        <div class="bg-light"><canvas id="prevLight" width="96" height="96" style="width:64px;height:64px;"></canvas></div>
+        <p>明るい背景</p>
+      </div>
+      <div class="preview-box">
+        <div class="bg-dark"><canvas id="prevDark" width="96" height="96" style="width:64px;height:64px;"></canvas></div>
+        <p>暗い背景</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Helper: scale from 32-space to 96-space
+function s(v) { return v * 3; }
+
+// Current preset name
+let currentPreset = '';
+
+// Copy canvas to all preview canvases
+function syncPreviews() {
+  const src = document.getElementById('main');
+  const targets = ['ribbon32', 'ribbon48', 'ribbon64', 'compareNew', 'prevLight', 'prevDark'];
+  targets.forEach(id => {
+    const c = document.getElementById(id);
+    const ctx2 = c.getContext('2d');
+    ctx2.clearRect(0, 0, 96, 96);
+    ctx2.drawImage(src, 0, 0);
+  });
+}
+
+// Run the code in textarea
+function runCode() {
+  const canvas = document.getElementById('main');
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, 96, 96);
+
+  try {
+    const fn = new Function('ctx', 's', document.getElementById('code').value);
+    fn(ctx, s);
+    syncPreviews();
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+// Download PNG with DPI=288
+function downloadPNG() {
+  const canvas = document.getElementById('main');
+  canvas.toBlob(blob => {
+    // Read as ArrayBuffer to inject pHYs chunk for DPI=288
+    const reader = new FileReader();
+    reader.onload = function() {
+      const pngWithDpi = injectDPI(new Uint8Array(reader.result), 288);
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([pngWithDpi], {type:'image/png'}));
+      a.download = (currentPreset || 'icon') + '_96.png';
+      a.click();
+    };
+    reader.readAsArrayBuffer(blob);
+  }, 'image/png');
+}
+
+// Inject pHYs chunk into PNG for DPI metadata
+function injectDPI(pngData, dpi) {
+  const ppm = Math.round(dpi / 0.0254); // pixels per meter
+  // pHYs chunk: 4 bytes X ppm + 4 bytes Y ppm + 1 byte unit(1=meter)
+  const phys = new Uint8Array(25); // 4 len + 4 type + 9 data + 4 crc
+  const view = new DataView(phys.buffer);
+  view.setUint32(0, 9); // data length
+  phys[4]=0x70; phys[5]=0x48; phys[6]=0x59; phys[7]=0x73; // "pHYs"
+  view.setUint32(8, ppm);
+  view.setUint32(12, ppm);
+  phys[16] = 1; // unit = meter
+
+  // CRC32 of type+data
+  const crcData = phys.slice(4, 17);
+  view.setUint32(17, crc32(crcData));
+
+  // Insert pHYs before first IDAT chunk
+  const result = [];
+  let i = 8; // skip PNG signature
+  result.push(...pngData.slice(0, 8)); // signature
+
+  let inserted = false;
+  while (i < pngData.length) {
+    const chunkLen = (pngData[i]<<24)|(pngData[i+1]<<16)|(pngData[i+2]<<8)|pngData[i+3];
+    const chunkType = String.fromCharCode(pngData[i+4], pngData[i+5], pngData[i+6], pngData[i+7]);
+    const totalChunkSize = 12 + chunkLen;
+
+    if (chunkType === 'pHYs') {
+      // Skip existing pHYs
+      i += totalChunkSize;
+      continue;
+    }
+
+    if (!inserted && chunkType === 'IDAT') {
+      result.push(...phys);
+      inserted = true;
+    }
+
+    result.push(...pngData.slice(i, i + totalChunkSize));
+    i += totalChunkSize;
+  }
+
+  return new Uint8Array(result);
+}
+
+// CRC32 implementation
+function crc32(data) {
+  let crc = 0xFFFFFFFF;
+  for (let i = 0; i < data.length; i++) {
+    crc ^= data[i];
+    for (let j = 0; j < 8; j++) {
+      crc = (crc >>> 1) ^ (crc & 1 ? 0xEDB88320 : 0);
+    }
+  }
+  return (crc ^ 0xFFFFFFFF) >>> 0;
+}
+
+// Load original icon for comparison
+function loadOriginal(name) {
+  const img = document.getElementById('origImg');
+  img.src = '../Resources/Icons/' + name + '_32.png';
+  img.onerror = () => { img.alt = '元画像なし'; };
+}
+
+// ============================================================
+// PRESETS - Drawing code for each icon
+// ============================================================
+const PRESETS = {};
+
+PRESETS.both = `
+// 通り芯・レベル 両端表示
+const DARK = '#323232';
+const LINE_W = s(2);
+
+// Grid lines (2 vertical + 2 horizontal)
+ctx.strokeStyle = DARK;
+ctx.lineWidth = LINE_W;
+
+// Vertical lines
+ctx.beginPath();
+ctx.moveTo(s(9.5), 0); ctx.lineTo(s(9.5), s(32));
+ctx.moveTo(s(22.5), 0); ctx.lineTo(s(22.5), s(32));
+// Horizontal lines
+ctx.moveTo(0, s(9.5)); ctx.lineTo(s(32), s(9.5));
+ctx.moveTo(0, s(22.5)); ctx.lineTo(s(32), s(22.5));
+ctx.stroke();
+
+// Bubbles at line ends
+function drawBubble(cx, cy, r) {
+  ctx.beginPath();
+  ctx.arc(s(cx), s(cy), s(r), 0, Math.PI * 2);
+  ctx.fillStyle = '#ffffff';
+  ctx.fill();
+  ctx.strokeStyle = DARK;
+  ctx.lineWidth = s(1.2);
+  ctx.stroke();
+}
+
+const R = 3.2;
+// Top bubbles
+drawBubble(9.5, 3, R);
+drawBubble(22.5, 3, R);
+// Bottom bubbles
+drawBubble(9.5, 29, R);
+drawBubble(22.5, 29, R);
+// Left bubbles
+drawBubble(3, 9.5, R);
+drawBubble(3, 22.5, R);
+// Right bubbles
+drawBubble(29, 9.5, R);
+drawBubble(29, 22.5, R);
+`;
+
+PRESETS.left = `
+// 通り芯・レベル 左端のみ
+const DARK = '#323232';
+const LINE_W = s(2);
+
+ctx.strokeStyle = DARK;
+ctx.lineWidth = LINE_W;
+
+ctx.beginPath();
+ctx.moveTo(s(9.5), 0); ctx.lineTo(s(9.5), s(26));
+ctx.moveTo(s(22.5), 0); ctx.lineTo(s(22.5), s(26));
+ctx.moveTo(0, s(9.5)); ctx.lineTo(s(26), s(9.5));
+ctx.moveTo(0, s(22.5)); ctx.lineTo(s(26), s(22.5));
+ctx.stroke();
+
+function drawBubble(cx, cy, r) {
+  ctx.beginPath();
+  ctx.arc(s(cx), s(cy), s(r), 0, Math.PI * 2);
+  ctx.fillStyle = '#ffffff';
+  ctx.fill();
+  ctx.strokeStyle = DARK;
+  ctx.lineWidth = s(1.2);
+  ctx.stroke();
+}
+
+const R = 3.2;
+drawBubble(9.5, 3, R);
+drawBubble(22.5, 3, R);
+drawBubble(3, 9.5, R);
+drawBubble(3, 22.5, R);
+`;
+
+PRESETS.right = `
+// 通り芯・レベル 右端のみ
+const DARK = '#323232';
+const LINE_W = s(2);
+
+ctx.strokeStyle = DARK;
+ctx.lineWidth = LINE_W;
+
+ctx.beginPath();
+ctx.moveTo(s(9.5), s(6)); ctx.lineTo(s(9.5), s(32));
+ctx.moveTo(s(22.5), s(6)); ctx.lineTo(s(22.5), s(32));
+ctx.moveTo(s(6), s(9.5)); ctx.lineTo(s(32), s(9.5));
+ctx.moveTo(s(6), s(22.5)); ctx.lineTo(s(32), s(22.5));
+ctx.stroke();
+
+function drawBubble(cx, cy, r) {
+  ctx.beginPath();
+  ctx.arc(s(cx), s(cy), s(r), 0, Math.PI * 2);
+  ctx.fillStyle = '#ffffff';
+  ctx.fill();
+  ctx.strokeStyle = DARK;
+  ctx.lineWidth = s(1.2);
+  ctx.stroke();
+}
+
+const R = 3.2;
+drawBubble(9.5, 29, R);
+drawBubble(22.5, 29, R);
+drawBubble(29, 9.5, R);
+drawBubble(29, 22.5, R);
+`;
+
+PRESETS.room_tag = `
+// 部屋タグ (表形式)
+const BLK = '#000000';
+const LW = s(1);
+ctx.strokeStyle = BLK;
+ctx.lineWidth = LW;
+
+// Outer border
+ctx.strokeRect(s(1.5), s(1.5), s(29), s(29));
+
+// Header row bottom
+ctx.beginPath();
+ctx.moveTo(s(1.5), s(11)); ctx.lineTo(s(30.5), s(11));
+// Row dividers
+ctx.moveTo(s(1.5), s(16.5)); ctx.lineTo(s(30.5), s(16.5));
+ctx.moveTo(s(1.5), s(21.5)); ctx.lineTo(s(30.5), s(21.5));
+ctx.moveTo(s(1.5), s(26.5)); ctx.lineTo(s(30.5), s(26.5));
+ctx.stroke();
+
+// Column dividers (below header only)
+ctx.beginPath();
+ctx.moveTo(s(9.5), s(11)); ctx.lineTo(s(9.5), s(30.5));
+ctx.moveTo(s(20), s(11)); ctx.lineTo(s(20), s(26.5));
+ctx.stroke();
+`;
+
+PRESETS.filled_region = `
+// 塗潰し領域 分割・統合
+const GRAY = '#646464';
+const LW = s(0.8);
+ctx.strokeStyle = GRAY;
+ctx.lineWidth = LW;
+
+// Left rectangle with crosshatch
+ctx.strokeRect(s(1.5), s(1.5), s(12), s(22));
+// Hatch pattern (left)
+ctx.beginPath();
+for (let i = -24; i < 36; i += 3) {
+  const y0 = s(1.5) + s(i);
+  const y1 = y0 + s(12);
+  ctx.moveTo(s(1.5), Math.max(s(1.5), y0));
+  ctx.lineTo(Math.min(s(13.5), s(1.5) + Math.min(s(12), y1 - s(1.5))), Math.min(s(23.5), y1));
+}
+ctx.stroke();
+
+// Right rectangle with crosshatch (diagonal other direction)
+ctx.strokeRect(s(18.5), s(1.5), s(12), s(22));
+ctx.beginPath();
+for (let i = -24; i < 36; i += 2.5) {
+  const x0 = s(18.5);
+  const y0 = s(1.5) + s(i);
+  const len = s(12);
+  ctx.moveTo(x0, Math.max(s(1.5), y0));
+  ctx.lineTo(Math.min(s(30.5), x0 + len), Math.min(s(23.5), y0 + len));
+}
+ctx.stroke();
+
+// Split/merge arrows at bottom
+ctx.lineWidth = s(0.7);
+ctx.beginPath();
+const ay = s(27);
+// Left arrow <
+ctx.moveTo(s(12), s(24.5)); ctx.lineTo(s(8), ay); ctx.lineTo(s(12), s(29.5));
+// Right arrow >
+ctx.moveTo(s(20), s(24.5)); ctx.lineTo(s(24), ay); ctx.lineTo(s(20), s(29.5));
+// Connecting line
+ctx.moveTo(s(8), ay); ctx.lineTo(s(24), ay);
+ctx.stroke();
+`;
+
+PRESETS.sheet_creation = `
+// シート一括作成
+const DARK = '#323232';
+const MID = '#808080';
+const LIGHT = '#C8C8C8';
+const LW = s(1);
+
+// Outer sheet (back)
+ctx.strokeStyle = DARK;
+ctx.lineWidth = LW;
+ctx.fillStyle = '#ffffff';
+ctx.fillRect(s(2), s(2), s(27), s(23));
+ctx.strokeRect(s(2), s(2), s(27), s(23));
+
+// Shadow edge
+ctx.fillStyle = LIGHT;
+ctx.fillRect(s(28), s(3), s(2), s(22));
+ctx.fillRect(s(3), s(24), s(27), s(2));
+
+// Title block separator
+ctx.beginPath();
+ctx.moveTo(s(3), s(19)); ctx.lineTo(s(28), s(19));
+ctx.strokeStyle = MID;
+ctx.stroke();
+
+// Inner sheet (front, smaller)
+ctx.fillStyle = '#ffffff';
+ctx.fillRect(s(9), s(7), s(15), s(12));
+ctx.strokeStyle = DARK;
+ctx.strokeRect(s(9), s(7), s(15), s(12));
+
+// Inner title block
+ctx.beginPath();
+ctx.moveTo(s(10), s(15)); ctx.lineTo(s(23), s(15));
+ctx.strokeStyle = MID;
+ctx.stroke();
+`;
+
+PRESETS.beam_under_level = `
+// 梁下端色分け: I型梁(上) + 上矢印 + FL線(下) + 3色ブロック(右)
+const DARK = '#505050';
+const MID = '#787878';
+const PINK = [255,128,148];
+const YELLOW = [218,185,47];
+const BLUE = [30,144,255];
+
+// I-beam at top
+ctx.fillStyle = MID;
+// Top flange
+ctx.fillRect(s(3), s(1), s(14), s(3));
+// Bottom flange
+ctx.fillRect(s(3), s(14), s(14), s(3));
+// Web
+ctx.fillRect(s(8), s(4), s(4), s(10));
+
+// Up arrow
+ctx.fillStyle = DARK;
+ctx.strokeStyle = DARK;
+ctx.lineWidth = s(0.8);
+// Arrow shaft
+ctx.beginPath();
+ctx.moveTo(s(10), s(22)); ctx.lineTo(s(10), s(12));
+ctx.stroke();
+// Arrow head (triangle)
+ctx.beginPath();
+ctx.moveTo(s(10), s(10));
+ctx.lineTo(s(7.5), s(14));
+ctx.lineTo(s(12.5), s(14));
+ctx.closePath();
+ctx.fill();
+
+// FL line at bottom
+ctx.strokeStyle = DARK;
+ctx.lineWidth = s(0.8);
+ctx.beginPath();
+ctx.moveTo(s(1), s(27)); ctx.lineTo(s(20), s(27));
+ctx.stroke();
+// Triangle marker
+ctx.beginPath();
+ctx.moveTo(s(4), s(23));
+ctx.lineTo(s(2.5), s(26));
+ctx.lineTo(s(5.5), s(26));
+ctx.closePath();
+ctx.fillStyle = DARK;
+ctx.fill();
+
+// 3 color blocks on right
+const bx = s(22), bw = s(8), bh = s(8);
+[[PINK,1],[YELLOW,11],[BLUE,21]].forEach(([c, y]) => {
+  ctx.fillStyle = 'rgb('+c.join(',')+')';
+  ctx.fillRect(bx, s(y), bw, bh);
+});
+`;
+
+PRESETS.beam_top_level = `
+// 梁天端色分け: FL線(上) + 下矢印 + I型梁(下) + 3色ブロック(右)
+const DARK = '#505050';
+const MID = '#787878';
+const PINK = [255,128,148];
+const YELLOW = [218,185,47];
+const BLUE = [30,144,255];
+
+// FL line at top
+ctx.strokeStyle = DARK;
+ctx.lineWidth = s(0.8);
+ctx.beginPath();
+ctx.moveTo(s(1), s(5)); ctx.lineTo(s(20), s(5));
+ctx.stroke();
+// Triangle marker (inverted)
+ctx.beginPath();
+ctx.moveTo(s(4), s(9));
+ctx.lineTo(s(2.5), s(6));
+ctx.lineTo(s(5.5), s(6));
+ctx.closePath();
+ctx.fillStyle = DARK;
+ctx.fill();
+
+// Vertical line + down arrow
+ctx.strokeStyle = DARK;
+ctx.lineWidth = s(0.8);
+ctx.beginPath();
+ctx.moveTo(s(10), s(5)); ctx.lineTo(s(10), s(18));
+ctx.stroke();
+// Arrow head
+ctx.beginPath();
+ctx.moveTo(s(10), s(20));
+ctx.lineTo(s(7.5), s(16));
+ctx.lineTo(s(12.5), s(16));
+ctx.closePath();
+ctx.fillStyle = DARK;
+ctx.fill();
+
+// I-beam at bottom
+ctx.fillStyle = MID;
+ctx.fillRect(s(3), s(22), s(14), s(3));
+ctx.fillRect(s(3), s(28), s(14), s(3));
+ctx.fillRect(s(8), s(25), s(4), s(3));
+
+// 3 color blocks
+const bx = s(22), bw = s(8), bh = s(8);
+[[PINK,1],[YELLOW,11],[BLUE,21]].forEach(([c, y]) => {
+  ctx.fillStyle = 'rgb('+c.join(',')+')';
+  ctx.fillRect(bx, s(y), bw, bh);
+});
+`;
+
+PRESETS.view_copy = `
+// 3Dビュー コピー (アイソメトリック立方体・淡色)
+const TOP = '#E0EEF8';
+const LEFT = '#B8D4EC';
+const RIGHT = '#9CC0DE';
+const EDGE = '#3C3C3C';
+
+const cx = s(16), cy = s(16);
+const dx = s(11), dy = s(7);
+
+// Face vertices
+const top = [[cx,cy-dy-s(3)],[cx+dx,cy-s(3)],[cx,cy+dy-s(3)],[cx-dx,cy-s(3)]];
+const left = [[cx-dx,cy-s(3)],[cx,cy+dy-s(3)],[cx,cy+dy+dy-s(3)],[cx-dx,cy+dy-s(3)]];
+const right = [[cx,cy+dy-s(3)],[cx+dx,cy-s(3)],[cx+dx,cy+dy-s(3)],[cx,cy+dy+dy-s(3)]];
+
+function drawFace(pts, fill) {
+  ctx.beginPath();
+  ctx.moveTo(pts[0][0], pts[0][1]);
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+  ctx.closePath();
+  ctx.fillStyle = fill;
+  ctx.fill();
+  ctx.strokeStyle = EDGE;
+  ctx.lineWidth = s(0.7);
+  ctx.stroke();
+}
+
+drawFace(left, LEFT);
+drawFace(right, RIGHT);
+drawFace(top, TOP);
+`;
+
+PRESETS.view_paste = `
+// 3Dビュー ペースト (アイソメトリック立方体・濃色)
+const TOP = '#66A3E0';
+const LEFT = '#3380CC';
+const RIGHT = '#1A66B3';
+const EDGE = '#3C3C3C';
+
+const cx = s(16), cy = s(16);
+const dx = s(11), dy = s(7);
+
+const top = [[cx,cy-dy-s(3)],[cx+dx,cy-s(3)],[cx,cy+dy-s(3)],[cx-dx,cy-s(3)]];
+const left = [[cx-dx,cy-s(3)],[cx,cy+dy-s(3)],[cx,cy+dy+dy-s(3)],[cx-dx,cy+dy-s(3)]];
+const right = [[cx,cy+dy-s(3)],[cx+dx,cy-s(3)],[cx+dx,cy+dy-s(3)],[cx,cy+dy+dy-s(3)]];
+
+function drawFace(pts, fill) {
+  ctx.beginPath();
+  ctx.moveTo(pts[0][0], pts[0][1]);
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+  ctx.closePath();
+  ctx.fillStyle = fill;
+  ctx.fill();
+  ctx.strokeStyle = EDGE;
+  ctx.lineWidth = s(0.7);
+  ctx.stroke();
+}
+
+drawFace(left, LEFT);
+drawFace(right, RIGHT);
+drawFace(top, TOP);
+`;
+
+PRESETS.sectionbox_copy = `
+// 切断ボックスコピー: 破線枠 + 小さい立方体
+const BLUE = '#0066CC';
+const EDGE = '#3C3C3C';
+const LW = s(0.8);
+
+// Dashed border
+ctx.setLineDash([s(3), s(2)]);
+ctx.strokeStyle = BLUE;
+ctx.lineWidth = s(1.2);
+ctx.strokeRect(s(2), s(2), s(28), s(28));
+ctx.setLineDash([]);
+
+// Small cube in center
+const cx = s(16), cy = s(17);
+const dx = s(7), dy = s(4.5);
+const TOP = '#C8D8E8';
+const LEFT = '#98B0C8';
+const RIGHT = '#7898B0';
+
+function drawFace(pts, fill) {
+  ctx.beginPath();
+  ctx.moveTo(pts[0][0], pts[0][1]);
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+  ctx.closePath();
+  ctx.fillStyle = fill;
+  ctx.fill();
+  ctx.strokeStyle = EDGE;
+  ctx.lineWidth = LW;
+  ctx.stroke();
+}
+
+const top = [[cx,cy-dy-s(2)],[cx+dx,cy-s(2)],[cx,cy+dy-s(2)],[cx-dx,cy-s(2)]];
+const left = [[cx-dx,cy-s(2)],[cx,cy+dy-s(2)],[cx,cy+dy+dy-s(2)],[cx-dx,cy+dy-s(2)]];
+const right = [[cx,cy+dy-s(2)],[cx+dx,cy-s(2)],[cx+dx,cy+dy-s(2)],[cx,cy+dy+dy-s(2)]];
+drawFace(left, LEFT);
+drawFace(right, RIGHT);
+drawFace(top, TOP);
+`;
+
+PRESETS.sectionbox_paste = `
+// 切断ボックスペースト: 実線枠 + 小さい立方体
+const BLUE = '#3399FF';
+const EDGE = '#3C3C3C';
+const LW = s(0.8);
+
+// Solid border
+ctx.strokeStyle = BLUE;
+ctx.lineWidth = s(2);
+ctx.strokeRect(s(2), s(2), s(28), s(28));
+
+// Small cube in center
+const cx = s(16), cy = s(17);
+const dx = s(7), dy = s(4.5);
+const TOP = '#5090D0';
+const LEFT = '#2870B0';
+const RIGHT = '#1860A0';
+
+function drawFace(pts, fill) {
+  ctx.beginPath();
+  ctx.moveTo(pts[0][0], pts[0][1]);
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+  ctx.closePath();
+  ctx.fillStyle = fill;
+  ctx.fill();
+  ctx.strokeStyle = EDGE;
+  ctx.lineWidth = LW;
+  ctx.stroke();
+}
+
+const top = [[cx,cy-dy-s(2)],[cx+dx,cy-s(2)],[cx,cy+dy-s(2)],[cx-dx,cy-s(2)]];
+const left = [[cx-dx,cy-s(2)],[cx,cy+dy-s(2)],[cx,cy+dy+dy-s(2)],[cx-dx,cy+dy-s(2)]];
+const right = [[cx,cy+dy-s(2)],[cx+dx,cy-s(2)],[cx+dx,cy+dy-s(2)],[cx,cy+dy+dy-s(2)]];
+drawFace(left, LEFT);
+drawFace(right, RIGHT);
+drawFace(top, TOP);
+`;
+
+PRESETS.viewport_copy = `
+// ビューポート位置コピー
+const DARK = '#323232';
+const MID = '#5C5C5C';
+const LIGHT = '#ADADAD';
+const VLIGHT = '#F0F0F0';
+const ACCENT = '#7FB2E5';
+const LW = s(1);
+
+// Outer frame
+ctx.strokeStyle = DARK;
+ctx.lineWidth = LW;
+ctx.fillStyle = '#FFFFFF';
+ctx.fillRect(s(1.5), s(5), s(29), s(22));
+ctx.strokeRect(s(1.5), s(5), s(29), s(22));
+
+// Title bar
+ctx.fillStyle = VLIGHT;
+ctx.fillRect(s(2.5), s(6), s(27), s(4));
+ctx.beginPath();
+ctx.moveTo(s(1.5), s(10)); ctx.lineTo(s(30.5), s(10));
+ctx.strokeStyle = DARK;
+ctx.stroke();
+
+// Content lines
+ctx.strokeStyle = ACCENT;
+ctx.lineWidth = s(0.6);
+[14, 17, 20].forEach(y => {
+  ctx.beginPath();
+  ctx.moveTo(s(5), s(y)); ctx.lineTo(s(18), s(y));
+  ctx.stroke();
+});
+
+// Small viewport box (bottom-right)
+ctx.strokeStyle = DARK;
+ctx.lineWidth = LW;
+ctx.fillStyle = '#FFFFFF';
+ctx.fillRect(s(19), s(18.5), s(9), s(6));
+ctx.strokeRect(s(19), s(18.5), s(9), s(6));
+`;
+
+PRESETS.viewport_paste = `
+// ビューポート位置ペースト
+const DARK = '#323232';
+const BLUE = '#3399FF';
+const LIGHT_BLUE = '#99CCFF';
+const VLIGHT = '#F0F0F0';
+const LW = s(1);
+
+ctx.strokeStyle = DARK;
+ctx.lineWidth = LW;
+ctx.fillStyle = '#FFFFFF';
+ctx.fillRect(s(1.5), s(5), s(29), s(22));
+ctx.strokeRect(s(1.5), s(5), s(29), s(22));
+
+ctx.fillStyle = VLIGHT;
+ctx.fillRect(s(2.5), s(6), s(27), s(4));
+ctx.beginPath();
+ctx.moveTo(s(1.5), s(10)); ctx.lineTo(s(30.5), s(10));
+ctx.strokeStyle = DARK;
+ctx.stroke();
+
+// Content lines (blue-tinted)
+ctx.strokeStyle = LIGHT_BLUE;
+ctx.lineWidth = s(0.6);
+[14, 17, 20].forEach(y => {
+  ctx.beginPath();
+  ctx.moveTo(s(5), s(y)); ctx.lineTo(s(18), s(y));
+  ctx.stroke();
+});
+
+// Viewport box with blue accent
+ctx.strokeStyle = BLUE;
+ctx.lineWidth = s(1.2);
+ctx.fillStyle = '#FFFFFF';
+ctx.fillRect(s(19), s(18.5), s(9), s(6));
+ctx.strokeRect(s(19), s(18.5), s(9), s(6));
+`;
+
+PRESETS.cropbox_copy = `
+// トリミング領域コピー (オレンジ)
+const ORANGE = '#FF9900';
+const LW = s(1);
+
+ctx.strokeStyle = ORANGE;
+ctx.lineWidth = LW;
+ctx.strokeRect(s(5), s(5), s(22), s(22));
+
+// Corner + midpoint handles
+const hs = s(2);
+const pts = [
+  [5,5],[16,5],[27,5],
+  [5,16],[27,16],
+  [5,27],[16,27],[27,27]
+];
+ctx.fillStyle = ORANGE;
+pts.forEach(([x,y]) => {
+  ctx.fillRect(s(x)-hs, s(y)-hs, hs*2, hs*2);
+});
+`;
+
+PRESETS.cropbox_paste = `
+// トリミング領域ペースト (ブルー)
+const BLUE = '#0066CC';
+const LW = s(1);
+
+ctx.strokeStyle = BLUE;
+ctx.lineWidth = LW;
+ctx.strokeRect(s(5), s(5), s(22), s(22));
+
+const hs = s(2);
+const pts = [
+  [5,5],[16,5],[27,5],
+  [5,16],[27,16],
+  [5,27],[16,27],[27,27]
+];
+ctx.fillStyle = BLUE;
+pts.forEach(([x,y]) => {
+  ctx.fillRect(s(x)-hs, s(y)-hs, hs*2, hs*2);
+});
+`;
+
+PRESETS.excel_export = `
+// Excel エクスポート
+const GREEN_DARK = '#1C643C';
+const GREEN = '#217346';
+const BLUE = '#0066CC';
+const WHITE = '#FFFFFF';
+const LW = s(1);
+
+// Excel document body
+ctx.fillStyle = GREEN;
+ctx.fillRect(s(0), s(5), s(22), s(23));
+ctx.fillStyle = GREEN_DARK;
+ctx.fillRect(s(0), s(5), s(22), s(2));
+
+// White area (spreadsheet)
+ctx.fillStyle = WHITE;
+ctx.fillRect(s(3), s(8), s(16), s(17));
+
+// X mark
+ctx.strokeStyle = GREEN_DARK;
+ctx.lineWidth = s(1.8);
+ctx.beginPath();
+ctx.moveTo(s(6), s(11)); ctx.lineTo(s(16), s(22));
+ctx.moveTo(s(16), s(11)); ctx.lineTo(s(6), s(22));
+ctx.stroke();
+
+// Grid lines
+ctx.strokeStyle = GREEN;
+ctx.lineWidth = s(0.5);
+ctx.beginPath();
+ctx.moveTo(s(11), s(8)); ctx.lineTo(s(11), s(25));
+ctx.moveTo(s(3), s(16)); ctx.lineTo(s(19), s(16));
+ctx.stroke();
+
+// Up arrow (export)
+ctx.fillStyle = BLUE;
+ctx.strokeStyle = BLUE;
+ctx.lineWidth = s(1.2);
+// Shaft
+ctx.beginPath();
+ctx.moveTo(s(27), s(8)); ctx.lineTo(s(27), s(22));
+ctx.stroke();
+// Head
+ctx.beginPath();
+ctx.moveTo(s(27), s(6));
+ctx.lineTo(s(23.5), s(11));
+ctx.lineTo(s(30.5), s(11));
+ctx.closePath();
+ctx.fill();
+`;
+
+PRESETS.excel_import = `
+// Excel インポート
+const GREEN_DARK = '#1C643C';
+const GREEN = '#217346';
+const BLUE = '#0066CC';
+const WHITE = '#FFFFFF';
+const LW = s(1);
+
+ctx.fillStyle = GREEN;
+ctx.fillRect(s(0), s(5), s(22), s(23));
+ctx.fillStyle = GREEN_DARK;
+ctx.fillRect(s(0), s(5), s(22), s(2));
+
+ctx.fillStyle = WHITE;
+ctx.fillRect(s(3), s(8), s(16), s(17));
+
+ctx.strokeStyle = GREEN_DARK;
+ctx.lineWidth = s(1.8);
+ctx.beginPath();
+ctx.moveTo(s(6), s(11)); ctx.lineTo(s(16), s(22));
+ctx.moveTo(s(16), s(11)); ctx.lineTo(s(6), s(22));
+ctx.stroke();
+
+ctx.strokeStyle = GREEN;
+ctx.lineWidth = s(0.5);
+ctx.beginPath();
+ctx.moveTo(s(11), s(8)); ctx.lineTo(s(11), s(25));
+ctx.moveTo(s(3), s(16)); ctx.lineTo(s(19), s(16));
+ctx.stroke();
+
+// Down arrow (import)
+ctx.fillStyle = BLUE;
+ctx.strokeStyle = BLUE;
+ctx.lineWidth = s(1.2);
+ctx.beginPath();
+ctx.moveTo(s(27), s(10)); ctx.lineTo(s(27), s(24));
+ctx.stroke();
+ctx.beginPath();
+ctx.moveTo(s(27), s(26));
+ctx.lineTo(s(23.5), s(21));
+ctx.lineTo(s(30.5), s(21));
+ctx.closePath();
+ctx.fill();
+`;
+
+// Preset selection handler
+document.getElementById('presetSelect').addEventListener('change', function() {
+  const name = this.value;
+  if (name && PRESETS[name]) {
+    currentPreset = name;
+    document.getElementById('code').value = PRESETS[name].trim();
+    loadOriginal(name);
+    runCode();
+  }
+});
+
+// Auto-run on load with "both" preset
+window.addEventListener('load', () => {
+  document.getElementById('presetSelect').value = 'both';
+  currentPreset = 'both';
+  document.getElementById('code').value = PRESETS.both.trim();
+  loadOriginal('both');
+  setTimeout(runCode, 100);
+});
+</script>
+</body>
+</html>
