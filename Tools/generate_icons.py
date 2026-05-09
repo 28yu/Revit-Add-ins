@@ -91,6 +91,13 @@ def save_icon(img, name):
     result.save(path, 'PNG', dpi=(288, 288))
     print(f'  Saved: {path}')
 
+def save_icon_as(img, filename):
+    """Save 384×384 draw canvas as 96×96 @ DPI=288 with exact filename."""
+    result = img.resize((96, 96), Image.LANCZOS)
+    path = os.path.join(OUT_DIR, filename)
+    result.save(path, 'PNG', dpi=(288.0106, 288.0106))
+    print(f'  Saved: {path}')
+
 # ─────────────────────────────────────────
 # sectionbox_copy
 # ─────────────────────────────────────────
@@ -503,6 +510,198 @@ def make_excel_import():
 
 
 # ─────────────────────────────────────────
+# Settings panel icons (flags, ver, manual)
+# 16px logical  → 48×48 PNG @ DPI=288  (coord space 0..16, s() value range same)
+# 32px logical  → 96×96 PNG @ DPI=288  (coord space 0..32, same as large icons)
+# ─────────────────────────────────────────
+
+SMALL_PHYS    = 48
+SMALL_DRAW_PX = SMALL_PHYS * SS   # 192
+
+def new_canvas_small():
+    return Image.new('RGBA', (SMALL_DRAW_PX, SMALL_DRAW_PX), (0, 0, 0, 0))
+
+def save_icon_small(draw_img, name):
+    out = draw_img.resize((SMALL_PHYS, SMALL_PHYS), Image.LANCZOS)
+    path = os.path.join(OUT_DIR, f'{name}.png')
+    out.save(path, dpi=(288.0106, 288.0106))
+    print(f'  Saved: {path}')
+
+def star_pts(cx, cy, r_out, r_in, n=5, start_deg=-90):
+    """Return vertices of an n-pointed star polygon."""
+    pts = []
+    for i in range(n * 2):
+        a = math.radians(start_deg + i * 180.0 / n)
+        r = r_out if i % 2 == 0 else r_in
+        pts.append((cx + r * math.cos(a), cy + r * math.sin(a)))
+    return pts
+
+# Flag color constants
+JP_RED   = (188,   0,  45, 255)
+US_RED   = (178,  34,  52, 255)
+US_BLUE  = ( 60,  59, 110, 255)
+CN_RED   = (222,  41,  16, 255)
+CN_YEL   = (255, 222,   0, 255)
+ICON_BLU = ( 37,  99, 235, 255)
+FG_WHITE = (255, 255, 255, 255)
+BORDER_K = ( 30,  30,  30, 255)
+
+
+def make_flag_jp():
+    # ── 16px logical (48px physical, 16-unit coord space) ──────────────
+    img = new_canvas_small()
+    d = ImageDraw.Draw(img)
+    d.rectangle([0, 0, SMALL_DRAW_PX - 1, SMALL_DRAW_PX - 1], fill=FG_WHITE)
+    r = s(4.8)
+    d.ellipse([s(8) - r, s(8) - r, s(8) + r, s(8) + r], fill=JP_RED)
+    d.rectangle([0, 0, SMALL_DRAW_PX - 1, SMALL_DRAW_PX - 1],
+                outline=BORDER_K, width=iw(s(0.5)))
+    save_icon_small(img, 'flag_jp_16')
+
+    # ── 32px logical (96px physical, 32-unit coord space) ───────────────
+    img2 = new_canvas()
+    d2 = ImageDraw.Draw(img2)
+    d2.rectangle([0, 0, 383, 383], fill=FG_WHITE)
+    r2 = s(9.5)
+    d2.ellipse([s(16) - r2, s(16) - r2, s(16) + r2, s(16) + r2], fill=JP_RED)
+    d2.rectangle([0, 0, 383, 383], outline=BORDER_K, width=iw(s(0.5)))
+    save_icon_as(img2, 'flag_jp_32.png')
+
+
+def make_flag_us():
+    # ── 16px logical ─────────────────────────────────────────────────────
+    img = new_canvas_small()
+    d = ImageDraw.Draw(img)
+    stripe_h = 16.0 / 7
+    for i in range(7):
+        y0 = round(s(i * stripe_h))
+        y1 = round(s((i + 1) * stripe_h))
+        d.rectangle([0, y0, SMALL_DRAW_PX - 1, y1],
+                    fill=US_RED if i % 2 == 0 else FG_WHITE)
+    # Blue canton: 40% width × 4 stripe heights
+    canton_x = round(s(6.5))
+    canton_y = round(s(4 * stripe_h))
+    d.rectangle([0, 0, canton_x, canton_y], fill=US_BLUE)
+    # Stars: 3 cols × 2 rows (simplified)
+    for sy in [1.5, 4.5]:
+        for sx in [1.4, 3.2, 5.0]:
+            r = s(0.65)
+            d.ellipse([s(sx) - r, s(sy) - r, s(sx) + r, s(sy) + r], fill=FG_WHITE)
+    d.rectangle([0, 0, SMALL_DRAW_PX - 1, SMALL_DRAW_PX - 1],
+                outline=BORDER_K, width=iw(s(0.5)))
+    save_icon_small(img, 'flag_us_16')
+
+    # ── 32px logical ─────────────────────────────────────────────────────
+    img2 = new_canvas()
+    d2 = ImageDraw.Draw(img2)
+    stripe_h2 = 32.0 / 7
+    for i in range(7):
+        y0 = round(s(i * stripe_h2))
+        y1 = round(s((i + 1) * stripe_h2))
+        d2.rectangle([0, y0, 383, y1],
+                     fill=US_RED if i % 2 == 0 else FG_WHITE)
+    canton_x2 = round(s(13.0))
+    canton_y2 = round(s(4 * stripe_h2))
+    d2.rectangle([0, 0, canton_x2, canton_y2], fill=US_BLUE)
+    for sy2 in [2.5, 6.0, 9.5, 13.0]:
+        for sx2 in [2.0, 5.5, 9.0, 12.0]:
+            r2 = s(1.3)
+            d2.ellipse([s(sx2) - r2, s(sy2) - r2, s(sx2) + r2, s(sy2) + r2],
+                       fill=FG_WHITE)
+    d2.rectangle([0, 0, 383, 383], outline=BORDER_K, width=iw(s(0.5)))
+    save_icon_as(img2, 'flag_us_32.png')
+
+
+def make_flag_cn():
+    # ── 16px logical ─────────────────────────────────────────────────────
+    img = new_canvas_small()
+    d = ImageDraw.Draw(img)
+    d.rectangle([0, 0, SMALL_DRAW_PX - 1, SMALL_DRAW_PX - 1], fill=CN_RED)
+    # Large star: center (4,5) r_out=3.0 r_in=1.2
+    d.polygon(star_pts(s(4), s(5), s(3.0), s(1.2)), fill=CN_YEL)
+    # 4 small stars in arc (upper-right of large star)
+    for sx, sy in [(9.0, 2.5), (11.0, 4.5), (11.0, 7.0), (9.0, 9.0)]:
+        d.polygon(star_pts(s(sx), s(sy), s(1.3), s(0.55)), fill=CN_YEL)
+    d.rectangle([0, 0, SMALL_DRAW_PX - 1, SMALL_DRAW_PX - 1],
+                outline=BORDER_K, width=iw(s(0.5)))
+    save_icon_small(img, 'flag_cn_16')
+
+    # ── 32px logical ─────────────────────────────────────────────────────
+    img2 = new_canvas()
+    d2 = ImageDraw.Draw(img2)
+    d2.rectangle([0, 0, 383, 383], fill=CN_RED)
+    d2.polygon(star_pts(s(8), s(10), s(6.0), s(2.4)), fill=CN_YEL)
+    for sx2, sy2 in [(18.0, 5.0), (22.0, 9.0), (22.0, 14.0), (18.0, 18.0)]:
+        d2.polygon(star_pts(s(sx2), s(sy2), s(2.6), s(1.1)), fill=CN_YEL)
+    d2.rectangle([0, 0, 383, 383], outline=BORDER_K, width=iw(s(0.5)))
+    save_icon_as(img2, 'flag_cn_32.png')
+
+
+def make_ver():
+    """Version info icon: blue circle with white 'i' symbol."""
+    # ── 16px logical ─────────────────────────────────────────────────────
+    img = new_canvas_small()
+    d = ImageDraw.Draw(img)
+    bg_r = s(7.5)
+    d.ellipse([s(8) - bg_r, s(8) - bg_r, s(8) + bg_r, s(8) + bg_r], fill=ICON_BLU)
+    # Dot of 'i'
+    dot_r = s(1.2)
+    d.ellipse([s(8) - dot_r, s(4) - dot_r, s(8) + dot_r, s(4) + dot_r], fill=FG_WHITE)
+    # Bar of 'i'
+    d.line([(s(8), s(6.5)), (s(8), s(13.0))], fill=FG_WHITE, width=iw(s(2.5)))
+    save_icon_small(img, 'ver_16')
+
+    # ── 32px logical ─────────────────────────────────────────────────────
+    img2 = new_canvas()
+    d2 = ImageDraw.Draw(img2)
+    bg_r2 = s(15.0)
+    d2.ellipse([s(16) - bg_r2, s(16) - bg_r2, s(16) + bg_r2, s(16) + bg_r2],
+               fill=ICON_BLU)
+    dot_r2 = s(2.5)
+    d2.ellipse([s(16) - dot_r2, s(8) - dot_r2, s(16) + dot_r2, s(8) + dot_r2],
+               fill=FG_WHITE)
+    d2.line([(s(16), s(13.0)), (s(16), s(26.0))], fill=FG_WHITE, width=iw(s(5.0)))
+    save_icon_as(img2, 'ver_32.png')
+
+
+def make_manual():
+    """Manual icon: blue circle with white '?' symbol."""
+    # ── 16px logical ─────────────────────────────────────────────────────
+    img = new_canvas_small()
+    d = ImageDraw.Draw(img)
+    bg_r = s(7.5)
+    d.ellipse([s(8) - bg_r, s(8) - bg_r, s(8) + bg_r, s(8) + bg_r], fill=ICON_BLU)
+    # '?' hook arc: center (8,5) r=2.5, from 200° clockwise to 90° (PIL: 0°=right, CW)
+    arc_w = iw(s(2.2))
+    arc_r = s(2.5)
+    d.arc([s(8) - arc_r, s(5) - arc_r, s(8) + arc_r, s(5) + arc_r],
+          start=200, end=90, fill=FG_WHITE, width=arc_w)
+    # Vertical tail below arc endpoint
+    d.line([(s(8), s(7.6)), (s(8), s(10.5))], fill=FG_WHITE, width=arc_w)
+    # Dot
+    dot_r = s(1.0)
+    d.ellipse([s(8) - dot_r, s(12.5) - dot_r, s(8) + dot_r, s(12.5) + dot_r],
+              fill=FG_WHITE)
+    save_icon_small(img, 'manual_16')
+
+    # ── 32px logical ─────────────────────────────────────────────────────
+    img2 = new_canvas()
+    d2 = ImageDraw.Draw(img2)
+    bg_r2 = s(15.0)
+    d2.ellipse([s(16) - bg_r2, s(16) - bg_r2, s(16) + bg_r2, s(16) + bg_r2],
+               fill=ICON_BLU)
+    arc_w2 = iw(s(4.0))
+    arc_r2 = s(5.0)
+    d2.arc([s(16) - arc_r2, s(10) - arc_r2, s(16) + arc_r2, s(10) + arc_r2],
+           start=200, end=90, fill=FG_WHITE, width=arc_w2)
+    d2.line([(s(16), s(15.2)), (s(16), s(21.0))], fill=FG_WHITE, width=arc_w2)
+    dot_r2 = s(2.0)
+    d2.ellipse([s(16) - dot_r2, s(25) - dot_r2, s(16) + dot_r2, s(25) + dot_r2],
+               fill=FG_WHITE)
+    save_icon_as(img2, 'manual_32.png')
+
+
+# ─────────────────────────────────────────
 if __name__ == '__main__':
     print('Generating icons...')
     make_sectionbox_copy()
@@ -514,4 +713,9 @@ if __name__ == '__main__':
     make_beam_top_level()
     make_excel_export()
     make_excel_import()
+    make_flag_jp()
+    make_flag_us()
+    make_flag_cn()
+    make_ver()
+    make_manual()
     print('Done.')
