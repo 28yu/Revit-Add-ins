@@ -421,37 +421,37 @@ def _draw_excel_file_icon(img):
     GREEN = hex_rgba('#217346')
     lw = iw(s(0.9))
 
-    # Document body: pentagon (3,1)-(16,1)-(21,7)-(21,31)-(3,31)
+    # Document body: pentagon (3,1)-(17,1)-(21,5)-(21,31)-(3,31)
     doc_poly = [
         (s(3),  s(1)),
-        (s(16), s(1)),
-        (s(21), s(7)),
+        (s(17), s(1)),
+        (s(21), s(5)),
         (s(21), s(31)),
         (s(3),  s(31)),
     ]
     draw.polygon(doc_poly, fill=WHITE, outline=DARK, width=lw)
 
-    # Fold triangle: (16,1)-(21,1)-(21,7)
+    # Fold triangle: (17,1)-(21,1)-(21,5)
     fold_poly = [
-        (s(16), s(1)),
+        (s(17), s(1)),
         (s(21), s(1)),
-        (s(21), s(7)),
+        (s(21), s(5)),
     ]
     draw.polygon(fold_poly, fill=FOLD, outline=DARK, width=lw)
 
-    # Green square: x=1..14, y=11..24 (13×13 square)
-    draw.rectangle([s(1), s(11), s(14), s(24)], fill=GREEN)
+    # Green rectangle: x=1..13, y=8..26 (12×18, portrait)
+    draw.rectangle([s(1), s(8), s(13), s(26)], fill=GREEN)
 
     # White X with butt (square) caps
-    x_lw = iw(s(2.4))
-    draw.line([(s(3.5), s(13)), (s(11),  s(22))], fill=WHITE, width=x_lw)
-    draw.line([(s(11),  s(13)), (s(3.5), s(22))], fill=WHITE, width=x_lw)
+    x_lw = iw(s(2.5))
+    draw.line([(s(3),  s(10)), (s(11), s(24))], fill=WHITE, width=x_lw)
+    draw.line([(s(11), s(10)), (s(3),  s(24))], fill=WHITE, width=x_lw)
 
-    # Horizontal lines: 2 pairs (upper group and lower group)
+    # Horizontal lines: 3 pairs beside the green rectangle (right strip)
     line_lw = iw(s(1.0))
-    for y1_32, y2_32 in [(6, 8.5), (26, 28.5)]:
-        draw.line([(s(15.5), s(y1_32)), (s(20), s(y1_32))], fill=GREEN, width=line_lw)
-        draw.line([(s(15.5), s(y2_32)), (s(20), s(y2_32))], fill=GREEN, width=line_lw)
+    for y1_32, y2_32 in [(11, 13), (17, 19), (23, 25)]:
+        draw.line([(s(14.5), s(y1_32)), (s(20), s(y1_32))], fill=GREEN, width=line_lw)
+        draw.line([(s(14.5), s(y2_32)), (s(20), s(y2_32))], fill=GREEN, width=line_lw)
 
 
 def make_excel_export():
