@@ -1164,28 +1164,32 @@ ctx.strokeRect(0.5, y0 + 0.5, 95, y1 - y0 - 1);
 `;
 
 PRESETS.flag_us = `
-// US フラグ: 横長 赤白ストライプ + 青カントン + 白5角星 32px論理サイズ
+// US フラグ: 横長 13本縞(7赤6白) + 青カントン(7縞×40%幅) + 白5角星 32px論理サイズ
+// 星: 4列×3行 ─ カントン内で均等余白
 const US_RED  = '#B22234';
 const US_BLUE = '#3C3B6E';
 const BORDER  = '#1E1E1E';
 
 const y0 = s(5), y1 = s(27);
 const totalH = y1 - y0;
-const stripeH = totalH / 7;
+const N = 13;
+const stripeH = totalH / N;
 
-// 7 ストライプ
-for (let i = 0; i < 7; i++) {
-  const ya = y0 + Math.round(i * stripeH);
-  const yb = y0 + Math.round((i + 1) * stripeH);
+// 13 ストライプ
+for (let i = 0; i < N; i++) {
+  const ya = y0 + i * stripeH;
+  const yb = y0 + (i + 1) * stripeH;
   ctx.fillStyle = i % 2 === 0 ? US_RED : '#FFFFFF';
-  ctx.fillRect(0, ya, 96, yb - ya);
+  ctx.fillRect(0, ya, 96, yb - ya + 0.5);
 }
 
-// 青カントン (4ストライプ分の高さ, canton_x=s(13))
+// 青カントン (7ストライプ分の高さ, canton_x = 40% of width = s(12.8))
+const cantonW = s(12.8);
+const cantonH = 7 * stripeH;
 ctx.fillStyle = US_BLUE;
-ctx.fillRect(0, y0, s(13), 4 * stripeH);
+ctx.fillRect(0, y0, cantonW, cantonH);
 
-// 白星描画ヘルパー
+// 白5角星ヘルパー
 function drawStar(cx, cy, ro, ri) {
   ctx.beginPath();
   for (let i = 0; i < 10; i++) {
@@ -1199,10 +1203,15 @@ function drawStar(cx, cy, ro, ri) {
   ctx.fill();
 }
 
-// 3行 × 4列 の星
-[0.65, 2.2, 3.7].forEach(sy => {
-  [1.5, 4.5, 7.5, 11.0].forEach(sx => {
-    drawStar(s(sx), y0 + sy * stripeH, s(1.2), s(1.2 * 0.382));
+// 4列×3行 均等余白配置
+// cols: cantonW / (4*2) * [1,3,5,7]
+// rows in 7-stripe canton: 7/(3*2) * [1,3,5] stripe-multiples
+const colXs = [1,3,5,7].map(k => k * cantonW / 8);
+const rowYs = [1,3,5].map(k => y0 + k * (7 * stripeH) / 6);
+
+rowYs.forEach(cy => {
+  colXs.forEach(cx => {
+    drawStar(cx, cy, s(1.2), s(1.2 * 0.382));
   });
 });
 
@@ -1213,18 +1222,20 @@ ctx.strokeRect(0.5, y0 + 0.5, 95, y1 - y0 - 1);
 `;
 
 PRESETS.flag_cn = `
-// 中国語フラグ: 横長赤地 + 黄色5角星 32px論理サイズ
+// 中国語フラグ: 横長赤地 + 黄色5角星 (公式30×20グリッド比率) 32px論理サイズ
+// 大星: グリッド(10,5)、小星: (20,2)(24,4)(24,8)(20,10) ─ すべて左上エリア
 const CN_RED = '#DE2910';
 const CN_YEL = '#FFDE00';
 const BORDER = '#1E1E1E';
 
 const y0 = s(5), y1 = s(27);
+const FW = 32, FH = 22;  // flag width/height in logical units
 
 // 赤背景 (横長)
 ctx.fillStyle = CN_RED;
 ctx.fillRect(0, y0, 96, y1 - y0);
 
-// 星描画ヘルパー
+// 5角星描画ヘルパー
 function drawStar(cx, cy, ro, ri) {
   ctx.beginPath();
   for (let i = 0; i < 10; i++) {
@@ -1238,12 +1249,19 @@ function drawStar(cx, cy, ro, ri) {
   ctx.fill();
 }
 
-// 大星: cx=s(10), cy=y0 + 27% of flagH
-drawStar(s(10), y0 + (y1 - y0) * 0.27, s(4.4), s(4.4 * 0.382));
+// 公式グリッド(gx,gy)→アイコン座標変換
+function gxy(gx, gy) {
+  return [s(FW * gx / 30), y0 + (y1 - y0) * gy / 20];
+}
 
-// 小星 × 4: (sx, sy_frac)
-[[17.0, 0.10], [20.4, 0.36], [20.4, 0.64], [17.0, 0.90]].forEach(([sx, sf]) => {
-  drawStar(s(sx), y0 + (y1 - y0) * sf, s(1.7), s(1.7 * 0.382));
+// 大星: (10,5) r=3.6
+const [bx, by] = gxy(10, 5);
+drawStar(bx, by, s(3.6), s(3.6 * 0.382));
+
+// 小星×4: (20,2)(24,4)(24,8)(20,10) r=1.35
+[[20,2],[24,4],[24,8],[20,10]].forEach(([gx,gy]) => {
+  const [sx, sy] = gxy(gx, gy);
+  drawStar(sx, sy, s(1.35), s(1.35 * 0.382));
 });
 
 // 外枠
@@ -1274,8 +1292,7 @@ ctx.stroke();
 `;
 
 PRESETS.manual = `
-// マニュアルアイコン: 青円 + 白 ? 文字 32px論理サイズ
-// arc_r=s(6.4), stroke=33%半径 で読みやすい文字
+// マニュアルアイコン: 青円 + 白 '?' フォント描画 32px論理サイズ
 const BLU = '#2563EB';
 
 // 青円
@@ -1284,31 +1301,12 @@ ctx.arc(s(16), s(16), s(15), 0, Math.PI * 2);
 ctx.fillStyle = BLU;
 ctx.fill();
 
-// ? フック: center(16,11), r=s(6.4), 250°→90° 時計回り
-const arcCY = s(11);
-const arcR  = s(6.4);
-const arcW  = s(6.4 * 0.33);  // stroke ≈ 33% of radius
-ctx.beginPath();
-ctx.arc(s(16), arcCY, arcR, 250 * Math.PI / 180, 90 * Math.PI / 180, false);
-ctx.strokeStyle = '#FFFFFF';
-ctx.lineWidth = arcW;
-ctx.lineCap = 'round';
-ctx.stroke();
-
-// ? 縦棒 (arc終端から tail_end=s(22) まで)
-ctx.beginPath();
-ctx.moveTo(s(16), arcCY + arcR + s(0.1));
-ctx.lineTo(s(16), s(22));
-ctx.strokeStyle = '#FFFFFF';
-ctx.lineWidth = arcW;
-ctx.lineCap = 'round';
-ctx.stroke();
-
-// ? 点 (cy=s(25.6), r=s(2))
-ctx.beginPath();
-ctx.arc(s(16), s(25.6), s(2), 0, Math.PI * 2);
+// '?' をフォントで描画 (アンチエイリアス・正確な形状)
+ctx.font = \`bold \${Math.round(s(22))}px 'Liberation Sans', Arial, sans-serif\`;
+ctx.textAlign = 'center';
+ctx.textBaseline = 'middle';
 ctx.fillStyle = '#FFFFFF';
-ctx.fill();
+ctx.fillText('?', s(16), s(17));
 `;
 
 // Preset selection handler

@@ -5,7 +5,7 @@ Targets: sectionbox_copy, sectionbox_paste, cropbox_copy, cropbox_paste, filled_
 Output: Resources/Icons/*_96.png (96x96, DPI=288)
 """
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 import math
 import os
 
@@ -582,18 +582,23 @@ def make_flag_jp():
 
 
 def make_flag_us():
-    def _draw_us(d, draw_w, y0, y1, canton_x_unit, star_ro, star_ri,
-                 star_rows_unit, star_cols_unit):
-        """Draw US flag stripes + canton + stars in given coordinate frame."""
+    def _draw_us(d, draw_w, y0, y1, n_stripes, canton_x_unit,
+                 star_ro, star_ri, star_rows_unit, star_cols_unit):
+        """Draw US flag: n_stripes stripes, canton, stars.
+        star_rows_unit = row positions as multiples of stripe_h from y0.
+        star_cols_unit = absolute x positions (units).
+        """
         total_h = y1 - y0
-        stripe_h = total_h / 7
-        for i in range(7):
+        stripe_h = total_h / n_stripes
+        for i in range(n_stripes):
             ya = round(s(y0 + i * stripe_h))
             yb = round(s(y0 + (i + 1) * stripe_h))
             d.rectangle([0, ya, draw_w - 1, yb],
                         fill=US_RED if i % 2 == 0 else FG_WHITE)
         canton_x = round(s(canton_x_unit))
-        canton_y = round(s(y0 + 4 * stripe_h))
+        # Canton covers top (n_stripes+1)//2 stripes (all red stripes)
+        n_canton = (n_stripes + 1) // 2
+        canton_y = round(s(y0 + n_canton * stripe_h))
         d.rectangle([0, round(s(y0)), canton_x, canton_y], fill=US_BLUE)
         for sy in star_rows_unit:
             for sx in star_cols_unit:
@@ -601,61 +606,70 @@ def make_flag_us():
                                s(star_ro), s(star_ri))
                 d.polygon(pts, fill=FG_WHITE)
 
-    # ── 16px logical ─────────────────────────────────────────────────────
+    # ── 16px logical: 7 stripes, 3 cols × 2 rows, canton 4 stripes × 6.4u ─
+    # Uniform spacing: cols at x=6.4/(3*2)*[1,3,5]=[1.067,3.2,5.333]
+    # rows in 4-stripe canton at stripe mult [1.0, 3.0]
     img = new_canvas_small()
     d = ImageDraw.Draw(img)
     _draw_us(d, SMALL_DRAW_PX,
              FLAG16_Y0, FLAG16_Y1,
-             canton_x_unit=6.5,
+             n_stripes=7,
+             canton_x_unit=6.4,
              star_ro=0.65, star_ri=0.65 * 0.382,
-             star_rows_unit=[0.65, 2.2],           # row positions as stripe multiples
-             star_cols_unit=[1.1, 3.1, 5.2])        # col x positions (unit)
+             star_rows_unit=[1.0, 3.0],
+             star_cols_unit=[1.067, 3.2, 5.333])
     d.rectangle([0, round(s(FLAG16_Y0)), SMALL_DRAW_PX - 1, round(s(FLAG16_Y1))],
                 outline=BORDER_K, width=iw(s(0.5)))
     save_icon_small(img, 'flag_us_16')
 
-    # ── 32px logical ─────────────────────────────────────────────────────
+    # ── 32px logical: 13 stripes (7R+6W), 4 cols × 3 rows, canton 7 stripes × 12.8u ─
+    # Uniform spacing: cols at x=12.8/(4*2)*[1,3,5,7]=[1.6,4.8,8.0,11.2]
+    # rows in 7-stripe canton at stripe mult [7/6, 7/2, 35/6] ≈ [1.167,3.5,5.833]
     img2 = new_canvas()
     d2 = ImageDraw.Draw(img2)
     _draw_us(d2, 384,
              FLAG32_Y0, FLAG32_Y1,
-             canton_x_unit=13.0,
+             n_stripes=13,
+             canton_x_unit=12.8,
              star_ro=1.2, star_ri=1.2 * 0.382,
-             star_rows_unit=[0.65, 2.2, 3.7],
-             star_cols_unit=[1.5, 4.5, 7.5, 11.0])
+             star_rows_unit=[7/6, 7/2, 35/6],
+             star_cols_unit=[1.6, 4.8, 8.0, 11.2])
     d2.rectangle([0, round(s(FLAG32_Y0)), 383, round(s(FLAG32_Y1))],
                  outline=BORDER_K, width=iw(s(0.5)))
     save_icon_as(img2, 'flag_us_32.png')
 
 
 def make_flag_cn():
-    # ── 16px logical ─────────────────────────────────────────────────────
+    """China flag using official 30-col × 20-row grid proportions.
+    Large star: (10,5) on 30×20 grid.  Small stars: (20,2),(24,4),(24,8),(20,10).
+    All 5 stars cluster in the upper-left quadrant of the flag.
+    """
+    def _draw_cn(d, draw_w, y0, flag_w, flag_h, big_r, small_r):
+        d.rectangle([0, round(s(y0)), draw_w - 1, round(s(y0 + flag_h))], fill=CN_RED)
+        # Large star: at (10/30, 5/20) of flag dimensions
+        bx = flag_w * 10/30
+        by = y0 + flag_h * 5/20
+        d.polygon(star_pts(s(bx), s(by), s(big_r), s(big_r * 0.382)), fill=CN_YEL)
+        # 4 small stars at official grid positions (20,2),(24,4),(24,8),(20,10)
+        for gx, gy in [(20, 2), (24, 4), (24, 8), (20, 10)]:
+            sx = flag_w * gx/30
+            sy = y0 + flag_h * gy/20
+            d.polygon(star_pts(s(sx), s(sy), s(small_r), s(small_r * 0.382)), fill=CN_YEL)
+        d.rectangle([0, round(s(y0)), draw_w - 1, round(s(y0 + flag_h))],
+                    outline=BORDER_K, width=iw(s(0.5)))
+
+    # 16px: flag 16×11 units
     img = new_canvas_small()
-    d = ImageDraw.Draw(img)
-    d.rectangle([0, round(s(FLAG16_Y0)), SMALL_DRAW_PX - 1, round(s(FLAG16_Y1))],
-                fill=CN_RED)
-    # Large star: left-center of flag (x≈31%, y≈27% from flag top)
-    big_cy = s(FLAG16_Y0 + (FLAG16_Y1 - FLAG16_Y0) * 0.27)   # ≈ s(5.5)
-    d.polygon(star_pts(s(5.0), big_cy, s(2.2), s(2.2 * 0.382)), fill=CN_YEL)
-    # 4 small stars in arc to the right of large star
-    for sx, sy_frac in [(8.5, 0.10), (10.2, 0.36), (10.2, 0.64), (8.5, 0.90)]:
-        sy = FLAG16_Y0 + (FLAG16_Y1 - FLAG16_Y0) * sy_frac
-        d.polygon(star_pts(s(sx), s(sy), s(0.85), s(0.85 * 0.382)), fill=CN_YEL)
-    d.rectangle([0, round(s(FLAG16_Y0)), SMALL_DRAW_PX - 1, round(s(FLAG16_Y1))],
-                outline=BORDER_K, width=iw(s(0.5)))
+    _draw_cn(ImageDraw.Draw(img), SMALL_DRAW_PX,
+             FLAG16_Y0, 16, FLAG16_Y1 - FLAG16_Y0,
+             big_r=1.9, small_r=0.75)
     save_icon_small(img, 'flag_cn_16')
 
-    # ── 32px logical ─────────────────────────────────────────────────────
+    # 32px: flag 32×22 units
     img2 = new_canvas()
-    d2 = ImageDraw.Draw(img2)
-    d2.rectangle([0, round(s(FLAG32_Y0)), 383, round(s(FLAG32_Y1))], fill=CN_RED)
-    big_cy2 = s(FLAG32_Y0 + (FLAG32_Y1 - FLAG32_Y0) * 0.27)  # ≈ s(11)
-    d2.polygon(star_pts(s(10.0), big_cy2, s(4.4), s(4.4 * 0.382)), fill=CN_YEL)
-    for sx2, sy_frac in [(17.0, 0.10), (20.4, 0.36), (20.4, 0.64), (17.0, 0.90)]:
-        sy2 = FLAG32_Y0 + (FLAG32_Y1 - FLAG32_Y0) * sy_frac
-        d2.polygon(star_pts(s(sx2), s(sy2), s(1.7), s(1.7 * 0.382)), fill=CN_YEL)
-    d2.rectangle([0, round(s(FLAG32_Y0)), 383, round(s(FLAG32_Y1))],
-                 outline=BORDER_K, width=iw(s(0.5)))
+    _draw_cn(ImageDraw.Draw(img2), 384,
+             FLAG32_Y0, 32, FLAG32_Y1 - FLAG32_Y0,
+             big_r=3.6, small_r=1.35)
     save_icon_as(img2, 'flag_cn_32.png')
 
 
@@ -687,46 +701,43 @@ def make_ver():
 
 
 def make_manual():
-    """Manual icon: blue circle with white '?' symbol.
-
-    PIL arc angles: 0°=right(3-o'clock), 90°=bottom(6-o'clock), CW direction.
-    Arc start=250° → upper-left of circle.
-    Arc end=90°   → bottom of circle.
-    Clockwise path: 250°→270°(top)→0°(right)→90°(bottom) = 200° arc = '?' hook shape.
-    Endpoint at 90°: (cx, cy + r_arc) → tail continues straight down.
-    stroke width ≈ r_arc * 0.33 for a clearly readable '?'.
+    """Manual icon: blue circle with white '?' rendered using TrueType font.
+    Using font rendering guarantees a clean, recognisable '?' shape.
     """
-    def _draw_question(d, cx_u, arc_cy_u, arc_r_u, tail_end_u, dot_cy_u, dot_r_u):
-        arc_r  = s(arc_r_u)
-        arc_w  = iw(s(arc_r_u * 0.33))   # stroke ≈ 33% of radius
-        cx, arc_cy = s(cx_u), s(arc_cy_u)
-        d.arc([cx - arc_r, arc_cy - arc_r, cx + arc_r, arc_cy + arc_r],
-              start=250, end=90, fill=FG_WHITE, width=arc_w)
-        # Tail: arc ends at (cx, arc_cy + arc_r); continue straight down
-        tail_start = arc_cy + arc_r
-        d.line([(cx, tail_start + s(0.1)), (cx, s(tail_end_u))],
-               fill=FG_WHITE, width=arc_w)
-        # Dot
-        dr = s(dot_r_u)
-        d.ellipse([cx - dr, s(dot_cy_u) - dr, cx + dr, s(dot_cy_u) + dr],
-                  fill=FG_WHITE)
+    FONT_PATH = '/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf'
 
-    # ── 16px logical (arc center at (8,5.5), r=3.2, tail→11, dot@13) ────
+    def _draw_icon(canvas, cx_u, cy_u, bg_r_u, font_sz_u):
+        d = ImageDraw.Draw(canvas)
+        cx, cy = s(cx_u), s(cy_u)
+        bg_r = s(bg_r_u)
+        d.ellipse([cx - bg_r, cy - bg_r, cx + bg_r, cy + bg_r], fill=ICON_BLU)
+        try:
+            fnt = ImageFont.truetype(FONT_PATH, size=iw(s(font_sz_u)))
+            bb = d.textbbox((0, 0), '?', font=fnt)
+            tw, th = bb[2] - bb[0], bb[3] - bb[1]
+            tx = cx - tw / 2 - bb[0]
+            ty = cy - th / 2 - bb[1]
+            d.text((tx, ty), '?', font=fnt, fill=FG_WHITE)
+        except Exception as e:
+            print(f'  Font unavailable ({e}), using arc fallback')
+            arc_r = s(bg_r_u * 0.42)
+            arc_w = iw(arc_r * 0.28)
+            d.arc([cx - arc_r, cy - arc_r * 1.1, cx + arc_r, cy + arc_r * 0.5],
+                  start=230, end=90, fill=FG_WHITE, width=arc_w)
+            d.line([(cx, cy + arc_r * 0.5), (cx, cy + arc_r * 0.85)],
+                   fill=FG_WHITE, width=arc_w)
+            dr = arc_r * 0.18
+            d.ellipse([cx - dr, cy + arc_r * 1.1 - dr,
+                       cx + dr, cy + arc_r * 1.1 + dr], fill=FG_WHITE)
+
+    # ── 16px logical ─────────────────────────────────────────────────────
     img = new_canvas_small()
-    d = ImageDraw.Draw(img)
-    d.ellipse([s(8) - s(7.5), s(8) - s(7.5), s(8) + s(7.5), s(8) + s(7.5)],
-              fill=ICON_BLU)
-    _draw_question(d, cx_u=8, arc_cy_u=5.5, arc_r_u=3.2,
-                   tail_end_u=11.0, dot_cy_u=12.8, dot_r_u=1.0)
+    _draw_icon(img, cx_u=8, cy_u=8, bg_r_u=7.5, font_sz_u=11.0)
     save_icon_small(img, 'manual_16')
 
-    # ── 32px logical (scale × 2) ──────────────────────────────────────────
+    # ── 32px logical ─────────────────────────────────────────────────────
     img2 = new_canvas()
-    d2 = ImageDraw.Draw(img2)
-    d2.ellipse([s(16) - s(15), s(16) - s(15), s(16) + s(15), s(16) + s(15)],
-               fill=ICON_BLU)
-    _draw_question(d2, cx_u=16, arc_cy_u=11.0, arc_r_u=6.4,
-                   tail_end_u=22.0, dot_cy_u=25.6, dot_r_u=2.0)
+    _draw_icon(img2, cx_u=16, cy_u=16, bg_r_u=15.0, font_sz_u=22.0)
     save_icon_as(img2, 'manual_32.png')
 
 
