@@ -645,7 +645,7 @@ def make_flag_cn():
     Applied x_shift = -0.07 (7% of flag width to the left) to match actual flag appearance.
     """
     X_SHIFT = -0.07       # all stars: 7% left
-    X_SHIFT_SMALL = -0.03  # small stars: additional 3% left
+    X_SHIFT_SMALL = -0.05  # small stars: additional 5% left
 
     def _draw_cn(d, draw_w, y0, flag_w, flag_h, big_r, small_r):
         y1 = y0 + flag_h
