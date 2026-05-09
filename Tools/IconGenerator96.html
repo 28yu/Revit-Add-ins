@@ -1142,87 +1142,114 @@ const bx = s(21), bw = s(9), bh = s(7);
 // ─── Settings panel icons (32px logical, 32-unit coord space) ───────────────
 
 PRESETS.flag_jp = `
-// 日本語フラグ: 白地 + 赤円 (日の丸) 32px論理サイズ
+// 日本語フラグ: 横長白地 + 赤円 (日の丸) 32px論理サイズ
 const JP_RED = '#BC002D';
 const BORDER = '#1E1E1E';
-const SW = s(0.5);
+const y0 = s(5), y1 = s(27);
 
-// 白背景
+// 白背景 (横長, 縦横比≈3:2)
 ctx.fillStyle = '#FFFFFF';
-ctx.fillRect(0, 0, 96, 96);
-// 赤円 (日の丸)
+ctx.fillRect(0, y0, 96, y1 - y0);
+
+// 赤円 (日の丸) 中央
 ctx.beginPath();
-ctx.arc(s(16), s(16), s(9.5), 0, Math.PI * 2);
+ctx.arc(s(16), s(16), s(6.6), 0, Math.PI * 2);
 ctx.fillStyle = JP_RED;
 ctx.fill();
+
 // 外枠
 ctx.strokeStyle = BORDER;
-ctx.lineWidth = SW;
-ctx.strokeRect(SW/2, SW/2, 96 - SW, 96 - SW);
+ctx.lineWidth = s(0.5);
+ctx.strokeRect(0.5, y0 + 0.5, 95, y1 - y0 - 1);
 `;
 
 PRESETS.flag_us = `
-// US フラグ: 赤白ストライプ + 青カントン + 白星 32px論理サイズ
+// US フラグ: 横長 赤白ストライプ + 青カントン + 白5角星 32px論理サイズ
 const US_RED  = '#B22234';
 const US_BLUE = '#3C3B6E';
 const BORDER  = '#1E1E1E';
 
-const stripeH = 96 / 7;
+const y0 = s(5), y1 = s(27);
+const totalH = y1 - y0;
+const stripeH = totalH / 7;
+
 // 7 ストライプ
 for (let i = 0; i < 7; i++) {
+  const ya = y0 + Math.round(i * stripeH);
+  const yb = y0 + Math.round((i + 1) * stripeH);
   ctx.fillStyle = i % 2 === 0 ? US_RED : '#FFFFFF';
-  ctx.fillRect(0, Math.round(i * stripeH), 96, Math.round(stripeH) + 1);
+  ctx.fillRect(0, ya, 96, yb - ya);
 }
-// 青カントン (4ストライプ分の高さ, 幅40%)
-const cx = Math.round(s(13)), cy = Math.round(4 * stripeH);
+
+// 青カントン (4ストライプ分の高さ, canton_x=s(13))
 ctx.fillStyle = US_BLUE;
-ctx.fillRect(0, 0, cx, cy);
-// 白星 (4行 × 4列)
-const starR = s(1.3);
-[[2,2.5],[5.5,2.5],[9,2.5],[12,2.5],
- [2,6.0],[5.5,6.0],[9,6.0],[12,6.0],
- [2,9.5],[5.5,9.5],[9,9.5],[12,9.5],
- [2,13.0],[5.5,13.0],[9,13.0],[12,13.0]].forEach(([sx,sy]) => {
-  ctx.beginPath();
-  ctx.arc(s(sx), s(sy), starR, 0, Math.PI*2);
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fill();
-});
-// 外枠
-ctx.strokeStyle = BORDER; ctx.lineWidth = s(0.5);
-ctx.strokeRect(s(0.25), s(0.25), s(31.5), s(31.5));
-`;
+ctx.fillRect(0, y0, s(13), 4 * stripeH);
 
-PRESETS.flag_cn = `
-// 中国語フラグ: 赤地 + 黄色星 32px論理サイズ
-const CN_RED = '#DE2910';
-const CN_YEL = '#FFDE00';
-const BORDER = '#1E1E1E';
-
-ctx.fillStyle = CN_RED;
-ctx.fillRect(0, 0, 96, 96);
-
-function star(cx, cy, ro, ri) {
+// 白星描画ヘルパー
+function drawStar(cx, cy, ro, ri) {
   ctx.beginPath();
   for (let i = 0; i < 10; i++) {
     const a = Math.PI * (-0.5 + i / 5);
     const r = i % 2 === 0 ? ro : ri;
-    i === 0 ? ctx.moveTo(cx + r*Math.cos(a), cy + r*Math.sin(a))
-            : ctx.lineTo(cx + r*Math.cos(a), cy + r*Math.sin(a));
+    i === 0 ? ctx.moveTo(cx + r * Math.cos(a), cy + r * Math.sin(a))
+            : ctx.lineTo(cx + r * Math.cos(a), cy + r * Math.sin(a));
   }
   ctx.closePath();
-  ctx.fillStyle = CN_YEL; ctx.fill();
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fill();
 }
 
-// 大星 center(8,10) r_out=6, r_in=2.4
-star(s(8), s(10), s(6), s(2.4));
-// 小星 × 4
-[[18,5],[22,9],[22,14],[18,18]].forEach(([sx,sy]) => {
-  star(s(sx), s(sy), s(2.6), s(1.1));
+// 3行 × 4列 の星
+[0.65, 2.2, 3.7].forEach(sy => {
+  [1.5, 4.5, 7.5, 11.0].forEach(sx => {
+    drawStar(s(sx), y0 + sy * stripeH, s(1.2), s(1.2 * 0.382));
+  });
 });
+
 // 外枠
-ctx.strokeStyle = BORDER; ctx.lineWidth = s(0.5);
-ctx.strokeRect(s(0.25), s(0.25), s(31.5), s(31.5));
+ctx.strokeStyle = BORDER;
+ctx.lineWidth = s(0.5);
+ctx.strokeRect(0.5, y0 + 0.5, 95, y1 - y0 - 1);
+`;
+
+PRESETS.flag_cn = `
+// 中国語フラグ: 横長赤地 + 黄色5角星 32px論理サイズ
+const CN_RED = '#DE2910';
+const CN_YEL = '#FFDE00';
+const BORDER = '#1E1E1E';
+
+const y0 = s(5), y1 = s(27);
+
+// 赤背景 (横長)
+ctx.fillStyle = CN_RED;
+ctx.fillRect(0, y0, 96, y1 - y0);
+
+// 星描画ヘルパー
+function drawStar(cx, cy, ro, ri) {
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const a = Math.PI * (-0.5 + i / 5);
+    const r = i % 2 === 0 ? ro : ri;
+    i === 0 ? ctx.moveTo(cx + r * Math.cos(a), cy + r * Math.sin(a))
+            : ctx.lineTo(cx + r * Math.cos(a), cy + r * Math.sin(a));
+  }
+  ctx.closePath();
+  ctx.fillStyle = CN_YEL;
+  ctx.fill();
+}
+
+// 大星: cx=s(10), cy=y0 + 27% of flagH
+drawStar(s(10), y0 + (y1 - y0) * 0.27, s(4.4), s(4.4 * 0.382));
+
+// 小星 × 4: (sx, sy_frac)
+[[17.0, 0.10], [20.4, 0.36], [20.4, 0.64], [17.0, 0.90]].forEach(([sx, sf]) => {
+  drawStar(s(sx), y0 + (y1 - y0) * sf, s(1.7), s(1.7 * 0.382));
+});
+
+// 外枠
+ctx.strokeStyle = BORDER;
+ctx.lineWidth = s(0.5);
+ctx.strokeRect(0.5, y0 + 0.5, 95, y1 - y0 - 1);
 `;
 
 PRESETS.ver = `
@@ -1248,29 +1275,40 @@ ctx.stroke();
 
 PRESETS.manual = `
 // マニュアルアイコン: 青円 + 白 ? 文字 32px論理サイズ
+// arc_r=s(6.4), stroke=33%半径 で読みやすい文字
 const BLU = '#2563EB';
 
 // 青円
 ctx.beginPath();
 ctx.arc(s(16), s(16), s(15), 0, Math.PI * 2);
-ctx.fillStyle = BLU; ctx.fill();
+ctx.fillStyle = BLU;
+ctx.fill();
 
-// ? のフック (arc from 200° to 90° CW, center(16,10) r=5)
+// ? フック: center(16,11), r=s(6.4), 250°→90° 時計回り
+const arcCY = s(11);
+const arcR  = s(6.4);
+const arcW  = s(6.4 * 0.33);  // stroke ≈ 33% of radius
 ctx.beginPath();
-ctx.arc(s(16), s(10), s(5), Math.PI*(200/180), Math.PI*(90/180));
-ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = s(4); ctx.lineCap = 'butt';
+ctx.arc(s(16), arcCY, arcR, 250 * Math.PI / 180, 90 * Math.PI / 180, false);
+ctx.strokeStyle = '#FFFFFF';
+ctx.lineWidth = arcW;
+ctx.lineCap = 'round';
 ctx.stroke();
 
-// ? の縦棒
+// ? 縦棒 (arc終端から tail_end=s(22) まで)
 ctx.beginPath();
-ctx.moveTo(s(16), s(15.5)); ctx.lineTo(s(16), s(21));
-ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = s(4); ctx.lineCap = 'round';
+ctx.moveTo(s(16), arcCY + arcR + s(0.1));
+ctx.lineTo(s(16), s(22));
+ctx.strokeStyle = '#FFFFFF';
+ctx.lineWidth = arcW;
+ctx.lineCap = 'round';
 ctx.stroke();
 
-// ? の点
+// ? 点 (cy=s(25.6), r=s(2))
 ctx.beginPath();
-ctx.arc(s(16), s(25), s(2), 0, Math.PI * 2);
-ctx.fillStyle = '#FFFFFF'; ctx.fill();
+ctx.arc(s(16), s(25.6), s(2), 0, Math.PI * 2);
+ctx.fillStyle = '#FFFFFF';
+ctx.fill();
 `;
 
 // Preset selection handler
