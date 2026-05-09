@@ -1222,16 +1222,17 @@ ctx.strokeRect(0.5, y0 + 0.5, 95, y1 - y0 - 1);
 `;
 
 PRESETS.flag_cn = `
-// 中国語フラグ: 横長赤地 + 黄色5角星 (公式30×20グリッド比率) 32px論理サイズ
-// 大星: グリッド(10,5)、小星: (20,2)(24,4)(24,8)(20,10) ─ すべて左上エリア
+// 中国語フラグ: 横長赤地 + 黄色5角星 (Wikimedia SVG 900×600 公式比率)
+// 大星: (225/900, 150/600) = 左から25%, 上から25%
+// 小星: (450,54)(525,105)(525,195)(450,246)/900×600
 const CN_RED = '#DE2910';
 const CN_YEL = '#FFDE00';
 const BORDER = '#1E1E1E';
 
 const y0 = s(5), y1 = s(27);
-const FW = 32, FH = 22;  // flag width/height in logical units
+const FW = 32, FH = 22;  // flag dimensions (logical units)
 
-// 赤背景 (横長)
+// 赤背景
 ctx.fillStyle = CN_RED;
 ctx.fillRect(0, y0, 96, y1 - y0);
 
@@ -1249,19 +1250,17 @@ function drawStar(cx, cy, ro, ri) {
   ctx.fill();
 }
 
-// 公式グリッド(gx,gy)→アイコン座標変換
-function gxy(gx, gy) {
-  return [s(FW * gx / 30), y0 + (y1 - y0) * gy / 20];
+// Wikimedia SVG 900×600 → icon座標変換 (fx,fy は 0..1 の旗比率)
+function starAt(fx, fy, r) {
+  drawStar(s(FW * fx), y0 + (y1 - y0) * fy, s(r), s(r * 0.382));
 }
 
-// 大星: (10,5) r=3.6
-const [bx, by] = gxy(10, 5);
-drawStar(bx, by, s(3.6), s(3.6 * 0.382));
+// 大星: (225/900, 150/600) = (25%, 25%)
+starAt(225/900, 150/600, 3.5);
 
-// 小星×4: (20,2)(24,4)(24,8)(20,10) r=1.35
-[[20,2],[24,4],[24,8],[20,10]].forEach(([gx,gy]) => {
-  const [sx, sy] = gxy(gx, gy);
-  drawStar(sx, sy, s(1.35), s(1.35 * 0.382));
+// 小星×4
+[[450, 54], [525, 105], [525, 195], [450, 246]].forEach(([x, y]) => {
+  starAt(x / 900, y / 600, 1.2);
 });
 
 // 外枠

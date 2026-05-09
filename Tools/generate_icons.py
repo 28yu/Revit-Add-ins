@@ -640,36 +640,42 @@ def make_flag_us():
 
 
 def make_flag_cn():
-    """China flag using official 30-col × 20-row grid proportions.
-    Large star: (10,5) on 30×20 grid.  Small stars: (20,2),(24,4),(24,8),(20,10).
-    All 5 stars cluster in the upper-left quadrant of the flag.
+    """China flag using Wikimedia SVG official proportions (900×600 viewbox).
+    Large star: (225,150) = 25% from left, 25% from top.
+    Small stars: (450,54),(525,105),(525,195),(450,246) in 900×600.
+    All stars cluster in the upper-left quarter of the flag.
     """
     def _draw_cn(d, draw_w, y0, flag_w, flag_h, big_r, small_r):
-        d.rectangle([0, round(s(y0)), draw_w - 1, round(s(y0 + flag_h))], fill=CN_RED)
-        # Large star: at (10/30, 5/20) of flag dimensions
-        bx = flag_w * 10/30
-        by = y0 + flag_h * 5/20
-        d.polygon(star_pts(s(bx), s(by), s(big_r), s(big_r * 0.382)), fill=CN_YEL)
-        # 4 small stars at official grid positions (20,2),(24,4),(24,8),(20,10)
-        for gx, gy in [(20, 2), (24, 4), (24, 8), (20, 10)]:
-            sx = flag_w * gx/30
-            sy = y0 + flag_h * gy/20
-            d.polygon(star_pts(s(sx), s(sy), s(small_r), s(small_r * 0.382)), fill=CN_YEL)
-        d.rectangle([0, round(s(y0)), draw_w - 1, round(s(y0 + flag_h))],
+        y1 = y0 + flag_h
+        d.rectangle([0, round(s(y0)), draw_w - 1, round(s(y1))], fill=CN_RED)
+
+        def star_at(fx, fy, r):
+            cx = s(flag_w * fx)
+            cy = s(y0 + flag_h * fy)
+            d.polygon(star_pts(cx, cy, s(r), s(r * 0.382)), fill=CN_YEL)
+
+        # Large star at 25%/25% (Wikipedia SVG: 225/900, 150/600)
+        star_at(225/900, 150/600, big_r)
+        # 4 small stars (Wikipedia SVG coordinates)
+        for fx, fy in [(450/900, 54/600),
+                       (525/900, 105/600),
+                       (525/900, 195/600),
+                       (450/900, 246/600)]:
+            star_at(fx, fy, small_r)
+
+        d.rectangle([0, round(s(y0)), draw_w - 1, round(s(y1))],
                     outline=BORDER_K, width=iw(s(0.5)))
 
     # 16px: flag 16×11 units
     img = new_canvas_small()
     _draw_cn(ImageDraw.Draw(img), SMALL_DRAW_PX,
-             FLAG16_Y0, 16, FLAG16_Y1 - FLAG16_Y0,
-             big_r=1.9, small_r=0.75)
+             FLAG16_Y0, 16, FLAG16_Y1 - FLAG16_Y0, big_r=1.8, small_r=0.65)
     save_icon_small(img, 'flag_cn_16')
 
     # 32px: flag 32×22 units
     img2 = new_canvas()
     _draw_cn(ImageDraw.Draw(img2), 384,
-             FLAG32_Y0, 32, FLAG32_Y1 - FLAG32_Y0,
-             big_r=3.6, small_r=1.35)
+             FLAG32_Y0, 32, FLAG32_Y1 - FLAG32_Y0, big_r=3.5, small_r=1.2)
     save_icon_as(img2, 'flag_cn_32.png')
 
 
