@@ -640,23 +640,22 @@ def make_flag_us():
 
 
 def make_flag_cn():
-    """China flag using Wikimedia SVG official proportions (900×600 viewbox).
-    Large star: (225,150) = 25% from left, 25% from top.
-    Small stars: (450,54),(525,105),(525,195),(450,246) in 900×600.
-    All stars cluster in the upper-left quarter of the flag.
+    """China flag using Wikimedia SVG proportions with slight left-shift.
+    Base (900×600): large star (225,150), small (450,54)(525,105)(525,195)(450,246).
+    Applied x_shift = -0.07 (7% of flag width to the left) to match actual flag appearance.
     """
+    X_SHIFT = -0.07  # shift all stars 7% of flag width to the left
+
     def _draw_cn(d, draw_w, y0, flag_w, flag_h, big_r, small_r):
         y1 = y0 + flag_h
         d.rectangle([0, round(s(y0)), draw_w - 1, round(s(y1))], fill=CN_RED)
 
         def star_at(fx, fy, r):
-            cx = s(flag_w * fx)
+            cx = s(flag_w * (fx + X_SHIFT))
             cy = s(y0 + flag_h * fy)
             d.polygon(star_pts(cx, cy, s(r), s(r * 0.382)), fill=CN_YEL)
 
-        # Large star at 25%/25% (Wikipedia SVG: 225/900, 150/600)
         star_at(225/900, 150/600, big_r)
-        # 4 small stars (Wikipedia SVG coordinates)
         for fx, fy in [(450/900, 54/600),
                        (525/900, 105/600),
                        (525/900, 195/600),
