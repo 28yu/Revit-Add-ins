@@ -1250,18 +1250,17 @@ function drawStar(cx, cy, ro, ri) {
   ctx.fill();
 }
 
-// Wikimedia SVG 900×600 → icon座標変換 + 左シフト補正
-const X_SHIFT = -0.07;  // 7% 左シフト
-function starAt(fx, fy, r) {
-  drawStar(s(FW * (fx + X_SHIFT)), y0 + (y1 - y0) * fy, s(r), s(r * 0.382));
-}
+const X_SHIFT = -0.07;        // 全星: 7% 左シフト
+const X_SHIFT_SMALL = -0.03;  // 小星のみ追加で 3% 左シフト
 
-// 大星: (225/900, 150/600) = 25%→補正後18%
-starAt(225/900, 150/600, 3.5);
+// 大星: (225/900, 150/600)
+drawStar(s(FW * (225/900 + X_SHIFT)), y0 + (y1 - y0) * (150/600), s(3.5), s(3.5 * 0.382));
 
-// 小星×4
+// 小星×4 (X_SHIFT + X_SHIFT_SMALL 適用)
 [[450, 54], [525, 105], [525, 195], [450, 246]].forEach(([x, y]) => {
-  starAt(x / 900, y / 600, 1.2);
+  const cx = s(FW * (x/900 + X_SHIFT + X_SHIFT_SMALL));
+  const cy = y0 + (y1 - y0) * (y/600);
+  drawStar(cx, cy, s(1.2), s(1.2 * 0.382));
 });
 
 // 外枠
