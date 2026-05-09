@@ -420,48 +420,50 @@ def _draw_excel_file_icon(img):
     GREEN = hex_rgba('#217346')
     sw = iw(s(1.3))  # thick black border
 
-    # Paper pentagon: (4,1)-(16,1)-(21,6)-(21,30)-(4,30)
+    # Paper pentagon: (4,2)-(16,2)-(21,7)-(21,26)-(4,26) — width=17, height=24, ratio 1:1.41
     paper_poly = [
-        (s(4),  s(1)),
-        (s(16), s(1)),
-        (s(21), s(6)),
-        (s(21), s(30)),
-        (s(4),  s(30)),
+        (s(4),  s(2)),
+        (s(16), s(2)),
+        (s(21), s(7)),
+        (s(21), s(26)),
+        (s(4),  s(26)),
     ]
     draw.polygon(paper_poly, fill=WHITE, outline=DARK, width=sw)
 
-    # Fold flap triangle: (16,1)-(21,1)-(21,6)
+    # Fold flap triangle: (16,2)-(21,2)-(21,7)
     fold_poly = [
-        (s(16), s(1)),
-        (s(21), s(1)),
-        (s(21), s(6)),
+        (s(16), s(2)),
+        (s(21), s(2)),
+        (s(21), s(7)),
     ]
     draw.polygon(fold_poly, fill=WHITE, outline=DARK, width=sw)
 
-    # Green square with thick black border: x=1..13, y=10..22 (12×12)
-    draw.rectangle([s(1), s(10), s(13), s(22)], fill=GREEN, outline=DARK, width=sw)
+    # Green square with thick black border: x=1..13, y=8..20 (12×12)
+    draw.rectangle([s(1), s(8), s(13), s(20)], fill=GREEN, outline=DARK, width=sw)
 
-    # White X with flat horizontal cuts (trapezoidal polygons)
+    # White X with flat horizontal cuts — 2.5-unit padding inside green (1..13, 8..20)
+    # X bounds: x=3.5..10.5, y=10.5..17.5, stroke width=2.5
     # Left stroke (top-left to bottom-right)
     draw.polygon([
-        (s(2.5),  s(11.5)),
-        (s(5.5),  s(11.5)),
-        (s(11.5), s(20.5)),
-        (s(8.5),  s(20.5)),
+        (s(3.5),  s(10.5)),
+        (s(6.0),  s(10.5)),
+        (s(10.5), s(17.5)),
+        (s(8.0),  s(17.5)),
     ], fill=WHITE)
     # Right stroke (top-right to bottom-left)
     draw.polygon([
-        (s(8.5),  s(11.5)),
-        (s(11.5), s(11.5)),
-        (s(5.5),  s(20.5)),
-        (s(2.5),  s(20.5)),
+        (s(8.0),  s(10.5)),
+        (s(10.5), s(10.5)),
+        (s(6.0),  s(17.5)),
+        (s(3.5),  s(17.5)),
     ], fill=WHITE)
 
-    # Green dashes: 3 rows × 2 columns
+    # Green dashes: 3 rows × 2 columns, centered in paper (y=2..26 → rows at 10,14,18)
+    # Right column ends at x=20 to stay clear of paper border at x=21
     dash_w = iw(s(1.6))
-    for y_32 in [12, 16, 20]:
+    for y_32 in [10, 14, 18]:
         draw.line([(s(14),   s(y_32)), (s(17),   s(y_32))], fill=GREEN, width=dash_w)
-        draw.line([(s(17.8), s(y_32)), (s(20.5), s(y_32))], fill=GREEN, width=dash_w)
+        draw.line([(s(17.8), s(y_32)), (s(20),   s(y_32))], fill=GREEN, width=dash_w)
 
 
 def make_excel_export():
