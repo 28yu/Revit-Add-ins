@@ -421,44 +421,37 @@ def _draw_excel_file_icon(img):
     GREEN = hex_rgba('#217346')
     lw = iw(s(0.9))
 
-    # Document body: pentagon (3,1)-(15,1)-(20,6)-(20,31)-(3,31)
+    # Document body: pentagon (3,1)-(16,1)-(21,7)-(21,31)-(3,31)
     doc_poly = [
         (s(3),  s(1)),
-        (s(15), s(1)),
-        (s(20), s(6)),
-        (s(20), s(31)),
+        (s(16), s(1)),
+        (s(21), s(7)),
+        (s(21), s(31)),
         (s(3),  s(31)),
     ]
     draw.polygon(doc_poly, fill=WHITE, outline=DARK, width=lw)
 
-    # Fold triangle: (15,1)-(20,1)-(20,6)
+    # Fold triangle: (16,1)-(21,1)-(21,7)
     fold_poly = [
-        (s(15), s(1)),
-        (s(20), s(1)),
-        (s(20), s(6)),
+        (s(16), s(1)),
+        (s(21), s(1)),
+        (s(21), s(7)),
     ]
     draw.polygon(fold_poly, fill=FOLD, outline=DARK, width=lw)
 
-    # Green square: x=1..13, y=9..27
-    draw.rectangle([s(1), s(9), s(13), s(27)], fill=GREEN)
+    # Green square: x=1..14, y=11..24 (13×13 square)
+    draw.rectangle([s(1), s(11), s(14), s(24)], fill=GREEN)
 
-    # White X with round caps
+    # White X with butt (square) caps
     x_lw = iw(s(2.4))
-    xa1, ya1 = s(3.5),  s(11.5)
-    xa2, ya2 = s(10.5), s(24.5)
-    xb1, yb1 = s(10.5), s(11.5)
-    xb2, yb2 = s(3.5),  s(24.5)
-    draw.line([(xa1, ya1), (xa2, ya2)], fill=WHITE, width=x_lw)
-    draw.line([(xb1, yb1), (xb2, yb2)], fill=WHITE, width=x_lw)
-    cr = x_lw // 2
-    for cx, cy in [(xa1,ya1),(xa2,ya2),(xb1,yb1),(xb2,yb2)]:
-        draw.ellipse([cx-cr, cy-cr, cx+cr, cy+cr], fill=WHITE)
+    draw.line([(s(3.5), s(13)), (s(11),  s(22))], fill=WHITE, width=x_lw)
+    draw.line([(s(11),  s(13)), (s(3.5), s(22))], fill=WHITE, width=x_lw)
 
-    # Horizontal lines on document right side: 3 pairs
-    line_lw = iw(s(0.9))
-    for y1_32, y2_32 in [(14, 16), (18, 20), (22, 24)]:
-        draw.line([(s(15), s(y1_32)), (s(19.5), s(y1_32))], fill=GREEN, width=line_lw)
-        draw.line([(s(15), s(y2_32)), (s(19.5), s(y2_32))], fill=GREEN, width=line_lw)
+    # Horizontal lines: 2 pairs (upper group and lower group)
+    line_lw = iw(s(1.0))
+    for y1_32, y2_32 in [(6, 8.5), (26, 28.5)]:
+        draw.line([(s(15.5), s(y1_32)), (s(20), s(y1_32))], fill=GREEN, width=line_lw)
+        draw.line([(s(15.5), s(y2_32)), (s(20), s(y2_32))], fill=GREEN, width=line_lw)
 
 
 def make_excel_export():
