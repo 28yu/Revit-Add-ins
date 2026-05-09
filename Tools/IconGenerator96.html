@@ -886,60 +886,78 @@ ctx.strokeRect(s(8), s(8), s(16), s(16));
 `;
 
 PRESETS.excel_export = `
-// Excel エクスポート: ファイルアイコン(書類+折り角)+縦長緑四角+白X+横線+青上矢印
+// Excel エクスポート: 紙(右上折り角)+左にはみ出した緑正方形(黒枠)+白X(上下真横切り)+横線3行2列
 const DARK  = '#1A1A1A';
-const DOC   = '#FFFFFF';
-const FOLD  = '#C8C8C8';
-const GREEN = '#217346';
 const WHITE = '#FFFFFF';
+const GREEN = '#217346';
 const BLUE  = '#0066CC';
-const LW    = s(0.9);
+const SW    = s(1.3);  // 太い黒枠
 
-// --- 書類本体: (3,1)-(17,1)-(21,5)-(21,31)-(3,31) ---
+// === 紙本体: 五角形 (4,1)-(16,1)-(21,6)-(21,30)-(4,30) ===
 ctx.beginPath();
-ctx.moveTo(s(3),  s(1));
-ctx.lineTo(s(17), s(1));
-ctx.lineTo(s(21), s(5));
-ctx.lineTo(s(21), s(31));
-ctx.lineTo(s(3),  s(31));
+ctx.moveTo(s(4),  s(1));
+ctx.lineTo(s(16), s(1));
+ctx.lineTo(s(21), s(6));
+ctx.lineTo(s(21), s(30));
+ctx.lineTo(s(4),  s(30));
 ctx.closePath();
-ctx.fillStyle = DOC; ctx.fill();
-ctx.strokeStyle = DARK; ctx.lineWidth = LW; ctx.stroke();
-
-// --- 折り角: (17,1)-(21,1)-(21,5) ---
-ctx.beginPath();
-ctx.moveTo(s(17), s(1));
-ctx.lineTo(s(21), s(1));
-ctx.lineTo(s(21), s(5));
-ctx.closePath();
-ctx.fillStyle = FOLD; ctx.fill();
-ctx.strokeStyle = DARK; ctx.lineWidth = LW; ctx.stroke();
-
-// --- 緑四角: x=1..13, y=8..26 (12×18, 縦長ポートレート) ---
-ctx.fillStyle = GREEN;
-ctx.fillRect(s(1), s(8), s(12), s(18));
-
-// --- 白X (butt caps = 角ばった端) ---
-ctx.strokeStyle = WHITE;
-ctx.lineWidth = s(2.5);
-ctx.lineCap = 'butt';
-ctx.beginPath();
-ctx.moveTo(s(3),  s(10)); ctx.lineTo(s(11), s(24));
-ctx.moveTo(s(11), s(10)); ctx.lineTo(s(3),  s(24));
+ctx.fillStyle = WHITE;
+ctx.fill();
+ctx.strokeStyle = DARK;
+ctx.lineWidth = SW;
+ctx.lineJoin = 'miter';
 ctx.stroke();
 
-// --- 横線 3ペア (緑四角の右横, 同じy範囲) ---
+// === 折り角: 小三角 (16,1)-(21,1)-(21,6) ===
+ctx.beginPath();
+ctx.moveTo(s(16), s(1));
+ctx.lineTo(s(21), s(1));
+ctx.lineTo(s(21), s(6));
+ctx.closePath();
+ctx.fillStyle = WHITE;
+ctx.fill();
+ctx.strokeStyle = DARK;
+ctx.lineWidth = SW;
+ctx.stroke();
+
+// === 緑正方形: x=1..13, y=10..22 (12×12 正方形, 紙の左端より3単位はみ出し) ===
+ctx.fillStyle = GREEN;
+ctx.fillRect(s(1), s(10), s(12), s(12));
+ctx.strokeStyle = DARK;
+ctx.lineWidth = SW;
+ctx.strokeRect(s(1), s(10), s(12), s(12));
+
+// === 白X (台形ポリゴン: 上下が真横に切られた角ばった形) ===
+ctx.fillStyle = WHITE;
+// 左ストローク (左上→右下)
+ctx.beginPath();
+ctx.moveTo(s(2.5),  s(11.5));   // 上左外
+ctx.lineTo(s(5.5),  s(11.5));   // 上左内 (真横)
+ctx.lineTo(s(11.5), s(20.5));   // 下右内
+ctx.lineTo(s(8.5),  s(20.5));   // 下右外 (真横)
+ctx.closePath();
+ctx.fill();
+// 右ストローク (右上→左下)
+ctx.beginPath();
+ctx.moveTo(s(8.5),  s(11.5));   // 上右外
+ctx.lineTo(s(11.5), s(11.5));   // 上右内 (真横)
+ctx.lineTo(s(5.5),  s(20.5));   // 下左内
+ctx.lineTo(s(2.5),  s(20.5));   // 下左外 (真横)
+ctx.closePath();
+ctx.fill();
+
+// === 緑横線: 3行×2列 ===
 ctx.strokeStyle = GREEN;
-ctx.lineWidth = s(1.0);
+ctx.lineWidth = s(1.6);
 ctx.lineCap = 'butt';
-[[11,13], [17,19], [23,25]].forEach(([y1, y2]) => {
+[12, 16, 20].forEach(y => {
   ctx.beginPath();
-  ctx.moveTo(s(14.5), s(y1)); ctx.lineTo(s(20), s(y1));
-  ctx.moveTo(s(14.5), s(y2)); ctx.lineTo(s(20), s(y2));
+  ctx.moveTo(s(14),   s(y)); ctx.lineTo(s(17),   s(y));   // 左列
+  ctx.moveTo(s(17.8), s(y)); ctx.lineTo(s(20.5), s(y));   // 右列
   ctx.stroke();
 });
 
-// === Up arrow (export) ===
+// === 青上矢印 (export) ===
 ctx.fillStyle = BLUE;
 ctx.strokeStyle = BLUE;
 ctx.lineWidth = s(1.2);
@@ -955,56 +973,72 @@ ctx.fill();
 `;
 
 PRESETS.excel_import = `
-// Excel インポート: ファイルアイコン(書類+折り角)+縦長緑四角+白X+横線+青下矢印
+// Excel インポート: 紙(右上折り角)+左にはみ出した緑正方形(黒枠)+白X(上下真横切り)+横線3行2列
 const DARK  = '#1A1A1A';
-const DOC   = '#FFFFFF';
-const FOLD  = '#C8C8C8';
-const GREEN = '#217346';
 const WHITE = '#FFFFFF';
+const GREEN = '#217346';
 const BLUE  = '#0066CC';
-const LW    = s(0.9);
+const SW    = s(1.3);
 
-// --- 書類本体: (3,1)-(17,1)-(21,5)-(21,31)-(3,31) ---
+// === 紙本体 ===
 ctx.beginPath();
-ctx.moveTo(s(3),  s(1));
-ctx.lineTo(s(17), s(1));
-ctx.lineTo(s(21), s(5));
-ctx.lineTo(s(21), s(31));
-ctx.lineTo(s(3),  s(31));
+ctx.moveTo(s(4),  s(1));
+ctx.lineTo(s(16), s(1));
+ctx.lineTo(s(21), s(6));
+ctx.lineTo(s(21), s(30));
+ctx.lineTo(s(4),  s(30));
 ctx.closePath();
-ctx.fillStyle = DOC; ctx.fill();
-ctx.strokeStyle = DARK; ctx.lineWidth = LW; ctx.stroke();
-
-// --- 折り角: (17,1)-(21,1)-(21,5) ---
-ctx.beginPath();
-ctx.moveTo(s(17), s(1));
-ctx.lineTo(s(21), s(1));
-ctx.lineTo(s(21), s(5));
-ctx.closePath();
-ctx.fillStyle = FOLD; ctx.fill();
-ctx.strokeStyle = DARK; ctx.lineWidth = LW; ctx.stroke();
-
-// --- 緑四角: x=1..13, y=8..26 (12×18, 縦長ポートレート) ---
-ctx.fillStyle = GREEN;
-ctx.fillRect(s(1), s(8), s(12), s(18));
-
-// --- 白X (butt caps = 角ばった端) ---
-ctx.strokeStyle = WHITE;
-ctx.lineWidth = s(2.5);
-ctx.lineCap = 'butt';
-ctx.beginPath();
-ctx.moveTo(s(3),  s(10)); ctx.lineTo(s(11), s(24));
-ctx.moveTo(s(11), s(10)); ctx.lineTo(s(3),  s(24));
+ctx.fillStyle = WHITE;
+ctx.fill();
+ctx.strokeStyle = DARK;
+ctx.lineWidth = SW;
+ctx.lineJoin = 'miter';
 ctx.stroke();
 
-// --- 横線 3ペア (緑四角の右横, 同じy範囲) ---
+// === 折り角 ===
+ctx.beginPath();
+ctx.moveTo(s(16), s(1));
+ctx.lineTo(s(21), s(1));
+ctx.lineTo(s(21), s(6));
+ctx.closePath();
+ctx.fillStyle = WHITE;
+ctx.fill();
+ctx.strokeStyle = DARK;
+ctx.lineWidth = SW;
+ctx.stroke();
+
+// === 緑正方形 (12×12) ===
+ctx.fillStyle = GREEN;
+ctx.fillRect(s(1), s(10), s(12), s(12));
+ctx.strokeStyle = DARK;
+ctx.lineWidth = SW;
+ctx.strokeRect(s(1), s(10), s(12), s(12));
+
+// === 白X (台形ポリゴン) ===
+ctx.fillStyle = WHITE;
+ctx.beginPath();
+ctx.moveTo(s(2.5),  s(11.5));
+ctx.lineTo(s(5.5),  s(11.5));
+ctx.lineTo(s(11.5), s(20.5));
+ctx.lineTo(s(8.5),  s(20.5));
+ctx.closePath();
+ctx.fill();
+ctx.beginPath();
+ctx.moveTo(s(8.5),  s(11.5));
+ctx.lineTo(s(11.5), s(11.5));
+ctx.lineTo(s(5.5),  s(20.5));
+ctx.lineTo(s(2.5),  s(20.5));
+ctx.closePath();
+ctx.fill();
+
+// === 緑横線: 3行×2列 ===
 ctx.strokeStyle = GREEN;
-ctx.lineWidth = s(1.0);
+ctx.lineWidth = s(1.6);
 ctx.lineCap = 'butt';
-[[11,13], [17,19], [23,25]].forEach(([y1, y2]) => {
+[12, 16, 20].forEach(y => {
   ctx.beginPath();
-  ctx.moveTo(s(14.5), s(y1)); ctx.lineTo(s(20), s(y1));
-  ctx.moveTo(s(14.5), s(y2)); ctx.lineTo(s(20), s(y2));
+  ctx.moveTo(s(14),   s(y)); ctx.lineTo(s(17),   s(y));
+  ctx.moveTo(s(17.8), s(y)); ctx.lineTo(s(20.5), s(y));
   ctx.stroke();
 });
 

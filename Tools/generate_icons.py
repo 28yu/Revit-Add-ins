@@ -413,45 +413,55 @@ def make_beam_top_level():
 # excel_export / excel_import
 # ─────────────────────────────────────────
 def _draw_excel_file_icon(img):
-    """Draw the Excel file icon (white document + fold + green square + white X + green lines)."""
+    """Draw Excel file icon: paper(top-right fold) + green square(black border, extends left) + flat-top X + dashes."""
     draw = ImageDraw.Draw(img)
     DARK  = (26, 26, 26, 255)
     WHITE = (255, 255, 255, 255)
-    FOLD  = (200, 200, 200, 255)
     GREEN = hex_rgba('#217346')
-    lw = iw(s(0.9))
+    sw = iw(s(1.3))  # thick black border
 
-    # Document body: pentagon (3,1)-(17,1)-(21,5)-(21,31)-(3,31)
-    doc_poly = [
-        (s(3),  s(1)),
-        (s(17), s(1)),
-        (s(21), s(5)),
-        (s(21), s(31)),
-        (s(3),  s(31)),
+    # Paper pentagon: (4,1)-(16,1)-(21,6)-(21,30)-(4,30)
+    paper_poly = [
+        (s(4),  s(1)),
+        (s(16), s(1)),
+        (s(21), s(6)),
+        (s(21), s(30)),
+        (s(4),  s(30)),
     ]
-    draw.polygon(doc_poly, fill=WHITE, outline=DARK, width=lw)
+    draw.polygon(paper_poly, fill=WHITE, outline=DARK, width=sw)
 
-    # Fold triangle: (17,1)-(21,1)-(21,5)
+    # Fold flap triangle: (16,1)-(21,1)-(21,6)
     fold_poly = [
-        (s(17), s(1)),
+        (s(16), s(1)),
         (s(21), s(1)),
-        (s(21), s(5)),
+        (s(21), s(6)),
     ]
-    draw.polygon(fold_poly, fill=FOLD, outline=DARK, width=lw)
+    draw.polygon(fold_poly, fill=WHITE, outline=DARK, width=sw)
 
-    # Green rectangle: x=1..13, y=8..26 (12×18, portrait)
-    draw.rectangle([s(1), s(8), s(13), s(26)], fill=GREEN)
+    # Green square with thick black border: x=1..13, y=10..22 (12×12)
+    draw.rectangle([s(1), s(10), s(13), s(22)], fill=GREEN, outline=DARK, width=sw)
 
-    # White X with butt (square) caps
-    x_lw = iw(s(2.5))
-    draw.line([(s(3),  s(10)), (s(11), s(24))], fill=WHITE, width=x_lw)
-    draw.line([(s(11), s(10)), (s(3),  s(24))], fill=WHITE, width=x_lw)
+    # White X with flat horizontal cuts (trapezoidal polygons)
+    # Left stroke (top-left to bottom-right)
+    draw.polygon([
+        (s(2.5),  s(11.5)),
+        (s(5.5),  s(11.5)),
+        (s(11.5), s(20.5)),
+        (s(8.5),  s(20.5)),
+    ], fill=WHITE)
+    # Right stroke (top-right to bottom-left)
+    draw.polygon([
+        (s(8.5),  s(11.5)),
+        (s(11.5), s(11.5)),
+        (s(5.5),  s(20.5)),
+        (s(2.5),  s(20.5)),
+    ], fill=WHITE)
 
-    # Horizontal lines: 3 pairs beside the green rectangle (right strip)
-    line_lw = iw(s(1.0))
-    for y1_32, y2_32 in [(11, 13), (17, 19), (23, 25)]:
-        draw.line([(s(14.5), s(y1_32)), (s(20), s(y1_32))], fill=GREEN, width=line_lw)
-        draw.line([(s(14.5), s(y2_32)), (s(20), s(y2_32))], fill=GREEN, width=line_lw)
+    # Green dashes: 3 rows × 2 columns
+    dash_w = iw(s(1.6))
+    for y_32 in [12, 16, 20]:
+        draw.line([(s(14),   s(y_32)), (s(17),   s(y_32))], fill=GREEN, width=dash_w)
+        draw.line([(s(17.8), s(y_32)), (s(20.5), s(y_32))], fill=GREEN, width=dash_w)
 
 
 def make_excel_export():
