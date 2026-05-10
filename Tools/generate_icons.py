@@ -753,50 +753,67 @@ def make_manual():
 # formwork (型枠数量算出)
 # ─────────────────────────────────────────
 def make_formwork():
-    """型枠数量算出: コンクリート(灰) + 型枠板(橙縦縞) + 横端太(鋼灰横バー) + セパレータ(点線)"""
-    CONC    = (185, 185, 180, 255)  # コンクリート
-    PL_BG   = (212, 118,  55, 255)  # 型枠板 明面
-    PL_BT   = (148,  66,  18, 255)  # 縦桁（バテン）暗
-    WLR     = (168, 172, 180, 255)  # 横端太
-    WLR_SH  = ( 95, 100, 112, 255)  # 横端太輪郭
-    TIE     = (125, 125, 118, 255)  # セパレータ（点線）
-    BK      = ( 38,  38,  38, 255)  # 輪郭
+    """型枠数量算出: 3D視点 — コンクリート側面(灰) + 天端(明灰) + 型枠板(橙) + 横端太(銀)"""
+    CONC_SIDE = (175, 175, 170, 255)   # コンクリート側面
+    CONC_TOP  = (215, 215, 210, 255)   # コンクリート天端（明）
+    PL_BG     = (212, 115,  52, 255)   # 型枠板 明面
+    PL_BT     = (145,  62,  15, 255)   # 縦桁（暗）
+    WLR       = (168, 172, 180, 255)   # 横端太
+    WLR_SH    = ( 88,  93, 106, 255)   # 横端太輪郭
+    TIE       = (120, 120, 114, 255)   # セパレータ点線
+    BK        = ( 38,  38,  38, 255)   # 輪郭
 
     img = new_canvas()
-    d   = ImageDraw.Draw(img)
+    d = ImageDraw.Draw(img)
 
-    y0, y1 = 2.0, 30.0   # 描画範囲
-    uh = y1 - y0          # 28 units
-    cx = 11.5             # コンクリート右端
-    fw = 32.0 - cx        # 型枠幅
-    n  = 4                # 縦板枚数
+    # 3D 奥行きベクトル: 右5単位・上4単位 (キャビネット図法)
+    ddx, ddy = 5.0, -4.0
 
-    # ① コンクリート
-    d.rectangle([s(0), s(y0), s(cx), s(y1)], fill=CONC)
-    d.rectangle([s(0), s(y0), s(cx), s(y1)], outline=BK, width=iw(s(0.45)))
+    # コンクリート側面（左面）: x=0.5..11, y=8..30
+    cx0, cy0 = 0.5, 8.0
+    cx1       = 11.0
+    ybot      = 30.0
+    fh = ybot - cy0   # 22 units
 
-    # ② 型枠板（縦板4枚 + 縦桁）
+    # 型枠正面右端
+    fx1 = 31.0
+    n   = 4            # 縦板枚数
+    fw  = fx1 - cx1   # 型枠幅 = 20 units
+
+    # ① コンクリート天端（平行四辺形）— 最初に描いて側面・型枠の下に隠れないように
+    top_pts = [
+        (s(cx0),        s(cy0)),
+        (s(cx1),        s(cy0)),
+        (s(cx1 + ddx),  s(cy0 + ddy)),
+        (s(cx0 + ddx),  s(cy0 + ddy)),
+    ]
+    d.polygon(top_pts, fill=CONC_TOP)
+    d.polygon(top_pts, outline=BK, width=iw(s(0.4)))
+
+    # ② コンクリート側面（左面、矩形）
+    d.rectangle([s(cx0), s(cy0), s(cx1), s(ybot)], fill=CONC_SIDE)
+    d.rectangle([s(cx0), s(cy0), s(cx1), s(ybot)], outline=BK, width=iw(s(0.4)))
+
+    # ③ 型枠板（正面、縦4枚 + 縦桁）
     for i in range(n):
-        px0 = cx + fw * i / n
-        px1 = cx + fw * (i + 1) / n
-        d.rectangle([s(px0), s(y0), s(px1), s(y1)], fill=PL_BG)
-        bt = fw / n * 0.30   # 縦桁幅
-        d.rectangle([s(px1 - bt), s(y0), s(px1), s(y1)], fill=PL_BT)
+        px0 = cx1 + fw * i / n
+        px1 = cx1 + fw * (i + 1) / n
+        d.rectangle([s(px0), s(cy0), s(px1), s(ybot)], fill=PL_BG)
+        bt = fw / n * 0.28   # 縦桁幅
+        d.rectangle([s(px1 - bt), s(cy0), s(px1), s(ybot)], fill=PL_BT)
+    d.rectangle([s(cx1), s(cy0), s(fx1), s(ybot)], outline=BK, width=iw(s(0.4)))
 
-    # 型枠全体の外枠
-    d.rectangle([s(cx), s(y0), s(31.5), s(y1)], outline=BK, width=iw(s(0.45)))
-
-    # ③ セパレータ点線（コンクリート内、横端太と同高）
+    # ④ セパレータ点線（コンクリート側面を水平に貫通）
     for fy in [0.25, 0.50, 0.75]:
-        ty = y0 + uh * fy
-        dashed_line(d, s(1.0), s(ty), s(cx - 0.8), s(ty),
-                    TIE, s(0.65), s(1.5), s(0.9))
+        ty = cy0 + fh * fy
+        dashed_line(d, s(cx0 + 0.6), s(ty), s(cx1 - 0.5), s(ty),
+                    TIE, s(0.65), s(1.6), s(1.0))
 
-    # ④ 横端太（型枠面に重ねる）
-    wh = 1.3   # 端太の半高
+    # ⑤ 横端太（型枠正面を横断するバー）
+    wh = 1.25
     for fy in [0.25, 0.50, 0.75]:
-        ty = y0 + uh * fy
-        d.rectangle([s(cx - 0.3), s(ty - wh), s(31.8), s(ty + wh)],
+        ty = cy0 + fh * fy
+        d.rectangle([s(cx1 - 0.2), s(ty - wh), s(fx1 + 0.4), s(ty + wh)],
                     fill=WLR, outline=WLR_SH, width=iw(s(0.35)))
 
     save_icon(img, 'formwork')
