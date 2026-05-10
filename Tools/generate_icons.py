@@ -750,6 +750,59 @@ def make_manual():
 
 
 # ─────────────────────────────────────────
+# formwork (型枠数量算出)
+# ─────────────────────────────────────────
+def make_formwork():
+    """型枠数量算出: コンクリート(灰) + 型枠板(橙縦縞) + 横端太(鋼灰横バー) + セパレータ(点線)"""
+    CONC    = (185, 185, 180, 255)  # コンクリート
+    PL_BG   = (212, 118,  55, 255)  # 型枠板 明面
+    PL_BT   = (148,  66,  18, 255)  # 縦桁（バテン）暗
+    WLR     = (168, 172, 180, 255)  # 横端太
+    WLR_SH  = ( 95, 100, 112, 255)  # 横端太輪郭
+    TIE     = (125, 125, 118, 255)  # セパレータ（点線）
+    BK      = ( 38,  38,  38, 255)  # 輪郭
+
+    img = new_canvas()
+    d   = ImageDraw.Draw(img)
+
+    y0, y1 = 2.0, 30.0   # 描画範囲
+    uh = y1 - y0          # 28 units
+    cx = 11.5             # コンクリート右端
+    fw = 32.0 - cx        # 型枠幅
+    n  = 4                # 縦板枚数
+
+    # ① コンクリート
+    d.rectangle([s(0), s(y0), s(cx), s(y1)], fill=CONC)
+    d.rectangle([s(0), s(y0), s(cx), s(y1)], outline=BK, width=iw(s(0.45)))
+
+    # ② 型枠板（縦板4枚 + 縦桁）
+    for i in range(n):
+        px0 = cx + fw * i / n
+        px1 = cx + fw * (i + 1) / n
+        d.rectangle([s(px0), s(y0), s(px1), s(y1)], fill=PL_BG)
+        bt = fw / n * 0.30   # 縦桁幅
+        d.rectangle([s(px1 - bt), s(y0), s(px1), s(y1)], fill=PL_BT)
+
+    # 型枠全体の外枠
+    d.rectangle([s(cx), s(y0), s(31.5), s(y1)], outline=BK, width=iw(s(0.45)))
+
+    # ③ セパレータ点線（コンクリート内、横端太と同高）
+    for fy in [0.25, 0.50, 0.75]:
+        ty = y0 + uh * fy
+        dashed_line(d, s(1.0), s(ty), s(cx - 0.8), s(ty),
+                    TIE, s(0.65), s(1.5), s(0.9))
+
+    # ④ 横端太（型枠面に重ねる）
+    wh = 1.3   # 端太の半高
+    for fy in [0.25, 0.50, 0.75]:
+        ty = y0 + uh * fy
+        d.rectangle([s(cx - 0.3), s(ty - wh), s(31.8), s(ty + wh)],
+                    fill=WLR, outline=WLR_SH, width=iw(s(0.35)))
+
+    save_icon(img, 'formwork')
+
+
+# ─────────────────────────────────────────
 if __name__ == '__main__':
     print('Generating icons...')
     make_sectionbox_copy()
@@ -766,4 +819,5 @@ if __name__ == '__main__':
     make_flag_cn()
     make_ver()
     make_manual()
+    make_formwork()
     print('Done.')
