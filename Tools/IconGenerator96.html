@@ -1097,45 +1097,109 @@ const bx = s(21), bw = s(9), bh = s(8);
 `;
 
 PRESETS.formwork = `
-// 型枠: コンクリート面 + 寸法矢印 + 右側色分けブロック
-const DARK = '#323232';
-const CONCRETE = '#8B6914'; // concrete/brown color
-const ARROW = '#3388CC';
-const PINK = [255,128,148];
-const YELLOW = [218,185,47];
-const BLUE_C = [30,144,255];
+// 型枠数量算出: 3D視点 — コンクリート + コンパネ面 + 縦バタ桟木3本 + 横端太3本 + セパレータ + フォームタイ
 
-// Large concrete face (main element)
-ctx.fillStyle = CONCRETE;
-ctx.fillRect(s(1), s(5), s(19), s(24));
-ctx.strokeStyle = DARK;
-ctx.lineWidth = s(0.8);
-ctx.strokeRect(s(1), s(5), s(19), s(24));
+// --- パラメータ ---
+const ddx = 9.0, ddy = -4.0;
+const cx0 = 0.5, cy0 = 8.0, cx1 = 6.0, ybot = 30.0;
 
-// Double-headed arrow (width indicator)
-ctx.strokeStyle = ARROW;
-ctx.lineWidth = s(1.0);
+// --- ① コンクリート側面 (正面グレー矩形) ---
+ctx.fillStyle = 'rgb(175,175,170)';
+ctx.fillRect(s(cx0), s(cy0), s(cx1 - cx0), s(ybot - cy0));
+
+// --- ② コンクリート天端 (パラレログラム) ---
+ctx.fillStyle = 'rgb(215,215,210)';
 ctx.beginPath();
-ctx.moveTo(s(3.5), s(2.5)); ctx.lineTo(s(17.5), s(2.5));
-ctx.stroke();
-ctx.fillStyle = ARROW;
-// Left arrowhead
-ctx.beginPath();
-ctx.moveTo(s(1), s(2.5)); ctx.lineTo(s(4), s(1)); ctx.lineTo(s(4), s(4)); ctx.closePath();
-ctx.fill();
-// Right arrowhead
-ctx.beginPath();
-ctx.moveTo(s(20), s(2.5)); ctx.lineTo(s(17), s(1)); ctx.lineTo(s(17), s(4)); ctx.closePath();
+ctx.moveTo(s(cx0),       s(cy0));
+ctx.lineTo(s(cx1),       s(cy0));
+ctx.lineTo(s(cx1 + ddx), s(cy0 + ddy));
+ctx.lineTo(s(cx0 + ddx), s(cy0 + ddy));
+ctx.closePath();
 ctx.fill();
 
-// Color classification blocks on right
-const bx = s(21), bw = s(9), bh = s(7);
-[[PINK,4],[YELLOW,13],[BLUE_C,22]].forEach(([c, y]) => {
-  ctx.fillStyle = 'rgb('+c.join(',')+')';
-  ctx.fillRect(bx, s(y), bw, bh);
-  ctx.strokeStyle = DARK;
-  ctx.lineWidth = s(0.4);
-  ctx.strokeRect(bx, s(y), bw, bh);
+// --- ③ コンパネ面 (右の奥面パラレログラム, 淡橙) ---
+ctx.fillStyle = 'rgb(240,195,155)';
+ctx.beginPath();
+ctx.moveTo(s(cx1),       s(cy0));
+ctx.lineTo(s(cx1 + ddx), s(cy0 + ddy));
+ctx.lineTo(s(cx1 + ddx), s(ybot + ddy));
+ctx.lineTo(s(cx1),       s(ybot));
+ctx.closePath();
+ctx.fill();
+
+// --- ④ 縦バタ桟木3本 (左端・中央・右端) 3色バンドで立体表現 ---
+const tw = 0.22, thi = 0.06, tsh = 0.06;
+const BATT_HI   = 'rgb(210,158,75)';
+const BATT_FACE = 'rgb(158,100,38)';
+const BATT_SH   = 'rgb(105,62,18)';
+
+function battPara(ta, tb, color) {
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(s(cx1 + ta*ddx), s(cy0 + ta*ddy));
+  ctx.lineTo(s(cx1 + tb*ddx), s(cy0 + tb*ddy));
+  ctx.lineTo(s(cx1 + tb*ddx), s(ybot + tb*ddy));
+  ctx.lineTo(s(cx1 + ta*ddx), s(ybot + ta*ddy));
+  ctx.closePath();
+  ctx.fill();
+}
+
+function batten3d(t0, t1) {
+  battPara(t0,          t0 + thi,   BATT_HI);
+  battPara(t0 + thi,    t1 - tsh,   BATT_FACE);
+  battPara(t1 - tsh,    t1,         BATT_SH);
+}
+
+batten3d(0.0,           tw);
+batten3d(0.5 - tw/2,    0.5 + tw/2);
+batten3d(1.0 - tw,      1.0);
+
+// --- ⑤ 横端太3本 (コンパネ面を横に走る鋼材) ---
+const WLR_HI   = 'rgb(215,220,228)';
+const WLR_MAIN = 'rgb(162,167,176)';
+const WLR_SH   = 'rgb(95,100,112)';
+const wh = 1.5;
+const walFys = [0.25, 0.50, 0.75];
+
+function wband(yc, dy0, dy1, color) {
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(s(cx1),       s(yc + dy0));
+  ctx.lineTo(s(cx1 + ddx), s(yc + dy0 + ddy));
+  ctx.lineTo(s(cx1 + ddx), s(yc + dy1 + ddy));
+  ctx.lineTo(s(cx1),       s(yc + dy1));
+  ctx.closePath();
+  ctx.fill();
+}
+
+walFys.forEach(fy => {
+  const yc = cy0 + fy * (ybot - cy0);
+  wband(yc, -wh,        -wh * 0.35,  WLR_HI);
+  wband(yc, -wh * 0.35,  wh * 0.55,  WLR_MAIN);
+  wband(yc,  wh * 0.55,  wh,         WLR_SH);
+});
+
+// --- ⑥ セパレータ (コンクリート正面を水平に貫く破線) ---
+ctx.strokeStyle = 'rgb(100,100,98)';
+ctx.lineWidth = s(0.35);
+ctx.setLineDash([s(0.7), s(0.5)]);
+walFys.forEach(fy => {
+  const yc = cy0 + fy * (ybot - cy0);
+  ctx.beginPath();
+  ctx.moveTo(s(cx0 + 0.4), s(yc));
+  ctx.lineTo(s(cx1 - 0.2), s(yc));
+  ctx.stroke();
+});
+ctx.setLineDash([]);
+
+// --- ⑦ フォームタイ (各端太とコンパネ面の接合部に小さな黒い金具) ---
+const FT_W = s(0.9), FT_H = s(1.0);
+ctx.fillStyle = 'rgb(55,55,58)';
+walFys.forEach(fy => {
+  const yc = cy0 + fy * (ybot - cy0);
+  const fx = s(cx1) - FT_W / 2;
+  const fy_px = s(yc) - FT_H / 2;
+  ctx.fillRect(fx, fy_px, FT_W, FT_H);
 });
 `;
 
