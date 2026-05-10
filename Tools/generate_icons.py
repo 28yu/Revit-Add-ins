@@ -762,7 +762,7 @@ def make_formwork():
     d = ImageDraw.Draw(img)
 
     # 3D 奥行きベクトル: 右5単位・上4単位 (キャビネット図法)
-    ddx, ddy = 5.0, -4.0
+    ddx, ddy = 9.0, -4.0
 
     # コンクリート寸法
     cx0, cy0 = 0.5, 8.0   # 側面 左上
