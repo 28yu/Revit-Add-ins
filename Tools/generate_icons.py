@@ -753,55 +753,60 @@ def make_manual():
 # formwork (型枠数量算出)
 # ─────────────────────────────────────────
 def make_formwork():
-    """型枠数量算出: 3D視点 — コンクリート + コンパネ面 + 縦バタ桟木3本"""
-    CONC_SIDE  = (175, 175, 170, 255)   # コンクリート側面（グレー）
-    CONC_TOP   = (215, 215, 210, 255)   # コンクリート天端（明灰）
-    CONC_PANEL = (240, 195, 155, 255)   # コンパネ接触面（淡いオレンジ）
-    BATTEN     = (155,  98,  38, 255)   # 縦バタ桟木（木材色）
+    """型枠数量算出: 3D視点 — コンクリート + コンパネ面 + 縦バタ桟木3本（立体）"""
+    CONC_SIDE    = (175, 175, 170, 255)   # コンクリート側面
+    CONC_TOP     = (215, 215, 210, 255)   # コンクリート天端
+    CONC_PANEL   = (240, 195, 155, 255)   # コンパネ面（淡橙）
+    BATTEN_FACE  = (155,  98,  38, 255)   # 縦バタ 正面
+    BATTEN_TOP   = (205, 150,  68, 255)   # 縦バタ 上面（明）
 
     img = new_canvas()
     d = ImageDraw.Draw(img)
 
-    # 3D 奥行きベクトル (キャビネット図法)
     ddx, ddy = 9.0, -4.0
-
-    # コンクリート寸法
     cx0, cy0 = 0.5, 8.0
     cx1       = 6.0
     ybot      = 30.0
 
-    # ① コンクリート側面（グレー矩形）
+    # バタ突出ベクトル（コンパネ面から手前へ: 奥行きベクトルの逆方向×2/9）
+    prt_x, prt_y = -2.0, +0.9
+
+    # ① コンクリート側面
     d.rectangle([s(cx0), s(cy0), s(cx1), s(ybot)], fill=CONC_SIDE)
 
-    # ② コンクリート天端（明灰平行四辺形）
+    # ② コンクリート天端
     d.polygon([
-        (s(cx0),        s(cy0)),
-        (s(cx1),        s(cy0)),
-        (s(cx1 + ddx),  s(cy0 + ddy)),
-        (s(cx0 + ddx),  s(cy0 + ddy)),
+        (s(cx0),       s(cy0)),      (s(cx1),       s(cy0)),
+        (s(cx1 + ddx), s(cy0 + ddy)), (s(cx0 + ddx), s(cy0 + ddy)),
     ], fill=CONC_TOP)
 
-    # ③ コンパネ接触面（淡橙平行四辺形）
+    # ③ コンパネ面
     d.polygon([
-        (s(cx1),        s(cy0)),
-        (s(cx1 + ddx),  s(cy0 + ddy)),
-        (s(cx1 + ddx),  s(ybot + ddy)),
-        (s(cx1),        s(ybot)),
+        (s(cx1),       s(cy0)),      (s(cx1 + ddx), s(cy0 + ddy)),
+        (s(cx1 + ddx), s(ybot + ddy)), (s(cx1),     s(ybot)),
     ], fill=CONC_PANEL)
 
-    # ④ 縦バタ桟木（左端・中央・右端、各幅15%）
-    def batten(t0, t1):
+    # ④ 縦バタ桟木（立体: 上面＋正面）
+    tw = 0.14
+    def batten_3d(t0, t1):
+        # 上面（コンパネ背面→手前突出先の天板）
         d.polygon([
-            (s(cx1 + t0*ddx), s(cy0 + t0*ddy)),
-            (s(cx1 + t1*ddx), s(cy0 + t1*ddy)),
-            (s(cx1 + t1*ddx), s(ybot + t1*ddy)),
-            (s(cx1 + t0*ddx), s(ybot + t0*ddy)),
-        ], fill=BATTEN)
+            (s(cx1 + t0*ddx),          s(cy0 + t0*ddy)),
+            (s(cx1 + t1*ddx),          s(cy0 + t1*ddy)),
+            (s(cx1 + t1*ddx + prt_x),  s(cy0 + t1*ddy + prt_y)),
+            (s(cx1 + t0*ddx + prt_x),  s(cy0 + t0*ddy + prt_y)),
+        ], fill=BATTEN_TOP)
+        # 正面（手前に突出した面、全高）
+        d.polygon([
+            (s(cx1 + t0*ddx + prt_x),  s(cy0 + t0*ddy + prt_y)),
+            (s(cx1 + t1*ddx + prt_x),  s(cy0 + t1*ddy + prt_y)),
+            (s(cx1 + t1*ddx + prt_x),  s(ybot + t1*ddy + prt_y)),
+            (s(cx1 + t0*ddx + prt_x),  s(ybot + t0*ddy + prt_y)),
+        ], fill=BATTEN_FACE)
 
-    tw = 0.14   # 桟木幅（比率）
-    batten(0.0,        tw)            # 左端
-    batten(0.5 - tw/2, 0.5 + tw/2)   # 中央
-    batten(1.0 - tw,   1.0)           # 右端
+    batten_3d(0.0,         tw)
+    batten_3d(0.5 - tw/2,  0.5 + tw/2)
+    batten_3d(1.0 - tw,    1.0)
 
     save_icon(img, 'formwork')
 
