@@ -754,11 +754,9 @@ def make_manual():
 # ─────────────────────────────────────────
 def make_formwork():
     """型枠数量算出: 3D視点 — コンクリート + コンパネ面 + 縦バタ桟木3本（立体）"""
-    CONC_SIDE    = (175, 175, 170, 255)   # コンクリート側面
-    CONC_TOP     = (215, 215, 210, 255)   # コンクリート天端
-    CONC_PANEL   = (240, 195, 155, 255)   # コンパネ面（淡橙）
-    BATTEN_FACE  = (155,  98,  38, 255)   # 縦バタ 正面
-    BATTEN_TOP   = (205, 150,  68, 255)   # 縦バタ 上面（明）
+    CONC_SIDE  = (175, 175, 170, 255)   # コンクリート側面
+    CONC_TOP   = (215, 215, 210, 255)   # コンクリート天端
+    CONC_PANEL = (240, 195, 155, 255)   # コンパネ面（淡橙）
 
     img = new_canvas()
     d = ImageDraw.Draw(img)
@@ -767,9 +765,6 @@ def make_formwork():
     cx0, cy0 = 0.5, 8.0
     cx1       = 6.0
     ybot      = 30.0
-
-    # バタ突出ベクトル（コンパネ面から手前へ: 奥行きベクトルの逆方向×2/9）
-    prt_x, prt_y = -2.0, +0.9
 
     # ① コンクリート側面
     d.rectangle([s(cx0), s(cy0), s(cx1), s(ybot)], fill=CONC_SIDE)
@@ -786,23 +781,27 @@ def make_formwork():
         (s(cx1 + ddx), s(ybot + ddy)), (s(cx1),     s(ybot)),
     ], fill=CONC_PANEL)
 
-    # ④ 縦バタ桟木（立体: 上面＋正面）
-    tw = 0.14
+    # ④ 縦バタ桟木（左端・中央・右端）立体感：左ハイライト＋中央本体＋右シャドウ
+    BATTEN_HI   = (210, 158,  75, 255)   # 左面ハイライト
+    BATTEN_FACE = (158, 100,  38, 255)   # 正面本体
+    BATTEN_SH   = (105,  62,  18, 255)   # 右面シャドウ
+
+    tw  = 0.22   # バタ幅（コンパネ面幅の比率）
+    thi = 0.06   # ハイライト幅
+    tsh = 0.06   # シャドウ幅
+
     def batten_3d(t0, t1):
-        # 上面（コンパネ背面→手前突出先の天板）
-        d.polygon([
-            (s(cx1 + t0*ddx),          s(cy0 + t0*ddy)),
-            (s(cx1 + t1*ddx),          s(cy0 + t1*ddy)),
-            (s(cx1 + t1*ddx + prt_x),  s(cy0 + t1*ddy + prt_y)),
-            (s(cx1 + t0*ddx + prt_x),  s(cy0 + t0*ddy + prt_y)),
-        ], fill=BATTEN_TOP)
-        # 正面（手前に突出した面、全高）
-        d.polygon([
-            (s(cx1 + t0*ddx + prt_x),  s(cy0 + t0*ddy + prt_y)),
-            (s(cx1 + t1*ddx + prt_x),  s(cy0 + t1*ddy + prt_y)),
-            (s(cx1 + t1*ddx + prt_x),  s(ybot + t1*ddy + prt_y)),
-            (s(cx1 + t0*ddx + prt_x),  s(ybot + t0*ddy + prt_y)),
-        ], fill=BATTEN_FACE)
+        def para(ta, tb, color):
+            d.polygon([
+                (s(cx1 + ta*ddx), s(cy0 + ta*ddy)),
+                (s(cx1 + tb*ddx), s(cy0 + tb*ddy)),
+                (s(cx1 + tb*ddx), s(ybot + tb*ddy)),
+                (s(cx1 + ta*ddx), s(ybot + ta*ddy)),
+            ], fill=color)
+
+        para(t0,       t0 + thi,        BATTEN_HI)    # 左ハイライト
+        para(t0 + thi, t1 - tsh,        BATTEN_FACE)  # 中央本体
+        para(t1 - tsh, t1,              BATTEN_SH)    # 右シャドウ
 
     batten_3d(0.0,         tw)
     batten_3d(0.5 - tw/2,  0.5 + tw/2)
