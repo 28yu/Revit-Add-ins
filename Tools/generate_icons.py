@@ -780,7 +780,7 @@ def make_formwork():
     n   = 4            # 縦板枚数
     fw  = fx1 - cx1   # 型枠幅 = 20 units
 
-    # ① コンクリート天端（平行四辺形）— 最初に描いて側面・型枠の下に隠れないように
+    # ① コンクリート天端（平行四辺形）
     top_pts = [
         (s(cx0),        s(cy0)),
         (s(cx1),        s(cy0)),
@@ -788,33 +788,9 @@ def make_formwork():
         (s(cx0 + ddx),  s(cy0 + ddy)),
     ]
     d.polygon(top_pts, fill=CONC_TOP)
-    d.polygon(top_pts, outline=BK, width=iw(s(0.4)))
 
     # ② コンクリート側面（左面、矩形）
     d.rectangle([s(cx0), s(cy0), s(cx1), s(ybot)], fill=CONC_SIDE)
-    d.rectangle([s(cx0), s(cy0), s(cx1), s(ybot)], outline=BK, width=iw(s(0.4)))
-
-    # ③ 型枠板（正面、縦4枚 + 縦桁）
-    for i in range(n):
-        px0 = cx1 + fw * i / n
-        px1 = cx1 + fw * (i + 1) / n
-        d.rectangle([s(px0), s(cy0), s(px1), s(ybot)], fill=PL_BG)
-        bt = fw / n * 0.28   # 縦桁幅
-        d.rectangle([s(px1 - bt), s(cy0), s(px1), s(ybot)], fill=PL_BT)
-    d.rectangle([s(cx1), s(cy0), s(fx1), s(ybot)], outline=BK, width=iw(s(0.4)))
-
-    # ④ セパレータ点線（コンクリート側面を水平に貫通）
-    for fy in [0.25, 0.50, 0.75]:
-        ty = cy0 + fh * fy
-        dashed_line(d, s(cx0 + 0.6), s(ty), s(cx1 - 0.5), s(ty),
-                    TIE, s(0.65), s(1.6), s(1.0))
-
-    # ⑤ 横端太（型枠正面を横断するバー）
-    wh = 1.25
-    for fy in [0.25, 0.50, 0.75]:
-        ty = cy0 + fh * fy
-        d.rectangle([s(cx1 - 0.2), s(ty - wh), s(fx1 + 0.4), s(ty + wh)],
-                    fill=WLR, outline=WLR_SH, width=iw(s(0.35)))
 
     save_icon(img, 'formwork')
 
