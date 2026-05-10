@@ -807,6 +807,31 @@ def make_formwork():
     batten_3d(0.5 - tw/2,  0.5 + tw/2)
     batten_3d(1.0 - tw,    1.0)
 
+    # ⑤ 横端太（3本）— バタの上に重ねて描画
+    WLR_HI   = (215, 220, 228, 255)   # ハイライト（上面）
+    WLR_MAIN = (162, 167, 176, 255)   # 本体（鋼材グレー）
+    WLR_SH   = ( 95, 100, 112, 255)   # シャドウ（下面）
+
+    wh = 1.5   # 端太の半高
+
+    def waler(fy):
+        yc = cy0 + fy * (ybot - cy0)   # 端太中心高さ（t=0側）
+
+        def wband(dy0, dy1, color):
+            d.polygon([
+                (s(cx1),        s(yc + dy0)),
+                (s(cx1 + ddx),  s(yc + dy0 + ddy)),
+                (s(cx1 + ddx),  s(yc + dy1 + ddy)),
+                (s(cx1),        s(yc + dy1)),
+            ], fill=color)
+
+        wband(-wh,        -wh * 0.35,  WLR_HI)    # 上面ハイライト
+        wband(-wh * 0.35,  wh * 0.55,  WLR_MAIN)  # 中央本体
+        wband( wh * 0.55,  wh,          WLR_SH)    # 下面シャドウ
+
+    for fy in [0.25, 0.50, 0.75]:
+        waler(fy)
+
     save_icon(img, 'formwork')
 
 
