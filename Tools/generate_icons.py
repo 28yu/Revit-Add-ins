@@ -753,44 +753,55 @@ def make_manual():
 # formwork (型枠数量算出)
 # ─────────────────────────────────────────
 def make_formwork():
-    """型枠数量算出: 3D視点 — コンクリート側面(灰) + 天端(明灰) + コンパネ接触面(淡橙)"""
+    """型枠数量算出: 3D視点 — コンクリート + コンパネ面 + 縦バタ桟木3本"""
     CONC_SIDE  = (175, 175, 170, 255)   # コンクリート側面（グレー）
     CONC_TOP   = (215, 215, 210, 255)   # コンクリート天端（明灰）
     CONC_PANEL = (240, 195, 155, 255)   # コンパネ接触面（淡いオレンジ）
+    BATTEN     = (155,  98,  38, 255)   # 縦バタ桟木（木材色）
 
     img = new_canvas()
     d = ImageDraw.Draw(img)
 
-    # 3D 奥行きベクトル: 右5単位・上4単位 (キャビネット図法)
+    # 3D 奥行きベクトル (キャビネット図法)
     ddx, ddy = 9.0, -4.0
 
     # コンクリート寸法
-    cx0, cy0 = 0.5, 8.0   # 側面 左上
-    cx1       = 6.0        # 側面 右端（＝コンパネ面の前端）
-    ybot      = 30.0       # 底
+    cx0, cy0 = 0.5, 8.0
+    cx1       = 6.0
+    ybot      = 30.0
 
-    # 描画順: 奥→手前
-
-    # ① コンクリート側面（左面、グレー矩形）
+    # ① コンクリート側面（グレー矩形）
     d.rectangle([s(cx0), s(cy0), s(cx1), s(ybot)], fill=CONC_SIDE)
 
-    # ② コンクリート天端（平行四辺形、明灰）
-    top_pts = [
+    # ② コンクリート天端（明灰平行四辺形）
+    d.polygon([
         (s(cx0),        s(cy0)),
         (s(cx1),        s(cy0)),
         (s(cx1 + ddx),  s(cy0 + ddy)),
         (s(cx0 + ddx),  s(cy0 + ddy)),
-    ]
-    d.polygon(top_pts, fill=CONC_TOP)
+    ], fill=CONC_TOP)
 
-    # ③ コンパネ接触面（右端面、淡いオレンジ平行四辺形）
-    panel_pts = [
+    # ③ コンパネ接触面（淡橙平行四辺形）
+    d.polygon([
         (s(cx1),        s(cy0)),
         (s(cx1 + ddx),  s(cy0 + ddy)),
         (s(cx1 + ddx),  s(ybot + ddy)),
         (s(cx1),        s(ybot)),
-    ]
-    d.polygon(panel_pts, fill=CONC_PANEL)
+    ], fill=CONC_PANEL)
+
+    # ④ 縦バタ桟木（左端・中央・右端、各幅15%）
+    def batten(t0, t1):
+        d.polygon([
+            (s(cx1 + t0*ddx), s(cy0 + t0*ddy)),
+            (s(cx1 + t1*ddx), s(cy0 + t1*ddy)),
+            (s(cx1 + t1*ddx), s(ybot + t1*ddy)),
+            (s(cx1 + t0*ddx), s(ybot + t0*ddy)),
+        ], fill=BATTEN)
+
+    tw = 0.14   # 桟木幅（比率）
+    batten(0.0,        tw)            # 左端
+    batten(0.5 - tw/2, 0.5 + tw/2)   # 中央
+    batten(1.0 - tw,   1.0)           # 右端
 
     save_icon(img, 'formwork')
 
