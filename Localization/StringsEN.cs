@@ -371,6 +371,7 @@ namespace Tools28.Localization
             { "Formwork.ShapesCreated", "Formwork face objects created: {0} (auto-hidden in other views)" },
             { "Formwork.ScheduleCreated", "Schedule \"Formwork Quantity\" has been created" },
             { "Formwork.SummaryScheduleCreated", "Summary schedule \"Formwork Quantity_Total\" has been created (auto-updates when DirectShapes are deleted)" },
+            { "Formwork.SheetCreated", "Sheet \"{0} - {1}\" created (3D view and schedules auto-placed)" },
             { "Formwork.SteelExcluded", "Excluded {0} steel members (no formwork needed)" },
             { "Formwork.DeckSlabExcluded", "Excluded {0} deck slabs (floor type name contains \"DS\")" },
             { "Formwork.WallSweepExcluded", "Excluded {0} wall sweeps/reveals (no formwork needed)" },

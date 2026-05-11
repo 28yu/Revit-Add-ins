@@ -87,6 +87,7 @@ namespace Tools28.Commands.FormworkCalculator
                 ElementId scheduleViewId = null;
                 ElementId summaryScheduleId = null;
                 ElementId view3DId = null;
+                ElementId sheetId = null;
                 List<ElementId> createdShapeIds = null;
 
                 if (settings.CreateSchedule || settings.Create3DView)
@@ -153,6 +154,31 @@ namespace Tools28.Commands.FormworkCalculator
                             }
                         }
                     }
+
+                    // 3Dビューと集計表が両方できていればシートに自動配置 (別トランザクション:
+                    // ScheduleSheetInstance.Create は元の集計表がコミット済みである必要があるため)
+                    bool haveAnyOutput =
+                        (view3DId != null && view3DId != ElementId.InvalidElementId) ||
+                        (scheduleViewId != null && scheduleViewId != ElementId.InvalidElementId) ||
+                        (summaryScheduleId != null && summaryScheduleId != ElementId.InvalidElementId);
+                    if (haveAnyOutput)
+                    {
+                        using (var tSheet = new Transaction(doc, "型枠数量算出 - シート作成"))
+                        {
+                            tSheet.Start();
+                            try
+                            {
+                                sheetId = FormworkSheetCreator.CreateSheet(
+                                    doc, view3DId, scheduleViewId, summaryScheduleId);
+                                tSheet.Commit();
+                            }
+                            catch (Exception ex)
+                            {
+                                tSheet.RollBack();
+                                FormworkDebugLog.Log($"  [Sheet] CreateSheet EX: {ex.Message}");
+                            }
+                        }
+                    }
                 }
 
                 // ビュータブを順に開く: 集計表系 → 最後に 3D ビュー (最終アクティブ)。
@@ -185,6 +211,16 @@ namespace Tools28.Commands.FormworkCalculator
                     }
                     catch { }
                 }
+                // シートを最終アクティブにする (3Dビュー・集計表の上に配置した全体像が見える)
+                if (sheetId != null && sheetId != ElementId.InvalidElementId)
+                {
+                    try
+                    {
+                        var v = doc.GetElement(sheetId) as View;
+                        if (v != null) uidoc.ActiveView = v;
+                    }
+                    catch { }
+                }
 
                 string summary =
                     string.Format(Loc.S("Formwork.DoneMsg"),
@@ -203,6 +239,18 @@ namespace Tools28.Commands.FormworkCalculator
                     summary += "\n" + Loc.S("Formwork.ScheduleCreated");
                 if (summaryScheduleId != null)
                     summary += "\n" + Loc.S("Formwork.SummaryScheduleCreated");
+                if (sheetId != null && sheetId != ElementId.InvalidElementId)
+                {
+                    try
+                    {
+                        var sh = doc.GetElement(sheetId) as ViewSheet;
+                        if (sh != null)
+                            summary += "\n" + string.Format(
+                                Loc.S("Formwork.SheetCreated"),
+                                sh.SheetNumber, sh.Name);
+                    }
+                    catch { }
+                }
 
                 if (result.ExcludedResults != null && result.ExcludedResults.Count > 0)
                 {

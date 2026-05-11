@@ -371,6 +371,7 @@ namespace Tools28.Localization
             { "Formwork.ShapesCreated", "已创建模板面对象: {0} 个（在其他视图中自动隐藏）" },
             { "Formwork.ScheduleCreated", "已创建明细表「模板数量汇总」" },
             { "Formwork.SummaryScheduleCreated", "已创建汇总明细表「模板数量汇总_合计」（构件删除时自动更新）" },
+            { "Formwork.SheetCreated", "已创建图纸「{0} - {1}」（自动放置三维视图与明细表）" },
             { "Formwork.SteelExcluded", "已排除 {0} 个钢构件（无需模板）" },
             { "Formwork.DeckSlabExcluded", "已排除 {0} 个压型钢板楼板（类型名称包含 \"DS\"）" },
             { "Formwork.WallSweepExcluded", "已排除 {0} 个墙饰条/凹槽（无需模板）" },

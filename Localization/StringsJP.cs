@@ -371,6 +371,7 @@ namespace Tools28.Localization
             { "Formwork.ShapesCreated", "型枠面オブジェクト: {0} 個を作成（他ビューでは自動的に非表示）" },
             { "Formwork.ScheduleCreated", "集計表「型枠数量集計」を作成しました" },
             { "Formwork.SummaryScheduleCreated", "サマリ集計表「型枠数量集計_合計」を作成しました（要素削除に追従）" },
+            { "Formwork.SheetCreated", "シート「{0} - {1}」を作成しました（3Dビューと集計表を自動配置）" },
             { "Formwork.SteelExcluded", "鉄骨部材 {0} 個を型枠不要として除外しました" },
             { "Formwork.DeckSlabExcluded", "デッキスラブ {0} 個を型枠不要として除外しました（タイプ名に \"DS\" を含む床）" },
             { "Formwork.WallSweepExcluded", "壁スイープ・リビール {0} 個を型枠不要として除外しました" },
