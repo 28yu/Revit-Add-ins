@@ -12,7 +12,7 @@ namespace Tools28.Localization
             { "Ribbon.Panel.3DView", "3Dビュー" },
             { "Ribbon.Panel.Annotation", "注釈・詳細" },
             { "Ribbon.Panel.Structural", "色分け" },
-            { "Ribbon.Panel.Quantity", "数量" },
+            { "Ribbon.Panel.Quantity", "数量算出" },
             { "Ribbon.Panel.Excel", "Excel連携" },
             { "Ribbon.Panel.Settings", "設定" },
 
@@ -61,7 +61,7 @@ namespace Tools28.Localization
             { "Ribbon.FireProtection.Tip", "梁の耐火被覆範囲を自動検出し、種類別に色分けした塗潰領域を作成します" },
 
             // === Ribbon: Quantity ===
-            { "Ribbon.Formwork", "型枠数量\n算出" },
+            { "Ribbon.Formwork", "型枠" },
             { "Ribbon.Formwork.Tip", "躯体モデルから型枠数量（面積）を自動算出し、Excel/Revit集計表/色分け3Dビューを出力します" },
 
             // === Ribbon: Excel ===

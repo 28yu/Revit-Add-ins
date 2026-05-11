@@ -12,7 +12,7 @@ namespace Tools28.Localization
             { "Ribbon.Panel.3DView", "3D View" },
             { "Ribbon.Panel.Annotation", "Annotation" },
             { "Ribbon.Panel.Structural", "Color Code" },
-            { "Ribbon.Panel.Quantity", "Quantity" },
+            { "Ribbon.Panel.Quantity", "Quantity Calc" },
             { "Ribbon.Panel.Excel", "Excel" },
             { "Ribbon.Panel.Settings", "Settings" },
 
@@ -61,7 +61,7 @@ namespace Tools28.Localization
             { "Ribbon.FireProtection.Tip", "Auto-detect fireproofing zones and create color-coded filled regions" },
 
             // === Ribbon: Quantity ===
-            { "Ribbon.Formwork", "Formwork\nQuantity" },
+            { "Ribbon.Formwork", "Formwork" },
             { "Ribbon.Formwork.Tip", "Auto-calculate formwork quantity (area) from the structural model and output to Excel / Revit view / color-coded 3D view" },
 
             // === Ribbon: Excel ===

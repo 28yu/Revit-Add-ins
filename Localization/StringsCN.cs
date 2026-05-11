@@ -12,7 +12,7 @@ namespace Tools28.Localization
             { "Ribbon.Panel.3DView", "3D视图" },
             { "Ribbon.Panel.Annotation", "注释·详图" },
             { "Ribbon.Panel.Structural", "色分" },
-            { "Ribbon.Panel.Quantity", "数量" },
+            { "Ribbon.Panel.Quantity", "数量算出" },
             { "Ribbon.Panel.Excel", "Excel" },
             { "Ribbon.Panel.Settings", "设置" },
 
@@ -61,7 +61,7 @@ namespace Tools28.Localization
             { "Ribbon.FireProtection.Tip", "自动检测防火涂层范围并创建按类型色分的填充区域" },
 
             // === Ribbon: Quantity ===
-            { "Ribbon.Formwork", "模板数量\n计算" },
+            { "Ribbon.Formwork", "模板" },
             { "Ribbon.Formwork.Tip", "从结构模型自动计算模板数量（面积），并输出到 Excel / Revit 汇总视图 / 色分3D视图" },
 
             // === Ribbon: Excel ===
