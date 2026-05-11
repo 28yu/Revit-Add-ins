@@ -753,7 +753,7 @@ def make_manual():
 # formwork (型枠数量算出)
 # ─────────────────────────────────────────
 def make_formwork():
-    """型枠数量算出: 3D視点 — コンクリート + コンパネ面 + 縦バタ桟木3本 + 横端太3本 + セパレータ + フォームタイ + 集計表 + Σ"""
+    """型枠数量算出: コンクリート(左) + 型枠面(奥行き右方向) + 集計表/Σ(右側白帯)"""
     CONC_SIDE  = (175, 175, 170, 255)
     CONC_TOP   = (215, 215, 210, 255)
     CONC_PANEL = (240, 195, 155, 255)
@@ -761,10 +761,10 @@ def make_formwork():
     img = new_canvas()
     d = ImageDraw.Draw(img)
 
-    ddx, ddy = 13.0, -4.0
-    cx0, cy0 = 0.5, 8.0
-    cx1       = 6.0
-    ybot      = 30.0
+    ddx, ddy = 17.0, -4.0   # 奥行きベクトル: より右方向
+    cx0, cy0 = 0.0, 5.0
+    cx1       = 5.0
+    ybot      = 31.0
 
     # ① コンクリート側面
     d.rectangle([s(cx0), s(cy0), s(cx1), s(ybot)], fill=CONC_SIDE)
@@ -839,13 +839,22 @@ def make_formwork():
         fy_px = s(yc) - ft_h / 2
         d.rectangle([fx, fy_px, fx + ft_w, fy_px + ft_h], fill=(55, 55, 58, 255))
 
-    # ⑧ 右下: 小型集計表（ヘッダー + データ1行 + 合計行）
-    TBX, TBW, TBY = 23.5, 7.0, 22.0
+    # ⑧ 集計表 + Σ の白帯背景（型枠右端x=22から右）
+    TBX, TBW, TBY = 22.0, 9.5, 22.0
     HDR_H, ROW_H, TOTAL_H, N_DATA = 2.0, 2.5, 3.5, 1
-    COL2 = TBX + 3.5
+    COL2 = TBX + 5.0
     bY   = TBY + HDR_H + N_DATA * ROW_H + TOTAL_H  # = 30.0
+    SX, SY = TBX + TBW / 2, 16.5
     TB   = (75, 75, 75, 255)
 
+    # 白帯背景（Σ + 表を含む右側エリア）
+    DRAW_W = 96 * SS
+    bg_x0 = max(0, int(s(TBX - 1.5)))
+    bg_y0 = max(0, int(s(SY - 4.2)))
+    bg_y1 = min(DRAW_W, int(s(bY + 0.8)))
+    d.rectangle([bg_x0, bg_y0, DRAW_W, bg_y1], fill=(255, 255, 255, 255))
+
+    # 集計表
     d.rectangle([s(TBX), s(TBY + HDR_H + N_DATA * ROW_H), s(TBX + TBW), s(bY)],
                 fill=(170, 210, 178, 255))
     d.rectangle([s(TBX), s(TBY), s(TBX + TBW), s(TBY + HDR_H)],
@@ -860,14 +869,14 @@ def make_formwork():
     d.rectangle([s(TBX), s(TBY), s(TBX + TBW), s(bY)],
                 outline=TB, width=iw(s(0.6)))
 
-    # ⑨ Σ記号（集計表の上）
+    # ⑨ Σ記号（白帯内、表の上）
     FONT_PATH = '/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf'
     try:
         fnt = ImageFont.truetype(FONT_PATH, size=iw(s(8.5)))
         bb  = d.textbbox((0, 0), 'Σ', font=fnt)
-        tx  = s(TBX + TBW / 2) - (bb[2] - bb[0]) / 2 - bb[0]
-        ty  = s(14.0)           - (bb[3] - bb[1]) / 2 - bb[1]
-        d.text((tx, ty), 'Σ', font=fnt, fill=(40, 80, 130, 255))
+        tx  = s(SX) - (bb[2] - bb[0]) / 2 - bb[0]
+        ty  = s(SY) - (bb[3] - bb[1]) / 2 - bb[1]
+        d.text((tx, ty), 'Σ', font=fnt, fill=(30, 60, 120, 255))
     except Exception as e:
         print(f'  Σ font unavailable ({e}), skipping')
 
