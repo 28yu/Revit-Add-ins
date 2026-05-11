@@ -68,20 +68,28 @@
 
         <!-- 出力設定 -->
         <GroupBox x:Name="grpOutput" Header="出力設定" Grid.Row="4" Padding="10">
-            <StackPanel>
-                <CheckBox x:Name="ChkExportExcel" IsChecked="False" Margin="0,3">
-                    <TextBlock x:Name="txtExportExcel" Text="Excel ファイルに出力"/>
-                </CheckBox>
-                <CheckBox x:Name="ChkCreateSchedule" IsChecked="True" Margin="0,3">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <CheckBox x:Name="ChkCreateSchedule" Grid.Row="0" Grid.Column="0" IsChecked="True" Margin="0,3">
                     <TextBlock x:Name="txtCreateSchedule" Text="Revit 集計ビューを作成"/>
                 </CheckBox>
-                <CheckBox x:Name="ChkCreate3DView" IsChecked="True" Margin="0,3">
+                <CheckBox x:Name="ChkCreate3DView" Grid.Row="0" Grid.Column="1" IsChecked="True" Margin="0,3">
                     <TextBlock x:Name="txtCreate3DView" Text="色分け 3D ビューを作成"/>
                 </CheckBox>
-                <CheckBox x:Name="ChkCreateSheet" IsChecked="True" Margin="0,3">
+                <CheckBox x:Name="ChkCreateSheet" Grid.Row="1" Grid.Column="0" IsChecked="True" Margin="0,3">
                     <TextBlock x:Name="txtCreateSheet" Text="集計シートを自動作成"/>
                 </CheckBox>
-            </StackPanel>
+                <CheckBox x:Name="ChkExportExcel" Grid.Row="1" Grid.Column="1" IsChecked="False" Margin="0,3">
+                    <TextBlock x:Name="txtExportExcel" Text="Excel ファイルに出力"/>
+                </CheckBox>
+            </Grid>
         </GroupBox>
 
         <!-- 色分け -->
