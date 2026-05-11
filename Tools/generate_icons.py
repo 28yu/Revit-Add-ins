@@ -46,16 +46,14 @@ def dashed_line(draw, x1, y1, x2, y2, color, width, dash_len, gap_len):
         pos = end
         draw_seg = not draw_seg
 
-def dashdot_line(draw, x1, y1, x2, y2, color, width, dots=1):
-    """Draw a dash-dot line. dots=1: 一点鎖線, dots=2: 二点鎖線."""
+def dashdot_line(draw, x1, y1, x2, y2, color, width, lens=None):
+    """Draw a dash-dot (一点鎖線) line. lens overrides the default segment pattern."""
     dx, dy = x2 - x1, y2 - y1
     length = math.hypot(dx, dy)
     if length < 0.001:
         return
     ux, uy = dx / length, dy / length
-    if dots == 2:
-        lens = [s(3), s(1.2), s(0.5), s(1.2), s(0.5), s(1.2)]  # dash, gap, dot, gap, dot, gap
-    else:
+    if lens is None:
         lens = [s(3), s(1.2), s(0.5), s(1.2)]  # dash, gap, dot, gap
     w = iw(width)
     n = len(lens)
@@ -358,8 +356,8 @@ def make_beam_under_level():
         (s(12.5), s(19)),  # right
     ], fill=DARK)
 
-    # Dash-dot FL line at y=27 (二点鎖線)
-    dashdot_line(draw, s(1), s(27), s(20), s(27), DARK, s(0.8), dots=2)
+    # 一点鎖線 FL line at y=27 (dash=6, gap=1.5, dot=0.5, gap=1.5 → 2 cycles in 19 units)
+    dashdot_line(draw, s(1), s(27), s(20), s(27), DARK, s(0.8), lens=[s(6), s(1.5), s(0.5), s(1.5)])
 
     # ▼ Triangle: larger, base at top (y=22), vertex at FL line (y=27)
     draw.polygon([
@@ -388,14 +386,14 @@ def make_beam_top_level():
     YELLOW = (218, 185,  47, 255)
     BLUE_C = ( 30, 144, 255, 255)
 
-    # Dash-dot FL line at y=5 (一点破線)
-    dashdot_line(draw, s(1), s(5), s(20), s(5), DARK, s(0.8))
+    # 一点鎖線 FL line at y=5 (dash=6, gap=1.5, dot=0.5, gap=1.5 → 2 cycles in 19 units)
+    dashdot_line(draw, s(1), s(5), s(20), s(5), DARK, s(0.8), lens=[s(6), s(1.5), s(0.5), s(1.5)])
 
-    # ▼ Triangle: base at top (y=1), vertex (bottom) touching FL line at y=5
+    # ▼ Triangle: larger, base at top (y=1), vertex touching FL line at y=5
     draw.polygon([
-        (s(2.5), s(1)),  # top-left
-        (s(5.5), s(1)),  # top-right
-        (s(4),   s(5)),  # bottom vertex touching FL line
+        (s(2), s(1)),  # top-left
+        (s(6), s(1)),  # top-right
+        (s(4), s(5)),  # bottom vertex touching FL line
     ], fill=DARK)
 
     # Down arrow: shaft y=7→y=11, tip at beam top (y=15)
@@ -407,10 +405,10 @@ def make_beam_top_level():
         (s(12.5), s(11)),  # right base
     ], fill=DARK)
 
-    # I-beam at bottom: top flange y=15..18, web y=18..28, bottom flange y=28..31
-    draw.rectangle([s(3), s(15), s(17), s(18)], fill=MID)  # top flange
-    draw.rectangle([s(3), s(28), s(17), s(31)], fill=MID)  # bottom flange
-    draw.rectangle([s(8), s(18), s(12), s(28)], fill=MID)  # web
+    # I-beam at bottom: flange thickness=2, web width=2 (x=4~16, y=15~29)
+    draw.rectangle([s(4), s(15), s(16), s(17)], fill=MID)  # top flange (thickness=2)
+    draw.rectangle([s(4), s(27), s(16), s(29)], fill=MID)  # bottom flange (thickness=2)
+    draw.rectangle([s(9), s(17), s(11), s(27)], fill=MID)  # web (width=2)
 
     # 3 color blocks on right
     bx, bw, bh = s(22), s(8), s(8)

@@ -512,10 +512,10 @@ ctx.lineTo(s(12.5), s(19));
 ctx.closePath();
 ctx.fill();
 
-// Dash-dot FL line at y=27 (二点鎖線: 長破線・点・点…)
+// 一点鎖線 FL line at y=27 (dash=6, gap=1.5, dot=0.5, gap=1.5 → 2 cycles in 19 units)
 ctx.strokeStyle = DARK;
 ctx.lineWidth = s(0.8);
-ctx.setLineDash([s(3), s(1.2), s(0.5), s(1.2), s(0.5), s(1.2)]);
+ctx.setLineDash([s(6), s(1.5), s(0.5), s(1.5)]);
 ctx.beginPath();
 ctx.moveTo(s(1), s(27)); ctx.lineTo(s(20), s(27));
 ctx.stroke();
@@ -539,29 +539,28 @@ const bx = s(22), bw = s(8), bh = s(8);
 `;
 
 PRESETS.beam_top_level = `
-// 梁天端色分け: 一点破線FL(上) + ▼マーカー + 下矢印(先端=梁上端) + I型梁(下) + 3色ブロック(右)
-// I型梁: 上フランジy=15..18, 下フランジy=28..31, ウェブy=18..28 → 梁上端=y15
-// 配置: 上端y=15, 下端y=31 (フランジ幅x=3~17, ウェブx=8~12)
+// 梁天端色分け: 一点鎖線FL(上) + ▼マーカー + 下矢印(先端=梁上端) + I型梁(下) + 3色ブロック(右)
+// I型梁: フランジ厚=2, ウェブ幅=2 (x=4~16, y=15~29) → 梁上端=y15
 const DARK = '#505050';
 const MID = '#787878';
 const PINK = [255,128,148];
 const YELLOW = [218,185,47];
 const BLUE = [30,144,255];
 
-// Dash-dot FL line at y=5 (一点破線)
+// 一点鎖線 FL line at y=5 (dash=6, gap=1.5, dot=0.5, gap=1.5 → 2 cycles in 19 units)
 ctx.strokeStyle = DARK;
 ctx.lineWidth = s(0.8);
-ctx.setLineDash([s(3), s(1.2), s(0.5), s(1.2)]);
+ctx.setLineDash([s(6), s(1.5), s(0.5), s(1.5)]);
 ctx.beginPath();
 ctx.moveTo(s(1), s(5)); ctx.lineTo(s(20), s(5));
 ctx.stroke();
 ctx.setLineDash([]);
 
-// ▼ Triangle: base at top (y=1), vertex (bottom) touching FL line at y=5
+// ▼ Triangle: larger, base at top (y=1), vertex touching FL line at y=5
 ctx.beginPath();
-ctx.moveTo(s(2.5), s(1));  // top-left
-ctx.lineTo(s(5.5), s(1));  // top-right
-ctx.lineTo(s(4),   s(5));  // bottom vertex touching FL line
+ctx.moveTo(s(2), s(1));  // top-left
+ctx.lineTo(s(6), s(1));  // top-right
+ctx.lineTo(s(4), s(5));  // bottom vertex touching FL line
 ctx.closePath();
 ctx.fillStyle = DARK;
 ctx.fill();
@@ -580,11 +579,11 @@ ctx.lineTo(s(12.5), s(11));  // right base
 ctx.closePath();
 ctx.fill();
 
-// I-beam at bottom: same shape as beam_under_level (top flange=3, web=10, bottom flange=3)
+// I-beam at bottom: flange thickness=2, web width=2 (x=4~16, y=15~29)
 ctx.fillStyle = MID;
-ctx.fillRect(s(3), s(15), s(14), s(3));   // Top flange    (top edge = y=15)
-ctx.fillRect(s(3), s(28), s(14), s(3));   // Bottom flange (bottom edge = y=31)
-ctx.fillRect(s(8), s(18), s(4),  s(10));  // Web
+ctx.fillRect(s(4), s(15), s(12), s(2));   // Top flange (thickness=2)
+ctx.fillRect(s(4), s(27), s(12), s(2));   // Bottom flange (thickness=2)
+ctx.fillRect(s(9), s(17), s(2),  s(10));  // Web (width=2)
 
 // 3 color blocks on right
 const bx = s(22), bw = s(8), bh = s(8);
