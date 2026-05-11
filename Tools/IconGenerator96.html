@@ -484,30 +484,31 @@ ctx.strokeRect(s(16.5), s(24), s(8), s(3));
 
 PRESETS.beam_under_level = `
 // 梁下端色分け: I型梁(上) + 上矢印(先端=梁下端) + 一点破線FL(下) + ▼マーカー + 3色ブロック(右)
-// I型梁: 上フランジy=1..4, 下フランジy=14..17, ウェブy=4..14 → 梁下端=y17
+// I型梁: 上フランジy=1..4, 下フランジy=12..15, ウェブy=4..12 → 梁下端=y15
+// ウェブ幅=2 < フランジ厚=3 (実H鋼断面の比率に合わせる)
 const DARK = '#505050';
 const MID = '#787878';
 const PINK = [255,128,148];
 const YELLOW = [218,185,47];
 const BLUE = [30,144,255];
 
-// I-beam
+// I-beam (smaller overall: x=4~16, y=1~15; web narrower than flange thickness)
 ctx.fillStyle = MID;
-ctx.fillRect(s(3), s(1),  s(14), s(3));   // Top flange
-ctx.fillRect(s(3), s(14), s(14), s(3));   // Bottom flange (bottom edge y=17)
-ctx.fillRect(s(8), s(4),  s(4),  s(10));  // Web
+ctx.fillRect(s(4), s(1),  s(12), s(3));   // Top flange (width=12, thickness=3)
+ctx.fillRect(s(4), s(12), s(12), s(3));   // Bottom flange (bottom edge y=15)
+ctx.fillRect(s(9), s(4),  s(2),  s(8));   // Web (width=2, thinner than flange)
 
-// Up arrow: tip at beam bottom (y=17), shaft y=21→y=25
+// Up arrow: tip at beam bottom (y=15), head base y=19, shaft y=19→y=25
 ctx.fillStyle = DARK;
 ctx.strokeStyle = DARK;
 ctx.lineWidth = s(0.8);
 ctx.beginPath();
-ctx.moveTo(s(10), s(21)); ctx.lineTo(s(10), s(25));
+ctx.moveTo(s(10), s(19)); ctx.lineTo(s(10), s(25));
 ctx.stroke();
 ctx.beginPath();
-ctx.moveTo(s(10), s(17));     // tip touches beam bottom
-ctx.lineTo(s(7.5), s(21));
-ctx.lineTo(s(12.5), s(21));
+ctx.moveTo(s(10), s(15));     // tip touches beam bottom
+ctx.lineTo(s(7.5), s(19));
+ctx.lineTo(s(12.5), s(19));
 ctx.closePath();
 ctx.fill();
 
@@ -539,8 +540,8 @@ const bx = s(22), bw = s(8), bh = s(8);
 
 PRESETS.beam_top_level = `
 // 梁天端色分け: 一点破線FL(上) + ▼マーカー + 下矢印(先端=梁上端) + I型梁(下) + 3色ブロック(右)
-// I型梁はbeam_under_levelと同形状: フランジ3+ウェブ10+フランジ3=16単位
-// 配置: 上端y=15, 下端y=31 (beam_under_levelのy=1..17を上下反転・下部配置)
+// I型梁: 上フランジy=15..18, 下フランジy=28..31, ウェブy=18..28 → 梁上端=y15
+// 配置: 上端y=15, 下端y=31 (フランジ幅x=3~17, ウェブx=8~12)
 const DARK = '#505050';
 const MID = '#787878';
 const PINK = [255,128,148];

@@ -403,8 +403,7 @@ def make_beam_top_level():
         (s(12.5), s(11)),  # right base
     ], fill=DARK)
 
-    # I-beam at bottom: same shape as beam_under_level (flange3+web10+flange3)
-    # Top edge y=15, bottom edge y=31
+    # I-beam at bottom: top flange y=15..18, web y=18..28, bottom flange y=28..31
     draw.rectangle([s(3), s(15), s(17), s(18)], fill=MID)  # top flange
     draw.rectangle([s(3), s(28), s(17), s(31)], fill=MID)  # bottom flange
     draw.rectangle([s(8), s(18), s(12), s(28)], fill=MID)  # web
