@@ -753,15 +753,15 @@ def make_manual():
 # formwork (型枠数量算出)
 # ─────────────────────────────────────────
 def make_formwork():
-    """型枠数量算出: 3D視点 — コンクリート + コンパネ面 + 縦バタ桟木3本（立体）"""
-    CONC_SIDE  = (175, 175, 170, 255)   # コンクリート側面
-    CONC_TOP   = (215, 215, 210, 255)   # コンクリート天端
-    CONC_PANEL = (240, 195, 155, 255)   # コンパネ面（淡橙）
+    """型枠数量算出: 3D視点 — コンクリート + コンパネ面 + 縦バタ桟木3本 + 横端太3本 + セパレータ + フォームタイ + 集計表 + Σ"""
+    CONC_SIDE  = (175, 175, 170, 255)
+    CONC_TOP   = (215, 215, 210, 255)
+    CONC_PANEL = (240, 195, 155, 255)
 
     img = new_canvas()
     d = ImageDraw.Draw(img)
 
-    ddx, ddy = 9.0, -4.0
+    ddx, ddy = 13.0, -4.0
     cx0, cy0 = 0.5, 8.0
     cx1       = 6.0
     ybot      = 30.0
@@ -771,24 +771,21 @@ def make_formwork():
 
     # ② コンクリート天端
     d.polygon([
-        (s(cx0),       s(cy0)),      (s(cx1),       s(cy0)),
+        (s(cx0),       s(cy0)),        (s(cx1),       s(cy0)),
         (s(cx1 + ddx), s(cy0 + ddy)), (s(cx0 + ddx), s(cy0 + ddy)),
     ], fill=CONC_TOP)
 
     # ③ コンパネ面
     d.polygon([
-        (s(cx1),       s(cy0)),      (s(cx1 + ddx), s(cy0 + ddy)),
-        (s(cx1 + ddx), s(ybot + ddy)), (s(cx1),     s(ybot)),
+        (s(cx1),       s(cy0)),        (s(cx1 + ddx), s(cy0 + ddy)),
+        (s(cx1 + ddx), s(ybot + ddy)), (s(cx1),       s(ybot)),
     ], fill=CONC_PANEL)
 
-    # ④ 縦バタ桟木（左端・中央・右端）立体感：左ハイライト＋中央本体＋右シャドウ
-    BATTEN_HI   = (210, 158,  75, 255)   # 左面ハイライト
-    BATTEN_FACE = (158, 100,  38, 255)   # 正面本体
-    BATTEN_SH   = (105,  62,  18, 255)   # 右面シャドウ
-
-    tw  = 0.22   # バタ幅（コンパネ面幅の比率）
-    thi = 0.06   # ハイライト幅
-    tsh = 0.06   # シャドウ幅
+    # ④ 縦バタ桟木（左端・中央・右端）立体感
+    BATTEN_HI   = (210, 158,  75, 255)
+    BATTEN_FACE = (158, 100,  38, 255)
+    BATTEN_SH   = (105,  62,  18, 255)
+    tw, thi, tsh = 0.22, 0.06, 0.06
 
     def batten_3d(t0, t1):
         def para(ta, tb, color):
@@ -798,41 +795,88 @@ def make_formwork():
                 (s(cx1 + tb*ddx), s(ybot + tb*ddy)),
                 (s(cx1 + ta*ddx), s(ybot + ta*ddy)),
             ], fill=color)
+        para(t0,       t0 + thi, BATTEN_HI)
+        para(t0 + thi, t1 - tsh, BATTEN_FACE)
+        para(t1 - tsh, t1,       BATTEN_SH)
 
-        para(t0,       t0 + thi,        BATTEN_HI)    # 左ハイライト
-        para(t0 + thi, t1 - tsh,        BATTEN_FACE)  # 中央本体
-        para(t1 - tsh, t1,              BATTEN_SH)    # 右シャドウ
+    batten_3d(0.0,        tw)
+    batten_3d(0.5 - tw/2, 0.5 + tw/2)
+    batten_3d(1.0 - tw,   1.0)
 
-    batten_3d(0.0,         tw)
-    batten_3d(0.5 - tw/2,  0.5 + tw/2)
-    batten_3d(1.0 - tw,    1.0)
-
-    # ⑤ 横端太（3本）— バタの上に重ねて描画
-    WLR_HI   = (215, 220, 228, 255)   # ハイライト（上面）
-    WLR_MAIN = (162, 167, 176, 255)   # 本体（鋼材グレー）
-    WLR_SH   = ( 95, 100, 112, 255)   # シャドウ（下面）
-
-    wh = 1.5   # 端太の半高
+    # ⑤ 横端太（3本）
+    WLR_HI   = (215, 220, 228, 255)
+    WLR_MAIN = (162, 167, 176, 255)
+    WLR_SH   = ( 95, 100, 112, 255)
+    wh = 1.5
 
     def waler(fy):
-        yc = cy0 + fy * (ybot - cy0)   # 端太中心高さ（t=0側）
-
+        yc = cy0 + fy * (ybot - cy0)
         def wband(dy0, dy1, color):
             d.polygon([
-                (s(cx1),        s(yc + dy0)),
-                (s(cx1 + ddx),  s(yc + dy0 + ddy)),
-                (s(cx1 + ddx),  s(yc + dy1 + ddy)),
-                (s(cx1),        s(yc + dy1)),
+                (s(cx1),       s(yc + dy0)),
+                (s(cx1 + ddx), s(yc + dy0 + ddy)),
+                (s(cx1 + ddx), s(yc + dy1 + ddy)),
+                (s(cx1),       s(yc + dy1)),
             ], fill=color)
-
-        wband(-wh,        -wh * 0.35,  WLR_HI)    # 上面ハイライト
-        wband(-wh * 0.35,  wh * 0.55,  WLR_MAIN)  # 中央本体
-        wband( wh * 0.55,  wh,          WLR_SH)    # 下面シャドウ
+        wband(-wh,        -wh * 0.35, WLR_HI)
+        wband(-wh * 0.35,  wh * 0.55, WLR_MAIN)
+        wband( wh * 0.55,  wh,        WLR_SH)
 
     for fy in [0.25, 0.50, 0.75]:
         waler(fy)
 
+    # ⑥ セパレータ（コンクリート正面を水平に貫く破線）
+    for fy in [0.25, 0.50, 0.75]:
+        yc = cy0 + fy * (ybot - cy0)
+        dashed_line(d, s(cx0 + 0.4), s(yc), s(cx1 - 0.2), s(yc),
+                    (100, 100, 98, 255), s(0.35), s(0.7), s(0.5))
+
+    # ⑦ フォームタイ（各端太とコンパネ面の接合部の金具）
+    ft_w, ft_h = s(0.9), s(1.0)
+    for fy in [0.25, 0.50, 0.75]:
+        yc = cy0 + fy * (ybot - cy0)
+        fx = s(cx1) - ft_w / 2
+        fy_px = s(yc) - ft_h / 2
+        d.rectangle([fx, fy_px, fx + ft_w, fy_px + ft_h], fill=(55, 55, 58, 255))
+
+    # ⑧ 右下: 小型集計表（ヘッダー + データ1行 + 合計行）
+    TBX, TBW, TBY = 23.5, 7.0, 22.0
+    HDR_H, ROW_H, TOTAL_H, N_DATA = 2.0, 2.5, 3.5, 1
+    COL2 = TBX + 3.5
+    bY   = TBY + HDR_H + N_DATA * ROW_H + TOTAL_H  # = 30.0
+    TB   = (75, 75, 75, 255)
+
+    d.rectangle([s(TBX), s(TBY + HDR_H + N_DATA * ROW_H), s(TBX + TBW), s(bY)],
+                fill=(170, 210, 178, 255))
+    d.rectangle([s(TBX), s(TBY), s(TBX + TBW), s(TBY + HDR_H)],
+                fill=(128, 148, 165, 255))
+    d.line([(s(TBX), s(TBY + HDR_H)), (s(TBX + TBW), s(TBY + HDR_H))],
+           fill=TB, width=iw(s(0.35)))
+    d.line([(s(TBX), s(TBY + HDR_H + N_DATA * ROW_H)),
+            (s(TBX + TBW), s(TBY + HDR_H + N_DATA * ROW_H))],
+           fill=TB, width=iw(s(0.7)))
+    d.line([(s(COL2), s(TBY)), (s(COL2), s(bY))],
+           fill=TB, width=iw(s(0.35)))
+    d.rectangle([s(TBX), s(TBY), s(TBX + TBW), s(bY)],
+                outline=TB, width=iw(s(0.6)))
+
+    # ⑨ Σ記号（集計表の上）
+    FONT_PATH = '/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf'
+    try:
+        fnt = ImageFont.truetype(FONT_PATH, size=iw(s(8.5)))
+        bb  = d.textbbox((0, 0), 'Σ', font=fnt)
+        tx  = s(TBX + TBW / 2) - (bb[2] - bb[0]) / 2 - bb[0]
+        ty  = s(14.0)           - (bb[3] - bb[1]) / 2 - bb[1]
+        d.text((tx, ty), 'Σ', font=fnt, fill=(40, 80, 130, 255))
+    except Exception as e:
+        print(f'  Σ font unavailable ({e}), skipping')
+
+    # 96px @ DPI=288 (32px論理サイズ)
     save_icon(img, 'formwork')
+    # 32px @ DPI=96
+    result32 = img.resize((32, 32), Image.LANCZOS)
+    result32.save(os.path.join(OUT_DIR, 'formwork_32.png'), 'PNG', dpi=(96.012, 96.012))
+    print(f'  Saved: formwork_32.png')
 
 
 # ─────────────────────────────────────────
