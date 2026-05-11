@@ -256,8 +256,9 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 if (body == null) return;
 
                 // 列幅 (Revit 内部単位: feet, 1ft = 304.8mm)
-                // 件数≈40mm / レベル≈80mm / 部位≈50mm / 区分≈60mm / 面積≈60mm
-                double[] widths = { 0.131, 0.262, 0.164, 0.197, 0.197 };
+                // ヘッダー名 "28Tools_Formwork_xxx" が改行しない幅を確保。
+                // 件数≈40mm / レベル≈80mm / 部位≈80mm / 区分≈80mm / 面積≈70mm
+                double[] widths = { 0.131, 0.262, 0.262, 0.262, 0.230 };
 
                 int colCount = body.NumberOfColumns;
                 for (int c = 0; c < colCount && c < widths.Length; c++)
