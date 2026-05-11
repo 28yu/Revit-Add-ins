@@ -426,17 +426,28 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             if (bArea <= 1e-6) { reason = "s2-b-area-zero"; return none; }
 
             // Phase 2: b の 4 隅を a に投影した UV 矩形を算出
-            BoundingBoxUV uvOnA = ProjectBCornersToA(a.Face, b.Face, bbB);
-            string uvOnAMethod = uvOnA != null ? "strict" : null;
+            //
+            // a が PlanarFace の場合は ViaPlane (平面方程式 + XVector/YVector) を最優先で使う。
+            // Face.Project は b の隅が a の polygon 外 (L字形 face の notch 部等) に
+            // 落ちると境界にスナップして UV が拡張されてしまう不具合がある:
+            //   例: face[0] (L字, V max=3.906) に対し b/f6 (V max=3.815) を strict 投影すると
+            //       V=3.906 にスナップ → 全高ストリップが cutter になり、上部の型枠まで
+            //       誤って carve される。
+            // ViaPlane は境界スナップしないので正確な UV 範囲が得られる。
+            BoundingBoxUV uvOnA = null;
+            string uvOnAMethod = null;
 
-            // Fallback 1: a が PlanarFace なら XVector/YVector で平面方程式から直接 UV 計算。
-            // Face.Project と異なり境界外でも正確な UV を返す（境界スナップなし）。
-            // a の UV 軸を直接使うため、a と b の UV 軸の相対回転も自動的に解消される。
-            // → relaxed/estimate より優先する最も正確な方法。
-            if (uvOnA == null)
+            if (a.Face is PlanarFace)
             {
                 uvOnA = ProjectBCornersToAViaPlane(a.Face, b.Face, bbB);
                 if (uvOnA != null) uvOnAMethod = "via-plane";
+            }
+
+            // Fallback 1: ViaPlane が使えない/失敗した場合は strict (Face.Project) を試す。
+            if (uvOnA == null)
+            {
+                uvOnA = ProjectBCornersToA(a.Face, b.Face, bbB);
+                if (uvOnA != null) uvOnAMethod = "strict";
             }
 
             // Fallback 2: 非平面 (CylindricalFace 等) の場合、距離制限なしで Face.Project する。
