@@ -407,8 +407,9 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 }
             }
 
-            // 床(スラブ)の天端は常に型枠不要: 最上部以外の段差・凹みを含め全ての上向き水平面を除外
-            if (isSlab)
+            // 床(スラブ)・構造基礎の天端は常に型枠不要: 段差・凹み・パデスタル天端を含め
+            // 全ての上向き水平面を除外する (上側はコンクリート打設時に開放されているため)
+            if (isSlab || isFoundation)
             {
                 foreach (var fi in faceInfos)
                 {
@@ -559,7 +560,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                     }
                 }
 
-                if (isSlab)
+                if (isSlab || isFoundation)
                 {
                     foreach (var f in faces)
                     {
