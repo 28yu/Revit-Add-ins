@@ -1202,12 +1202,11 @@ walFys.forEach(fy => {
   ctx.fillRect(fx, fy_px, FT_W, FT_H);
 });
 
-// --- ⑧ 右側: 小型集計表 (型枠数量スケジュール) ---
-// ヘッダー行(グレー) + データ3行 + 合計行(グリーン強調) + 縦列分割
-const TBX = 17.0, TBW = 13.0, TBY = 2.5;
-const HDR_H = 4.0, ROW_H = 5.5, TOTAL_H = 6.0, N_DATA = 3;
-const COL2 = TBX + 7.5;
-const bottomY = TBY + HDR_H + N_DATA * ROW_H + TOTAL_H;  // = 29.0
+// --- ⑧ 右下: 小型集計表 (半分サイズ) ---
+const TBX = 23.5, TBW = 7.0, TBY = 16.0;
+const HDR_H = 2.0, ROW_H = 2.5, TOTAL_H = 3.5, N_DATA = 3;
+const COL2 = TBX + 3.5;
+const bottomY = TBY + HDR_H + N_DATA * ROW_H + TOTAL_H; // = 29.0
 
 // 合計行背景 (薄緑)
 ctx.fillStyle = 'rgb(170,210,178)';
@@ -1217,9 +1216,9 @@ ctx.fillRect(s(TBX), s(TBY + HDR_H + N_DATA * ROW_H), s(TBW), s(TOTAL_H));
 ctx.fillStyle = 'rgb(128,148,165)';
 ctx.fillRect(s(TBX), s(TBY), s(TBW), s(HDR_H));
 
-// データ行の水平罫線 (細線)
+// データ行の水平罫線
 ctx.strokeStyle = 'rgb(75,75,75)';
-ctx.lineWidth = s(0.45);
+ctx.lineWidth = s(0.35);
 [HDR_H, HDR_H + ROW_H, HDR_H + 2 * ROW_H].forEach(dy => {
   ctx.beginPath();
   ctx.moveTo(s(TBX), s(TBY + dy));
@@ -1228,22 +1227,30 @@ ctx.lineWidth = s(0.45);
 });
 
 // 合計行上の区切り線 (太線)
-ctx.lineWidth = s(0.9);
+ctx.lineWidth = s(0.7);
 ctx.beginPath();
 ctx.moveTo(s(TBX), s(TBY + HDR_H + N_DATA * ROW_H));
 ctx.lineTo(s(TBX + TBW), s(TBY + HDR_H + N_DATA * ROW_H));
 ctx.stroke();
 
 // 縦列分割線
-ctx.lineWidth = s(0.45);
+ctx.lineWidth = s(0.35);
 ctx.beginPath();
 ctx.moveTo(s(COL2), s(TBY));
 ctx.lineTo(s(COL2), s(bottomY));
 ctx.stroke();
 
 // 外枠
-ctx.lineWidth = s(0.7);
+ctx.strokeStyle = 'rgb(75,75,75)';
+ctx.lineWidth = s(0.6);
 ctx.strokeRect(s(TBX), s(TBY), s(TBW), s(bottomY - TBY));
+
+// --- ⑨ Σ記号 (表の上、右側中央) ---
+ctx.fillStyle = 'rgb(40,80,130)';
+ctx.font = `bold ${Math.round(s(8.5))}px Georgia, serif`;
+ctx.textAlign = 'center';
+ctx.textBaseline = 'middle';
+ctx.fillText('Σ', s(TBX + TBW / 2), s(9.0));
 `;
 
 // ─── Settings panel icons (32px logical, 32-unit coord space) ───────────────
