@@ -628,21 +628,26 @@ namespace Tools28.Commands.FormworkCalculator.Output
         /// 新しい解析ビューにコピーする。3D ビュー以外の場合は何もしない（既定のアイソメトリックを維持）。
         /// </summary>
         /// <summary>
-        /// ビューキューブの青い角（右前上）からのアイソメトリック視点を設定する。
-        /// ForwardDirection: 右前上 (+X+Y+Z) から左後下を向く (-1,-1,-1)。
-        /// UpDirection: 前方と直交し概ね上向き (-1,-1,2) normalized。
+        /// ビューキューブの青い角（前・上・右の交差する角）からのアイソメトリック視点を設定する。
+        /// Revit の標準プロジェクト方位では:
+        ///   - 右 (右側面) = +X、左 (左側面) = -X
+        ///   - 前 (正面)   = -Y、後 (背面)   = +Y
+        ///   - 上 (上面)   = +Z、下 (下面)   = -Z
+        /// 「前・上・右」の交差する角はカメラ位置 (+X, -Y, +Z) に対応する。
+        /// ForwardDirection: そこから原点を見る方向 = (-1, +1, -1)。
+        /// UpDirection: 前方と直交し概ね上向き (-1, +1, 2) normalized。
         /// </summary>
         private static void SetIsometricOrientation(View3D view)
         {
             if (view == null) return;
             try
             {
-                var forward = new XYZ(-1, -1, -1);
-                var up = new XYZ(-1, -1, 2);
-                var eye = new XYZ(100, 100, 100);
+                var forward = new XYZ(-1, 1, -1);
+                var up = new XYZ(-1, 1, 2);
+                var eye = new XYZ(100, -100, 100);
                 var orient = new ViewOrientation3D(eye, up, forward);
                 view.SetOrientation(orient);
-                FormworkDebugLog.Log("  [Visual] isometric orientation set (upper-right-front)");
+                FormworkDebugLog.Log("  [Visual] isometric orientation set (front-top-right corner)");
             }
             catch (Exception ex)
             {

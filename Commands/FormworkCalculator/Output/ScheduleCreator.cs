@@ -312,57 +312,74 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     }
                 }
 
-                // 列ヘッダー (Body 行 0) のスタイル: 太字・赤字・薄黄背景・大きめフォント
-                // Revit 内部単位 (feet): デフォルト ≈ 0.0104 ft。0.0208 ft ≈ 倍 (16pt 相当)。
-                var headerStyle = new TableCellStyle
-                {
-                    BackgroundColor = new Color(255, 240, 200), // 薄い黄色
-                    TextColor = new Color(192, 0, 0),           // 赤
-                    IsFontBold = true,
-                    FontHorizontalAlignment = HorizontalAlignmentStyle.Center,
-                };
-                // FontSize はバージョンによっては存在しない可能性があるため try で
-                TrySetTableCellStyleFontSize(headerStyle, 0.0208);
-
-                var ov = headerStyle.GetCellStyleOverrideOptions();
-                ov.BackgroundColor = true;
-                ov.FontColor = true;
-                ov.Bold = true;
-                TrySetOverrideOption(ov, "FontSize", true);
-                TrySetOverrideOption(ov, "HorizontalAlignment", true);
-                headerStyle.SetCellStyleOverrideOptions(ov);
+                // 列ヘッダー (Body 行 0) のスタイル: 太字・赤字、列ごとの背景色。
+                //   件数列 (col 0)   = 薄黄
+                //   面積列 (col 1)   = ピンク
+                //   それ以外 (隠し列) = 薄黄
+                // Revit 2022 ではデータ行 (Body 行 1+) のスタイル変更は API で許可されないため、
+                // 列ヘッダーセルの背景でピンクを表現する。
+                var yellow = new Color(255, 240, 200);
+                var pink = new Color(255, 200, 220);
+                var redText = new Color(192, 0, 0);
+                const int areaColumnIndex = 1; // 件数(0) / 面積(1) / [hidden marker(2)]
 
                 for (int c = 0; c < colCount; c++)
                 {
-                    try { body.SetCellStyle(0, c, headerStyle); }
+                    var style = new TableCellStyle
+                    {
+                        BackgroundColor = (c == areaColumnIndex) ? pink : yellow,
+                        TextColor = redText,
+                        IsFontBold = true,
+                        FontHorizontalAlignment = HorizontalAlignmentStyle.Center,
+                    };
+                    var ov = style.GetCellStyleOverrideOptions();
+                    ov.BackgroundColor = true;
+                    ov.FontColor = true;
+                    ov.Bold = true;
+                    TrySetOverrideOption(ov, "HorizontalAlignment", true);
+                    style.SetCellStyleOverrideOptions(ov);
+
+                    try { body.SetCellStyle(0, c, style); }
                     catch (Exception ex)
                     {
                         FormworkDebugLog.Log(
                             $"  [Sched:Summary] SetCellStyle col={c} EX: {ex.Message}");
                     }
                 }
+
+                // 試行: データ行 (Body 行 1) の面積セルをピンクに。
+                // Revit 2022 は body のデータ行スタイル上書きを許可しないため通常は例外。
+                // 将来の Revit でサポートされた場合に動作するよう試行のみ行う。
+                if (rowCount > 1 && colCount > areaColumnIndex)
+                {
+                    try
+                    {
+                        var dataPinkStyle = new TableCellStyle
+                        {
+                            BackgroundColor = pink,
+                        };
+                        var ov2 = dataPinkStyle.GetCellStyleOverrideOptions();
+                        ov2.BackgroundColor = true;
+                        dataPinkStyle.SetCellStyleOverrideOptions(ov2);
+                        body.SetCellStyle(1, areaColumnIndex, dataPinkStyle);
+                        FormworkDebugLog.Log(
+                            "  [Sched:Summary] data row area cell colored pink (Revit allowed it)");
+                    }
+                    catch (Exception ex)
+                    {
+                        FormworkDebugLog.Log(
+                            $"  [Sched:Summary] data row pink EX (expected on Revit 2022): {ex.Message}");
+                    }
+                }
+
                 FormworkDebugLog.Log(
-                    "  [Sched:Summary] column headers styled (bold/red/yellow)");
+                    "  [Sched:Summary] column headers styled (bold/red, area col pink)");
             }
             catch (Exception ex)
             {
                 FormworkDebugLog.Log(
                     $"  [Sched:Summary] StyleColumnHeaders EX: {ex.GetType().Name}: {ex.Message}");
             }
-        }
-
-        /// <summary>
-        /// TableCellStyle.FontSize プロパティを安全に設定する (バージョン差吸収)。
-        /// </summary>
-        private static void TrySetTableCellStyleFontSize(TableCellStyle style, double sizeFeet)
-        {
-            try
-            {
-                var p = style.GetType().GetProperty("FontSize");
-                if (p != null && p.CanWrite)
-                    p.SetValue(style, sizeFeet);
-            }
-            catch (Exception ex) { LogReflEx("TableCellStyle.FontSize", ex); }
         }
 
         /// <summary>

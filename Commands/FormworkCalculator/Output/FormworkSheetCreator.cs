@@ -265,6 +265,9 @@ namespace Tools28.Commands.FormworkCalculator.Output
             }
             if (vp == null) return;
 
+            // ビューポートタイプを「タイトルなし」に切り替える
+            ApplyNoTitleViewportType(doc, vp);
+
             // ビューポートの実アウトラインから幅・高さを取得
             double w = 0, h = 0;
             try
@@ -278,20 +281,118 @@ namespace Tools28.Commands.FormworkCalculator.Output
             }
             catch { }
 
-            // 右下に合わせて移動 (center 基準)
+            // 右下に合わせて移動 (center 基準)。下端から少し浮かせて配置 (≈100mm)。
+            const double upOffset = 0.328;  // ≈100mm
             double targetCx = draw.Max.U - margin - w / 2.0;
-            double targetCy = draw.Min.V + margin + h / 2.0;
+            double targetCy = draw.Min.V + margin + h / 2.0 + upOffset;
             try
             {
                 var delta = new XYZ(targetCx - tmpX, targetCy - tmpY, 0);
                 ElementTransformUtils.MoveElement(doc, vp.Id, delta);
                 FormworkDebugLog.Log(
-                    $"  [Sheet] viewport bottom-right cx={targetCx:F2} cy={targetCy:F2} w={w:F2} h={h:F2}");
+                    $"  [Sheet] viewport bottom-right cx={targetCx:F2} cy={targetCy:F2} w={w:F2} h={h:F2} upOffset={upOffset:F3}");
             }
             catch (Exception ex)
             {
                 FormworkDebugLog.Log($"  [Sheet] viewport move EX: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// ビューポートに「タイトルなし」タイプを適用する。
+        /// 探索順:
+        ///   1. 名前に「タイトルなし」「No Title」を含む既存タイプ
+        ///   2. パラメータ VIEWPORT_ATTR_SHOW_LABEL=0 のタイプ
+        ///   3. 既定タイプを複製して SHOW_LABEL=0 に設定 (フォールバック)
+        /// </summary>
+        private static void ApplyNoTitleViewportType(Document doc, Viewport vp)
+        {
+            if (doc == null || vp == null) return;
+            try
+            {
+                ElementId noTitleId = FindNoTitleViewportType(doc);
+
+                // 既存に見つからなければ、現在タイプを複製して SHOW_LABEL=0 に設定
+                if (noTitleId == ElementId.InvalidElementId)
+                {
+                    try
+                    {
+                        var currentTypeId = vp.GetTypeId();
+                        var currentType = doc.GetElement(currentTypeId) as ElementType;
+                        if (currentType != null)
+                        {
+                            var dup = currentType.Duplicate("Viewport_NoTitle_28Tools");
+                            var p = dup.get_Parameter(BuiltInParameter.VIEWPORT_ATTR_SHOW_LABEL);
+                            if (p != null && !p.IsReadOnly && p.StorageType == StorageType.Integer)
+                            {
+                                p.Set(0);
+                                noTitleId = dup.Id;
+                                FormworkDebugLog.Log(
+                                    $"  [Sheet] duplicated viewport type → no-title id={noTitleId.IntegerValue}");
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        FormworkDebugLog.Log($"  [Sheet] duplicate viewport type EX: {ex.Message}");
+                    }
+                }
+
+                if (noTitleId != ElementId.InvalidElementId)
+                {
+                    try
+                    {
+                        vp.ChangeTypeId(noTitleId);
+                        FormworkDebugLog.Log($"  [Sheet] viewport type → no-title id={noTitleId.IntegerValue}");
+                    }
+                    catch (Exception ex)
+                    {
+                        FormworkDebugLog.Log($"  [Sheet] ChangeTypeId EX: {ex.Message}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                FormworkDebugLog.Log($"  [Sheet] ApplyNoTitleViewportType EX: {ex.Message}");
+            }
+        }
+
+        private static ElementId FindNoTitleViewportType(Document doc)
+        {
+            var types = new FilteredElementCollector(doc)
+                .OfCategory(BuiltInCategory.OST_Viewports)
+                .WhereElementIsElementType()
+                .Cast<ElementType>()
+                .ToList();
+
+            // 1. 名前で「タイトルなし」「No Title」を含むタイプ
+            foreach (var vt in types)
+            {
+                string name = null;
+                try { name = vt.Name; } catch { }
+                if (string.IsNullOrEmpty(name)) continue;
+                if (name.Contains("タイトルなし") ||
+                    name.IndexOf("No Title", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    name.Contains("無し") ||
+                    name.Contains("無タイトル"))
+                {
+                    return vt.Id;
+                }
+            }
+
+            // 2. VIEWPORT_ATTR_SHOW_LABEL = 0 のタイプ
+            foreach (var vt in types)
+            {
+                try
+                {
+                    var p = vt.get_Parameter(BuiltInParameter.VIEWPORT_ATTR_SHOW_LABEL);
+                    if (p != null && p.StorageType == StorageType.Integer && p.AsInteger() == 0)
+                        return vt.Id;
+                }
+                catch { }
+            }
+
+            return ElementId.InvalidElementId;
         }
 
         private sealed class ElementIdComparer : IEqualityComparer<ElementId>
