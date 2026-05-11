@@ -145,6 +145,9 @@ namespace Tools28.Commands.FormworkCalculator.Output
             }
             LogDef(def, "FINAL");
 
+            // 列幅を自動調整して文字の折り返しを防ぐ
+            SetMainScheduleColumnWidths(schedule);
+
             return schedule.Id;
         }
 
@@ -240,9 +243,42 @@ namespace Tools28.Commands.FormworkCalculator.Output
         }
 
         /// <summary>
+        /// メイン集計表の列幅を設定して文字の折り返しを防ぐ。
+        /// 列順: 件数 / レベル / 部位 / 区分 / 面積。
+        /// </summary>
+        private static void SetMainScheduleColumnWidths(ViewSchedule schedule)
+        {
+            if (schedule == null) return;
+            try
+            {
+                var tableData = schedule.GetTableData();
+                var body = tableData?.GetSectionData(SectionType.Body);
+                if (body == null) return;
+
+                // 列幅 (Revit 内部単位: feet, 1ft = 304.8mm)
+                // 件数≈40mm / レベル≈80mm / 部位≈50mm / 区分≈60mm / 面積≈60mm
+                double[] widths = { 0.131, 0.262, 0.164, 0.197, 0.197 };
+
+                int colCount = body.NumberOfColumns;
+                for (int c = 0; c < colCount && c < widths.Length; c++)
+                {
+                    try { body.SetColumnWidth(c, widths[c]); }
+                    catch (Exception ex)
+                    {
+                        FormworkDebugLog.Log($"  [Sched] SetColumnWidth col={c} EX: {ex.Message}");
+                    }
+                }
+                FormworkDebugLog.Log($"  [Sched] column widths set for {Math.Min(colCount, widths.Length)} columns");
+            }
+            catch (Exception ex)
+            {
+                FormworkDebugLog.Log($"  [Sched] SetMainScheduleColumnWidths EX: {ex.Message}");
+            }
+        }
+
+        /// <summary>
         /// 集計表の列ヘッダー (Body 行 0) を太字・赤字・薄黄背景でスタイル設定し、
         /// 列幅を広く確保してタイトル「&lt;型枠数量集計_合計&gt;」が改行しないようにする。
-        /// データ行のフォントサイズも可能な限り拡大する。
         /// </summary>
         private static void StyleColumnHeaders(ViewSchedule schedule)
         {
@@ -306,219 +342,13 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     }
                 }
                 FormworkDebugLog.Log(
-                    "  [Sched:Summary] column headers styled (bold/red/yellow, large font)");
-
-                // データ行のフォントも拡大 (リフレクションで複数候補を試す)
-                TryEnlargeDataFont(schedule, 0.0156);
-
-                // Revit 2022 では TableCellStyle.FontSize が存在しないため、
-                // Schedule View の「Body text / Header text」パラメータ (TextNoteType 参照)
-                // を経由して大きめのテキストタイプを割り当てる。
-                EnlargeViewTextStyles(schedule);
+                    "  [Sched:Summary] column headers styled (bold/red/yellow)");
             }
             catch (Exception ex)
             {
                 FormworkDebugLog.Log(
                     $"  [Sched:Summary] StyleColumnHeaders EX: {ex.GetType().Name}: {ex.Message}");
             }
-        }
-
-        /// <summary>
-        /// データ行 (Body 行 1+) のフォントサイズを拡大する。
-        /// ScheduleField の CellStyle / SetStyle をリフレクションで試行。
-        /// </summary>
-        private static void TryEnlargeDataFont(ViewSchedule schedule, double fontSize)
-        {
-            if (schedule == null) return;
-            try
-            {
-                var def = schedule.Definition;
-                int fc = def.GetFieldCount();
-                for (int i = 0; i < fc; i++)
-                {
-                    ScheduleField field = null;
-                    try { field = def.GetField(i); } catch { }
-                    if (field == null) continue;
-                    try { if (field.IsHidden) continue; } catch { }
-
-                    var dataStyle = new TableCellStyle();
-                    TrySetTableCellStyleFontSize(dataStyle, fontSize);
-                    var ov = dataStyle.GetCellStyleOverrideOptions();
-                    TrySetOverrideOption(ov, "FontSize", true);
-                    dataStyle.SetCellStyleOverrideOptions(ov);
-
-                    var t = field.GetType();
-                    bool applied = false;
-
-                    // 候補 1: プロパティ "CellStyle" の setter
-                    try
-                    {
-                        var prop = t.GetProperty("CellStyle");
-                        if (prop != null && prop.CanWrite &&
-                            prop.PropertyType == typeof(TableCellStyle))
-                        {
-                            prop.SetValue(field, dataStyle);
-                            applied = true;
-                            FormworkDebugLog.Log($"  [Sched:Summary] field[{i}] CellStyle set");
-                        }
-                    }
-                    catch (Exception ex) { LogReflEx($"field[{i}].CellStyle", ex); }
-
-                    // 候補 2: メソッド "SetStyle(TableCellStyle)"
-                    if (!applied)
-                    {
-                        try
-                        {
-                            var m = t.GetMethod("SetStyle", new[] { typeof(TableCellStyle) });
-                            if (m != null)
-                            {
-                                m.Invoke(field, new object[] { dataStyle });
-                                applied = true;
-                                FormworkDebugLog.Log($"  [Sched:Summary] field[{i}] SetStyle invoked");
-                            }
-                        }
-                        catch (Exception ex) { LogReflEx($"field[{i}].SetStyle", ex); }
-                    }
-
-                    if (!applied)
-                        FormworkDebugLog.Log($"  [Sched:Summary] field[{i}] no font API found");
-                }
-            }
-            catch (Exception ex)
-            {
-                FormworkDebugLog.Log(
-                    $"  [Sched:Summary] TryEnlargeDataFont EX: {ex.GetType().Name}: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// Schedule View の「Body text / Header text / Title text」パラメータに、
-        /// 既存テキストタイプの中で最も大きいフォントサイズのものを割り当てる。
-        /// これにより、TableCellStyle.FontSize が存在しない Revit 2022 環境でも
-        /// 文字を大きく表示できる。
-        /// </summary>
-        private static void EnlargeViewTextStyles(ViewSchedule schedule)
-        {
-            if (schedule == null) return;
-            try
-            {
-                var doc = schedule.Document;
-
-                // プロジェクト内の TextNoteType を全て取得し、最大フォントサイズを選択
-                ElementId largestId = ElementId.InvalidElementId;
-                double largestSize = 0;
-                foreach (TextNoteType tt in new FilteredElementCollector(doc)
-                    .OfClass(typeof(TextNoteType))
-                    .Cast<TextNoteType>())
-                {
-                    try
-                    {
-                        var p = tt.get_Parameter(BuiltInParameter.TEXT_SIZE);
-                        if (p == null || !p.HasValue) continue;
-                        double size = p.AsDouble();
-                        if (size > largestSize)
-                        {
-                            largestSize = size;
-                            largestId = tt.Id;
-                        }
-                    }
-                    catch { }
-                }
-
-                if (largestId == ElementId.InvalidElementId)
-                {
-                    FormworkDebugLog.Log("  [Sched:Summary] no TextNoteType found for enlargement");
-                    return;
-                }
-
-                FormworkDebugLog.Log(
-                    $"  [Sched:Summary] largest text type id={largestId.IntegerValue} size={largestSize:F4} ft");
-
-                // 候補となるパラメータ名 (英語版 Revit / 日本語版 Revit / 簡体中文版)
-                string[] candidateNames = new[]
-                {
-                    "Body text", "Header text", "Title text",
-                    "本体テキスト", "ヘッダー テキスト", "タイトル テキスト",
-                    "ボディ テキスト", "ヘッダーテキスト", "タイトルテキスト",
-                    "正文文字", "标题栏文字", "标题文字",
-                    "タイトル", "ヘッダー", "本体",
-                };
-
-                // 1. Schedule View 自身に対して試す
-                int assignedView = TrySetTextStyleParams(schedule, candidateNames, largestId, "view");
-
-                // 2. Schedule View の Type 要素に対して試す
-                //    (ログから「タイプ」パラメータでタイプ要素が参照されていることが判明)
-                int assignedType = 0;
-                ElementId typeId = ElementId.InvalidElementId;
-                try { typeId = schedule.GetTypeId(); } catch { }
-                if (typeId != null && typeId != ElementId.InvalidElementId)
-                {
-                    var typeElem = doc.GetElement(typeId);
-                    if (typeElem != null)
-                    {
-                        FormworkDebugLog.Log($"  [Sched:Summary] schedule type id={typeId.IntegerValue}");
-                        assignedType = TrySetTextStyleParams(typeElem, candidateNames, largestId, "type");
-
-                        // Diagnostic: type 要素の settable ElementId パラメータを全列挙
-                        FormworkDebugLog.Log("  [Sched:Summary] type element ElementId params:");
-                        foreach (Parameter p in typeElem.Parameters)
-                        {
-                            try
-                            {
-                                if (p.StorageType == StorageType.ElementId && !p.IsReadOnly)
-                                    FormworkDebugLog.Log(
-                                        $"    typeParam='{p.Definition?.Name}' value={p.AsElementId()?.IntegerValue}");
-                            }
-                            catch { }
-                        }
-                    }
-                }
-
-                int totalAssigned = assignedView + assignedType;
-                if (totalAssigned == 0)
-                {
-                    FormworkDebugLog.Log("  [Sched:Summary] no text-style params matched on view or type");
-                }
-                else
-                {
-                    FormworkDebugLog.Log(
-                        $"  [Sched:Summary] text style assigned: view={assignedView} type={assignedType}");
-                }
-            }
-            catch (Exception ex)
-            {
-                FormworkDebugLog.Log(
-                    $"  [Sched:Summary] EnlargeViewTextStyles EX: {ex.GetType().Name}: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// 候補となるパラメータ名のいずれかに合致した ElementId 型パラメータに、
-        /// 指定の ElementId 値 (TextNoteType の Id) を設定する。
-        /// </summary>
-        private static int TrySetTextStyleParams(Element elem, string[] candidates, ElementId valueId, string label)
-        {
-            if (elem == null) return 0;
-            int count = 0;
-            foreach (var name in candidates)
-            {
-                try
-                {
-                    var p = elem.LookupParameter(name);
-                    if (p != null && !p.IsReadOnly && p.StorageType == StorageType.ElementId)
-                    {
-                        p.Set(valueId);
-                        FormworkDebugLog.Log($"  [Sched:Summary] {label}.'{name}' = {valueId.IntegerValue}");
-                        count++;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    FormworkDebugLog.Log($"  [Sched:Summary] {label}.'{name}' set EX: {ex.Message}");
-                }
-            }
-            return count;
         }
 
         /// <summary>

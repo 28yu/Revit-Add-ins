@@ -80,6 +80,13 @@ namespace Tools28.Commands.FormworkCalculator.Output
             }
             try { view.DetailLevel = ViewDetailLevel.Fine; } catch { }
 
+            // 尺度を 1/200 に設定
+            try { view.Scale = 200; }
+            catch (Exception ex) { FormworkDebugLog.Log($"  [Visual] Scale set EX: {ex.Message}"); }
+
+            // 視点をビューキューブの青い角（右前上からのアイソメトリック）に設定
+            SetIsometricOrientation(view);
+
             // OST_GenericModel (DirectShape のカテゴリ) を明示的に表示状態にする。
             // ビューテンプレートやデフォルト設定で非表示になっている場合への防御。
             try
@@ -98,8 +105,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 FormworkDebugLog.Log($"  [Visual] OST_GenericModel category set EX: {ex.Message}");
             }
 
-            // ソースが 3D ビューなら視点（カメラの向き）を継承する
-            CopyOrientationIfPossible(sourceView, view);
+            // 視点は常にアイソメトリック固定（上記 SetIsometricOrientation で設定済み）
 
             // 接触検出込みで面を再計算（幾何学的検査なので rayView 不要）
             var facesByElement = FormworkCalcEngine.RecomputeFaces(doc, result, settings);
@@ -621,6 +627,29 @@ namespace Tools28.Commands.FormworkCalculator.Output
         /// ソースビューが 3D ビューの場合、その視点（EyePosition / ForwardDirection / UpDirection）を
         /// 新しい解析ビューにコピーする。3D ビュー以外の場合は何もしない（既定のアイソメトリックを維持）。
         /// </summary>
+        /// <summary>
+        /// ビューキューブの青い角（右前上）からのアイソメトリック視点を設定する。
+        /// ForwardDirection: 右前上 (+X+Y+Z) から左後下を向く (-1,-1,-1)。
+        /// UpDirection: 前方と直交し概ね上向き (-1,-1,2) normalized。
+        /// </summary>
+        private static void SetIsometricOrientation(View3D view)
+        {
+            if (view == null) return;
+            try
+            {
+                var forward = new XYZ(-1, -1, -1);
+                var up = new XYZ(-1, -1, 2);
+                var eye = new XYZ(100, 100, 100);
+                var orient = new ViewOrientation3D(eye, up, forward);
+                view.SetOrientation(orient);
+                FormworkDebugLog.Log("  [Visual] isometric orientation set (upper-right-front)");
+            }
+            catch (Exception ex)
+            {
+                FormworkDebugLog.Log($"  [Visual] SetIsometricOrientation EX: {ex.Message}");
+            }
+        }
+
         private static void CopyOrientationIfPossible(View sourceView, View3D targetView)
         {
             if (!(sourceView is View3D src) || targetView == null) return;
