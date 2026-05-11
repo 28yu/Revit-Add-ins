@@ -1,11 +1,11 @@
 # 型枠数量算出アドイン 開発状況ハンドオフ
 
-**最終更新**: 2026-05-08
+**最終更新**: 2026-05-11
 **開発用 Revit**: 2022 (`dev-config.json`)
 
 ---
 
-## 🎯 次セッションへの引き継ぎ事項（2026-05-08 終了時点）
+## 🎯 次セッションへの引き継ぎ事項（2026-05-11 終了時点）
 
 ### 動作確認済み・本番投入可能な機能
 1. 6 カテゴリ（柱・梁・壁・床・基礎・階段）の型枠面積算出
@@ -19,6 +19,7 @@
 9. **[7] 非矩形面の型枠が半透明問題の修正**: Clipper 失敗時に 3D Boolean Difference fallback
 10. **[8] 直交梁端部型枠が省かれない問題の修正**: SmallAreaRatio=0.3 / OverlapRatioMinSmallA=0.25 で小さな a の閾値緩和
 11. **[9] 構造基礎×スラブ重なり検出**: `cond3-project-null` も Stage 2 トリガーに追加
+12. **[13] 壁 E4522721 の 290mm 帯型枠欠落の修正**: a が b より大きい場合の誤 Full Contact を 3D AABB 包含チェックで Partial に降格（2026-05-11）
 
 ### ⚠️ 未解決の課題（次セッションで取り組む）
 
@@ -66,6 +67,9 @@
 ### 直近の修正コミット (順)
 | 日時 | 内容 |
 |---|---|
+| 2026-05-11 | [13] 3D AABB 包含チェックで a>b の誤 Full Contact を Partial に降格 |
+| 2026-05-11 | [13] PolygonCutter: face B の実ポリゴン形状でカット (L字面等に対応) |
+| 2026-05-11 | [13] PolygonCutter: face B 法線逆向き時のループ自動反転 (needsReverse) |
 | 2026-05-08 | [10] ProjectBCornersToARelaxed 追加 (3段階 fallback UvBoundsOnA) |
 | 2026-05-08 | [9] cond3-project-null を Stage 2 トリガーに追加 |
 | 2026-05-08 | [8] SmallAreaRatio=0.3 / OverlapRatioMinSmallA=0.25 で閾値動的切替 |
@@ -99,6 +103,141 @@
   - `REJECTED(s1=理由,s2=理由)` で除外条件を確認
 
 ユーザーが疑わしい要素 ID を `grep "⚠️"` で抽出 → `grep "Pair E<id>"` でペア評価を確認可能。
+
+---
+
+## 2026-05-11 セッション: 壁 E4522721 の 290mm 帯型枠欠落を修正 [13]
+
+### 問題の概要
+
+天端切り欠き壁（高さ 1190.5mm）の上部 290mm 帯に型枠 DirectShape が表示されない。
+
+**要素構成**:
+- 壁 E4522721: 高さ 1190.5mm、上端に 110.5mm 高 × 75mm 深の切り欠き
+  - face[1] (−Y 面): Z=−4.726〜−0.820 ft (全 1190.5mm の背面)
+- 壁 E4485936: 隣接する低い壁、Z=−11.615〜−2.755 ft (上端が E4522721 の Z=−0.820 より低い)
+- スラブ E4486237: Z=−2.756〜−1.772 ft
+
+**症状の本当の原因**（最初の仮説は誤りだった）:
+- face[0]（正面 +Y 面）ではなく **face[1]（背面 −Y 面）の誤 Full Contact 判定** が根本原因
+- face[1] は E4485936 face[0] と `FULL_CONTACT` と判定 → `DeductedContact` → 型枠なし
+- E4485936 の Z_max=−2.755 < face[1] の Z_max=−0.820（290mm = 0.951 ft はみ出し）
+
+**誤判定のメカニズム**:
+```
+f1->f0 (E4522721 face[1] areaRatio=0.07 ≤ SmallAreaRatio=0.3)
+→ 緩和閾値 OverlapRatioMinSmallA=0.25 を適用
+→ okCount=2/4 (overlap=0.5) ≥ 0.25 → FULL_CONTACT ← 誤!
+(E4522721 face[1] の Z_max が E4485936 face[0] の Z_max を 0.951ft 超えていた)
+```
+
+### 修正内容
+
+#### 1. Stage 1 後の 3D AABB 包含チェック (`ContactFaceDetector.cs`)
+
+Stage 1 が受理した後、a の 3D バウンディングボックスが b の 3D バウンディングボックスの範囲を超えて延びていれば Full Contact を拒否し、Partial へ降格する。
+
+```csharp
+if (stage1Accepted)
+{
+    var aBox = Compute3DBBox(a.Face);
+    var bBox = Compute3DBBox(b.Face);
+    if (aBox.min != null && bBox.min != null)
+    {
+        double tol = CoincidenceTolFeet * 2.0;
+        bool aExtends =
+            aBox.min.X < bBox.min.X - tol || aBox.max.X > bBox.max.X + tol ||
+            aBox.min.Y < bBox.min.Y - tol || aBox.max.Y > bBox.max.Y + tol ||
+            aBox.min.Z < bBox.min.Z - tol || aBox.max.Z > bBox.max.Z + tol;
+        if (aExtends)
+        {
+            stage1Accepted = false;
+            stage1Reason = "cond6-a-extends-beyond-b";
+        }
+    }
+}
+```
+
+#### 2. `cond6-a-extends-beyond-b` を Stage 2 トリガーに追加
+
+```csharp
+else if (stage1Reason == "cond6-a-extends-beyond-b")
+{
+    stage2 = ComputePartialFromBBoxIntersect(a, b, out stage2Reason);
+}
+```
+
+#### 3. 新規ヘルパー: `Compute3DBBox(Face face)`
+
+UV bbox の 4 隅（+ 中点）を `face.Evaluate()` で 3D 点に変換し、3D AABB（min/max XYZ）を返す。
+
+#### 4. 新規関数: `ComputePartialFromBBoxIntersect(FaceInfo a, FaceInfo b, out string reason)`
+
+a と b の 3D AABB の交差範囲を計算し、それを a の UV 空間（`PlanarFace.XVector / YVector / Origin`）に投影して `ContactResult { Kind=Partial, UvBoundsOnA, FaceB }` を返す。
+
+**PlanarFace UV 座標系の投影**:
+```csharp
+PlanarFace pf = (PlanarFace)a.Face;
+XYZ origin = pf.Origin;
+XYZ xVec = pf.XVector;
+XYZ yVec = pf.YVector;
+// 3D 点 → UV: u = dot(pt - origin, xVec), v = dot(pt - origin, yVec)
+```
+
+### 追加で実装: ポリゴンカッター (`FormworkVisualizer.cs`)
+
+L 字形などの非矩形接触面に対して、UV-AABB 矩形よりも正確なカットを実現するため、
+接触面 B の実際のエッジポリゴンを使ったカッターを実装した。
+
+#### `BuildCutterFromContactFacePolygon`
+
+```csharp
+// face B のエッジループを取得
+IList<CurveLoop> loops = contactFaceB.GetEdgesAsCurveLoops();
+
+// face B の法線が押し出し方向 (face A の法線) と逆向きのとき → ループを反転
+bool needsReverse = faceBNormal.DotProduct(dir) < 0;
+if (needsReverse) { /* 各 CurveLoop を Reverse して向き修正 */ }
+
+// 薄板 Solid として押し出し
+Solid cutter = GeometryCreationUtilities.CreateExtrusionGeometry(
+    loops, dir, prePad + thickness);
+```
+
+#### ⚠️ CurveLoop の向きの落とし穴
+
+`CreateExtrusionGeometry` は押し出し方向から見て **CCW** のループを要求する。
+face B の法線が面 A の法線（押し出し方向）と逆向きの場合、`GetEdgesAsCurveLoops()` は
+face B の法線基準で CCW のループを返す → 押し出し方向から見ると CW になる。
+
+**判定式**: `faceBNormal.DotProduct(faceANormal) < 0` → `needsReverse = true`
+
+ループの反転方法:
+```csharp
+var reversed = new CurveLoop();
+var curves = loop.ToList();
+curves.Reverse();
+foreach (var c in curves) reversed.Append(c.CreateReversed());
+```
+
+Revit は CW でも例外を投げずに裏返った（inside-out）Solid を生成することがあるため、
+この問題は気づきにくい。ログに `needsReverse=True` が出たら要注意。
+
+### 追加された定数
+
+| 定数 | 値 | 追加理由 |
+|---|---|---|
+| `cond6-a-extends-beyond-b` | Stage 1 拒否理由文字列 | a が b の 3D AABB 外に延びている場合 |
+
+### ログで確認できる新しいマーカー
+
+```
+[Pair E<a> x E<b>]
+  f1->f0 ... cond6-a-extends-beyond-b → s2=bbox-intersect(area=X.XX)
+  
+[FormworkViz] polygon-cutter: loops=1 needsReverse=True volume=0.003
+[BoolDiff] subtract volBefore=0.524 volAfter=0.312 delta=-0.212
+```
 
 ---
 
@@ -204,7 +343,7 @@ if (stage1Reason == "cond2-area-ratio" ||
 
 ---
 
-### ContactFaceDetector の現在の定数一覧（2026-05-08 時点）
+### ContactFaceDetector の現在の定数一覧（2026-05-11 時点）
 
 | 定数 | 値 | 意味 |
 |---|---|---|
@@ -214,6 +353,16 @@ if (stage1Reason == "cond2-area-ratio" ||
 | `OverlapRatioMin` | 0.95 | Stage 1 の 4 隅重なり比閾値（通常） |
 | `SmallAreaRatio` | 0.3 | a/b ≤ この値のとき「小面」扱い |
 | `OverlapRatioMinSmallA` | 0.25 | 小面のときの緩和閾値 |
+
+**⚠️ SmallAreaRatio / OverlapRatioMinSmallA の副作用と対策**:
+
+[8] の修正（小面の緩和閾値）は意図通り動くが、副作用がある。
+a が b より面積比で小さい（≤ 0.3）ときに閾値を緩和するため、
+a が b の Z 範囲を超えて延びているケースでも Full Contact と誤判定してしまう
+（okCount=2/4 → overlap=0.5 ≥ 0.25 でも通過）。
+
+[13] の修正（3D AABB チェック）はこの副作用を打ち消す：Stage 1 受理後に
+a が b の 3D AABB の外に延びていれば Full 受理を取り消し Partial 経路へ送る。
 
 ### EvaluatePartialBToA の UvBoundsOnA 3 段階 fallback（2026-05-08 実装）
 
