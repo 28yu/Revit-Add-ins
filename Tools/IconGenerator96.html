@@ -747,9 +747,9 @@ function poly(pts, fill) {
   ctx.fillStyle=fill; ctx.fill();
   ctx.strokeStyle=EDGE; ctx.lineWidth=s(0.7); ctx.stroke();
 }
-poly([[cf.x1,cf.y1],[cf.x2,cf.y1],[cb.x2,cb.y1],[cb.x1,cb.y1]], '#5090D0'); // 上面
-poly([[cf.x2,cf.y1],[cb.x2,cb.y1],[cb.x2,cb.y2],[cf.x2,cf.y2]], '#2870B0'); // 右面
-poly([[cf.x1,cf.y1],[cf.x2,cf.y1],[cf.x2,cf.y2],[cf.x1,cf.y2]], '#70B0E0'); // 前面
+poly([[cf.x1,cf.y1],[cf.x2,cf.y1],[cb.x2,cb.y1],[cb.x1,cb.y1]], '#A8B8C8'); // 上面 (copy と同色)
+poly([[cf.x2,cf.y1],[cb.x2,cb.y1],[cb.x2,cb.y2],[cf.x2,cf.y2]], '#7A8A9A'); // 右面 (copy と同色)
+poly([[cf.x1,cf.y1],[cf.x2,cf.y1],[cf.x2,cf.y2],[cf.x1,cf.y2]], '#B8C8D8'); // 前面 (copy と同色)
 
 // === Step3: 前面4辺 (最前面に描画) ===
 ctx.strokeStyle = BLUE;

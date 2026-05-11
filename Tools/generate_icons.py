@@ -184,7 +184,7 @@ def make_sectionbox_paste():
     draw.line([(s(fx2),s(fy2)), (s(bx2),s(by2))], fill=BLUE, width=lw)
     draw.line([(s(fx1),s(fy2)), (s(bx1),s(by2))], fill=BLUE, width=lw)
 
-    # Step 2: Inner solid cube — blue tones
+    # Step 2: Inner solid cube — same colors as sectionbox_copy
     cf = (9, 14, 18, 23)
     cdx, cdy = 4, -4
     cb = (cf[0]+cdx, cf[1]+cdy, cf[2]+cdx, cf[3]+cdy)
@@ -192,13 +192,13 @@ def make_sectionbox_paste():
 
     top = [(s(cf[0]),s(cf[1])), (s(cf[2]),s(cf[1])),
            (s(cb[2]),s(cb[1])), (s(cb[0]),s(cb[1]))]
-    filled_poly(draw, top, hex_rgba('#5090D0'), EDGE, elw)
+    filled_poly(draw, top, hex_rgba('#A8B8C8'), EDGE, elw)
     right = [(s(cf[2]),s(cf[1])), (s(cb[2]),s(cb[1])),
              (s(cb[2]),s(cb[3])), (s(cf[2]),s(cf[3]))]
-    filled_poly(draw, right, hex_rgba('#2870B0'), EDGE, elw)
+    filled_poly(draw, right, hex_rgba('#7A8A9A'), EDGE, elw)
     front = [(s(cf[0]),s(cf[1])), (s(cf[2]),s(cf[1])),
              (s(cf[2]),s(cf[3])), (s(cf[0]),s(cf[3]))]
-    filled_poly(draw, front, hex_rgba('#70B0E0'), EDGE, elw)
+    filled_poly(draw, front, hex_rgba('#B8C8D8'), EDGE, elw)
 
     # Step 3: Front face on top (solid)
     draw.line([(s(fx1),s(fy1)), (s(fx2),s(fy1))], fill=BLUE, width=lw)
