@@ -1071,18 +1071,15 @@ const PINK = [255,128,148];
 const YELLOW = [218,185,47];
 const BLUE_C = [30,144,255];
 
-// Outer rectangle: yellow fill (same yellow as color blocks)
+// Outer rectangle: yellow fill, no border (耐火被覆、均等離れ=3units)
 ctx.fillStyle = 'rgb(218,185,47)';
 ctx.fillRect(s(1), s(1), s(18), s(30));
-ctx.strokeStyle = DARK;
-ctx.lineWidth = s(1.2);
-ctx.strokeRect(s(1), s(1), s(18), s(30));
 
-// I-beam: flange w=12 (x=4~16), h=2, web w=2 (x=9~11), centered at y=16 → top y=9, bottom y=23
+// I-beam: gap=3 on all sides → flange x=4~16 (w=12), top y=4~6, bottom y=26~28, web y=6~26
 ctx.fillStyle = MID;
-ctx.fillRect(s(4), s(9),  s(12), s(2));   // top flange
-ctx.fillRect(s(9), s(11), s(2),  s(10));  // web
-ctx.fillRect(s(4), s(21), s(12), s(2));   // bottom flange
+ctx.fillRect(s(4), s(4),  s(12), s(2));   // top flange
+ctx.fillRect(s(9), s(6),  s(2),  s(20));  // web
+ctx.fillRect(s(4), s(26), s(12), s(2));   // bottom flange
 
 // 3 color blocks on right
 const bx = s(22), bw = s(8), bh = s(8);
