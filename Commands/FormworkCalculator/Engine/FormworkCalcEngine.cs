@@ -397,6 +397,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             // 他要素との接触は ContactDetector が個別に検出する
             bool isFoundation = ElementCollector.ToCategoryGroup(elem) == CategoryGroup.Foundation;
             bool isSlab = ElementCollector.ToCategoryGroup(elem) == CategoryGroup.Slab;
+            bool isWall = ElementCollector.ToCategoryGroup(elem) == CategoryGroup.Wall;
 
             if (!isFoundation)
             {
@@ -407,9 +408,9 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 }
             }
 
-            // 床(スラブ)・構造基礎の天端は常に型枠不要: 段差・凹み・パデスタル天端を含め
+            // 床(スラブ)・構造基礎・壁の天端は常に型枠不要: 段差・凹み・リビール溝底を含め
             // 全ての上向き水平面を除外する (上側はコンクリート打設時に開放されているため)
-            if (isSlab || isFoundation)
+            if (isSlab || isFoundation || isWall)
             {
                 foreach (var fi in faceInfos)
                 {
@@ -550,6 +551,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
 
                 bool isFoundation = ElementCollector.ToCategoryGroup(elem) == CategoryGroup.Foundation;
                 bool isSlab = ElementCollector.ToCategoryGroup(elem) == CategoryGroup.Slab;
+                bool isWall = ElementCollector.ToCategoryGroup(elem) == CategoryGroup.Wall;
 
                 if (!isFoundation)
                 {
@@ -560,7 +562,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                     }
                 }
 
-                if (isSlab || isFoundation)
+                if (isSlab || isFoundation || isWall)
                 {
                     foreach (var f in faces)
                     {
