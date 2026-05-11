@@ -348,6 +348,7 @@ namespace Tools28.Localization
             { "Formwork.Output.Excel", "Export to Excel" },
             { "Formwork.Output.Schedule", "Create Revit summary view" },
             { "Formwork.Output.View3D", "Create color-coded 3D view" },
+            { "Formwork.Output.Sheet", "Auto-create summary sheet" },
             { "Formwork.Color.Header", "Color Scheme" },
             { "Formwork.Color.Category", "By category" },
             { "Formwork.Color.Zone", "By zone" },

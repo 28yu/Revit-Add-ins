@@ -25,9 +25,10 @@ namespace Tools28.Commands.FormworkCalculator.Models
         public bool GroupByFormworkType { get; set; }
         public string FormworkTypeParameterName { get; set; } = string.Empty;
 
-        public bool ExportToExcel { get; set; } = true;
+        public bool ExportToExcel { get; set; } = false;
         public bool CreateSchedule { get; set; } = true;
         public bool Create3DView { get; set; } = true;
+        public bool CreateSheet { get; set; } = true;
 
         public ColorSchemeType ColorScheme { get; set; } = ColorSchemeType.ByCategory;
         public bool ShowDeductedFaces { get; set; }

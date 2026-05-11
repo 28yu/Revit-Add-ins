@@ -105,7 +105,9 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 FormworkDebugLog.Log($"  [Visual] OST_GenericModel category set EX: {ex.Message}");
             }
 
-            // 視点は常にアイソメトリック固定（上記 SetIsometricOrientation で設定済み）
+            // 視点を固定アイソメトリックに設定し、ロックする（ユーザーが誤って回転しないよう）
+            try { view.SaveOrientationAndLock(); }
+            catch (Exception ex) { FormworkDebugLog.Log($"  [Visual] SaveOrientationAndLock EX: {ex.Message}"); }
 
             // 接触検出込みで面を再計算（幾何学的検査なので rayView 不要）
             var facesByElement = FormworkCalcEngine.RecomputeFaces(doc, result, settings);

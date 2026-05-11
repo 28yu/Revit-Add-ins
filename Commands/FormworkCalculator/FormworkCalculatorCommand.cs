@@ -161,7 +161,7 @@ namespace Tools28.Commands.FormworkCalculator
                         (view3DId != null && view3DId != ElementId.InvalidElementId) ||
                         (scheduleViewId != null && scheduleViewId != ElementId.InvalidElementId) ||
                         (summaryScheduleId != null && summaryScheduleId != ElementId.InvalidElementId);
-                    if (haveAnyOutput)
+                    if (settings.CreateSheet && haveAnyOutput)
                     {
                         using (var tSheet = new Transaction(doc, "型枠数量算出 - シート作成"))
                         {

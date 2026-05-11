@@ -41,6 +41,7 @@ namespace Tools28.Commands.FormworkCalculator.Views
             txtExportExcel.Text = Loc.S("Formwork.Output.Excel");
             txtCreateSchedule.Text = Loc.S("Formwork.Output.Schedule");
             txtCreate3DView.Text = Loc.S("Formwork.Output.View3D");
+            txtCreateSheet.Text = Loc.S("Formwork.Output.Sheet");
 
             grpColor.Header = Loc.S("Formwork.Color.Header");
             txtColorCat.Text = Loc.S("Formwork.Color.Category");
@@ -94,6 +95,7 @@ namespace Tools28.Commands.FormworkCalculator.Views
             ChkExportExcel.IsChecked = s.ExportToExcel;
             ChkCreateSchedule.IsChecked = s.CreateSchedule;
             ChkCreate3DView.IsChecked = s.Create3DView;
+            ChkCreateSheet.IsChecked = s.CreateSheet;
 
             switch (s.ColorScheme)
             {
@@ -121,6 +123,7 @@ namespace Tools28.Commands.FormworkCalculator.Views
                 ExportToExcel = ChkExportExcel.IsChecked == true,
                 CreateSchedule = ChkCreateSchedule.IsChecked == true,
                 Create3DView = ChkCreate3DView.IsChecked == true,
+                CreateSheet = ChkCreateSheet.IsChecked == true,
                 ShowDeductedFaces = ChkShowDeducted.IsChecked == true,
                 UseGLDeduction = ChkUseGL.IsChecked == true,
             };

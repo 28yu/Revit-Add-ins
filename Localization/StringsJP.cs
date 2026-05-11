@@ -348,6 +348,7 @@ namespace Tools28.Localization
             { "Formwork.Output.Excel", "Excel ファイルに出力" },
             { "Formwork.Output.Schedule", "Revit 集計ビューを作成" },
             { "Formwork.Output.View3D", "色分け 3D ビューを作成" },
+            { "Formwork.Output.Sheet", "集計シートを自動作成" },
             { "Formwork.Color.Header", "色分け区分" },
             { "Formwork.Color.Category", "部位別" },
             { "Formwork.Color.Zone", "工区別" },

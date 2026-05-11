@@ -281,8 +281,8 @@ namespace Tools28.Commands.FormworkCalculator.Output
             }
             catch { }
 
-            // 右下に合わせて移動 (center 基準)。下端から少し浮かせて配置 (≈100mm)。
-            const double upOffset = 0.328;  // ≈100mm
+            // 右下に合わせて移動 (center 基準)。下端から少し浮かせて配置 (≈30mm)。
+            const double upOffset = 0.098;  // ≈30mm (100mm up から 70mm 下げた位置)
             double targetCx = draw.Max.U - margin - w / 2.0;
             double targetCy = draw.Min.V + margin + h / 2.0 + upOffset;
             try

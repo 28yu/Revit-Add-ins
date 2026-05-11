@@ -348,6 +348,7 @@ namespace Tools28.Localization
             { "Formwork.Output.Excel", "导出到 Excel" },
             { "Formwork.Output.Schedule", "创建 Revit 汇总视图" },
             { "Formwork.Output.View3D", "创建色分 3D 视图" },
+            { "Formwork.Output.Sheet", "自动创建汇总图纸" },
             { "Formwork.Color.Header", "色分方案" },
             { "Formwork.Color.Category", "按部位" },
             { "Formwork.Color.Zone", "按施工区" },
