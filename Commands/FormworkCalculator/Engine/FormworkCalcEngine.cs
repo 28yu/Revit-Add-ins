@@ -347,6 +347,37 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             FormworkDebugLog.Section("Post Pass 2 Totals");
             FormworkDebugLog.Log($"  FormworkRequired: {req}");
             FormworkDebugLog.Log($"  DeductedContact:  {con}");
+
+            // 各面の詳細ダンプ (個別要素の不具合追跡用)。面数 ≥ 6 の要素のみ。
+            FormworkDebugLog.Section("Per-Face Detail (elements with ≥6 faces)");
+            FormworkDebugLog.Log("  fmt: [FaceDetail] E<id> face[i] type=<T> area=<ft²> n=(x,y,z) center=(x,y,z)");
+            foreach (var ctx in contexts)
+            {
+                if (ctx.Faces.Count < 6) continue;
+                for (int i = 0; i < ctx.Faces.Count; i++)
+                {
+                    var fi = ctx.Faces[i];
+                    var n = fi.Normal;
+                    string nStr = n != null
+                        ? $"({n.X:F3},{n.Y:F3},{n.Z:F3})" : "(null)";
+                    string cStr = "(?,?,?)";
+                    try
+                    {
+                        var bb = fi.Face.GetBoundingBox();
+                        if (bb != null)
+                        {
+                            var midUV = (bb.Min + bb.Max) * 0.5;
+                            var p = fi.Face.Evaluate(midUV);
+                            if (p != null)
+                                cStr = $"({p.X:F3},{p.Y:F3},{p.Z:F3})";
+                        }
+                    }
+                    catch { }
+                    FormworkDebugLog.Log(
+                        $"[FaceDetail] E{ctx.ElementId} face[{i}] type={fi.FaceType} " +
+                        $"area={fi.Area:F4} n={nStr} center={cStr} partials={fi.PartialContacts.Count}");
+                }
+            }
             FormworkDebugLog.Flush();
         }
 

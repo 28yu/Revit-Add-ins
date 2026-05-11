@@ -407,7 +407,19 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             bool uvInside =
                 uv.U >= bbA.Min.U - marginU && uv.U <= bbA.Max.U + marginU &&
                 uv.V >= bbA.Min.V - marginV && uv.V <= bbA.Max.V + marginV;
-            if (!uvInside) { reason = "s2-uv-out-of-bounds"; return none; }
+
+            // 中心が a の UV 外でも、b の 4 隅投影が a と重なる場合は partial contact として扱う。
+            // 典型ケース: a が大面 (e.g. 床長辺 5385x300mm)、b がオフセットした小面
+            // (e.g. 壁背面 825x1191mm, 高さ範囲が a と部分的にしか重ならない)。
+            // 中心点ベースの判定だけだと「a と b が同じ平面上にあるが中心同士が離れている」
+            // 部分接触ケースを取りこぼす。
+            bool centerOutsideButCornersMayOverlap = !uvInside && projDist <= CoincidenceTolFeet;
+
+            if (!uvInside && !centerOutsideButCornersMayOverlap)
+            {
+                reason = "s2-uv-out-of-bounds";
+                return none;
+            }
 
             double bArea = 0;
             try { bArea = b.Face.Area; } catch { }
@@ -494,6 +506,14 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             // [12] 梁 face[5] (L字, 38.66ft²) x スラブ面 (46.26ft²) のケースで
             // 旧実装は bArea=46.26 を使い partialSum>face*0.95 で誤 demoted-to-contact。
             // 修正後は 46.26/84.92×38.66 = 21.07 となり demoted されず、上部に型枠が生成される。
+            // 中心が a の UV 外でクランプ後 uvOnA が null (= corners も a と重ならない)
+            // 場合は真に接触なし。reject する (full bArea を引いて過剰控除するのを防ぐ)。
+            if (!uvInside && uvOnA == null)
+            {
+                reason = "s2-uv-out-of-bounds";
+                return none;
+            }
+
             double aFaceArea = 0;
             try { aFaceArea = a.Face.Area; } catch { }
             double faceUvBboxArea = (bbA.Max.U - bbA.Min.U) * (bbA.Max.V - bbA.Min.V);
