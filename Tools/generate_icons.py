@@ -839,52 +839,51 @@ def make_formwork():
         fy_px = s(yc) - ft_h / 2
         d.rectangle([fx, fy_px, fx + ft_w, fy_px + ft_h], fill=(55, 55, 58, 255))
 
-    # ⑧ 集計表 + Σ (外側のみ白縁取り、白内地、等行高)
+    # ⑧ 集計表 + Σ (外側のみ白縁取り、白内地、等行高、Σは表と同サイズ)
     TBX, TBW, TBY = 22.0, 9.5, 22.0
-    ROW_H = 2.5  # 全行均等
-    COL2 = TBX + 5.0
-    bY   = TBY + 3 * ROW_H  # = 29.5
-    SX, SY = TBX + TBW / 2, 16.5
-    TB      = (75, 75, 75, 255)
+    ROW_H = 2.5
+    COL2  = TBX + 5.0
+    bY    = TBY + 3 * ROW_H   # = 29.5
+    SX    = TBX + TBW / 2
+    SY    = 14.75              # Σ中心
+    SigY  = SY - ROW_H * 1.5  # Σボックス上端
+    TB       = (75, 75, 75, 255)
     WHITE_OL = (255, 255, 255, 230)
 
-    # 外側の白縁取り
+    FONT_PATH = '/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf'
+
+    # ── Σボックス (表と同サイズ・同スタイル) ──
+    d.rectangle([s(TBX - 0.8), s(SigY - 0.8), s(TBX + TBW + 0.8), s(SigY + 3 * ROW_H + 0.8)],
+                outline=WHITE_OL, width=iw(s(1.4)))
+    d.rectangle([s(TBX), s(SigY), s(TBX + TBW), s(SigY + 3 * ROW_H)],
+                fill=(255, 255, 255, 255))
+    try:
+        fnt = ImageFont.truetype(FONT_PATH, size=iw(s(9.0)))
+        cx_px, cy_px = s(SX), s(SY)
+        bb  = d.textbbox((0, 0), 'Σ', font=fnt)
+        tx  = cx_px - (bb[2] - bb[0]) / 2 - bb[0]
+        ty  = cy_px - (bb[3] - bb[1]) / 2 - bb[1]
+        d.text((tx, ty), 'Σ', font=fnt, fill=(20, 45, 115, 255))
+    except Exception as e:
+        print(f'  Σ font unavailable ({e}), skipping')
+
+    # ── 集計表 ──
     d.rectangle([s(TBX - 0.8), s(TBY - 0.8), s(TBX + TBW + 0.8), s(bY + 0.8)],
                 outline=WHITE_OL, width=iw(s(1.4)))
-    # 白内地
     d.rectangle([s(TBX), s(TBY), s(TBX + TBW), s(bY)],
                 fill=(255, 255, 255, 255))
-    # 合計行 (緑)
     d.rectangle([s(TBX), s(TBY + 2 * ROW_H), s(TBX + TBW), s(bY)],
                 fill=(170, 210, 178, 255))
-    # ヘッダー行 (青灰)
     d.rectangle([s(TBX), s(TBY), s(TBX + TBW), s(TBY + ROW_H)],
                 fill=(128, 148, 165, 255))
-    # 内部罫線
     d.line([(s(TBX), s(TBY + ROW_H)),     (s(TBX + TBW), s(TBY + ROW_H))],
            fill=TB, width=iw(s(0.35)))
     d.line([(s(TBX), s(TBY + 2 * ROW_H)), (s(TBX + TBW), s(TBY + 2 * ROW_H))],
            fill=TB, width=iw(s(0.35)))
     d.line([(s(COL2), s(TBY)), (s(COL2), s(bY))],
            fill=TB, width=iw(s(0.35)))
-    # 外枠 (ダーク)
     d.rectangle([s(TBX), s(TBY), s(TBX + TBW), s(bY)],
                 outline=TB, width=iw(s(0.6)))
-
-    # ⑨ Σ記号 (白四角背景 + テキスト)
-    SW, SH = s(7.5), s(6.5)
-    cx_px, cy_px = s(SX), s(SY)
-    d.rectangle([cx_px - SW / 2, cy_px - SH / 2, cx_px + SW / 2, cy_px + SH / 2],
-                fill=(255, 255, 255, 255))
-    FONT_PATH = '/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf'
-    try:
-        fnt = ImageFont.truetype(FONT_PATH, size=iw(s(8.5)))
-        bb  = d.textbbox((0, 0), 'Σ', font=fnt)
-        tx  = cx_px - (bb[2] - bb[0]) / 2 - bb[0]
-        ty  = cy_px - (bb[3] - bb[1]) / 2 - bb[1]
-        d.text((tx, ty), 'Σ', font=fnt, fill=(30, 60, 120, 255))
-    except Exception as e:
-        print(f'  Σ font unavailable ({e}), skipping')
 
     # 96px @ DPI=288 (32px論理サイズ)
     save_icon(img, 'formwork')

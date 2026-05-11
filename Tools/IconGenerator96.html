@@ -1190,28 +1190,34 @@ walFys.forEach(fy => {
 
 // ⑧ 集計表 + Σ (外側のみ白縁取り、白内地、等行高)
 const TBX = 22.0, TBW = 9.5, TBY = 22.0;
-const ROW_H = 2.5;  // 全行均等
+const ROW_H = 2.5;
 const COL2 = TBX + 5.0;
 const bottomY = TBY + 3 * ROW_H; // = 29.5
-const SX = TBX + TBW / 2, SY = 16.5;
+const SX = TBX + TBW / 2, SY = 14.75;  // Σ中心
+const SigY = SY - ROW_H * 1.5;         // Σボックス上端 (表と同じ高さ)
 
-// 外側の白縁取り (外周のみ)
+// ── Σボックス (表と同サイズ・同スタイル) ──
+ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+ctx.lineWidth = s(1.4);
+ctx.strokeRect(s(TBX - 0.8), s(SigY - 0.8), s(TBW + 1.6), s(3 * ROW_H + 1.6));
+ctx.fillStyle = '#FFFFFF';
+ctx.fillRect(s(TBX), s(SigY), s(TBW), s(3 * ROW_H));
+ctx.fillStyle = 'rgb(20,45,115)';
+ctx.font = \`bold \${Math.round(s(9.0))}px Georgia, serif\`;
+ctx.textAlign = 'center';
+ctx.textBaseline = 'middle';
+ctx.fillText('Σ', s(SX), s(SY));
+
+// ── 集計表 ──
 ctx.strokeStyle = 'rgba(255,255,255,0.9)';
 ctx.lineWidth = s(1.4);
 ctx.strokeRect(s(TBX - 0.8), s(TBY - 0.8), s(TBW + 1.6), s(3 * ROW_H + 1.6));
-
-// 白内地
 ctx.fillStyle = '#FFFFFF';
 ctx.fillRect(s(TBX), s(TBY), s(TBW), s(3 * ROW_H));
-
-// 合計行 (緑)
 ctx.fillStyle = 'rgb(170,210,178)';
 ctx.fillRect(s(TBX), s(TBY + 2 * ROW_H), s(TBW), s(ROW_H));
-// ヘッダー行 (青灰)
 ctx.fillStyle = 'rgb(128,148,165)';
 ctx.fillRect(s(TBX), s(TBY), s(TBW), s(ROW_H));
-
-// 内部罫線
 ctx.strokeStyle = 'rgb(75,75,75)';
 ctx.lineWidth = s(0.35);
 ctx.beginPath();
@@ -1219,19 +1225,8 @@ ctx.moveTo(s(TBX), s(TBY + ROW_H));     ctx.lineTo(s(TBX + TBW), s(TBY + ROW_H))
 ctx.moveTo(s(TBX), s(TBY + 2 * ROW_H)); ctx.lineTo(s(TBX + TBW), s(TBY + 2 * ROW_H));
 ctx.moveTo(s(COL2), s(TBY));             ctx.lineTo(s(COL2), s(bottomY));
 ctx.stroke();
-// 外枠 (ダーク)
 ctx.lineWidth = s(0.6);
 ctx.strokeRect(s(TBX), s(TBY), s(TBW), s(3 * ROW_H));
-
-// ⑨ Σ記号 (白四角背景 + テキスト)
-const SW = s(7.5), SH = s(6.5);  // Σに合わせた白背景矩形
-ctx.fillStyle = '#FFFFFF';
-ctx.fillRect(s(SX) - SW / 2, s(SY) - SH / 2, SW, SH);
-ctx.fillStyle = 'rgb(30,60,120)';
-ctx.font = \`bold \${Math.round(s(6.5))}px Georgia, serif\`;
-ctx.textAlign = 'center';
-ctx.textBaseline = 'middle';
-ctx.fillText('Σ', s(SX), s(SY));
 `;
 
 // ─── Settings panel icons (32px logical, 32-unit coord space) ───────────────
