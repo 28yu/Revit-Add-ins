@@ -1064,33 +1064,29 @@ ctx.fill();
 `;
 
 PRESETS.fire_protection = `
-// 耐火被覆: 外周矩形(被覆) + I型梁断面 + 右側3色ブロック
-const DARK = '#323232';
-const COVER = '#C8C8C8';   // fire protection material (light gray)
-const BEAM = '#505050';    // I-beam body (dark gray)
+// 耐火被覆: 外周矩形(黄色被覆) + I型梁断面(beam_under_levelと同形状) + 右側3色ブロック
+const DARK = '#505050';
+const MID = '#787878';
 const PINK = [255,128,148];
 const YELLOW = [218,185,47];
 const BLUE_C = [30,144,255];
 
-// Outer rectangle filled with cover material
-ctx.fillStyle = COVER;
+// Outer rectangle: yellow fill (same yellow as color blocks)
+ctx.fillStyle = 'rgb(218,185,47)';
 ctx.fillRect(s(1), s(1), s(18), s(30));
 ctx.strokeStyle = DARK;
 ctx.lineWidth = s(1.2);
 ctx.strokeRect(s(1), s(1), s(18), s(30));
 
-// I-beam cross section (drawn on top of cover)
-ctx.fillStyle = BEAM;
-// Top flange
-ctx.fillRect(s(2.5), s(4), s(15), s(4.5));
-// Web
-ctx.fillRect(s(7.5), s(8.5), s(5), s(15));
-// Bottom flange
-ctx.fillRect(s(2.5), s(23.5), s(15), s(4.5));
+// I-beam: flange w=12 (x=4~16), h=2, web w=2 (x=9~11), centered at y=16 → top y=9, bottom y=23
+ctx.fillStyle = MID;
+ctx.fillRect(s(4), s(9),  s(12), s(2));   // top flange
+ctx.fillRect(s(9), s(11), s(2),  s(10));  // web
+ctx.fillRect(s(4), s(21), s(12), s(2));   // bottom flange
 
 // 3 color blocks on right
-const bx = s(21), bw = s(9), bh = s(8);
-[[PINK,2],[YELLOW,12],[BLUE_C,22]].forEach(([c, y]) => {
+const bx = s(22), bw = s(8), bh = s(8);
+[[PINK,1],[YELLOW,11],[BLUE_C,21]].forEach(([c, y]) => {
   ctx.fillStyle = 'rgb('+c.join(',')+')';
   ctx.fillRect(bx, s(y), bw, bh);
 });

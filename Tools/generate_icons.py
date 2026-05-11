@@ -873,6 +873,36 @@ def make_formwork():
 
 
 # ─────────────────────────────────────────
+# fire_protection (耐火被覆色分け)
+# ─────────────────────────────────────────
+def make_fire_protection():
+    img = new_canvas()
+    draw = ImageDraw.Draw(img)
+
+    DARK   = hex_rgba('#505050')
+    MID    = hex_rgba('#787878')
+    PINK   = (255, 128, 148, 255)
+    YELLOW = (218, 185,  47, 255)
+    BLUE_C = ( 30, 144, 255, 255)
+
+    # Outer rectangle: yellow fill (same yellow as color blocks)
+    draw.rectangle([s(1), s(1), s(19), s(31)], fill=YELLOW, outline=DARK, width=iw(s(1.2)))
+
+    # I-beam centered in rectangle: flange w=12 (x=4~16), h=2, web w=2 (x=9~11)
+    # Vertically centered: beam height=14 → top y=9, bottom y=23
+    draw.rectangle([s(4), s(9),  s(16), s(11)], fill=MID)   # top flange
+    draw.rectangle([s(9), s(11), s(11), s(21)], fill=MID)   # web
+    draw.rectangle([s(4), s(21), s(16), s(23)], fill=MID)   # bottom flange
+
+    # 3 color blocks on right
+    bx, bw, bh = s(22), s(8), s(8)
+    for color, y in [(PINK, 1), (YELLOW, 11), (BLUE_C, 21)]:
+        draw.rectangle([bx, s(y), bx + bw, s(y) + bh], fill=color)
+
+    save_icon(img, 'fire_protection')
+
+
+# ─────────────────────────────────────────
 if __name__ == '__main__':
     print('Generating icons...')
     make_sectionbox_copy()
@@ -890,4 +920,5 @@ if __name__ == '__main__':
     make_ver()
     make_manual()
     make_formwork()
+    make_fire_protection()
     print('Done.')
