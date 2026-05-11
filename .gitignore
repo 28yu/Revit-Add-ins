@@ -15,3 +15,9 @@ Addins/
 
 # デバッグログ
 *.log
+
+# 診断ログ用ディレクトリ
+# - 全体は無視するが Formwork_debug.txt のみ commit を許可する
+# - 用途: Claude Code が解析できるよう一時的にログを共有する
+.diag/*
+!.diag/Formwork_debug.txt
