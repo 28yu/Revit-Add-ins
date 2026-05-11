@@ -1097,12 +1097,12 @@ const bx = s(21), bw = s(9), bh = s(8);
 `;
 
 PRESETS.formwork = `
-// 型枠数量算出: 全面展開 + 集計表/Σ を重ね配置
+// 型枠数量算出: 全面展開(コンクリート薄め) + 集計表/Σ を右下に重ね配置
 
 const ddx = 14.0, ddy = -4.0;
-const cx0 = 0.5, cy0 = 5.0, cx1 = 16.0, ybot = 31.5;
+const cx0 = 0.5, cy0 = 4.0, cx1 = 7.0, ybot = 32.0;
 
-// ① コンクリート側面
+// ① コンクリート側面 (薄い)
 ctx.fillStyle = 'rgb(175,175,170)';
 ctx.fillRect(s(cx0), s(cy0), s(cx1 - cx0), s(ybot - cy0));
 
@@ -1187,11 +1187,11 @@ walFys.forEach(fy => {
   ctx.fillRect(s(cx1) - FT_W / 2, s(yc) - FT_H / 2, FT_W, FT_H);
 });
 
-// ⑧ 集計表 (コンパネ面に重ね、白半透明背景)
-const TBX = 17.0, TBW = 12.0, TBY = 19.0;
+// ⑧ 集計表 (右下, 白半透明背景)
+const TBX = 20.0, TBW = 11.0, TBY = 23.0;
 const HDR_H = 2.0, ROW_H = 2.5, TOTAL_H = 3.5, N_DATA = 1;
-const COL2 = TBX + 6.0;
-const bottomY = TBY + HDR_H + N_DATA * ROW_H + TOTAL_H; // = 27.0
+const COL2 = TBX + 5.5;
+const bottomY = TBY + HDR_H + N_DATA * ROW_H + TOTAL_H; // = 31.0
 
 ctx.fillStyle = 'rgba(255,255,255,0.88)';
 ctx.fillRect(s(TBX), s(TBY), s(TBW), s(bottomY - TBY));
@@ -1224,14 +1224,14 @@ ctx.stroke();
 ctx.lineWidth = s(0.6);
 ctx.strokeRect(s(TBX), s(TBY), s(TBW), s(bottomY - TBY));
 
-// ⑨ Σ記号 (白円背景 + ダークブルー)
-const SX = TBX + TBW / 2, SY = 11.0;
+// ⑨ Σ記号 (右下エリア、表の上)
+const SX = TBX + TBW / 2, SY = 17.0;
 ctx.fillStyle = 'rgba(255,255,255,0.82)';
 ctx.beginPath();
-ctx.arc(s(SX), s(SY), s(4.0), 0, Math.PI * 2);
+ctx.arc(s(SX), s(SY), s(3.5), 0, Math.PI * 2);
 ctx.fill();
 ctx.fillStyle = 'rgb(30,60,120)';
-ctx.font = \`bold \${Math.round(s(6.5))}px Georgia, serif\`;
+ctx.font = \`bold \${Math.round(s(6.0))}px Georgia, serif\`;
 ctx.textAlign = 'center';
 ctx.textBaseline = 'middle';
 ctx.fillText('Σ', s(SX), s(SY));
