@@ -218,16 +218,16 @@ def make_cropbox_copy():
     DARK = hex_rgba('#323232')
     WHITE = (255, 255, 255, 255)
     BLUE = hex_rgba('#0066CC')
-    R = 2
+    R = 3
 
-    # Step 1: Grid lines
+    # Step 1: Grid lines (same as both/left/right grid bubble icons)
     lw = iw(s(1))
     draw.line([(s(10),s(4+R)), (s(10),s(28-R))], fill=DARK, width=lw)
     draw.line([(s(22),s(4+R)), (s(22),s(28-R))], fill=DARK, width=lw)
     draw.line([(s(4+R),s(10)), (s(28-R),s(10))], fill=DARK, width=lw)
     draw.line([(s(4+R),s(22)), (s(28-R),s(22))], fill=DARK, width=lw)
 
-    # Step 2: Bubbles (R=2)
+    # Step 2: Bubbles R=3 (matches grid bubble icons)
     sw = iw(s(1.2))
     for bx, by in [(10,4),(22,4),(4,10),(28,10),(4,22),(28,22),(10,28),(22,28)]:
         bubble(draw, s(bx), s(by), s(R), WHITE, DARK, sw)
@@ -252,16 +252,16 @@ def make_cropbox_paste():
     DARK = hex_rgba('#323232')
     WHITE = (255, 255, 255, 255)
     BLUE = hex_rgba('#2288DD')
-    R = 2
+    R = 3
 
-    # Step 1: Grid lines
+    # Step 1: Grid lines (same as both/left/right grid bubble icons)
     lw = iw(s(1))
     draw.line([(s(10),s(4+R)), (s(10),s(28-R))], fill=DARK, width=lw)
     draw.line([(s(22),s(4+R)), (s(22),s(28-R))], fill=DARK, width=lw)
     draw.line([(s(4+R),s(10)), (s(28-R),s(10))], fill=DARK, width=lw)
     draw.line([(s(4+R),s(22)), (s(28-R),s(22))], fill=DARK, width=lw)
 
-    # Step 2: Bubbles (R=2)
+    # Step 2: Bubbles R=3 (matches grid bubble icons)
     sw = iw(s(1.2))
     for bx, by in [(10,4),(22,4),(4,10),(28,10),(4,22),(28,22),(10,28),(22,28)]:
         bubble(draw, s(bx), s(by), s(R), WHITE, DARK, sw)

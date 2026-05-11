@@ -822,9 +822,9 @@ PRESETS.cropbox_copy = `
 // トリミング領域コピー: 通り芯(both)ベース + 青破線矩形 [3]
 const DARK = '#323232';
 const BLUE = '#0066CC';
-const R = 2;
+const R = 3;
 
-// === Step1: 通り芯グリッド線 ===
+// === Step1: 通り芯グリッド線 (grid bubble icons と同じ) ===
 ctx.strokeStyle = DARK;
 ctx.lineWidth = s(1);
 ctx.beginPath();
@@ -834,7 +834,7 @@ ctx.moveTo(s(4+R), s(10)); ctx.lineTo(s(28-R), s(10));
 ctx.moveTo(s(4+R), s(22)); ctx.lineTo(s(28-R), s(22));
 ctx.stroke();
 
-// === Step2: バブル ===
+// === Step2: バブル R=3 (grid bubble icons と同じ) ===
 function bubble(x, y) {
   ctx.beginPath();
   ctx.arc(s(x), s(y), s(R), 0, Math.PI*2);
@@ -847,7 +847,6 @@ bubble(4,22); bubble(28,22);
 bubble(10,28); bubble(22,28);
 
 // === Step3: 青破線矩形（トリミング領域・コピー）===
-// [9] 線幅s(1.2)、バブル内縁(R=2 → 内縁x/y=6)から2単位内側の(8,8)-(24,24)
 ctx.strokeStyle = BLUE;
 ctx.lineWidth = s(1.2);
 ctx.setLineDash([s(2.5), s(1.5)]);
@@ -859,9 +858,9 @@ PRESETS.cropbox_paste = `
 // トリミング領域ペースト: 通り芯(both)ベース + 青実線矩形 [3]
 const DARK = '#323232';
 const BLUE = '#2288DD';
-const R = 2;
+const R = 3;
 
-// === Step1: 通り芯グリッド線 ===
+// === Step1: 通り芯グリッド線 (grid bubble icons と同じ) ===
 ctx.strokeStyle = DARK;
 ctx.lineWidth = s(1);
 ctx.beginPath();
@@ -871,7 +870,7 @@ ctx.moveTo(s(4+R), s(10)); ctx.lineTo(s(28-R), s(10));
 ctx.moveTo(s(4+R), s(22)); ctx.lineTo(s(28-R), s(22));
 ctx.stroke();
 
-// === Step2: バブル ===
+// === Step2: バブル R=3 (grid bubble icons と同じ) ===
 function bubble(x, y) {
   ctx.beginPath();
   ctx.arc(s(x), s(y), s(R), 0, Math.PI*2);
@@ -884,7 +883,6 @@ bubble(4,22); bubble(28,22);
 bubble(10,28); bubble(22,28);
 
 // === Step3: 青実線矩形（トリミング領域・ペースト）===
-// [9] 線幅s(1.2)、バブルに触れないよう(8,8)-(24,24)
 ctx.strokeStyle = BLUE;
 ctx.lineWidth = s(1.2);
 ctx.strokeRect(s(8), s(8), s(16), s(16));
