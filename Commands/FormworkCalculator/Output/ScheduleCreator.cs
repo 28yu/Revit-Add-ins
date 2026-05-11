@@ -125,6 +125,11 @@ namespace Tools28.Commands.FormworkCalculator.Output
             // 合計タイトル文字列自体は設定するが、ShowGrandTotalTitle=false により非表示。
             // (ユーザーがモードを変更したときのためにタイトル文字列は保持)
             SetGrandTotalTitle(def, "型枠面積(合計)", showTitle: false, showCount: false);
+
+            // 外観タブ「データの前に空白行を挿入」を OFF に設定。
+            // Revit API のプロパティ名はバージョンによって異なるためリフレクションで複数候補を試す。
+            TrySetBlankLineBeforeData(def, false);
+
             if (areaField != null)
             {
                 try
@@ -659,6 +664,44 @@ namespace Tools28.Commands.FormworkCalculator.Output
         }
 
         /// <summary>
+        /// 「データの前に空白行を挿入」(外観タブ) を設定する。
+        /// ScheduleDefinition の bool プロパティとして複数の候補名でリフレクション試行する。
+        /// </summary>
+        private static void TrySetBlankLineBeforeData(ScheduleDefinition def, bool value)
+        {
+            if (def == null) return;
+            var t = def.GetType();
+            // 複数バージョンで確認された候補名を優先度順に試す
+            var candidates = new[]
+            {
+                "ShowBlankLines",
+                "InsertLineBeforeData",
+                "BlankLineBeforeData",
+                "ShowLeadingBlankLine",
+                "AddBlankLineBeforeData",
+                "InsertBlankLineBeforeData",
+            };
+            bool applied = false;
+            foreach (var name in candidates)
+            {
+                var p = t.GetProperty(name);
+                if (p != null && p.CanWrite && p.PropertyType == typeof(bool))
+                {
+                    try
+                    {
+                        p.SetValue(def, value);
+                        FormworkDebugLog.Log($"  [Sched] BlankLineBeforeData via '{name}' = {value}");
+                        applied = true;
+                        break;
+                    }
+                    catch (Exception ex) { LogReflEx($"BlankLineBeforeData.{name}", ex); }
+                }
+            }
+            if (!applied)
+                FormworkDebugLog.Log("  [Sched] BlankLineBeforeData: no matching property found (manual setting required)");
+        }
+
+        /// <summary>
         /// リフレクション経由の TargetInvocationException から内部例外を取り出してログする。
         /// </summary>
         private static void LogReflEx(string action, Exception ex)
@@ -671,7 +714,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
         }
 
         /// <summary>
-        /// グループフィールドとして追加（ヘッダー + フッター付き）。
+        /// グループフィールドとして追加（見出しON / フッタOFF）。
         /// </summary>
         private static void AddGroupField(ScheduleDefinition def, ScheduleField field)
         {
@@ -681,7 +724,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 var sort = new ScheduleSortGroupField(field.FieldId)
                 {
                     ShowHeader = true,
-                    ShowFooter = true,
+                    ShowFooter = false,
                     ShowBlankLine = false,
                     SortOrder = ScheduleSortOrder.Ascending,
                 };
