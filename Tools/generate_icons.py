@@ -46,18 +46,22 @@ def dashed_line(draw, x1, y1, x2, y2, color, width, dash_len, gap_len):
         pos = end
         draw_seg = not draw_seg
 
-def dashdot_line(draw, x1, y1, x2, y2, color, width):
-    """Draw a dash-dot line (長破線・ギャップ・点・ギャップ…)."""
+def dashdot_line(draw, x1, y1, x2, y2, color, width, dots=1):
+    """Draw a dash-dot line. dots=1: 一点鎖線, dots=2: 二点鎖線."""
     dx, dy = x2 - x1, y2 - y1
     length = math.hypot(dx, dy)
     if length < 0.001:
         return
     ux, uy = dx / length, dy / length
-    lens = [s(3), s(1.2), s(0.5), s(1.2)]  # dash, gap, dot, gap
+    if dots == 2:
+        lens = [s(3), s(1.2), s(0.5), s(1.2), s(0.5), s(1.2)]  # dash, gap, dot, gap, dot, gap
+    else:
+        lens = [s(3), s(1.2), s(0.5), s(1.2)]  # dash, gap, dot, gap
     w = iw(width)
+    n = len(lens)
     pos, phase = 0.0, 0
     while pos < length:
-        seg = lens[phase % 4]
+        seg = lens[phase % n]
         end = min(pos + seg, length)
         if phase % 2 == 0:  # draw segment (dash or dot)
             p1 = (x1 + ux * pos, y1 + uy * pos)
@@ -340,10 +344,10 @@ def make_beam_under_level():
     YELLOW = (218, 185,  47, 255)
     BLUE_C = ( 30, 144, 255, 255)
 
-    # I-beam (smaller overall: x=4~16, y=1~15; web narrower than flange thickness)
-    draw.rectangle([s(4), s(1),  s(16), s(4)],  fill=MID)  # top flange (width=12, thickness=3)
-    draw.rectangle([s(4), s(12), s(16), s(15)], fill=MID)  # bottom flange (bottom=y15)
-    draw.rectangle([s(9), s(4),  s(11), s(12)], fill=MID)  # web (width=2, thinner than flange)
+    # I-beam: flange thickness=2 same as web width=2 (x=4~16, y=1~15)
+    draw.rectangle([s(4), s(1),  s(16), s(3)],  fill=MID)  # top flange (thickness=2)
+    draw.rectangle([s(4), s(13), s(16), s(15)], fill=MID)  # bottom flange (thickness=2, bottom=y15)
+    draw.rectangle([s(9), s(3),  s(11), s(13)], fill=MID)  # web (width=2)
 
     # Up arrow: tip at y=15 (beam bottom), head base at y=19, shaft y=19→25
     lw = iw(s(0.8))
@@ -354,14 +358,14 @@ def make_beam_under_level():
         (s(12.5), s(19)),  # right
     ], fill=DARK)
 
-    # Dash-dot FL line at y=27 (一点破線)
-    dashdot_line(draw, s(1), s(27), s(20), s(27), DARK, s(0.8))
+    # Dash-dot FL line at y=27 (二点鎖線)
+    dashdot_line(draw, s(1), s(27), s(20), s(27), DARK, s(0.8), dots=2)
 
-    # ▼ Triangle: base at top (y=23), vertex at FL line (y=27)
+    # ▼ Triangle: larger, base at top (y=22), vertex at FL line (y=27)
     draw.polygon([
-        (s(2.5), s(23)),  # top-left
-        (s(5.5), s(23)),  # top-right
-        (s(4),   s(27)),  # bottom vertex touching FL line
+        (s(2), s(22)),  # top-left  (was 2.5, 23)
+        (s(6), s(22)),  # top-right (was 5.5, 23)
+        (s(4), s(27)),  # bottom vertex touching FL line
     ], fill=DARK)
 
     # 3 color blocks on right

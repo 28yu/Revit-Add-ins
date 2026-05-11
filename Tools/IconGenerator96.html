@@ -492,11 +492,11 @@ const PINK = [255,128,148];
 const YELLOW = [218,185,47];
 const BLUE = [30,144,255];
 
-// I-beam (smaller overall: x=4~16, y=1~15; web narrower than flange thickness)
+// I-beam: flange thickness=2 same as web width=2 (x=4~16, y=1~15)
 ctx.fillStyle = MID;
-ctx.fillRect(s(4), s(1),  s(12), s(3));   // Top flange (width=12, thickness=3)
-ctx.fillRect(s(4), s(12), s(12), s(3));   // Bottom flange (bottom edge y=15)
-ctx.fillRect(s(9), s(4),  s(2),  s(8));   // Web (width=2, thinner than flange)
+ctx.fillRect(s(4), s(1),  s(12), s(2));   // Top flange (thickness=2)
+ctx.fillRect(s(4), s(13), s(12), s(2));   // Bottom flange (thickness=2, bottom edge y=15)
+ctx.fillRect(s(9), s(3),  s(2),  s(10));  // Web (width=2)
 
 // Up arrow: tip at beam bottom (y=15), head base y=19, shaft y=19→y=25
 ctx.fillStyle = DARK;
@@ -512,20 +512,20 @@ ctx.lineTo(s(12.5), s(19));
 ctx.closePath();
 ctx.fill();
 
-// Dash-dot FL line at y=27 (一点破線: 長破線・点・長破線…)
+// Dash-dot FL line at y=27 (二点鎖線: 長破線・点・点…)
 ctx.strokeStyle = DARK;
 ctx.lineWidth = s(0.8);
-ctx.setLineDash([s(3), s(1.2), s(0.5), s(1.2)]);
+ctx.setLineDash([s(3), s(1.2), s(0.5), s(1.2), s(0.5), s(1.2)]);
 ctx.beginPath();
 ctx.moveTo(s(1), s(27)); ctx.lineTo(s(20), s(27));
 ctx.stroke();
 ctx.setLineDash([]);
 
-// ▼ Triangle: base at top, vertex (bottom) touching FL line at y=27
+// ▼ Triangle: larger, base at top (y=22), vertex at FL line (y=27)
 ctx.beginPath();
-ctx.moveTo(s(2.5), s(23));  // top-left
-ctx.lineTo(s(5.5), s(23));  // top-right
-ctx.lineTo(s(4),   s(27));  // bottom vertex touching FL line
+ctx.moveTo(s(2), s(22));  // top-left  (was 2.5, 23)
+ctx.lineTo(s(6), s(22));  // top-right (was 5.5, 23)
+ctx.lineTo(s(4), s(27));  // bottom vertex touching FL line
 ctx.closePath();
 ctx.fillStyle = DARK;
 ctx.fill();
