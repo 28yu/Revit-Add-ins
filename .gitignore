@@ -21,3 +21,4 @@ Addins/
 # - 用途: Claude Code が解析できるよう一時的にログを共有する
 .diag/*
 !.diag/Formwork_debug.txt
+__pycache__/
