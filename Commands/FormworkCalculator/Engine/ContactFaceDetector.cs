@@ -485,7 +485,12 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             return new ContactResult
             {
                 Kind = ContactKind.Partial,
-                ContactArea = bArea,
+                // uvOnA はクランプ済みのため、その bbox 面積が A 面上の実際の接触面積に近い。
+                // bArea (B 面全体の面積) は B が A より大きい場合に過大となり、
+                // partialSum >= face * 0.95 で誤った demoted-to-contact を引き起こす。
+                ContactArea = uvOnA != null
+                    ? (uvOnA.Max.U - uvOnA.Min.U) * (uvOnA.Max.V - uvOnA.Min.V)
+                    : bArea,
                 UvBounds = bbB,
                 UvBoundsOnA = uvOnA,
             };
