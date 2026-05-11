@@ -10,15 +10,15 @@ namespace Tools28.Commands.FormworkCalculator.Output
     /// <summary>
     /// ViewSchedule を作成して DirectShape に格納した型枠情報を集計表示する。
     ///
-    /// レイアウト（インスタンス内訳 + 階層集計）:
-    ///   - IsItemized = true → 各 DirectShape を個別に表示
-    ///   - 列: 件数 / レベル / 部位 / タイプ名 / 区分 / 面積(合計を計算)
-    ///   - 階層グループ化 (ShowHeader + ShowFooter で各階層に合計行):
-    ///       1段目: レベル  (参照レベル毎)
-    ///       2段目: 部位    (カテゴリ毎)
-    ///       3段目: タイプ名 (タイプ毎)
+    /// レイアウト（集計表示・タイプ名なし）:
+    ///   - IsItemized = false → 各 DirectShape をソートキー単位で集約
+    ///   - 列: 件数 / レベル / 部位 / 区分 / 面積(合計を計算)
+    ///   - 並べ替え/グループ化:
+    ///       1段目: レベル  (見出しON / フッタOFF)
+    ///       2段目: 部位    (見出しON / フッタOFF)
+    ///       3段目: 区分    (見出しOFF / フッタOFF)
     ///   - 面積フィールドの DisplayType=Totals → 各グループおよび総合計で面積合計を表示
-    ///   - 総合計行を表示
+    ///   - 総合計行は「合計のみ」モード (ShowGrandTotalTitle=false / ShowGrandTotalCount=false)
     /// </summary>
     internal static class ScheduleCreator
     {
@@ -51,17 +51,16 @@ namespace Tools28.Commands.FormworkCalculator.Output
             LogDef(def, "after-create");
 
             // 集計表の基本設定 (フィールド追加前に設定する必要がある場合がある)
-            //   IsItemized=true: 各インスタンスを個別行で表示
-            //   ShowGrandTotal=true: 末尾に総合計行
-            try { def.IsItemized = true; } catch (Exception ex) { LogEx("IsItemized=true (before)", ex); }
+            //   IsItemized=false: ソートキー単位で集約 (各インスタンスの内訳を非表示)
+            //   ShowGrandTotal=true: 末尾に総合計行 (合計のみモード)
+            try { def.IsItemized = false; } catch (Exception ex) { LogEx("IsItemized=false (before)", ex); }
             try { def.ShowGrandTotal = true; } catch (Exception ex) { LogEx("ShowGrandTotal=true (before)", ex); }
             LogDef(def, "after-set-itemized-before-fields");
 
-            // 列順: 件数 / レベル / 部位 / タイプ名 / 区分 / 面積
+            // 列順: 件数 / レベル / 部位 / 区分 / 面積
             var countField = AddCountField(def, schedulable);
             var levelField = AddField(doc, def, schedulable, paramIds, FormworkParameterManager.ParamLevel);
             var partField = AddField(doc, def, schedulable, paramIds, FormworkParameterManager.ParamCategory);
-            var typeNameField = AddFieldByBip(def, schedulable, BuiltInParameter.ALL_MODEL_TYPE_NAME);
             var groupField = AddField(doc, def, schedulable, paramIds, FormworkParameterManager.ParamGroupKey);
             var areaField = AddField(doc, def, schedulable, paramIds, FormworkParameterManager.ParamArea);
             LogDef(def, "after-add-fields");
@@ -93,10 +92,9 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 catch { }
             }
 
-            // 階層グループ化: レベル → 部位 → タイプ名（各階層にヘッダー・フッター）
+            // 階層グループ化: レベル → 部位（見出しON / フッタOFF）
             AddGroupField(def, levelField);
             AddGroupField(def, partField);
-            AddGroupField(def, typeNameField);
             LogDef(def, "after-group-fields");
             LogField(areaField, "areaField after-group");
 
@@ -120,12 +118,13 @@ namespace Tools28.Commands.FormworkCalculator.Output
 
             // SortGroupField 追加後に最終設定（Revit が上書きする場合の保険）。
             // FieldId で再取得して設定（古い参照では Revit 内部状態と同期していない可能性）。
-            try { def.IsItemized = true; } catch (Exception ex) { LogEx("IsItemized=true (after)", ex); }
+            try { def.IsItemized = false; } catch (Exception ex) { LogEx("IsItemized=false (after)", ex); }
             try { def.ShowGrandTotal = true; } catch { }
 
-            // 総合計タイトルを「型枠面積(合計)」に設定し、Excel 総括表との対応を明確化。
-            // Revit バージョンによりプロパティ名が異なる可能性があるためリフレクションで安全に設定。
-            SetGrandTotalTitle(def, "型枠面積(合計)");
+            // 総合計を「合計のみ」モードに設定: タイトル文字列と件数欄を非表示。
+            // 合計タイトル文字列自体は設定するが、ShowGrandTotalTitle=false により非表示。
+            // (ユーザーがモードを変更したときのためにタイトル文字列は保持)
+            SetGrandTotalTitle(def, "型枠面積(合計)", showTitle: false, showCount: false);
             if (areaField != null)
             {
                 try
@@ -141,128 +140,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
             }
             LogDef(def, "FINAL");
 
-            // Body の総合計行は API でスタイル変更できない (Revit の制約)。
-            // 代わりに Header セクションに強調表示用の「型枠面積(合計): X.XX ㎡」行を追加し、
-            // 集計表名にも合計値を含めて Project Browser での識別性も向上させる。
-            EmphasizeGrandTotal(schedule, result);
-
             return schedule.Id;
-        }
-
-        /// <summary>
-        /// 集計表の総合計を視覚的に強調する。
-        /// Revit API は Body の総合計行へのスタイル変更を許可しないため、
-        /// Header セクションに「型枠面積(合計)」のラベルを styled な独立行として追加する。
-        /// 値は Body 側の総合計行 (Revit が自動再計算) に任せ、ここではラベルのみとする
-        /// （Header テキストは静的なので値を含めると DirectShape 削除時に追従しないため）。
-        /// </summary>
-        private static void EmphasizeGrandTotal(ViewSchedule schedule, FormworkResult result)
-        {
-            if (schedule == null) return;
-            // ラベルのみ。値は body の総合計行 (Revit auto-updated) で見せる。
-            string labelText = "型枠面積(合計) ↓";
-
-            bool added = TryAddStyledHeaderRow(schedule, labelText);
-            if (!added)
-                FormworkDebugLog.Log("  [Sched:Style] Header row addition failed");
-        }
-
-        /// <summary>
-        /// Header セクションに「型枠面積(合計): X.XX ㎡」の強調表示行を追加する。
-        /// 列が不足していたら追加し、既存ヘッダー行の下に挿入してから
-        /// セル結合・スタイル設定を行う。
-        /// </summary>
-        private static bool TryAddStyledHeaderRow(ViewSchedule schedule, string text)
-        {
-            try
-            {
-                var tableData = schedule.GetTableData();
-                if (tableData == null) return false;
-                var header = tableData.GetSectionData(SectionType.Header);
-                if (header == null) return false;
-
-                int initRows = header.NumberOfRows;
-                int initCols = header.NumberOfColumns;
-                FormworkDebugLog.Log(
-                    $"  [Sched:Style] Header initial rows={initRows} cols={initCols}");
-
-                // 列が無ければ 1 列追加
-                if (initCols == 0)
-                {
-                    try { header.InsertColumn(0); }
-                    catch (Exception ex)
-                    {
-                        FormworkDebugLog.Log($"  [Sched:Style] Header InsertColumn EX: {ex.Message}");
-                        return false;
-                    }
-                }
-
-                // 既存ヘッダー行の最後に新しい行を追加 (一番下 = body の真上)
-                int insertAt = header.NumberOfRows;
-                try { header.InsertRow(insertAt); }
-                catch (Exception ex)
-                {
-                    FormworkDebugLog.Log($"  [Sched:Style] Header InsertRow at {insertAt} EX: {ex.Message}");
-                    return false;
-                }
-
-                int newRow = insertAt;
-                int colCount = header.NumberOfColumns;
-
-                // セル結合 (新規行を全列にまたいで 1 セルに)
-                if (colCount > 1)
-                {
-                    try
-                    {
-                        var merge = new TableMergedCell(newRow, 0, newRow, colCount - 1);
-                        header.MergeCells(merge);
-                    }
-                    catch (Exception ex)
-                    {
-                        FormworkDebugLog.Log($"  [Sched:Style] Header MergeCells EX: {ex.Message}");
-                    }
-                }
-
-                // テキスト設定
-                try { header.SetCellText(newRow, 0, text); }
-                catch (Exception ex)
-                {
-                    FormworkDebugLog.Log($"  [Sched:Style] Header SetCellText EX: {ex.Message}");
-                    return false;
-                }
-
-                // スタイル設定 (太字・赤字・薄黄背景)
-                var style = new TableCellStyle
-                {
-                    BackgroundColor = new Color(255, 240, 200), // 薄い黄色
-                    TextColor = new Color(192, 0, 0),           // 赤
-                    IsFontBold = true,
-                };
-                var ov = style.GetCellStyleOverrideOptions();
-                ov.BackgroundColor = true;
-                ov.FontColor = true;
-                ov.Bold = true;
-                style.SetCellStyleOverrideOptions(ov);
-
-                try
-                {
-                    header.SetCellStyle(newRow, 0, style);
-                    FormworkDebugLog.Log(
-                        $"  [Sched:Style] Header row {newRow} added & styled: '{text}'");
-                    return true;
-                }
-                catch (Exception ex)
-                {
-                    FormworkDebugLog.Log($"  [Sched:Style] Header SetCellStyle EX: {ex.Message}");
-                    return false;
-                }
-            }
-            catch (Exception ex)
-            {
-                FormworkDebugLog.Log(
-                    $"  [Sched:Style] EmphasizeGrandTotal Header EX: {ex.GetType().Name}: {ex.Message}");
-                return false;
-            }
         }
 
         /// <summary>
@@ -707,57 +585,47 @@ namespace Tools28.Commands.FormworkCalculator.Output
         }
 
         /// <summary>
-        /// ScheduleDefinition の総合計タイトルを設定する。Revit のバージョンによって
-        /// プロパティ名が異なる可能性があるため、リフレクションで複数候補を試す。
-        /// 失敗時は内部例外まで詳細ログに記録する。
+        /// ScheduleDefinition の総合計タイトルとモードを設定する。
+        /// showTitle/showCount で UI の「合計」ドロップダウン相当を制御:
+        ///   - (true, true)  → タイトル、件数、合計
+        ///   - (true, false) → タイトルと合計
+        ///   - (false, true) → 件数と合計
+        ///   - (false, false) → 合計のみ
+        /// Revit のバージョンによってプロパティ名が異なる可能性があるため、
+        /// リフレクションで複数候補を試す。失敗時は内部例外まで詳細ログに記録する。
         /// </summary>
-        private static void SetGrandTotalTitle(ScheduleDefinition def, string title)
+        private static void SetGrandTotalTitle(
+            ScheduleDefinition def, string title, bool showTitle, bool showCount)
         {
-            if (def == null || string.IsNullOrEmpty(title)) return;
+            if (def == null) return;
             var t = def.GetType();
 
-            // 関連 bool プロパティが存在する場合、先に true にしておく
-            // (一部の Revit バージョンでは ShowGrandTotalTitle = true が前提条件のため)
+            // タイトル文字列の設定は ShowGrandTotalTitle=true が前提となるバージョンがあるため、
+            // 一旦 true に切り替えてから文字列を設定し、最後に希望の値へ戻す。
             TrySetBool(def, t, "ShowGrandTotalTitle", true);
-            TrySetBool(def, t, "ShowGrandTotalCount", true);
 
-            // 1. プロパティ "GrandTotalTitle" を試す
-            if (TrySetString(def, t, "GrandTotalTitle", title)) return;
-
-            // 2. メソッド "SetGrandTotalTitle(string)" を試す
-            try
+            if (!string.IsNullOrEmpty(title))
             {
-                var method = t.GetMethod("SetGrandTotalTitle", new[] { typeof(string) });
-                if (method != null)
+                // 1. プロパティ "GrandTotalTitle" を試す
+                if (!TrySetString(def, t, "GrandTotalTitle", title))
                 {
-                    method.Invoke(def, new object[] { title });
-                    FormworkDebugLog.Log($"  [Sched] GrandTotalTitle set via method: '{title}'");
-                    return;
+                    // 2. メソッド "SetGrandTotalTitle(string)" を試す
+                    try
+                    {
+                        var method = t.GetMethod("SetGrandTotalTitle", new[] { typeof(string) });
+                        if (method != null)
+                        {
+                            method.Invoke(def, new object[] { title });
+                            FormworkDebugLog.Log($"  [Sched] GrandTotalTitle set via method: '{title}'");
+                        }
+                    }
+                    catch (Exception ex) { LogReflEx("SetGrandTotalTitle method", ex); }
                 }
             }
-            catch (Exception ex) { LogReflEx("SetGrandTotalTitle method", ex); }
 
-            // 3. 診断: ScheduleDefinition の全 settable プロパティを列挙してログに残す
-            try
-            {
-                FormworkDebugLog.Log("  [Sched] -- ScheduleDefinition settable string properties --");
-                foreach (var p in t.GetProperties())
-                {
-                    if (p.CanWrite && p.PropertyType == typeof(string))
-                        FormworkDebugLog.Log($"    propString: {p.Name}");
-                    else if (p.CanWrite && p.PropertyType == typeof(bool))
-                        FormworkDebugLog.Log($"    propBool:   {p.Name}");
-                }
-                foreach (var m in t.GetMethods())
-                {
-                    if (m.Name.StartsWith("Set") &&
-                        (m.Name.Contains("Total") || m.Name.Contains("Title")))
-                        FormworkDebugLog.Log($"    method:     {m.Name}({string.Join(",", m.GetParameters().Select(p => p.ParameterType.Name))})");
-                }
-            }
-            catch { }
-
-            FormworkDebugLog.Log("  [Sched] GrandTotalTitle could not be set in this Revit version");
+            // タイトル設定後に最終的な表示モードを反映
+            TrySetBool(def, t, "ShowGrandTotalTitle", showTitle);
+            TrySetBool(def, t, "ShowGrandTotalCount", showCount);
         }
 
         private static bool TrySetString(object obj, Type t, string propName, string value)
@@ -886,16 +754,6 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     catch { return false; }
                 });
             }
-            if (sf == null) return null;
-            try { return def.AddField(sf); } catch { return null; }
-        }
-
-        private static ScheduleField AddFieldByBip(
-            ScheduleDefinition def,
-            IList<SchedulableField> schedulable,
-            BuiltInParameter bip)
-        {
-            var sf = schedulable.FirstOrDefault(f => f.ParameterId == new ElementId(bip));
             if (sf == null) return null;
             try { return def.AddField(sf); } catch { return null; }
         }
