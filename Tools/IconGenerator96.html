@@ -891,19 +891,18 @@ ctx.strokeRect(s(8), s(8), s(16), s(16));
 `;
 
 PRESETS.excel_export = `
-// Excel エクスポート: 紙(右上折り角=グレー塗り+折り線のみ)+緑バッジ(黒枠)+白X+横線3本+青上矢印
+// Excel エクスポート: 紙(右上折り角=白塗り+対角折り線のみ)+緑バッジ(黒枠)+白X+横線3本+青上矢印
 const DARK  = '#1A1A1A';
 const WHITE = '#FFFFFF';
-const FOLD_GRAY = '#D2D2D2';
 const GREEN = '#217346';
 const BLUE  = '#0066CC';
 const SW    = s(1.3);
 
-// 1) 折りフラップ先に描画: グレー塗り、枠なし (折り線はペンタゴン輪郭で描画)
+// 1) 折りフラップ: 白塗り、枠なし (折り線はペンタゴン輪郭の対角線のみで表現)
 ctx.beginPath();
 ctx.moveTo(s(16), s(1)); ctx.lineTo(s(22), s(1)); ctx.lineTo(s(22), s(7));
 ctx.closePath();
-ctx.fillStyle = FOLD_GRAY;
+ctx.fillStyle = WHITE;
 ctx.fill();
 
 // 2) 紙本体ペンタゴン (大): x=2~22, y=1~30, 折り角(16,1)→(22,7)
@@ -949,35 +948,34 @@ ctx.lineCap = 'butt';
   ctx.stroke();
 });
 
-// === 青上矢印 (export) ===
+// === 青上矢印 (export): span y=8~24, 余白均等(上8/下8) ===
 ctx.fillStyle = BLUE;
 ctx.strokeStyle = BLUE;
 ctx.lineWidth = s(1.2);
 ctx.beginPath();
-ctx.moveTo(s(27), s(8)); ctx.lineTo(s(27), s(22));
+ctx.moveTo(s(27), s(13)); ctx.lineTo(s(27), s(24));
 ctx.stroke();
 ctx.beginPath();
-ctx.moveTo(s(27), s(6));
-ctx.lineTo(s(23.5), s(11));
-ctx.lineTo(s(30.5), s(11));
+ctx.moveTo(s(27),   s(8));
+ctx.lineTo(s(23.5), s(13));
+ctx.lineTo(s(30.5), s(13));
 ctx.closePath();
 ctx.fill();
 `;
 
 PRESETS.excel_import = `
-// Excel インポート: 紙(右上折り角=グレー塗り+折り線のみ)+緑バッジ(黒枠)+白X+横線3本+青下矢印
+// Excel インポート: 紙(右上折り角=白塗り+対角折り線のみ)+緑バッジ(黒枠)+白X+横線3本+青下矢印
 const DARK  = '#1A1A1A';
 const WHITE = '#FFFFFF';
-const FOLD_GRAY = '#D2D2D2';
 const GREEN = '#217346';
 const BLUE  = '#0066CC';
 const SW    = s(1.3);
 
-// 1) 折りフラップ: グレー塗り、枠なし
+// 1) 折りフラップ: 白塗り、枠なし
 ctx.beginPath();
 ctx.moveTo(s(16), s(1)); ctx.lineTo(s(22), s(1)); ctx.lineTo(s(22), s(7));
 ctx.closePath();
-ctx.fillStyle = FOLD_GRAY;
+ctx.fillStyle = WHITE;
 ctx.fill();
 
 // 2) 紙本体ペンタゴン (大): x=2~22, y=1~30
@@ -1023,17 +1021,17 @@ ctx.lineCap = 'butt';
   ctx.stroke();
 });
 
-// === 青下矢印 (import) ===
+// === 青下矢印 (import): span y=8~24, 余白均等(上8/下8) ===
 ctx.fillStyle = BLUE;
 ctx.strokeStyle = BLUE;
 ctx.lineWidth = s(1.2);
 ctx.beginPath();
-ctx.moveTo(s(27), s(8)); ctx.lineTo(s(27), s(22));
+ctx.moveTo(s(27), s(8)); ctx.lineTo(s(27), s(19));
 ctx.stroke();
 ctx.beginPath();
-ctx.moveTo(s(27), s(26));
-ctx.lineTo(s(23.5), s(21));
-ctx.lineTo(s(30.5), s(21));
+ctx.moveTo(s(27),   s(24));
+ctx.lineTo(s(23.5), s(19));
+ctx.lineTo(s(30.5), s(19));
 ctx.closePath();
 ctx.fill();
 `;

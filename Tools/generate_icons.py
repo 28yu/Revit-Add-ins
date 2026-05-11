@@ -423,15 +423,14 @@ def make_beam_top_level():
 def _draw_excel_file_icon(img):
     """Draw Excel file icon: paper(top-right dog-ear fold) + green badge(black border) + white X + content lines."""
     draw = ImageDraw.Draw(img)
-    DARK      = (26, 26, 26, 255)
-    WHITE     = (255, 255, 255, 255)
-    FOLD_GRAY = (210, 210, 210, 255)
-    GREEN     = hex_rgba('#217346')
+    DARK  = (26, 26, 26, 255)
+    WHITE = (255, 255, 255, 255)
+    GREEN = hex_rgba('#217346')
     sw = iw(s(1.3))
 
-    # 1) Fold flap first: gray fill, NO border (crease drawn by pentagon outline below)
+    # 1) Fold flap: WHITE fill, no border (same color as paper — crease drawn by pentagon outline)
     fold_poly = [(s(16), s(1)), (s(22), s(1)), (s(22), s(7))]
-    draw.polygon(fold_poly, fill=FOLD_GRAY)
+    draw.polygon(fold_poly, fill=WHITE)
 
     # 2) Paper pentagon (larger): x=2~22, y=1~30, fold corner at (16,1)→(22,7)
     paper_poly = [
@@ -471,14 +470,15 @@ def make_excel_export():
     _draw_excel_file_icon(img)
     draw = ImageDraw.Draw(img)
 
-    # Blue up arrow: shaft y=8→22, tip at y=6
+    # Blue up arrow: span y=8~24 (=16), equal margins top=8, bottom=8
+    # tip y=8, head base y=13, shaft y=13~24
     BLUE = (0, 102, 204, 255)
     lw = iw(s(1.2))
-    draw.line([(s(27), s(8)), (s(27), s(22))], fill=BLUE, width=lw)
+    draw.line([(s(27), s(13)), (s(27), s(24))], fill=BLUE, width=lw)
     draw.polygon([
-        (s(27),   s(6)),
-        (s(23.5), s(11)),
-        (s(30.5), s(11)),
+        (s(27),   s(8)),
+        (s(23.5), s(13)),
+        (s(30.5), s(13)),
     ], fill=BLUE)
 
     save_icon(img, 'excel_export')
@@ -489,14 +489,15 @@ def make_excel_import():
     _draw_excel_file_icon(img)
     draw = ImageDraw.Draw(img)
 
-    # Blue down arrow: shaft y=8→22, tip at y=26
+    # Blue down arrow: span y=8~24 (=16), equal margins top=8, bottom=8
+    # shaft y=8~19, head base y=19, tip y=24
     BLUE = (0, 102, 204, 255)
     lw = iw(s(1.2))
-    draw.line([(s(27), s(8)), (s(27), s(22))], fill=BLUE, width=lw)
+    draw.line([(s(27), s(8)), (s(27), s(19))], fill=BLUE, width=lw)
     draw.polygon([
-        (s(27),   s(26)),
-        (s(23.5), s(21)),
-        (s(30.5), s(21)),
+        (s(27),   s(24)),
+        (s(23.5), s(19)),
+        (s(30.5), s(19)),
     ], fill=BLUE)
 
     save_icon(img, 'excel_import')
