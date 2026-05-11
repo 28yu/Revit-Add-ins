@@ -340,18 +340,18 @@ def make_beam_under_level():
     YELLOW = (218, 185,  47, 255)
     BLUE_C = ( 30, 144, 255, 255)
 
-    # I-beam
-    draw.rectangle([s(3), s(1),  s(17), s(4)],  fill=MID)  # top flange
-    draw.rectangle([s(3), s(14), s(17), s(17)], fill=MID)  # bottom flange (bottom=y17)
-    draw.rectangle([s(8), s(4),  s(12), s(14)], fill=MID)  # web
+    # I-beam (smaller overall: x=4~16, y=1~15; web narrower than flange thickness)
+    draw.rectangle([s(4), s(1),  s(16), s(4)],  fill=MID)  # top flange (width=12, thickness=3)
+    draw.rectangle([s(4), s(12), s(16), s(15)], fill=MID)  # bottom flange (bottom=y15)
+    draw.rectangle([s(9), s(4),  s(11), s(12)], fill=MID)  # web (width=2, thinner than flange)
 
-    # Up arrow: tip at y=17 (beam bottom), head base at y=21, shaft y=21→25
+    # Up arrow: tip at y=15 (beam bottom), head base at y=19, shaft y=19→25
     lw = iw(s(0.8))
-    draw.line([(s(10), s(21)), (s(10), s(25))], fill=DARK, width=lw)
+    draw.line([(s(10), s(19)), (s(10), s(25))], fill=DARK, width=lw)
     draw.polygon([
-        (s(10), s(17)),    # tip
-        (s(7.5), s(21)),   # left
-        (s(12.5), s(21)),  # right
+        (s(10), s(15)),    # tip
+        (s(7.5), s(19)),   # left
+        (s(12.5), s(19)),  # right
     ], fill=DARK)
 
     # Dash-dot FL line at y=27 (一点破線)
