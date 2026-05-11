@@ -1203,7 +1203,7 @@ ctx.strokeRect(s(TBX - 0.8), s(SigY - 0.8), s(TBW + 1.6), s(3 * ROW_H + 1.6));
 ctx.fillStyle = '#FFFFFF';
 ctx.fillRect(s(TBX), s(SigY), s(TBW), s(3 * ROW_H));
 ctx.fillStyle = 'rgb(20,45,115)';
-ctx.font = \`bold \${Math.round(s(9.0))}px Georgia, serif\`;
+ctx.font = \`bold \${Math.round(s(10.5))}px Georgia, serif\`;
 ctx.textAlign = 'center';
 ctx.textBaseline = 'middle';
 ctx.fillText('Σ', s(SX), s(SY));
@@ -1225,7 +1225,7 @@ ctx.moveTo(s(TBX), s(TBY + ROW_H));     ctx.lineTo(s(TBX + TBW), s(TBY + ROW_H))
 ctx.moveTo(s(TBX), s(TBY + 2 * ROW_H)); ctx.lineTo(s(TBX + TBW), s(TBY + 2 * ROW_H));
 ctx.moveTo(s(COL2), s(TBY));             ctx.lineTo(s(COL2), s(bottomY));
 ctx.stroke();
-ctx.lineWidth = s(0.6);
+ctx.lineWidth = s(0.35);
 ctx.strokeRect(s(TBX), s(TBY), s(TBW), s(3 * ROW_H));
 `;
 

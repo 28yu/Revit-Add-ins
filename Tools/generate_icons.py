@@ -858,7 +858,7 @@ def make_formwork():
     d.rectangle([s(TBX), s(SigY), s(TBX + TBW), s(SigY + 3 * ROW_H)],
                 fill=(255, 255, 255, 255))
     try:
-        fnt = ImageFont.truetype(FONT_PATH, size=iw(s(9.0)))
+        fnt = ImageFont.truetype(FONT_PATH, size=iw(s(10.5)))
         cx_px, cy_px = s(SX), s(SY)
         bb  = d.textbbox((0, 0), 'Σ', font=fnt)
         tx  = cx_px - (bb[2] - bb[0]) / 2 - bb[0]
@@ -883,7 +883,7 @@ def make_formwork():
     d.line([(s(COL2), s(TBY)), (s(COL2), s(bY))],
            fill=TB, width=iw(s(0.35)))
     d.rectangle([s(TBX), s(TBY), s(TBX + TBW), s(bY)],
-                outline=TB, width=iw(s(0.6)))
+                outline=TB, width=iw(s(0.35)))
 
     # 96px @ DPI=288 (32px論理サイズ)
     save_icon(img, 'formwork')
