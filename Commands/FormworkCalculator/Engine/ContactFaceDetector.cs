@@ -451,6 +451,37 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 FormworkDebugLog.Log($"    s2-uvOnA method={uvOnAMethod} bounds={FmtUVBounds(uvOnA)}");
             }
 
+            // uvOnA を face A の UV 範囲でクランプ。
+            // B の投影コーナーが A の外にはみ出すと bounding box が膨れる（area > faceA.Area も起こりうる）。
+            // A の UV 範囲に制限して Clipper に正確な接触 UV 矩形を渡す。
+            // (ok=1/off=3 などのケース: 3 コーナーが A 外 → 膨れた bbox → Clipper 誤判定 → demoted-to-contact)
+            if (uvOnA != null)
+            {
+                double clampUMin = Math.Max(uvOnA.Min.U, bbA.Min.U);
+                double clampUMax = Math.Min(uvOnA.Max.U, bbA.Max.U);
+                double clampVMin = Math.Max(uvOnA.Min.V, bbA.Min.V);
+                double clampVMax = Math.Min(uvOnA.Max.V, bbA.Max.V);
+                if (clampUMax > clampUMin && clampVMax > clampVMin)
+                {
+                    if (FormworkDebugLog.Enabled && (
+                        Math.Abs(clampUMin - uvOnA.Min.U) > 0.001 ||
+                        Math.Abs(clampUMax - uvOnA.Max.U) > 0.001 ||
+                        Math.Abs(clampVMin - uvOnA.Min.V) > 0.001 ||
+                        Math.Abs(clampVMax - uvOnA.Max.V) > 0.001))
+                    {
+                        FormworkDebugLog.Log(
+                            $"    s2-uvOnA clamped to faceA bounds={FmtUVBounds(uvOnA)} → [{clampUMin:F3}..{clampUMax:F3},{clampVMin:F3}..{clampVMax:F3}]");
+                    }
+                    uvOnA = new BoundingBoxUV(clampUMin, clampVMin, clampUMax, clampVMax);
+                }
+                else
+                {
+                    // クランプ後に UV 範囲が消えた = 実際には A の UV 空間と重ならない
+                    FormworkDebugLog.Log($"    s2-uvOnA clamp-eliminated (no overlap with faceA UV range)");
+                    uvOnA = null;
+                }
+            }
+
             return new ContactResult
             {
                 Kind = ContactKind.Partial,
