@@ -595,24 +595,63 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             XYZ xN = xVec.Normalize();
             XYZ yN = yVec.Normalize();
 
-            var corners = new UV[]
+            // b の actual polygon の境界エッジから 3D 頂点を収集する。
+            // bbB の 4 隅を直接使うと b が L 字形等の場合に bbox の notch 内点も含めて
+            // しまい、a 上の UV 範囲が過大になる (典型例: 隣接壁 f6 が wall top notch
+            // と同じ場所に notch を持つケース)。
+            // 実エッジを使えば polygon の実際の範囲が反映される。
+            var pts = new List<XYZ>();
+            try
             {
-                new UV(bbB.Min.U, bbB.Min.V),
-                new UV(bbB.Max.U, bbB.Min.V),
-                new UV(bbB.Max.U, bbB.Max.V),
-                new UV(bbB.Min.U, bbB.Max.V),
-            };
+                var loops = b.GetEdgesAsCurveLoops();
+                if (loops != null && loops.Count > 0)
+                {
+                    foreach (var loop in loops)
+                    {
+                        foreach (var curve in loop)
+                        {
+                            if (curve == null) continue;
+                            // Curve を 8 分割で tessellate (Line は端点 2 点で十分だが
+                            // Arc 等のために統一)
+                            for (int i = 0; i <= 8; i++)
+                            {
+                                double t = i / 8.0;
+                                try
+                                {
+                                    var p = curve.Evaluate(t, true);
+                                    if (p != null) pts.Add(p);
+                                }
+                                catch { }
+                            }
+                        }
+                    }
+                }
+            }
+            catch { }
+
+            // fallback: エッジ取得失敗時は bbB の 4 隅を使う
+            if (pts.Count < 3)
+            {
+                pts.Clear();
+                var corners = new UV[]
+                {
+                    new UV(bbB.Min.U, bbB.Min.V),
+                    new UV(bbB.Max.U, bbB.Min.V),
+                    new UV(bbB.Max.U, bbB.Max.V),
+                    new UV(bbB.Min.U, bbB.Max.V),
+                };
+                foreach (var c in corners)
+                {
+                    try { var p = b.Evaluate(c); if (p != null) pts.Add(p); } catch { }
+                }
+            }
 
             double uMin = double.MaxValue, vMin = double.MaxValue;
             double uMax = double.MinValue, vMax = double.MinValue;
             int successCount = 0;
 
-            foreach (var c in corners)
+            foreach (var p in pts)
             {
-                XYZ p;
-                try { p = b.Evaluate(c); } catch { continue; }
-                if (p == null) continue;
-
                 XYZ d = p - origin;
                 double u = d.DotProduct(xN);
                 double v = d.DotProduct(yN);
