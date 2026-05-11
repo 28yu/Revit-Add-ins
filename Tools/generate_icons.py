@@ -87,7 +87,7 @@ def new_canvas():
 
 def save_icon(img, name):
     result = img.resize((96, 96), Image.LANCZOS)
-    path = os.path.join(OUT_DIR, name + '_96.png')
+    path = os.path.join(OUT_DIR, name + '.png')
     result.save(path, 'PNG', dpi=(288, 288))
     print(f'  Saved: {path}')
 
@@ -695,18 +695,6 @@ def make_ver():
     d.line([(s(8), s(6.5)), (s(8), s(13.0))], fill=FG_WHITE, width=iw(s(2.5)))
     save_icon_small(img, 'ver_16')
 
-    # ── 32px logical ─────────────────────────────────────────────────────
-    img2 = new_canvas()
-    d2 = ImageDraw.Draw(img2)
-    bg_r2 = s(15.0)
-    d2.ellipse([s(16) - bg_r2, s(16) - bg_r2, s(16) + bg_r2, s(16) + bg_r2],
-               fill=ICON_BLU)
-    dot_r2 = s(2.5)
-    d2.ellipse([s(16) - dot_r2, s(8) - dot_r2, s(16) + dot_r2, s(8) + dot_r2],
-               fill=FG_WHITE)
-    d2.line([(s(16), s(13.0)), (s(16), s(26.0))], fill=FG_WHITE, width=iw(s(5.0)))
-    save_icon_as(img2, 'ver_32.png')
-
 
 def make_manual():
     """Manual icon: blue circle with white '?' rendered using TrueType font.
@@ -742,11 +730,6 @@ def make_manual():
     img = new_canvas_small()
     _draw_icon(img, cx_u=8, cy_u=8, bg_r_u=7.5, font_sz_u=11.0)
     save_icon_small(img, 'manual_16')
-
-    # ── 32px logical ─────────────────────────────────────────────────────
-    img2 = new_canvas()
-    _draw_icon(img2, cx_u=16, cy_u=16, bg_r_u=15.0, font_sz_u=22.0)
-    save_icon_as(img2, 'manual_32.png')
 
 
 # ─────────────────────────────────────────
@@ -885,12 +868,7 @@ def make_formwork():
     d.rectangle([s(TBX), s(TBY), s(TBX + TBW), s(bY)],
                 outline=TB, width=iw(s(0.35)))
 
-    # 96px @ DPI=288 (32px論理サイズ)
     save_icon(img, 'formwork')
-    # 32px @ DPI=96
-    result32 = img.resize((32, 32), Image.LANCZOS)
-    result32.save(os.path.join(OUT_DIR, 'formwork_32.png'), 'PNG', dpi=(96.012, 96.012))
-    print(f'  Saved: formwork_32.png')
 
 
 # ─────────────────────────────────────────

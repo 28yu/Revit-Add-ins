@@ -44,29 +44,26 @@
 
   <!-- リソースファイル -->
   <ItemGroup>
-    <Resource Include="Resources\Icons\both_96.png" />
-    <Resource Include="Resources\Icons\left_96.png" />
-    <Resource Include="Resources\Icons\right_96.png" />
-    <Resource Include="Resources\Icons\sheet_creation_96.png" />
-    <Resource Include="Resources\Icons\view_copy_96.png" />
-    <Resource Include="Resources\Icons\view_paste_96.png" />
-    <Resource Include="Resources\Icons\sectionbox_copy_96.png" />
-    <Resource Include="Resources\Icons\sectionbox_paste_96.png" />
-    <Resource Include="Resources\Icons\viewport_copy_96.png" />
-    <Resource Include="Resources\Icons\viewport_paste_96.png" />
-    <Resource Include="Resources\Icons\cropbox_copy_96.png" />
-    <Resource Include="Resources\Icons\cropbox_paste_96.png" />
-    <Resource Include="Resources\Icons\filled_region_96.png" />
-    <Resource Include="Resources\Icons\beam_under_level_96.png" />
-    <Resource Include="Resources\Icons\beam_top_level_96.png" />
-    <Resource Include="Resources\Icons\fire_protection_96.png" />
-    <Resource Include="Resources\Icons\formwork_32.png" />
-    <Resource Include="Resources\Icons\formwork_96.png" />
-    <Resource Include="Resources\Icons\room_tag_96.png" />
-    <Resource Include="Resources\Icons\excel_export_96.png" />
-    <Resource Include="Resources\Icons\excel_import_96.png" />
-    <Resource Include="Resources\Icons\language_16.png" />
-    <Resource Include="Resources\Icons\language_32.png" />
+    <Resource Include="Resources\Icons\both.png" />
+    <Resource Include="Resources\Icons\left.png" />
+    <Resource Include="Resources\Icons\right.png" />
+    <Resource Include="Resources\Icons\sheet_creation.png" />
+    <Resource Include="Resources\Icons\view_copy.png" />
+    <Resource Include="Resources\Icons\view_paste.png" />
+    <Resource Include="Resources\Icons\sectionbox_copy.png" />
+    <Resource Include="Resources\Icons\sectionbox_paste.png" />
+    <Resource Include="Resources\Icons\viewport_copy.png" />
+    <Resource Include="Resources\Icons\viewport_paste.png" />
+    <Resource Include="Resources\Icons\cropbox_copy.png" />
+    <Resource Include="Resources\Icons\cropbox_paste.png" />
+    <Resource Include="Resources\Icons\filled_region.png" />
+    <Resource Include="Resources\Icons\beam_under_level.png" />
+    <Resource Include="Resources\Icons\beam_top_level.png" />
+    <Resource Include="Resources\Icons\fire_protection.png" />
+    <Resource Include="Resources\Icons\formwork.png" />
+    <Resource Include="Resources\Icons\room_tag.png" />
+    <Resource Include="Resources\Icons\excel_export.png" />
+    <Resource Include="Resources\Icons\excel_import.png" />
     <Resource Include="Resources\Icons\flag_jp_16.png" />
     <Resource Include="Resources\Icons\flag_jp_32.png" />
     <Resource Include="Resources\Icons\flag_us_16.png" />
@@ -74,9 +71,7 @@
     <Resource Include="Resources\Icons\flag_cn_16.png" />
     <Resource Include="Resources\Icons\flag_cn_32.png" />
     <Resource Include="Resources\Icons\ver_16.png" />
-    <Resource Include="Resources\Icons\ver_32.png" />
     <Resource Include="Resources\Icons\manual_16.png" />
-    <Resource Include="Resources\Icons\manual_32.png" />
   </ItemGroup>
 
 

@@ -192,17 +192,17 @@ namespace Tools28
 
             var bothData = new PushButtonData("GridBubbleBoth", Loc.S("Ribbon.GridBubble.Both"), assemblyPath, "Tools28.Commands.GridBubble.ExecuteGridBubbleBothCommand");
             bothData.ToolTip = Loc.S("Ribbon.GridBubble.Both.Tip");
-            bothData.LargeImage = LoadImage("both_96.png");
+            bothData.LargeImage = LoadImage("both.png");
             AddButton(panel, bothData);
 
             var leftData = new PushButtonData("GridBubbleLeft", Loc.S("Ribbon.GridBubble.Left"), assemblyPath, "Tools28.Commands.GridBubble.ExecuteGridBubbleLeftCommand");
             leftData.ToolTip = Loc.S("Ribbon.GridBubble.Left.Tip");
-            leftData.LargeImage = LoadImage("left_96.png");
+            leftData.LargeImage = LoadImage("left.png");
             AddButton(panel, leftData);
 
             var rightData = new PushButtonData("GridBubbleRight", Loc.S("Ribbon.GridBubble.Right"), assemblyPath, "Tools28.Commands.GridBubble.ExecuteGridBubbleRightCommand");
             rightData.ToolTip = Loc.S("Ribbon.GridBubble.Right.Tip");
-            rightData.LargeImage = LoadImage("right_96.png");
+            rightData.LargeImage = LoadImage("right.png");
             AddButton(panel, rightData);
         }
 
@@ -213,31 +213,31 @@ namespace Tools28
 
             var sheetData = new PushButtonData("SheetCreation", Loc.S("Ribbon.Sheet.Create"), assemblyPath, "Tools28.Commands.SheetCreation.ExecuteSheetCreationCommand");
             sheetData.ToolTip = Loc.S("Ribbon.Sheet.Create.Tip");
-            sheetData.LargeImage = LoadImage("sheet_creation_96.png");
+            sheetData.LargeImage = LoadImage("sheet_creation.png");
             AddButton(panel, sheetData);
 
             panel.AddSeparator();
 
             var vpCopyData = new PushButtonData("ViewportPositionCopy", Loc.S("Ribbon.Viewport.Copy"), assemblyPath, "Tools28.Commands.ViewportPosition.ExecuteViewportPositionCopyCommand");
             vpCopyData.ToolTip = Loc.S("Ribbon.Viewport.Copy.Tip");
-            vpCopyData.LargeImage = LoadImage("viewport_copy_96.png");
+            vpCopyData.LargeImage = LoadImage("viewport_copy.png");
             AddButton(panel, vpCopyData);
 
             var vpPasteData = new PushButtonData("ViewportPositionPaste", Loc.S("Ribbon.Viewport.Paste"), assemblyPath, "Tools28.Commands.ViewportPosition.ExecuteViewportPositionPasteCommand");
             vpPasteData.ToolTip = Loc.S("Ribbon.Viewport.Paste.Tip");
-            vpPasteData.LargeImage = LoadImage("viewport_paste_96.png");
+            vpPasteData.LargeImage = LoadImage("viewport_paste.png");
             AddButton(panel, vpPasteData);
 
             panel.AddSeparator();
 
             var cbCopyData = new PushButtonData("CropBoxCopy", Loc.S("Ribbon.CropBox.Copy"), assemblyPath, "Tools28.Commands.CropBoxCopy.ExecuteCropBoxCopyCommand");
             cbCopyData.ToolTip = Loc.S("Ribbon.CropBox.Copy.Tip");
-            cbCopyData.LargeImage = LoadImage("cropbox_copy_96.png");
+            cbCopyData.LargeImage = LoadImage("cropbox_copy.png");
             AddButton(panel, cbCopyData);
 
             var cbPasteData = new PushButtonData("CropBoxPaste", Loc.S("Ribbon.CropBox.Paste"), assemblyPath, "Tools28.Commands.CropBoxCopy.ExecuteCropBoxPasteCommand");
             cbPasteData.ToolTip = Loc.S("Ribbon.CropBox.Paste.Tip");
-            cbPasteData.LargeImage = LoadImage("cropbox_paste_96.png");
+            cbPasteData.LargeImage = LoadImage("cropbox_paste.png");
             AddButton(panel, cbPasteData);
         }
 
@@ -248,24 +248,24 @@ namespace Tools28
 
             var viewCopyData = new PushButtonData("ViewCopy", Loc.S("Ribbon.View.Copy"), assemblyPath, "Tools28.Commands.ViewCopy.ExecuteViewCopyCommand");
             viewCopyData.ToolTip = Loc.S("Ribbon.View.Copy.Tip");
-            viewCopyData.LargeImage = LoadImage("view_copy_96.png");
+            viewCopyData.LargeImage = LoadImage("view_copy.png");
             AddButton(panel, viewCopyData);
 
             var viewPasteData = new PushButtonData("ViewPaste", Loc.S("Ribbon.View.Paste"), assemblyPath, "Tools28.Commands.ViewCopy.ExecuteViewPasteCommand");
             viewPasteData.ToolTip = Loc.S("Ribbon.View.Paste.Tip");
-            viewPasteData.LargeImage = LoadImage("view_paste_96.png");
+            viewPasteData.LargeImage = LoadImage("view_paste.png");
             AddButton(panel, viewPasteData);
 
             panel.AddSeparator();
 
             var sbCopyData = new PushButtonData("SectionBoxCopy", Loc.S("Ribbon.SectionBox.Copy"), assemblyPath, "Tools28.Commands.SectionBoxCopy.ExecuteSectionBoxCopyCommand");
             sbCopyData.ToolTip = Loc.S("Ribbon.SectionBox.Copy.Tip");
-            sbCopyData.LargeImage = LoadImage("sectionbox_copy_96.png");
+            sbCopyData.LargeImage = LoadImage("sectionbox_copy.png");
             AddButton(panel, sbCopyData);
 
             var sbPasteData = new PushButtonData("SectionBoxPaste", Loc.S("Ribbon.SectionBox.Paste"), assemblyPath, "Tools28.Commands.SectionBoxCopy.ExecuteSectionBoxPasteCommand");
             sbPasteData.ToolTip = Loc.S("Ribbon.SectionBox.Paste.Tip");
-            sbPasteData.LargeImage = LoadImage("sectionbox_paste_96.png");
+            sbPasteData.LargeImage = LoadImage("sectionbox_paste.png");
             AddButton(panel, sbPasteData);
         }
 
@@ -276,14 +276,14 @@ namespace Tools28
 
             var roomTagData = new PushButtonData("RoomTagAutoCreator", Loc.S("Ribbon.RoomTag"), assemblyPath, "Tools28.Commands.RoomTagCreator.RoomTagAutoCreatorCommand");
             roomTagData.ToolTip = Loc.S("Ribbon.RoomTag.Tip");
-            roomTagData.LargeImage = LoadImage("room_tag_96.png");
+            roomTagData.LargeImage = LoadImage("room_tag.png");
             AddButton(panel, roomTagData);
 
             panel.AddSeparator();
 
             var filledData = new PushButtonData("FilledRegionSplitMerge2", Loc.S("Ribbon.FilledRegion"), assemblyPath, "Tools28.Commands.FilledRegionSplitMerge.FilledRegionSplitMergeCommand");
             filledData.ToolTip = Loc.S("Ribbon.FilledRegion.Tip");
-            filledData.LargeImage = LoadImage("filled_region_96.png");
+            filledData.LargeImage = LoadImage("filled_region.png");
             AddButton(panel, filledData);
         }
 
@@ -294,19 +294,19 @@ namespace Tools28
 
             var beamUnderData = new PushButtonData("BeamUnderLevel", Loc.S("Ribbon.BeamUnder"), assemblyPath, "Tools28.Commands.BeamUnderLevel.BeamUnderLevelCommand");
             beamUnderData.ToolTip = Loc.S("Ribbon.BeamUnder.Tip");
-            beamUnderData.LargeImage = LoadImage("beam_under_level_96.png");
+            beamUnderData.LargeImage = LoadImage("beam_under_level.png");
             AddButton(panel, beamUnderData);
 
             var beamTopData = new PushButtonData("BeamTopLevel", Loc.S("Ribbon.BeamTop"), assemblyPath, "Tools28.Commands.BeamTopLevel.BeamTopLevelCommand");
             beamTopData.ToolTip = Loc.S("Ribbon.BeamTop.Tip");
-            beamTopData.LargeImage = LoadImage("beam_top_level_96.png");
+            beamTopData.LargeImage = LoadImage("beam_top_level.png");
             AddButton(panel, beamTopData);
 
             panel.AddSeparator();
 
             var fireData = new PushButtonData("FireProtection", Loc.S("Ribbon.FireProtection"), assemblyPath, "Tools28.Commands.FireProtection.FireProtectionCommand");
             fireData.ToolTip = Loc.S("Ribbon.FireProtection.Tip");
-            fireData.LargeImage = LoadImage("fire_protection_96.png");
+            fireData.LargeImage = LoadImage("fire_protection.png");
             AddButton(panel, fireData);
         }
 
@@ -317,7 +317,7 @@ namespace Tools28
 
             var formworkData = new PushButtonData("Formwork", Loc.S("Ribbon.Formwork"), assemblyPath, "Tools28.Commands.FormworkCalculator.FormworkCalculatorCommand");
             formworkData.ToolTip = Loc.S("Ribbon.Formwork.Tip");
-            formworkData.LargeImage = LoadImage("formwork_96.png");
+            formworkData.LargeImage = LoadImage("formwork.png");
             AddButton(panel, formworkData);
         }
 
@@ -328,12 +328,12 @@ namespace Tools28
 
             var exportData = new PushButtonData("ExcelExport", Loc.S("Ribbon.Excel.Export"), assemblyPath, "Tools28.Commands.ExcelExportImport.ExcelExportCommand");
             exportData.ToolTip = Loc.S("Ribbon.Excel.Export.Tip");
-            exportData.LargeImage = LoadImage("excel_export_96.png");
+            exportData.LargeImage = LoadImage("excel_export.png");
             AddButton(panel, exportData);
 
             var importData = new PushButtonData("ExcelImport", Loc.S("Ribbon.Excel.Import"), assemblyPath, "Tools28.Commands.ExcelExportImport.ExcelImportCommand");
             importData.ToolTip = Loc.S("Ribbon.Excel.Import.Tip");
-            importData.LargeImage = LoadImage("excel_import_96.png");
+            importData.LargeImage = LoadImage("excel_import.png");
             AddButton(panel, importData);
         }
 
