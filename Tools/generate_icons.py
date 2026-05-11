@@ -761,7 +761,7 @@ def make_formwork():
     img = new_canvas()
     d = ImageDraw.Draw(img)
 
-    ddx, ddy = 17.0, -4.0   # 奥行きベクトル: より右方向
+    ddx, ddy = 20.0, -4.0   # 奥行きベクトル: より右方向
     cx0, cy0 = 0.0, 5.0
     cx1       = 5.0
     ybot      = 31.0
@@ -839,22 +839,16 @@ def make_formwork():
         fy_px = s(yc) - ft_h / 2
         d.rectangle([fx, fy_px, fx + ft_w, fy_px + ft_h], fill=(55, 55, 58, 255))
 
-    # ⑧ 集計表 + Σ の白帯背景（型枠右端x=22から右）
+    # ⑧ 集計表 + Σ (白塗りなし、輪郭のみ)
     TBX, TBW, TBY = 22.0, 9.5, 22.0
     HDR_H, ROW_H, TOTAL_H, N_DATA = 2.0, 2.5, 3.5, 1
     COL2 = TBX + 5.0
     bY   = TBY + HDR_H + N_DATA * ROW_H + TOTAL_H  # = 30.0
     SX, SY = TBX + TBW / 2, 16.5
     TB   = (75, 75, 75, 255)
+    WHITE_OL = (255, 255, 255, 216)  # 白輪郭色
 
-    # 白帯背景（Σ + 表を含む右側エリア）
-    DRAW_W = 96 * SS
-    bg_x0 = max(0, int(s(TBX - 1.5)))
-    bg_y0 = max(0, int(s(SY - 4.2)))
-    bg_y1 = min(DRAW_W, int(s(bY + 0.8)))
-    d.rectangle([bg_x0, bg_y0, DRAW_W, bg_y1], fill=(255, 255, 255, 255))
-
-    # 集計表
+    # 集計表 (各行の塗り + 罫線)
     d.rectangle([s(TBX), s(TBY + HDR_H + N_DATA * ROW_H), s(TBX + TBW), s(bY)],
                 fill=(170, 210, 178, 255))
     d.rectangle([s(TBX), s(TBY), s(TBX + TBW), s(TBY + HDR_H)],
@@ -866,16 +860,23 @@ def make_formwork():
            fill=TB, width=iw(s(0.7)))
     d.line([(s(COL2), s(TBY)), (s(COL2), s(bY))],
            fill=TB, width=iw(s(0.35)))
+    # 集計表の輪郭 (白縁取り → ダーク枠)
+    d.rectangle([s(TBX - 0.7), s(TBY - 0.7), s(TBX + TBW + 0.7), s(bY + 0.7)],
+                outline=WHITE_OL, width=iw(s(1.2)))
     d.rectangle([s(TBX), s(TBY), s(TBX + TBW), s(bY)],
                 outline=TB, width=iw(s(0.6)))
 
-    # ⑨ Σ記号（白帯内、表の上）
+    # ⑨ Σ記号 (円輪郭のみ + テキスト)
+    r_sigma = s(4.0)
+    cx_px, cy_px = s(SX), s(SY)
+    d.ellipse([cx_px - r_sigma, cy_px - r_sigma, cx_px + r_sigma, cy_px + r_sigma],
+              outline=WHITE_OL, width=iw(s(1.2)))
     FONT_PATH = '/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf'
     try:
         fnt = ImageFont.truetype(FONT_PATH, size=iw(s(8.5)))
         bb  = d.textbbox((0, 0), 'Σ', font=fnt)
-        tx  = s(SX) - (bb[2] - bb[0]) / 2 - bb[0]
-        ty  = s(SY) - (bb[3] - bb[1]) / 2 - bb[1]
+        tx  = cx_px - (bb[2] - bb[0]) / 2 - bb[0]
+        ty  = cy_px - (bb[3] - bb[1]) / 2 - bb[1]
         d.text((tx, ty), 'Σ', font=fnt, fill=(30, 60, 120, 255))
     except Exception as e:
         print(f'  Σ font unavailable ({e}), skipping')
