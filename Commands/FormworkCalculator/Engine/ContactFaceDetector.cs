@@ -482,15 +482,33 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 }
             }
 
+            // ContactArea の推定:
+            // face A が L 字等の非矩形の場合、UV bbox 面積は実ポリゴン面積より大きい
+            // (例: face[5] 実面積=38.66ft² vs UV bbox=84.92ft², 充填率=45.5%)。
+            // クランプ済み uvOnA がそのまま使えるとは限らない (uvOnA が UV bbox を
+            // 超えなくても、実ポリゴン外の領域を含むため過大評価される)。
+            //
+            // 解決策: 面ポリゴンが UV bbox 内に均一分布すると仮定した期待接触面積。
+            //   contactArea ≈ (uvOnA面積 / face A UV bbox面積) × face A 実面積
+            //
+            // [12] 梁 face[5] (L字, 38.66ft²) x スラブ面 (46.26ft²) のケースで
+            // 旧実装は bArea=46.26 を使い partialSum>face*0.95 で誤 demoted-to-contact。
+            // 修正後は 46.26/84.92×38.66 = 21.07 となり demoted されず、上部に型枠が生成される。
+            double aFaceArea = 0;
+            try { aFaceArea = a.Face.Area; } catch { }
+            double faceUvBboxArea = (bbA.Max.U - bbA.Min.U) * (bbA.Max.V - bbA.Min.V);
+            double contactAreaEstimate = bArea;
+            if (uvOnA != null && faceUvBboxArea > 1e-9 && aFaceArea > 1e-9)
+            {
+                double uvRectArea = (uvOnA.Max.U - uvOnA.Min.U) * (uvOnA.Max.V - uvOnA.Min.V);
+                contactAreaEstimate = (uvRectArea / faceUvBboxArea) * aFaceArea;
+                contactAreaEstimate = Math.Min(contactAreaEstimate, bArea);
+            }
+
             return new ContactResult
             {
                 Kind = ContactKind.Partial,
-                // uvOnA はクランプ済みのため、その bbox 面積が A 面上の実際の接触面積に近い。
-                // bArea (B 面全体の面積) は B が A より大きい場合に過大となり、
-                // partialSum >= face * 0.95 で誤った demoted-to-contact を引き起こす。
-                ContactArea = uvOnA != null
-                    ? (uvOnA.Max.U - uvOnA.Min.U) * (uvOnA.Max.V - uvOnA.Min.V)
-                    : bArea,
+                ContactArea = contactAreaEstimate,
                 UvBounds = bbB,
                 UvBoundsOnA = uvOnA,
             };
