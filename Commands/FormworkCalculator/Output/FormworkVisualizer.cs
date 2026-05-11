@@ -192,6 +192,9 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 // 集計表の総合計は維持される。
                 double openingDelta = er.OpeningEdgeAreaAdded - er.OpeningAreaDeducted;
                 bool firstFormworkAssigned = false;
+                // 合計一致保証用: 実際に DS パラメータに書き込んだ面積の合計と最初の DS の ID
+                double assignedAreaM2 = 0;
+                ElementId firstFormworkDsId = null;
 
                 foreach (var fi in faces)
                 {
@@ -262,6 +265,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     foreach (var solid in partSolids)
                     {
                         ElementId dsId = null;
+                        double areaM2ThisDs = 0.0;
                         try
                         {
                             var catOst = new ElementId(BuiltInCategory.OST_GenericModel);
@@ -294,6 +298,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
                                 string filterKey = IsDeducted(fi.FaceType) ? "控除面" : key;
                                 FormworkParameterManager.SetInstanceValues(
                                     ds, catLabel, levelName, filterKey, areaM2, faceHasPartialContact);
+                                areaM2ThisDs = areaM2;
                             }
                             catch { }
 
@@ -304,6 +309,11 @@ namespace Tools28.Commands.FormworkCalculator.Output
                         if (dsId != null)
                         {
                             vr.CreatedShapeIds.Add(dsId);
+                            if (isFormworkRequired)
+                            {
+                                assignedAreaM2 += areaM2ThisDs;
+                                if (firstFormworkDsId == null) firstFormworkDsId = dsId;
+                            }
                             // Clipper でクリップ済みなら形状が既に正確なので半透明不要。
                             // Clipper 失敗時のみ「一部控除されている」ことを視覚化するが、
                             // 部分接触の合計面積が面全体の 5% 以下なら誤差として無視し、
@@ -314,6 +324,40 @@ namespace Tools28.Commands.FormworkCalculator.Output
                                 try { ApplyPartialContactOverride(view, dsId); } catch { }
                             }
                         }
+                    }
+                }
+
+                // 合計一致の保証: CreateThinSolid 失敗等でスキップされた面の面積を
+                // 最初の FormworkRequired DirectShape で補正し、Revit 集計表と Excel の
+                // 合計値が常に一致するようにする。
+                if (firstFormworkDsId != null)
+                {
+                    double discrepancy = er.FormworkArea - assignedAreaM2;
+                    if (Math.Abs(discrepancy) > 1e-6)
+                    {
+                        try
+                        {
+                            var dsFix = doc.GetElement(firstFormworkDsId);
+                            if (dsFix != null)
+                            {
+                                var pArea = dsFix.LookupParameter(FormworkParameterManager.ParamArea);
+                                if (pArea != null && !pArea.IsReadOnly
+                                    && pArea.StorageType == StorageType.Double)
+                                {
+                                    double curFt2 = pArea.AsDouble();
+                                    double curM2 = UnitUtils.ConvertFromInternalUnits(
+                                        curFt2, UnitTypeId.SquareMeters);
+                                    double newM2 = curM2 + discrepancy;
+                                    pArea.Set(UnitUtils.ConvertToInternalUnits(
+                                        newM2, UnitTypeId.SquareMeters));
+                                    FormworkDebugLog.Log(
+                                        $"  [Visual] area reconcile E{er.ElementId}: " +
+                                        $"assigned={assignedAreaM2:F4} expected={er.FormworkArea:F4} " +
+                                        $"delta={discrepancy:F4}m²");
+                                }
+                            }
+                        }
+                        catch { }
                     }
                 }
             }
