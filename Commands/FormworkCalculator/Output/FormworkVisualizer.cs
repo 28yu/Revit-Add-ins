@@ -1223,8 +1223,12 @@ namespace Tools28.Commands.FormworkCalculator.Output
 
                 try
                 {
+                    double volBefore = currentSolid.Volume;
                     Solid result = BooleanOperationsUtils.ExecuteBooleanOperation(
                         currentSolid, cutter, BooleanOperationsType.Difference);
+                    double volAfter = result != null ? result.Volume : -1.0;
+                    if (FormworkDebugLog.Enabled)
+                        FormworkDebugLog.Log($"    [BoolDiff] subtract volBefore={volBefore:F6} volAfter={volAfter:F6} delta={volBefore-volAfter:F6}");
                     if (result != null && result.Volume > 1e-9)
                     {
                         currentSolid = result;
@@ -1262,38 +1266,69 @@ namespace Tools28.Commands.FormworkCalculator.Output
 
             XYZ dir = faceANormal.Normalize();
             var transform = Transform.CreateTranslation(dir.Multiply(-prePad));
+
+            // 接触面 B の法線が押し出し方向(face A 法線) と反対向きの場合
+            // (= 通常の接触ペア)、GetEdgesAsCurveLoops が返すループは
+            // 押し出し方向から見ると CW になる。CreateExtrusionGeometry は
+            // CCW を要求するため、その場合は事前にループを反転する。
+            XYZ faceBNormal = null;
+            try
+            {
+                var pf = contactFaceB as PlanarFace;
+                if (pf != null) faceBNormal = pf.FaceNormal.Normalize();
+            }
+            catch { }
+            bool needsReverse = (faceBNormal != null && faceBNormal.DotProduct(dir) < 0);
+
             var translatedLoops = new List<CurveLoop>(loops.Count);
             foreach (var l in loops)
             {
                 CurveLoop tl = null;
                 try { tl = CurveLoop.CreateViaTransform(l, transform); } catch { return null; }
                 if (tl == null) return null;
+                if (needsReverse)
+                {
+                    try
+                    {
+                        var curves = new List<Curve>();
+                        foreach (var c in tl) curves.Add(c.CreateReversed());
+                        curves.Reverse();
+                        tl = CurveLoop.Create(curves);
+                    }
+                    catch { return null; }
+                }
                 translatedLoops.Add(tl);
             }
 
+            Solid cutter = null;
             try
             {
-                return GeometryCreationUtilities.CreateExtrusionGeometry(translatedLoops, dir, thickness);
+                cutter = GeometryCreationUtilities.CreateExtrusionGeometry(translatedLoops, dir, thickness);
             }
-            catch
+            catch (Exception ex)
             {
-                // ループ向きが逆の場合は反転して再試行
+                if (FormworkDebugLog.Enabled)
+                    FormworkDebugLog.Log($"    [PolyCutter] EXTRUDE-EX needsReverse={needsReverse} ex={ex.Message}");
+
+                // 反転して再試行
                 try
                 {
-                    var reversedLoops = new List<CurveLoop>(translatedLoops.Count);
+                    var altLoops = new List<CurveLoop>(translatedLoops.Count);
                     foreach (var l in translatedLoops)
                     {
-                        var rl = new CurveLoop();
                         var curves = new List<Curve>();
-                        foreach (var c in l) curves.Add(c);
+                        foreach (var c in l) curves.Add(c.CreateReversed());
                         curves.Reverse();
-                        foreach (var c in curves) rl.Append(c.CreateReversed());
-                        reversedLoops.Add(rl);
+                        altLoops.Add(CurveLoop.Create(curves));
                     }
-                    return GeometryCreationUtilities.CreateExtrusionGeometry(reversedLoops, dir, thickness);
+                    cutter = GeometryCreationUtilities.CreateExtrusionGeometry(altLoops, dir, thickness);
                 }
                 catch { return null; }
             }
+
+            if (FormworkDebugLog.Enabled && cutter != null)
+                FormworkDebugLog.Log($"    [PolyCutter] vol={cutter.Volume:F6} faceBNormal=({(faceBNormal != null ? $"{faceBNormal.X:F2},{faceBNormal.Y:F2},{faceBNormal.Z:F2}" : "null")}) dir=({dir.X:F2},{dir.Y:F2},{dir.Z:F2}) needsReverse={needsReverse} loops={translatedLoops.Count}");
+            return cutter;
         }
 
         /// <summary>
