@@ -1100,7 +1100,7 @@ PRESETS.formwork = `
 // 型枠数量算出: 3D視点 — コンクリート + コンパネ面 + 縦バタ桟木3本 + 横端太3本 + セパレータ + フォームタイ
 
 // --- パラメータ ---
-const ddx = 9.0, ddy = -4.0;
+const ddx = 13.0, ddy = -4.0;
 const cx0 = 0.5, cy0 = 8.0, cx1 = 6.0, ybot = 30.0;
 
 // --- ① コンクリート側面 (正面グレー矩形) ---
@@ -1202,11 +1202,11 @@ walFys.forEach(fy => {
   ctx.fillRect(fx, fy_px, FT_W, FT_H);
 });
 
-// --- ⑧ 右下: 小型集計表 (半分サイズ) ---
-const TBX = 23.5, TBW = 7.0, TBY = 16.0;
-const HDR_H = 2.0, ROW_H = 2.5, TOTAL_H = 3.5, N_DATA = 3;
+// --- ⑧ 右下: 小型集計表 (3行: ヘッダー + データ1行 + 合計行) ---
+const TBX = 23.5, TBW = 7.0, TBY = 22.0;
+const HDR_H = 2.0, ROW_H = 2.5, TOTAL_H = 3.5, N_DATA = 1;
 const COL2 = TBX + 3.5;
-const bottomY = TBY + HDR_H + N_DATA * ROW_H + TOTAL_H; // = 29.0
+const bottomY = TBY + HDR_H + N_DATA * ROW_H + TOTAL_H; // = 30.0
 
 // 合計行背景 (薄緑)
 ctx.fillStyle = 'rgb(170,210,178)';
@@ -1216,15 +1216,13 @@ ctx.fillRect(s(TBX), s(TBY + HDR_H + N_DATA * ROW_H), s(TBW), s(TOTAL_H));
 ctx.fillStyle = 'rgb(128,148,165)';
 ctx.fillRect(s(TBX), s(TBY), s(TBW), s(HDR_H));
 
-// データ行の水平罫線
+// ヘッダー〜データ行の水平罫線 (細線)
 ctx.strokeStyle = 'rgb(75,75,75)';
 ctx.lineWidth = s(0.35);
-[HDR_H, HDR_H + ROW_H, HDR_H + 2 * ROW_H].forEach(dy => {
-  ctx.beginPath();
-  ctx.moveTo(s(TBX), s(TBY + dy));
-  ctx.lineTo(s(TBX + TBW), s(TBY + dy));
-  ctx.stroke();
-});
+ctx.beginPath();
+ctx.moveTo(s(TBX), s(TBY + HDR_H));
+ctx.lineTo(s(TBX + TBW), s(TBY + HDR_H));
+ctx.stroke();
 
 // 合計行上の区切り線 (太線)
 ctx.lineWidth = s(0.7);
@@ -1250,7 +1248,7 @@ ctx.fillStyle = 'rgb(40,80,130)';
 ctx.font = \`bold \${Math.round(s(8.5))}px Georgia, serif\`;
 ctx.textAlign = 'center';
 ctx.textBaseline = 'middle';
-ctx.fillText('Σ', s(TBX + TBW / 2), s(9.0));
+ctx.fillText('Σ', s(TBX + TBW / 2), s(14.0));
 `;
 
 // ─── Settings panel icons (32px logical, 32-unit coord space) ───────────────
