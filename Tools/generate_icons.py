@@ -885,13 +885,13 @@ def make_fire_protection():
     YELLOW = (218, 185,  47, 255)
     BLUE_C = ( 30, 144, 255, 255)
 
-    # Outer rectangle: yellow fill, no border (耐火被覆を表現、均等離れ=3units)
-    draw.rectangle([s(1), s(1), s(19), s(31)], fill=YELLOW)
+    # Outer rectangle: 18×18 square, centered at y=16 (y=7~25), no border
+    draw.rectangle([s(1), s(7), s(19), s(25)], fill=YELLOW)
 
-    # I-beam: gap=3 on all sides → flange x=4~16 (w=12), top y=4~6, bottom y=26~28, web y=6~26
-    draw.rectangle([s(4), s(4),  s(16), s(6)],  fill=MID)   # top flange
-    draw.rectangle([s(9), s(6),  s(11), s(26)], fill=MID)   # web
-    draw.rectangle([s(4), s(26), s(16), s(28)], fill=MID)   # bottom flange
+    # I-beam centered in square with gap=3 all sides → flange x=4~16, top y=10~12, bottom y=20~22
+    draw.rectangle([s(4), s(10), s(16), s(12)], fill=MID)   # top flange (w=12, h=2)
+    draw.rectangle([s(9), s(12), s(11), s(20)], fill=MID)   # web (w=2, h=8)
+    draw.rectangle([s(4), s(20), s(16), s(22)], fill=MID)   # bottom flange (w=12, h=2)
 
     # 3 color blocks on right
     bx, bw, bh = s(22), s(8), s(8)
