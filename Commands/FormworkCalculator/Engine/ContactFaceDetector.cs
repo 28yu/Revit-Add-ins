@@ -267,6 +267,32 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 }
             }
 
+            // --- Stage 1 検証: 3D AABB 包含チェック ---
+            // a が b より小さくても、a の 3D AABB が b の 3D AABB の外に
+            // 延びている場合は Full Contact ではない。例:
+            //   E4522721 face[1] (Z:-4.726..-0.820) vs E4485936 face[0] (Z:-11.6..-2.755)
+            //   → face[1] 上部 290mm が E4485936 範囲外
+            //   旧ロジック: SmallA 閾値 (overlap >= 0.25) を 0.5 が通過し誤 Full
+            //   新ロジック: a が b 3D AABB を超えると Full 拒否 → Partial 経路へ
+            if (stage1Accepted)
+            {
+                var aBox = Compute3DBBox(a.Face);
+                var bBox = Compute3DBBox(b.Face);
+                if (aBox.min != null && bBox.min != null)
+                {
+                    double tol = CoincidenceTolFeet * 2.0;
+                    bool aExtends =
+                        aBox.min.X < bBox.min.X - tol || aBox.max.X > bBox.max.X + tol ||
+                        aBox.min.Y < bBox.min.Y - tol || aBox.max.Y > bBox.max.Y + tol ||
+                        aBox.min.Z < bBox.min.Z - tol || aBox.max.Z > bBox.max.Z + tol;
+                    if (aExtends)
+                    {
+                        stage1Accepted = false;
+                        stage1Reason = "cond6-a-extends-beyond-b";
+                    }
+                }
+            }
+
             // --- Stage 2: Partial Contact 判定 (a >> b の場合) ---
             //   大面 a に小面 b が部分的に接触しているケース
             //   判定: b の中心を a に投影して、a 内部にあり距離≈0ならば部分接触
@@ -286,6 +312,13 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                     stage1Reason == "cond3-project-null")
                 {
                     stage2 = EvaluatePartialBToA(a, b, out stage2Reason);
+                }
+                else if (stage1Reason == "cond6-a-extends-beyond-b")
+                {
+                    // a が b の 3D AABB を超えて延びている場合は、b の中心を a に投影しても
+                    // a 範囲外になるため EvaluatePartialBToA が失敗する。
+                    // 代わりに 3D AABB 交差を直接使って partial 領域を計算する。
+                    stage2 = ComputePartialFromBBoxIntersect(a, b, out stage2Reason);
                 }
                 else
                 {
@@ -544,6 +577,142 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 ContactArea = contactAreaEstimate,
                 UvBounds = bbB,
                 UvBoundsOnA = uvOnA,
+                FaceB = b.Face,
+            };
+        }
+
+        /// <summary>
+        /// face の 3D AABB を計算する。UV bbox の 4 隅を Evaluate して得る。
+        /// </summary>
+        private static (XYZ min, XYZ max) Compute3DBBox(Face face)
+        {
+            if (face == null) return (null, null);
+            BoundingBoxUV bb = null;
+            try { bb = face.GetBoundingBox(); } catch { }
+            if (bb == null) return (null, null);
+
+            var corners = new UV[]
+            {
+                new UV(bb.Min.U, bb.Min.V),
+                new UV(bb.Max.U, bb.Min.V),
+                new UV(bb.Max.U, bb.Max.V),
+                new UV(bb.Min.U, bb.Max.V),
+            };
+
+            double xMin = double.MaxValue, yMin = double.MaxValue, zMin = double.MaxValue;
+            double xMax = double.MinValue, yMax = double.MinValue, zMax = double.MinValue;
+
+            foreach (var uv in corners)
+            {
+                XYZ p;
+                try { p = face.Evaluate(uv); } catch { return (null, null); }
+                if (p == null) return (null, null);
+                if (p.X < xMin) xMin = p.X;
+                if (p.X > xMax) xMax = p.X;
+                if (p.Y < yMin) yMin = p.Y;
+                if (p.Y > yMax) yMax = p.Y;
+                if (p.Z < zMin) zMin = p.Z;
+                if (p.Z > zMax) zMax = p.Z;
+            }
+
+            return (new XYZ(xMin, yMin, zMin), new XYZ(xMax, yMax, zMax));
+        }
+
+        /// <summary>
+        /// a が b より小さく、a の 3D AABB の一部が b の外に延びているケース用の
+        /// partial contact 計算。a と b の 3D AABB 交差を a の UV 空間に変換して返す。
+        /// </summary>
+        private static ContactResult ComputePartialFromBBoxIntersect(
+            FaceClassifier.FaceInfo a, FaceClassifier.FaceInfo b, out string reason)
+        {
+            reason = null;
+            var none = new ContactResult { Kind = ContactKind.None };
+
+            if (a?.Face == null || b?.Face == null) { reason = "s3-face-null"; return none; }
+
+            var pfA = a.Face as PlanarFace;
+            if (pfA == null) { reason = "s3-a-not-planar"; return none; }
+
+            var (aMin, aMax) = Compute3DBBox(a.Face);
+            var (bMin, bMax) = Compute3DBBox(b.Face);
+            if (aMin == null || bMin == null) { reason = "s3-bbox-null"; return none; }
+
+            // 3D AABB intersection
+            double ixMin = Math.Max(aMin.X, bMin.X);
+            double iyMin = Math.Max(aMin.Y, bMin.Y);
+            double izMin = Math.Max(aMin.Z, bMin.Z);
+            double ixMax = Math.Min(aMax.X, bMax.X);
+            double iyMax = Math.Min(aMax.Y, bMax.Y);
+            double izMax = Math.Min(aMax.Z, bMax.Z);
+
+            const double minDim = 1e-4;
+            // 同一平面なので、ある軸方向の AABB は薄くなる (~0)。
+            // X, Z (または平面に沿う 2 軸) で十分な交差があれば OK とする。
+            int thinAxes = 0;
+            if (ixMax - ixMin < minDim) thinAxes++;
+            if (iyMax - iyMin < minDim) thinAxes++;
+            if (izMax - izMin < minDim) thinAxes++;
+            // 平面なので 1 軸が薄いのは正常。2 軸以上が薄いと交差なし
+            if (thinAxes >= 2) { reason = "s3-no-intersect"; return none; }
+            if (ixMax < ixMin || iyMax < iyMin || izMax < izMin) { reason = "s3-no-intersect"; return none; }
+
+            // 交差 3D AABB の 8 隅を a の UV 座標に変換し、UV AABB を求める
+            XYZ xN = pfA.XVector.Normalize();
+            XYZ yN = pfA.YVector.Normalize();
+
+            var corners3D = new XYZ[]
+            {
+                new XYZ(ixMin, iyMin, izMin),
+                new XYZ(ixMax, iyMin, izMin),
+                new XYZ(ixMin, iyMax, izMin),
+                new XYZ(ixMax, iyMax, izMin),
+                new XYZ(ixMin, iyMin, izMax),
+                new XYZ(ixMax, iyMin, izMax),
+                new XYZ(ixMin, iyMax, izMax),
+                new XYZ(ixMax, iyMax, izMax),
+            };
+
+            double uMin = double.MaxValue, vMin = double.MaxValue;
+            double uMax = double.MinValue, vMax = double.MinValue;
+            foreach (var p in corners3D)
+            {
+                XYZ rel = p - pfA.Origin;
+                double u = rel.DotProduct(xN);
+                double v = rel.DotProduct(yN);
+                if (u < uMin) uMin = u;
+                if (u > uMax) uMax = u;
+                if (v < vMin) vMin = v;
+                if (v > vMax) vMax = v;
+            }
+
+            // a の UV bbox にクランプ
+            BoundingBoxUV bbA = null;
+            try { bbA = a.Face.GetBoundingBox(); } catch { }
+            if (bbA != null)
+            {
+                uMin = Math.Max(uMin, bbA.Min.U);
+                vMin = Math.Max(vMin, bbA.Min.V);
+                uMax = Math.Min(uMax, bbA.Max.U);
+                vMax = Math.Min(vMax, bbA.Max.V);
+            }
+
+            if (uMax - uMin < minDim || vMax - vMin < minDim)
+            {
+                reason = "s3-clamped-empty";
+                return none;
+            }
+
+            double interAreaUV = (uMax - uMin) * (vMax - vMin);
+
+            if (FormworkDebugLog.Enabled)
+                FormworkDebugLog.Log($"    s3-bbox-intersect uv=[U:{Fmt(uMin,3)}..{Fmt(uMax,3)},V:{Fmt(vMin,3)}..{Fmt(vMax,3)}] area={interAreaUV:F4}");
+
+            return new ContactResult
+            {
+                Kind = ContactKind.Partial,
+                ContactArea = interAreaUV,
+                UvBounds = null,
+                UvBoundsOnA = new BoundingBoxUV(uMin, vMin, uMax, vMax),
                 FaceB = b.Face,
             };
         }
