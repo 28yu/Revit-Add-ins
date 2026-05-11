@@ -60,6 +60,13 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             /// null の場合は A 上への投影に失敗したことを示す → Phase 2 はフォールバック。
             /// </summary>
             public BoundingBoxUV UvBoundsOnA;
+
+            /// <summary>
+            /// 接触相手の Face B への参照。
+            /// TryBuildCarvedFaceSolid でポリゴン形状のカッターを作成するために使用する。
+            /// L字形などの非矩形面では UvBoundsOnA (AABB) より正確なカットが可能。
+            /// </summary>
+            public Face ContactFaceB;
         }
 
         internal static List<FaceInfo> ClassifyAll(

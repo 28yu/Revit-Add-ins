@@ -129,6 +129,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                                         ContactArea = result.ContactArea,
                                         UvBounds = result.UvBounds,
                                         UvBoundsOnA = result.UvBoundsOnA,
+                                        ContactFaceB = result.FaceB,
                                     });
                                     partialContactAdded++;
                                 }
@@ -154,6 +155,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             public double ContactArea;
             public BoundingBoxUV UvBounds;       // B 自身の UV (debug)
             public BoundingBoxUV UvBoundsOnA;    // A 面上での B の投影 UV (Phase 2 用)
+            public Face FaceB;                   // 接触面 B への参照 (ポリゴンカッター用)
         }
 
         /// <summary>
@@ -542,6 +544,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 ContactArea = contactAreaEstimate,
                 UvBounds = bbB,
                 UvBoundsOnA = uvOnA,
+                FaceB = b.Face,
             };
         }
 

@@ -1200,9 +1200,25 @@ namespace Tools28.Commands.FormworkCalculator.Output
 
             foreach (var pc in fi.PartialContacts)
             {
-                if (pc.UvBoundsOnA == null) continue;
+                if (FormworkDebugLog.Enabled)
+                    FormworkDebugLog.Log($"  [BoolDiff] pc E{pc.OtherElementId}/f{pc.OtherFaceIndex} UvBoundsOnA={(pc.UvBoundsOnA == null ? "NULL" : $"[U:{pc.UvBoundsOnA.Min.U:F3}..{pc.UvBoundsOnA.Max.U:F3},V:{pc.UvBoundsOnA.Min.V:F3}..{pc.UvBoundsOnA.Max.V:F3}]")} hasContactFaceB={(pc.ContactFaceB != null)}");
 
-                Solid cutter = BuildCutterFromUvRect(fi.Face, pc.UvBoundsOnA, normal);
+                // ポリゴンカッター（ContactFaceB の実形状から押し出し）を最優先で使用する。
+                // これにより L 字形など非矩形の接触面を UV-AABB 矩形でオーバーカットする問題を回避する。
+                Solid cutter = null;
+                if (pc.ContactFaceB != null)
+                {
+                    cutter = BuildCutterFromContactFacePolygon(pc.ContactFaceB, normal);
+                    if (FormworkDebugLog.Enabled)
+                        FormworkDebugLog.Log($"    [BoolDiff] polygon-cutter={(cutter != null ? "OK" : "null")}");
+                }
+                // フォールバック: ポリゴンカッターが失敗した場合に UV 矩形カッターを使用
+                if (cutter == null && pc.UvBoundsOnA != null)
+                {
+                    cutter = BuildCutterFromUvRect(fi.Face, pc.UvBoundsOnA, normal);
+                    if (FormworkDebugLog.Enabled)
+                        FormworkDebugLog.Log($"    [BoolDiff] uvRect-cutter-fallback={(cutter != null ? "OK" : "null")}");
+                }
                 if (cutter == null) continue;
 
                 try
@@ -1226,6 +1242,58 @@ namespace Tools28.Commands.FormworkCalculator.Output
             if (currentSolid.Volume < 1e-9) return null;
 
             return currentSolid;
+        }
+
+        /// <summary>
+        /// 接触面 B の実際のポリゴン形状から「貫通カッター」Solid を生成する。
+        /// UV-AABB 矩形カッターと異なり、L 字形などの非矩形接触面に対して
+        /// オーバーカットを起こさない。
+        /// </summary>
+        private static Solid BuildCutterFromContactFacePolygon(Face contactFaceB, XYZ faceANormal)
+        {
+            IList<CurveLoop> loops = null;
+            try { loops = contactFaceB.GetEdgesAsCurveLoops(); } catch { return null; }
+            if (loops == null || loops.Count == 0) return null;
+
+            // 面 A の法線方向に prePad だけ手前からカッターを始め、thickness だけ押し出す。
+            // baseSolid (厚み 0.05 ft) を確実に包含するよう設定する。
+            const double prePad = 0.10;
+            const double thickness = 0.20;
+
+            XYZ dir = faceANormal.Normalize();
+            var transform = Transform.CreateTranslation(dir.Multiply(-prePad));
+            var translatedLoops = new List<CurveLoop>(loops.Count);
+            foreach (var l in loops)
+            {
+                CurveLoop tl = null;
+                try { tl = CurveLoop.CreateViaTransform(l, transform); } catch { return null; }
+                if (tl == null) return null;
+                translatedLoops.Add(tl);
+            }
+
+            try
+            {
+                return GeometryCreationUtilities.CreateExtrusionGeometry(translatedLoops, dir, thickness);
+            }
+            catch
+            {
+                // ループ向きが逆の場合は反転して再試行
+                try
+                {
+                    var reversedLoops = new List<CurveLoop>(translatedLoops.Count);
+                    foreach (var l in translatedLoops)
+                    {
+                        var rl = new CurveLoop();
+                        var curves = new List<Curve>();
+                        foreach (var c in l) curves.Add(c);
+                        curves.Reverse();
+                        foreach (var c in curves) rl.Append(c.CreateReversed());
+                        reversedLoops.Add(rl);
+                    }
+                    return GeometryCreationUtilities.CreateExtrusionGeometry(reversedLoops, dir, thickness);
+                }
+                catch { return null; }
+            }
         }
 
         /// <summary>
