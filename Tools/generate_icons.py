@@ -421,57 +421,49 @@ def make_beam_top_level():
 # excel_export / excel_import
 # ─────────────────────────────────────────
 def _draw_excel_file_icon(img):
-    """Draw Excel file icon: paper(top-right fold) + green square(black border, extends left) + flat-top X + dashes."""
+    """Draw Excel file icon: paper(top-right dog-ear fold) + green badge(black border) + white X + content lines."""
     draw = ImageDraw.Draw(img)
-    DARK  = (26, 26, 26, 255)
-    WHITE = (255, 255, 255, 255)
-    GREEN = hex_rgba('#217346')
-    sw = iw(s(1.3))  # thick black border
+    DARK      = (26, 26, 26, 255)
+    WHITE     = (255, 255, 255, 255)
+    FOLD_GRAY = (210, 210, 210, 255)
+    GREEN     = hex_rgba('#217346')
+    sw = iw(s(1.3))
 
-    # Paper pentagon: (4,2)-(16,2)-(21,7)-(21,26)-(4,26) — width=17, height=24, ratio 1:1.41
+    # 1) Fold flap first: gray fill, NO border (crease drawn by pentagon outline below)
+    fold_poly = [(s(16), s(1)), (s(22), s(1)), (s(22), s(7))]
+    draw.polygon(fold_poly, fill=FOLD_GRAY)
+
+    # 2) Paper pentagon (larger): x=2~22, y=1~30, fold corner at (16,1)→(22,7)
     paper_poly = [
-        (s(4),  s(2)),
-        (s(16), s(2)),
-        (s(21), s(7)),
-        (s(21), s(26)),
-        (s(4),  s(26)),
+        (s(2),  s(1)),
+        (s(16), s(1)),
+        (s(22), s(7)),
+        (s(22), s(30)),
+        (s(2),  s(30)),
     ]
     draw.polygon(paper_poly, fill=WHITE, outline=DARK, width=sw)
 
-    # Fold flap triangle: (16,2)-(21,2)-(21,7)
-    fold_poly = [
-        (s(16), s(2)),
-        (s(21), s(2)),
-        (s(21), s(7)),
-    ]
-    draw.polygon(fold_poly, fill=WHITE, outline=DARK, width=sw)
+    # 3) Green Excel badge (larger): x=1~15, y=9~23 (14×14)
+    draw.rectangle([s(1), s(9), s(15), s(23)], fill=GREEN, outline=DARK, width=sw)
 
-    # Green square with thick black border: x=1..13, y=8..20 (12×12)
-    draw.rectangle([s(1), s(8), s(13), s(20)], fill=GREEN, outline=DARK, width=sw)
-
-    # White X with flat horizontal cuts — 2.5-unit padding inside green (1..13, 8..20)
-    # X bounds: x=3.5..10.5, y=10.5..17.5, stroke width=2.5
-    # Left stroke (top-left to bottom-right)
+    # 4) White X inside badge — bounds x=3.5~13.5, y=11.5~21.5, stroke width≈2.5
     draw.polygon([
-        (s(3.5),  s(10.5)),
-        (s(6.0),  s(10.5)),
-        (s(10.5), s(17.5)),
-        (s(8.0),  s(17.5)),
+        (s(3.5),  s(11.5)),
+        (s(6.0),  s(11.5)),
+        (s(13.5), s(21.5)),
+        (s(11.0), s(21.5)),
     ], fill=WHITE)
-    # Right stroke (top-right to bottom-left)
     draw.polygon([
-        (s(8.0),  s(10.5)),
-        (s(10.5), s(10.5)),
-        (s(6.0),  s(17.5)),
-        (s(3.5),  s(17.5)),
+        (s(11.0), s(11.5)),
+        (s(13.5), s(11.5)),
+        (s(6.0),  s(21.5)),
+        (s(3.5),  s(21.5)),
     ], fill=WHITE)
 
-    # Green dashes: 3 rows × 2 columns, centered in paper (y=2..26 → rows at 10,14,18)
-    # Right column ends at x=20 to stay clear of paper border at x=21
-    dash_w = iw(s(1.6))
-    for y_32 in [10, 14, 18]:
-        draw.line([(s(14),   s(y_32)), (s(17),   s(y_32))], fill=GREEN, width=dash_w)
-        draw.line([(s(17.8), s(y_32)), (s(20),   s(y_32))], fill=GREEN, width=dash_w)
+    # 5) Green content lines in paper (right of badge): x=16.5~21.5, y=11,15,19
+    dash_w = iw(s(1.5))
+    for y_32 in [11, 15, 19]:
+        draw.line([(s(16.5), s(y_32)), (s(21.5), s(y_32))], fill=GREEN, width=dash_w)
 
 
 def make_excel_export():
