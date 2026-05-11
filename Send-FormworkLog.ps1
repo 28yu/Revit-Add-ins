@@ -1,14 +1,11 @@
-# Formwork 診断ログを Claude Code に共有するためのスクリプト
+# Formwork diagnostic log uploader for Claude Code
 #
-# 使い方:
-#   1. Revit で「型枠数量算出」を実行 → C:\temp\Formwork_debug.txt が更新される
-#   2. このスクリプトを実行: .\Send-FormworkLog.ps1
-#   3. Claude に "ログを更新したので確認してください" と伝える
+# Usage:
+#   1. Run formwork takeoff in Revit -> C:\temp\Formwork_debug.txt is updated
+#   2. Run this script: .\Send-FormworkLog.ps1
+#   3. Tell Claude that the log has been updated
 #
-# 動作:
-#   - C:\temp\Formwork_debug.txt を .diag\Formwork_debug.txt にコピー
-#   - 現在のブランチに commit して push
-#   - Claude が git pull すれば直接 Read ツールでログを読める
+# Note: ASCII only to avoid PowerShell 5.1 UTF-8/Shift-JIS encoding issues.
 
 $ErrorActionPreference = "Stop"
 
@@ -18,7 +15,7 @@ $dstDir   = Join-Path $repoRoot ".diag"
 $dstLog   = Join-Path $dstDir   "Formwork_debug.txt"
 
 if (-not (Test-Path $srcLog)) {
-    Write-Host "エラー: $srcLog が見つかりません。Revit で型枠数量算出を先に実行してください。" -ForegroundColor Red
+    Write-Host "ERROR: $srcLog not found. Run formwork takeoff in Revit first." -ForegroundColor Red
     exit 1
 }
 
@@ -29,15 +26,15 @@ if (-not (Test-Path $dstDir)) {
 Copy-Item $srcLog $dstLog -Force
 
 $size = (Get-Item $dstLog).Length
-$sizeKB = [math]::Round($size / 1KB, 1)
-Write-Host "ログをコピー: $dstLog ($sizeKB KB)" -ForegroundColor Green
+$sizeKB = [math]::Round($size / 1024, 1)
+Write-Host ("Copied: {0} ({1} KB)" -f $dstLog, $sizeKB) -ForegroundColor Green
 
 Push-Location $repoRoot
 try {
     git add -f .\.diag\Formwork_debug.txt
-    git commit -m "診断ログ更新: Formwork_debug.txt"
+    git commit -m "diag: update Formwork_debug.txt"
     git push
-    Write-Host "push 完了。Claude に「ログを更新しました」と伝えてください。" -ForegroundColor Green
+    Write-Host "Push done. Tell Claude that the log has been updated." -ForegroundColor Green
 }
 finally {
     Pop-Location
