@@ -3,21 +3,9 @@ echo Revit 2025版 28 Tools をアンインストール中...
 
 set ADDON_DIR=C:\ProgramData\Autodesk\Revit\Addins\2025
 
-if exist "%ADDON_DIR%\28Tools" (
-    rmdir /S /Q "%ADDON_DIR%\28Tools"
-    echo 削除しました: 28Tools フォルダ
-)
-
-if exist "%ADDON_DIR%\Tools28.addin" (
-    del "%ADDON_DIR%\Tools28.addin"
-    echo 削除しました: Tools28.addin
-)
-
-REM 旧バージョンのクリーンアップ（ルートに直置きされていた場合）
-if exist "%ADDON_DIR%\Tools28.dll" (
-    del "%ADDON_DIR%\Tools28.dll"
-    echo 削除しました: Tools28.dll（旧バージョン）
-)
+if exist "%ADDON_DIR%\28Tools" rmdir /S /Q "%ADDON_DIR%\28Tools"
+if exist "%ADDON_DIR%\Tools28.addin" del "%ADDON_DIR%\Tools28.addin"
+if exist "%ADDON_DIR%\Tools28.dll" del "%ADDON_DIR%\Tools28.dll"
 
 echo アンインストール完了！
 echo Revit 2025を再起動してください。

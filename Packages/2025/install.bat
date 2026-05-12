@@ -9,7 +9,7 @@ echo インストール中...
 echo.
 
 REM Revit 起動中チェック (DLL ファイルロック回避)
-tasklist /FI "IMAGENAME eq Revit.exe" 2>/dev/null | find /I "Revit.exe" >/dev/null
+tasklist /FI "IMAGENAME eq Revit.exe" 2>nul | find /I "Revit.exe" >nul
 if errorlevel 1 goto revit_ok
 echo [NG] Revit が起動しています。
 echo Revit を終了してから再度このスクリプトを実行してください。
@@ -23,10 +23,7 @@ set ADDON_DIR=C:\ProgramData\Autodesk\Revit\Addins\2025
 set SCRIPT_DIR=%~dp0
 
 REM アドインディレクトリが存在しなければ作成
-if not exist "%ADDON_DIR%" (
-    mkdir "%ADDON_DIR%"
-    echo [OK] ディレクトリを作成しました
-)
+if not exist "%ADDON_DIR%" mkdir "%ADDON_DIR%"
 
 REM 28Tools フォルダの確認
 if not exist "%SCRIPT_DIR%28Tools" goto no_folder
@@ -39,15 +36,12 @@ exit /b 1
 :folder_ok
 
 REM 旧バージョンのクリーンアップ（ルートに直置きされていた場合）
-if exist "%ADDON_DIR%\Tools28.dll" (
-    del "%ADDON_DIR%\Tools28.dll"
-    echo [OK] 旧バージョンの Tools28.dll を削除しました
-)
+if exist "%ADDON_DIR%\Tools28.dll" del "%ADDON_DIR%\Tools28.dll"
 
 REM 28Tools フォルダごとコピー（DLL + 依存ライブラリ）
 echo ファイルをコピー中...
 if not exist "%ADDON_DIR%\28Tools" mkdir "%ADDON_DIR%\28Tools"
-xcopy /Y /Q "%SCRIPT_DIR%28Tools\*.dll" "%ADDON_DIR%\28Tools\" >/dev/null
+xcopy /Y /Q "%SCRIPT_DIR%28Tools\*.dll" "%ADDON_DIR%\28Tools\" >nul
 if errorlevel 1 goto copy_fail
 goto copy_ok
 :copy_fail
@@ -61,7 +55,7 @@ echo [OK] DLLファイルをコピーしました
 
 REM アドインマニフェストのコピー（Addins ルートに配置）
 if not exist "%SCRIPT_DIR%28Tools\Tools28.addin" goto no_addin
-copy /Y "%SCRIPT_DIR%28Tools\Tools28.addin" "%ADDON_DIR%\Tools28.addin" >/dev/null
+copy /Y "%SCRIPT_DIR%28Tools\Tools28.addin" "%ADDON_DIR%\Tools28.addin" >nul
 if errorlevel 1 goto addin_fail
 echo [OK] Tools28.addin をコピーしました
 goto addin_ok
