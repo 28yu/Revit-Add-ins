@@ -379,7 +379,6 @@ namespace Tools28.Localization
             { "Formwork.DeckSlabExcluded", "已排除 {0} 个压型钢板楼板（类型名称包含 \"DS\"）" },
             { "Formwork.WallSweepExcluded", "已排除 {0} 个墙饰条/凹槽（无需模板）" },
             { "Formwork.SteelStairExcluded", "已排除 {0} 个钢楼梯（类型/材质包含钢相关关键字）" },
-            { "Formwork.AlcEcpExcluded", "已排除 {0} 个 ALC/ECP 板（墙类型名称包含 \"ALC\" / \"ECP\"）" },
             { "Formwork.LgsExcluded", "已排除 {0} 个 LGS 墙（含石膏板层、不含混凝土层的墙）" },
             { "Formwork.ExcludedFilterNote", "（排除的构件在分析三维视图中由「型枠_除外」过滤器隐藏，开启过滤器即可查看）" },
 

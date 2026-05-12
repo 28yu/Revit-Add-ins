@@ -66,6 +66,29 @@ namespace Tools28.Commands.FormworkCalculator.Output
             LogDef(def, "after-add-fields");
             LogField(areaField, "areaField after-add");
 
+            // 列ヘッダーを短く設定 (パラメータ名 "28Tools_Formwork_xxx" が長いため
+            // セル幅が大きくなりすぎないように短い見出しに置き換える)。
+            if (levelField != null)
+            {
+                try { levelField.ColumnHeading = "レベル"; }
+                catch (Exception ex) { LogEx("levelField.ColumnHeading", ex); }
+            }
+            if (partField != null)
+            {
+                try { partField.ColumnHeading = "部位"; }
+                catch (Exception ex) { LogEx("partField.ColumnHeading", ex); }
+            }
+            if (groupField != null)
+            {
+                try { groupField.ColumnHeading = "区分"; }
+                catch (Exception ex) { LogEx("groupField.ColumnHeading", ex); }
+            }
+            if (areaField != null)
+            {
+                try { areaField.ColumnHeading = "型枠面積"; }
+                catch (Exception ex) { LogEx("areaField.ColumnHeading", ex); }
+            }
+
             // 面積フィールドは「合計を計算」を有効化（最終的にソート・グループ追加後に再設定）
             //   ScheduleField.DisplayType に ScheduleFieldDisplayType.Totals を設定すると
             //   集計表プロパティ「書式」タブのドロップダウンが「合計を計算」になる。
@@ -256,9 +279,10 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 if (body == null) return;
 
                 // 列幅 (Revit 内部単位: feet, 1ft = 304.8mm)
-                // ヘッダー名 "28Tools_Formwork_xxx" が改行しない幅を確保。
-                // 件数≈40mm / レベル≈80mm / 部位≈80mm / 区分≈80mm / 面積≈70mm
-                double[] widths = { 0.131, 0.262, 0.262, 0.262, 0.230 };
+                // 列ヘッダーを短く設定済 (レベル/部位/区分/型枠面積) のため、
+                // 文字と罫線の間の余白が大きくなりすぎないようコンパクトに設定。
+                // 件数≈25mm / レベル≈30mm / 部位≈25mm / 区分≈40mm / 面積≈35mm
+                double[] widths = { 0.082, 0.098, 0.082, 0.131, 0.115 };
 
                 int colCount = body.NumberOfColumns;
                 for (int c = 0; c < colCount && c < widths.Length; c++)
@@ -298,13 +322,17 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 if (colCount <= 0 || rowCount <= 0) return;
 
                 // 列幅を設定 (タイトル「<型枠数量集計_合計>」が改行しない総幅を確保しつつ
-                // 余白過多にならないバランス)。Revit 内部単位は feet。約 50mm = 0.167 ft。
+                // 文字と罫線の間の余白が過大にならないバランス)。Revit 内部単位は feet。
+                // 件数(合計)≈35mm / 型枠面積(合計)≈40mm / hidden marker≈25mm
+                double[] summaryWidths = { 0.115, 0.131, 0.082 };
                 for (int c = 0; c < colCount; c++)
                 {
+                    double w = c < summaryWidths.Length ? summaryWidths[c] : 0.115;
                     try
                     {
-                        body.SetColumnWidth(c, 0.167);
-                        FormworkDebugLog.Log($"  [Sched:Summary] col {c} width=0.167 ft (~50mm)");
+                        body.SetColumnWidth(c, w);
+                        FormworkDebugLog.Log(
+                            $"  [Sched:Summary] col {c} width={w:F3} ft (~{w * 304.8:F0}mm)");
                     }
                     catch (Exception ex)
                     {

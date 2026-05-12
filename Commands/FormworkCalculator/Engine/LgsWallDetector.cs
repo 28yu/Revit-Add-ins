@@ -7,12 +7,16 @@ namespace Tools28.Commands.FormworkCalculator.Engine
     ///
     /// LGS壁は石膏ボード (PB) を主構成とする乾式壁で、コンクリート打設を伴わず型枠不要。
     /// RC壁に石膏ボード仕上げを貼った構成と区別するため、以下の条件で判定:
-    ///   - L1: WallType 名に "LGS" / "軽鉄" / "軽量鉄骨" / "軽量間仕切" を含む
-    ///   - L2: CompoundStructure に石膏ボード層が存在し、かつコンクリート層が存在しない
-    ///        (RC壁 + 石膏ボード仕上げ等を誤検出しないため)
     ///
-    /// 石膏ボードの代表的な厚さ: 12.5mm, 9.5mm, 15mm, 21mm (日本)
-    /// ただし厚さ単独では判定せず、必ず材料名のキーワードと組み合わせて判定する。
+    /// 判定条件 (いずれかに該当):
+    ///   L1: WallType 名に "LGS" / "軽鉄" / "軽量鉄骨" / "軽量間仕切" を含む
+    ///   L2: CompoundStructure に石膏ボードと判定される層が存在し、かつコンクリート層が存在しない
+    ///       (RC壁 + 石膏ボード仕上げ等を誤検出しないため)
+    ///
+    /// 石膏ボード層の判定 (どちらか一方で OK):
+    ///   - 材料名 / MaterialClass に石膏キーワード (Gypsum / 石膏 / プラスターボード等) を含む
+    ///   - 層の厚さが日本標準サイズ (9.5 / 12.5 / 15 / 21mm) のいずれかに一致 (±0.3mm)
+    ///     ※ コンクリート壁にこれらの薄い層が含まれることは稀のため、厚さだけでも石膏ボードと判定する
     /// </summary>
     internal static class LgsWallDetector
     {
@@ -42,6 +46,16 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         {
             "LGS", "軽鉄", "軽量鉄骨", "軽量間仕切",
         };
+
+        /// <summary>
+        /// 日本標準の石膏ボード厚さ (mm)。±_thicknessToleranceMm の許容差で判定。
+        /// </summary>
+        private static readonly double[] _gypsumBoardThicknessesMm = new[]
+        {
+            9.5, 12.5, 15.0, 21.0,
+        };
+
+        private const double _thicknessToleranceMm = 0.3;
 
         /// <summary>
         /// 壁要素を LGS壁と判定する。判定できなければ false を返す。
@@ -76,48 +90,75 @@ namespace Tools28.Commands.FormworkCalculator.Engine
 
             foreach (var layer in cs.GetLayers())
             {
-                ElementId matId = layer.MaterialId;
-                if (matId == null || matId == ElementId.InvalidElementId) continue;
-                var mat = doc.GetElement(matId) as Material;
-                if (mat == null) continue;
+                double thicknessMm = 0;
+                try
+                {
+                    thicknessMm = UnitUtils.ConvertFromInternalUnits(
+                        layer.Width, UnitTypeId.Millimeters);
+                }
+                catch { }
 
-                string matName = (mat.Name ?? string.Empty).ToUpperInvariant();
+                Material mat = null;
+                try
+                {
+                    if (layer.MaterialId != null && layer.MaterialId != ElementId.InvalidElementId)
+                        mat = doc.GetElement(layer.MaterialId) as Material;
+                }
+                catch { }
+
+                string matName = (mat?.Name ?? string.Empty).ToUpperInvariant();
                 string matClass = string.Empty;
-                try { matClass = (mat.MaterialClass ?? string.Empty).ToUpperInvariant(); } catch { }
+                try { matClass = (mat?.MaterialClass ?? string.Empty).ToUpperInvariant(); } catch { }
                 string combined = matName + " " + matClass;
 
-                bool layerGypsum = false;
-                foreach (var kw in _gypsumKeywords)
+                // 厚さで石膏ボード判定
+                bool isGypsumByThickness = false;
+                foreach (var t in _gypsumBoardThicknessesMm)
                 {
-                    if (combined.Contains(kw.ToUpperInvariant()))
+                    if (System.Math.Abs(thicknessMm - t) <= _thicknessToleranceMm)
                     {
-                        layerGypsum = true;
+                        isGypsumByThickness = true;
                         break;
                     }
                 }
-                if (layerGypsum)
+
+                // 材料名で石膏ボード判定 (mat==null でもキーワード判定はスキップ)
+                bool isGypsumByName = false;
+                if (mat != null)
+                {
+                    foreach (var kw in _gypsumKeywords)
+                    {
+                        if (combined.Contains(kw.ToUpperInvariant()))
+                        {
+                            isGypsumByName = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (isGypsumByThickness || isGypsumByName)
                 {
                     hasGypsum = true;
                     if (gypsumDesc.Length == 0)
                     {
-                        double thicknessMm = 0;
-                        try
-                        {
-                            thicknessMm = UnitUtils.ConvertFromInternalUnits(
-                                layer.Width, UnitTypeId.Millimeters);
-                        }
-                        catch { }
-                        gypsumDesc = $"layer '{mat.Name}' ({thicknessMm:F1}mm)";
+                        string trigger = isGypsumByName
+                            ? (isGypsumByThickness ? "name+thickness" : "name")
+                            : "thickness";
+                        gypsumDesc = $"layer '{mat?.Name ?? "(no material)"}' ({thicknessMm:F1}mm, by {trigger})";
                     }
                     continue;
                 }
 
-                foreach (var kw in _concreteKeywords)
+                // コンクリート層判定 (材料名で判定)
+                if (mat != null)
                 {
-                    if (combined.Contains(kw.ToUpperInvariant()))
+                    foreach (var kw in _concreteKeywords)
                     {
-                        hasConcrete = true;
-                        break;
+                        if (combined.Contains(kw.ToUpperInvariant()))
+                        {
+                            hasConcrete = true;
+                            break;
+                        }
                     }
                 }
             }
