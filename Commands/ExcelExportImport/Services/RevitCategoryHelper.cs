@@ -81,7 +81,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
                 }
             }
 
-            return result.OrderBy(c => c.Name).ToList();
+            return result.OrderBy(c => c.DisplayLabel).ToList();
         }
 
         /// <summary>

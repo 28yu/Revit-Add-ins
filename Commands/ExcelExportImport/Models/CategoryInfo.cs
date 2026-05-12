@@ -1,4 +1,5 @@
 using Autodesk.Revit.DB;
+using Tools28.Commands.ExcelExportImport.Services;
 
 namespace Tools28.Commands.ExcelExportImport.Models
 {
@@ -12,8 +13,15 @@ namespace Tools28.Commands.ExcelExportImport.Models
         public bool IsChecked { get; set; }
         public int ElementCount { get; set; }
 
-        /// <summary>表示用ラベル (「カテゴリ名 (件数)」)</summary>
-        public string DisplayLabel => $"{Name} ({ElementCount})";
+        /// <summary>表示用ラベル（Tools28言語設定に応じてローカライズ）</summary>
+        public string DisplayLabel
+        {
+            get
+            {
+                string localizedName = CategoryLocalizer.GetLocalizedName(BuiltInCategory, Name);
+                return $"{localizedName} ({ElementCount})";
+            }
+        }
 
         public CategoryInfo(BuiltInCategory builtInCategory, string name, int elementCount)
         {
@@ -25,7 +33,7 @@ namespace Tools28.Commands.ExcelExportImport.Models
 
         public override string ToString()
         {
-            return $"{Name} ({ElementCount})";
+            return DisplayLabel;
         }
     }
 }

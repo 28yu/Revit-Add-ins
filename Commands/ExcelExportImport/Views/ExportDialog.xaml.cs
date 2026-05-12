@@ -115,7 +115,8 @@ namespace Tools28.Commands.ExcelExportImport.Views
             else
             {
                 CategoryListBox.ItemsSource = _allCategories
-                    .Where(c => c.Name.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0)
+                    .Where(c => c.Name.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0
+                             || c.DisplayLabel.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0)
                     .ToList();
             }
         }
