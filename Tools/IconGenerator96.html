@@ -28,6 +28,16 @@
   .compare-box { text-align: center; }
   .compare-box img, .compare-box canvas { border: 1px solid #ccc; }
   .compare-box p { font-size: 11px; color: #666; margin: 2px 0; }
+  /* Batch panel */
+  .batch-panel { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.15); margin-top: 20px; }
+  .batch-panel h3 { margin: 0 0 12px; font-size: 15px; }
+  .batch-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; }
+  .batch-groups { display: flex; gap: 24px; flex-wrap: wrap; }
+  .batch-group { min-width: 160px; }
+  .batch-group h4 { margin: 0 0 6px; font-size: 12px; color: #555; border-bottom: 1px solid #e0e0e0; padding-bottom: 4px; }
+  .batch-item { display: flex; align-items: center; gap: 6px; margin: 4px 0; font-size: 13px; cursor: pointer; }
+  .batch-item input[type=checkbox] { width: 15px; height: 15px; cursor: pointer; }
+  .batch-status { font-size: 13px; color: #555; margin-left: 8px; }
 </style>
 </head>
 <body>
@@ -138,6 +148,18 @@
       </div>
     </div>
   </div>
+</div>
+
+<!-- Batch download panel -->
+<div class="batch-panel">
+  <h3>一括PNG保存</h3>
+  <div class="batch-toolbar">
+    <button onclick="selectAllBatch(true)">全選択</button>
+    <button onclick="selectAllBatch(false)">全解除</button>
+    <button class="primary" onclick="batchDownload()">💾 選択を一括保存</button>
+    <span class="batch-status" id="batchStatus"></span>
+  </div>
+  <div class="batch-groups" id="batchGrid"></div>
 </div>
 
 <script>
@@ -1361,6 +1383,139 @@ ctx.textBaseline = 'middle';
 ctx.fillStyle = '#FFFFFF';
 ctx.fillText('?', s(16), s(17));
 `;
+
+// ---- Batch generation ----
+
+const PRESET_GROUPS = [
+  { label: '通り芯・レベル', items: [
+    { key: 'both',            label: 'both (両端)' },
+    { key: 'left',            label: 'left (左端)' },
+    { key: 'right',           label: 'right (右端)' },
+  ]},
+  { label: 'シート・ビュー', items: [
+    { key: 'sheet_creation',  label: 'sheet_creation' },
+    { key: 'view_copy',       label: 'view_copy' },
+    { key: 'view_paste',      label: 'view_paste' },
+    { key: 'sectionbox_copy', label: 'sectionbox_copy' },
+    { key: 'sectionbox_paste',label: 'sectionbox_paste' },
+    { key: 'viewport_copy',   label: 'viewport_copy' },
+    { key: 'viewport_paste',  label: 'viewport_paste' },
+    { key: 'cropbox_copy',    label: 'cropbox_copy' },
+    { key: 'cropbox_paste',   label: 'cropbox_paste' },
+  ]},
+  { label: '注釈・詳細', items: [
+    { key: 'room_tag',        label: 'room_tag' },
+    { key: 'filled_region',   label: 'filled_region' },
+  ]},
+  { label: '構造', items: [
+    { key: 'beam_under_level',label: 'beam_under_level' },
+    { key: 'beam_top_level',  label: 'beam_top_level' },
+    { key: 'fire_protection', label: 'fire_protection' },
+    { key: 'formwork',        label: 'formwork' },
+  ]},
+  { label: 'データ', items: [
+    { key: 'excel_export',    label: 'excel_export' },
+    { key: 'excel_import',    label: 'excel_import' },
+  ]},
+  { label: '設定', items: [
+    { key: 'flag_jp',         label: 'flag_jp' },
+    { key: 'flag_us',         label: 'flag_us' },
+    { key: 'flag_cn',         label: 'flag_cn' },
+    { key: 'ver',             label: 'ver' },
+    { key: 'manual',          label: 'manual' },
+  ]},
+];
+
+function buildBatchGrid() {
+  const grid = document.getElementById('batchGrid');
+  grid.innerHTML = '';
+  PRESET_GROUPS.forEach(group => {
+    const div = document.createElement('div');
+    div.className = 'batch-group';
+    const h4 = document.createElement('h4');
+    h4.textContent = group.label;
+    div.appendChild(h4);
+    group.items.forEach(item => {
+      const label = document.createElement('label');
+      label.className = 'batch-item';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = true;
+      cb.dataset.key = item.key;
+      label.appendChild(cb);
+      label.appendChild(document.createTextNode(item.label));
+      div.appendChild(label);
+    });
+    grid.appendChild(div);
+  });
+}
+
+function selectAllBatch(checked) {
+  document.querySelectorAll('#batchGrid input[type=checkbox]').forEach(cb => cb.checked = checked);
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function renderAndCapturePNG(presetKey) {
+  return new Promise((resolve, reject) => {
+    if (!PRESETS[presetKey]) { reject(new Error('No preset: ' + presetKey)); return; }
+    const canvas = document.getElementById('main');
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, 96, 96);
+    try {
+      const fn = new Function('ctx', 's', PRESETS[presetKey].trim());
+      fn(ctx, s);
+      syncPreviews();
+    } catch(e) { reject(e); return; }
+    canvas.toBlob(blob => {
+      const reader = new FileReader();
+      reader.onload = function() {
+        const pngWithDpi = injectDPI(new Uint8Array(reader.result), 288);
+        resolve({ name: presetKey + '.png', data: pngWithDpi });
+      };
+      reader.readAsArrayBuffer(blob);
+    }, 'image/png');
+  });
+}
+
+async function batchDownload() {
+  const selected = [...document.querySelectorAll('#batchGrid input[type=checkbox]:checked')]
+    .map(cb => cb.dataset.key);
+  if (selected.length === 0) {
+    alert('チェックボックスを選択してください');
+    return;
+  }
+  const statusEl = document.getElementById('batchStatus');
+  for (let i = 0; i < selected.length; i++) {
+    const key = selected[i];
+    statusEl.textContent = `保存中... ${i + 1} / ${selected.length}  (${key})`;
+    try {
+      const { name, data } = await renderAndCapturePNG(key);
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([data], { type: 'image/png' }));
+      a.download = name;
+      a.click();
+      await sleep(300);
+    } catch(e) {
+      console.warn('Skip ' + key + ':', e.message);
+    }
+  }
+  statusEl.textContent = `完了 (${selected.length}件)`;
+  // Restore the preset that was active before batch
+  if (currentPreset && PRESETS[currentPreset]) {
+    const fn = new Function('ctx', 's', PRESETS[currentPreset].trim());
+    const canvas = document.getElementById('main');
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, 96, 96);
+    fn(ctx, s);
+    syncPreviews();
+  }
+}
+
+// Build batch grid on page load
+window.addEventListener('load', () => { buildBatchGrid(); });
+
+// ---- End batch generation ----
 
 // Preset selection handler
 document.getElementById('presetSelect').addEventListener('change', function() {
