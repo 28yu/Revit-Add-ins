@@ -192,18 +192,23 @@ namespace Tools28
 
             var bothData = new PushButtonData("GridBubbleBoth", Loc.S("Ribbon.GridBubble.Both"), assemblyPath, "Tools28.Commands.GridBubble.ExecuteGridBubbleBothCommand");
             bothData.ToolTip = Loc.S("Ribbon.GridBubble.Both.Tip");
+            bothData.Image = LoadImage("both_16.png");
             bothData.LargeImage = LoadImage("both.png");
-            AddButton(panel, bothData);
 
             var leftData = new PushButtonData("GridBubbleLeft", Loc.S("Ribbon.GridBubble.Left"), assemblyPath, "Tools28.Commands.GridBubble.ExecuteGridBubbleLeftCommand");
             leftData.ToolTip = Loc.S("Ribbon.GridBubble.Left.Tip");
+            leftData.Image = LoadImage("left_16.png");
             leftData.LargeImage = LoadImage("left.png");
-            AddButton(panel, leftData);
 
             var rightData = new PushButtonData("GridBubbleRight", Loc.S("Ribbon.GridBubble.Right"), assemblyPath, "Tools28.Commands.GridBubble.ExecuteGridBubbleRightCommand");
             rightData.ToolTip = Loc.S("Ribbon.GridBubble.Right.Tip");
+            rightData.Image = LoadImage("right_16.png");
             rightData.LargeImage = LoadImage("right.png");
-            AddButton(panel, rightData);
+
+            var stackedItems = panel.AddStackedItems(bothData, leftData, rightData);
+            _buttons["GridBubbleBoth"] = stackedItems[0] as RibbonItem;
+            _buttons["GridBubbleLeft"] = stackedItems[1] as RibbonItem;
+            _buttons["GridBubbleRight"] = stackedItems[2] as RibbonItem;
         }
 
         private void CreateSheetViewPanel(UIControlledApplication application, string tabName, string assemblyPath)

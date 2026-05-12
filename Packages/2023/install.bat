@@ -3,7 +3,7 @@ chcp 65001 >nul
 setlocal enabledelayedexpansion
 
 echo ========================================
-echo   28 Tools v2.0 for Revit 2023
+echo   28 Tools v2.1 for Revit 2023
 echo ========================================
 echo.
 echo インストール中...

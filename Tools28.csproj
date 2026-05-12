@@ -47,6 +47,9 @@
     <Resource Include="Resources\Icons\both.png" />
     <Resource Include="Resources\Icons\left.png" />
     <Resource Include="Resources\Icons\right.png" />
+    <Resource Include="Resources\Icons\both_16.png" />
+    <Resource Include="Resources\Icons\left_16.png" />
+    <Resource Include="Resources\Icons\right_16.png" />
     <Resource Include="Resources\Icons\sheet_creation.png" />
     <Resource Include="Resources\Icons\view_copy.png" />
     <Resource Include="Resources\Icons\view_paste.png" />

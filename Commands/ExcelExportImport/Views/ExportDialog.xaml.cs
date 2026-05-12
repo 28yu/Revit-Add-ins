@@ -65,7 +65,7 @@ namespace Tools28.Commands.ExcelExportImport.Views
         private void ApplyLocalization()
         {
             this.Title = Loc.S("Export.Title");
-            grpCategory.Header = Loc.S("Export.SelectCategory.Header");
+            grpCategory.Header = Loc.S("Export.Category");
             btnSearchCat.Content = Loc.S("Common.Search");
             grpParameter.Header = Loc.S("Export.Parameter");
             btnSearchParam.Content = Loc.S("Common.Search");
@@ -75,8 +75,8 @@ namespace Tools28.Commands.ExcelExportImport.Views
             btnSearchOutput.Content = Loc.S("Common.Search");
             btnMoveUp.ToolTip = Loc.S("Export.MoveUp");
             btnMoveDown.ToolTip = Loc.S("Export.MoveDown");
-            SplitByCategoryCheckBox.Content = Loc.S("Export.SplitByCategory");
-            btnResetSettings.Content = Loc.S("Export.ResetSettings");
+            SplitByCategoryCheckBox.Content = Loc.S("Export.SeparateSheets");
+            btnResetSettings.Content = Loc.S("Export.RestoreSettings");
             btnLoadSettings.Content = Loc.S("Export.LoadSettings");
             btnSaveSettings.Content = Loc.S("Export.SaveSettings");
             btnOK.Content = Loc.S("Common.OK");
