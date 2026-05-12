@@ -238,7 +238,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         {
             // 構造柱: 鉛直 Z 方向
             if (elem.Category != null &&
-                elem.Category.Id.IntegerValue == (int)BuiltInCategory.OST_StructuralColumns)
+                elem.Category.Id.IntValue() == (int)BuiltInCategory.OST_StructuralColumns)
             {
                 return XYZ.BasisZ;
             }

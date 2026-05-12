@@ -28,7 +28,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
 
             ElementId solidFillId = GetDraftingSolidFillPatternId(doc);
             Engine.FormworkDebugLog.Log(
-                $"  [Filter] solidFillPatternId={(solidFillId != null && solidFillId != ElementId.InvalidElementId ? solidFillId.IntegerValue.ToString() : "INVALID")}");
+                $"  [Filter] solidFillPatternId={(solidFillId != null && solidFillId != ElementId.InvalidElementId ? solidFillId.IntValue().ToString() : "INVALID")}");
 
             // 区分パラメータの ElementId を取得（DirectShape から）
             ElementId paramElemId = GetSharedParameterIdFromDirectShape(
@@ -39,7 +39,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 return;
             }
             Engine.FormworkDebugLog.Log(
-                $"  [Filter] paramElemId={paramElemId.IntegerValue} (28Tools_Formwork_区分)");
+                $"  [Filter] paramElemId={paramElemId.IntValue()} (28Tools_Formwork_区分)");
 
             // 既存の型枠_* フィルタをビューから外して再作成
             RemoveExistingFiltersFromView(doc, view);

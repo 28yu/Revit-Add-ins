@@ -461,7 +461,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
                             ? $"BB=[{bb.Min.X:F2},{bb.Min.Y:F2},{bb.Min.Z:F2}]-[{bb.Max.X:F2},{bb.Max.Y:F2},{bb.Max.Z:F2}]"
                             : "BB=null";
                         FormworkDebugLog.Log(
-                            $"  [Visual:Diag] sample key='{key}' id={id.IntegerValue} {bbStr} " +
+                            $"  [Visual:Diag] sample key='{key}' id={id.IntValue()} {bbStr} " +
                             $"solids={solidCount} vol={totalVol:F6}");
                     }
                 }
