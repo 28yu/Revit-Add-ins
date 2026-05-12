@@ -1,4 +1,4 @@
-@echo off
+﻿@echo off
 chcp 65001 >nul
 setlocal enabledelayedexpansion
 
@@ -8,6 +8,16 @@ echo ========================================
 echo.
 echo インストール中...
 echo.
+
+REM Revit 起動中チェック (DLL ファイルロック回避)
+tasklist /FI "IMAGENAME eq Revit.exe" 2>nul | find /I "Revit.exe" >nul
+if not errorlevel 1 (
+    echo [NG] Revit が起動しています。
+    echo Revit を終了してから再度このスクリプトを実行してください。
+    echo.
+    pause
+    exit /b 1
+)
 
 REM パス設定
 set ADDON_DIR=C:\ProgramData\Autodesk\Revit\Addins\2023
@@ -39,6 +49,8 @@ if not exist "%ADDON_DIR%\28Tools" mkdir "%ADDON_DIR%\28Tools"
 xcopy /Y /Q "%SCRIPT_DIR%28Tools\*.dll" "%ADDON_DIR%\28Tools\" >nul
 if errorlevel 1 (
     echo [NG] DLLファイルのコピーに失敗しました
+    echo Revit が起動中、または管理者権限が必要な可能性があります。
+    echo Revit を終了し、install.bat を右クリック ^> 管理者として実行してください。
     pause
     exit /b 1
 )

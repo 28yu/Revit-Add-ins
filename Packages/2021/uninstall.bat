@@ -1,4 +1,4 @@
-@echo off
+﻿@echo off
 chcp 65001 >nul
 echo Revit 2021版 28 Tools をアンインストール中...
 
