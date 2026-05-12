@@ -72,7 +72,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                                 Reason = det.Reason ?? string.Empty,
                             });
                             FormworkDebugLog.Log(
-                                $"  [SteelExclude] E{elem.Id.IntegerValue} " +
+                                $"  [SteelExclude] E{elem.Id.IntValue()} " +
                                 $"Cat={elem.Category?.Name} Name='{elem.Name}' " +
                                 $"L={det.Layer} reason={det.Reason}");
                             steelCount++;
@@ -81,7 +81,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                         else if (det != null && FormworkDebugLog.Enabled)
                         {
                             FormworkDebugLog.Log(
-                                $"  [SteelKeep]    E{elem.Id.IntegerValue} " +
+                                $"  [SteelKeep]    E{elem.Id.IntValue()} " +
                                 $"Cat={elem.Category?.Name} Name='{elem.Name}' " +
                                 $"reason={det.Reason}");
                         }
@@ -100,7 +100,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                                 Reason = deckReason,
                             });
                             FormworkDebugLog.Log(
-                                $"  [DeckSlabExclude] E{elem.Id.IntegerValue} " +
+                                $"  [DeckSlabExclude] E{elem.Id.IntValue()} " +
                                 $"Cat={elem.Category?.Name} reason={deckReason}");
                             deckCount++;
                             continue;
@@ -123,7 +123,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         private static bool IsSteelDetectionTarget(Element elem)
         {
             if (elem?.Category == null) return false;
-            int catId = elem.Category.Id.IntegerValue;
+            int catId = elem.Category.Id.IntValue();
             return catId == (int)BuiltInCategory.OST_StructuralColumns
                 || catId == (int)BuiltInCategory.OST_StructuralFraming;
         }
@@ -134,7 +134,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         private static bool IsDeckSlabDetectionTarget(Element elem)
         {
             if (elem?.Category == null) return false;
-            return elem.Category.Id.IntegerValue == (int)BuiltInCategory.OST_Floors;
+            return elem.Category.Id.IntValue() == (int)BuiltInCategory.OST_Floors;
         }
 
         internal static List<Element> Collect(Document doc, FormworkSettings settings, View activeView)
@@ -167,7 +167,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
 
                     foreach (var e in elems)
                     {
-                        if (seenIds.Add(e.Id.IntegerValue)) result.Add(e);
+                        if (seenIds.Add(e.Id.IntValue())) result.Add(e);
                     }
 
                     // 壁スイープ・リビール（独立した WallSweep 要素として存在）も追加
@@ -179,14 +179,14 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                         .ToList();
                     foreach (var sw in sweeps)
                     {
-                        if (seenIds.Add(sw.Id.IntegerValue)) result.Add(sw);
+                        if (seenIds.Add(sw.Id.IntValue())) result.Add(sw);
                     }
                 }
                 else
                 {
                     foreach (var e in elems)
                     {
-                        if (seenIds.Add(e.Id.IntegerValue)) result.Add(e);
+                        if (seenIds.Add(e.Id.IntValue())) result.Add(e);
                     }
                 }
             }
@@ -198,7 +198,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             if (elem == null) return CategoryGroup.Other;
             if (elem is WallSweep) return CategoryGroup.Wall;
             if (elem.Category == null) return CategoryGroup.Other;
-            switch ((BuiltInCategory)elem.Category.Id.IntegerValue)
+            switch ((BuiltInCategory)elem.Category.Id.IntValue())
             {
                 case BuiltInCategory.OST_StructuralColumns: return CategoryGroup.Column;
                 case BuiltInCategory.OST_StructuralFraming: return CategoryGroup.Beam;

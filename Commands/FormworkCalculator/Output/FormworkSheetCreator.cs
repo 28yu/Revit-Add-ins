@@ -121,7 +121,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
             {
                 var best = counts.OrderByDescending(kv => kv.Value).First();
                 FormworkDebugLog.Log(
-                    $"  [Sheet] most-used title block id={best.Key.IntegerValue} count={best.Value}");
+                    $"  [Sheet] most-used title block id={best.Key.IntValue()} count={best.Value}");
                 return best.Key;
             }
 
@@ -131,7 +131,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 .WhereElementIsElementType()
                 .FirstElementId();
             FormworkDebugLog.Log(
-                $"  [Sheet] no existing sheets; fallback title block id={anySym?.IntegerValue}");
+                $"  [Sheet] no existing sheets; fallback title block id={anySym?.IntValue()}");
             return anySym;
         }
 
@@ -217,7 +217,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
             }
             catch (Exception ex)
             {
-                FormworkDebugLog.Log($"  [Sheet] PlaceSchedule {scheduleId.IntegerValue} EX: {ex.Message}");
+                FormworkDebugLog.Log($"  [Sheet] PlaceSchedule {scheduleId.IntValue()} EX: {ex.Message}");
                 return topY;
             }
             if (inst == null) return topY;
@@ -230,7 +230,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 {
                     double bottom = bb.Min.Y;
                     FormworkDebugLog.Log(
-                        $"  [Sheet] schedule {scheduleId.IntegerValue} placed top={topY:F2} bottom={bottom:F2}");
+                        $"  [Sheet] schedule {scheduleId.IntValue()} placed top={topY:F2} bottom={bottom:F2}");
                     return bottom - gap;
                 }
             }
@@ -328,7 +328,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
                                 p.Set(0);
                                 noTitleId = dup.Id;
                                 FormworkDebugLog.Log(
-                                    $"  [Sheet] duplicated viewport type → no-title id={noTitleId.IntegerValue}");
+                                    $"  [Sheet] duplicated viewport type → no-title id={noTitleId.IntValue()}");
                             }
                         }
                     }
@@ -343,7 +343,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     try
                     {
                         vp.ChangeTypeId(noTitleId);
-                        FormworkDebugLog.Log($"  [Sheet] viewport type → no-title id={noTitleId.IntegerValue}");
+                        FormworkDebugLog.Log($"  [Sheet] viewport type → no-title id={noTitleId.IntValue()}");
                     }
                     catch (Exception ex)
                     {
@@ -398,9 +398,9 @@ namespace Tools28.Commands.FormworkCalculator.Output
         private sealed class ElementIdComparer : IEqualityComparer<ElementId>
         {
             public bool Equals(ElementId x, ElementId y) =>
-                x != null && y != null && x.IntegerValue == y.IntegerValue;
+                x != null && y != null && x.IntValue() == y.IntValue();
             public int GetHashCode(ElementId obj) =>
-                obj?.IntegerValue.GetHashCode() ?? 0;
+                obj?.IntValue().GetHashCode() ?? 0;
         }
     }
 }

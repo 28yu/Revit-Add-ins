@@ -57,7 +57,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 var e = ex.Element;
                 result.ExcludedResults.Add(new ExcludedResult
                 {
-                    ElementId = e.Id.IntegerValue,
+                    ElementId = e.Id.IntValue(),
                     ElementName = e.Name ?? string.Empty,
                     Category = ElementCollector.ToCategoryGroup(e),
                     CategoryName = e.Category?.Name ?? string.Empty,
@@ -101,7 +101,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 {
                     result.Errors.Add(new ErrorLogEntry
                     {
-                        ElementId = elem.Id.IntegerValue,
+                        ElementId = elem.Id.IntValue(),
                         CategoryName = elem.Category?.Name ?? string.Empty,
                         ElementName = elem.Name,
                         ErrorKind = "ClassifyError",
@@ -427,7 +427,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
 
             return new ContactFaceDetector.ElementFacesContext
             {
-                ElementId = elem.Id.IntegerValue,
+                ElementId = elem.Id.IntValue(),
                 Category = ElementCollector.ToCategoryGroup(elem),
                 CategoryName = elem.Category?.Name ?? string.Empty,
                 BB = bb,
@@ -579,7 +579,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
 
                 contexts.Add(new ContactFaceDetector.ElementFacesContext
                 {
-                    ElementId = elem.Id.IntegerValue,
+                    ElementId = elem.Id.IntValue(),
                     Category = ElementCollector.ToCategoryGroup(elem),
                     CategoryName = elem.Category?.Name ?? string.Empty,
                     BB = bb,

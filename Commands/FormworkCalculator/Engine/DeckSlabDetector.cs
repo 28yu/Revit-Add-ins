@@ -16,7 +16,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             reason = string.Empty;
             if (elem == null) return false;
             if (elem.Category == null) return false;
-            if (elem.Category.Id.IntegerValue != (int)BuiltInCategory.OST_Floors) return false;
+            if (elem.Category.Id.IntValue() != (int)BuiltInCategory.OST_Floors) return false;
 
             string typeName = string.Empty;
             try

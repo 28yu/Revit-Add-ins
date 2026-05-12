@@ -67,7 +67,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
 
             return new OpeningDelta
             {
-                HostElementId = wall.Id.IntegerValue,
+                HostElementId = wall.Id.IntValue(),
                 DeductedArea = deducted,
                 AddedEdgeArea = added,
             };
@@ -108,7 +108,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
 
             return new OpeningDelta
             {
-                HostElementId = floor.Id.IntegerValue,
+                HostElementId = floor.Id.IntValue(),
                 DeductedArea = deducted,
                 AddedEdgeArea = added,
             };
