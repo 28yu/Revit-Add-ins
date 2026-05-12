@@ -255,7 +255,7 @@ namespace Tools28.Commands.FormworkCalculator
 
                 if (result.ExcludedResults != null && result.ExcludedResults.Count > 0)
                 {
-                    int steelN = 0, deckN = 0, sweepN = 0, steelStairN = 0, alcEcpN = 0;
+                    int steelN = 0, deckN = 0, sweepN = 0, steelStairN = 0, alcEcpN = 0, lgsN = 0;
                     foreach (var ex in result.ExcludedResults)
                     {
                         if (ex.Kind == ExclusionKind.Steel) steelN++;
@@ -263,6 +263,7 @@ namespace Tools28.Commands.FormworkCalculator
                         else if (ex.Kind == ExclusionKind.WallSweep) sweepN++;
                         else if (ex.Kind == ExclusionKind.SteelStair) steelStairN++;
                         else if (ex.Kind == ExclusionKind.AlcEcpPanel) alcEcpN++;
+                        else if (ex.Kind == ExclusionKind.LgsWall) lgsN++;
                     }
                     if (steelN > 0)
                         summary += "\n\n" + string.Format(Loc.S("Formwork.SteelExcluded"), steelN);
@@ -274,6 +275,8 @@ namespace Tools28.Commands.FormworkCalculator
                         summary += "\n" + string.Format(Loc.S("Formwork.SteelStairExcluded"), steelStairN);
                     if (alcEcpN > 0)
                         summary += "\n" + string.Format(Loc.S("Formwork.AlcEcpExcluded"), alcEcpN);
+                    if (lgsN > 0)
+                        summary += "\n" + string.Format(Loc.S("Formwork.LgsExcluded"), lgsN);
                     summary += "\n" + Loc.S("Formwork.ExcludedFilterNote");
                 }
 

@@ -252,6 +252,48 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             FormworkDebugLog.Flush();
         }
 
+        /// <summary>
+        /// 面の水平射影 (XY平面) のバウンディングボックス短辺を feet 単位で返す。
+        /// 壁の斜めの天端で「斜面の幅」を判定するために使用する。
+        /// 面のエッジを 10 分割サンプリングして XY 投影の min/max を求める。
+        /// </summary>
+        private static double ComputeFaceHorizontalShortDim(Face face)
+        {
+            if (face == null) return 0;
+            double minX = double.MaxValue, maxX = double.MinValue;
+            double minY = double.MaxValue, maxY = double.MinValue;
+            int sampleCount = 0;
+            try
+            {
+                foreach (EdgeArray ea in face.EdgeLoops)
+                {
+                    foreach (Edge e in ea)
+                    {
+                        Curve c = null;
+                        try { c = e.AsCurve(); } catch { }
+                        if (c == null) continue;
+                        for (int i = 0; i <= 10; i++)
+                        {
+                            double t = i / 10.0;
+                            XYZ p;
+                            try { p = c.Evaluate(t, true); } catch { continue; }
+                            if (p == null) continue;
+                            if (p.X < minX) minX = p.X;
+                            if (p.X > maxX) maxX = p.X;
+                            if (p.Y < minY) minY = p.Y;
+                            if (p.Y > maxY) maxY = p.Y;
+                            sampleCount++;
+                        }
+                    }
+                }
+            }
+            catch { return 0; }
+            if (sampleCount < 2) return 0;
+            double dx = maxX - minX;
+            double dy = maxY - minY;
+            return Math.Min(dx, dy);
+        }
+
         private static string CategoryShort(CategoryGroup cg)
         {
             switch (cg)
@@ -426,6 +468,32 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 }
             }
 
+            // 壁の斜めの天端: 斜面の水平射影の短辺 (壁厚方向の幅) が
+            // しきい値 (既定 30mm) 以上なら型枠不要 (天端扱い) として控除する。
+            // 小さな面取り (< 30mm) は型枠必要のまま残す。
+            if (isWall && _settings.SlopedWallTopWidthThresholdMm > 0)
+            {
+                double thresholdFeet = UnitUtils.ConvertToInternalUnits(
+                    _settings.SlopedWallTopWidthThresholdMm, UnitTypeId.Millimeters);
+                foreach (var fi in faceInfos)
+                {
+                    if (fi.FaceType != FaceType.FormworkRequired) continue;
+                    if (fi.Normal == null) continue;
+                    double nz = fi.Normal.Z;
+                    // 上向き斜面のみ対象 (水平面は既存ルールで処理済み)
+                    if (nz <= 0.1 || nz >= 0.99) continue;
+
+                    double widthFeet = ComputeFaceHorizontalShortDim(fi.Face);
+                    if (widthFeet >= thresholdFeet)
+                    {
+                        fi.FaceType = FaceType.DeductedTop;
+                        FormworkDebugLog.Log(
+                            $"  [SlopedWallTop] E{elem.Id.IntValue()} face nz={nz:F3} " +
+                            $"widthMm={widthFeet * 304.8:F1} → DeductedTop");
+                    }
+                }
+            }
+
             BoundingBoxXYZ bb = null;
             try { bb = elem.get_BoundingBox(null); } catch { }
 
@@ -577,6 +645,23 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                         {
                             f.FaceType = FaceType.DeductedTop;
                         }
+                    }
+                }
+
+                // 壁の斜めの天端も控除 (BuildElementResult と同じロジック)
+                if (isWall && settings.SlopedWallTopWidthThresholdMm > 0)
+                {
+                    double thresholdFeet = UnitUtils.ConvertToInternalUnits(
+                        settings.SlopedWallTopWidthThresholdMm, UnitTypeId.Millimeters);
+                    foreach (var f in faces)
+                    {
+                        if (f.FaceType != FaceType.FormworkRequired) continue;
+                        if (f.Normal == null) continue;
+                        double nz = f.Normal.Z;
+                        if (nz <= 0.1 || nz >= 0.99) continue;
+                        double widthFeet = ComputeFaceHorizontalShortDim(f.Face);
+                        if (widthFeet >= thresholdFeet)
+                            f.FaceType = FaceType.DeductedTop;
                     }
                 }
 

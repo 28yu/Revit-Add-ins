@@ -380,6 +380,7 @@ namespace Tools28.Localization
             { "Formwork.WallSweepExcluded", "壁スイープ・リビール {0} 個を型枠不要として除外しました" },
             { "Formwork.SteelStairExcluded", "鉄骨階段 {0} 個を型枠不要として除外しました（タイプ名・マテリアルに鉄骨キーワードを含む階段）" },
             { "Formwork.AlcEcpExcluded", "ALC/ECP パネル {0} 個を型枠不要として除外しました（タイプ名に \"ALC\" / \"ECP\" を含む壁）" },
+            { "Formwork.LgsExcluded", "LGS壁 {0} 個を型枠不要として除外しました（石膏ボード層を含みコンクリート層を含まない壁）" },
             { "Formwork.ExcludedFilterNote", "（除外要素は解析3Dビューの「型枠_除外」フィルタで非表示。表示 ON で確認可能）" },
 
             // === Excel エクスポート カテゴリ名（BuiltInCategory→ローカライズ）===

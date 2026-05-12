@@ -101,6 +101,7 @@ namespace Tools28.Commands.FormworkCalculator.Models
         WallSweep,  // 壁スイープ・リビール (壁の天端や面に付帯する成形)
         SteelStair, // 鉄骨階段 (タイプ名・マテリアルに鉄骨キーワードを含む階段)
         AlcEcpPanel, // ALC/ECP パネル (タイプ名に "ALC" / "ECP" を含む壁)
+        LgsWall,    // LGS壁・乾式壁 (壁構造に石膏ボード層があり、コンクリート層が無い壁)
     }
 
     /// <summary>

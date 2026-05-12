@@ -31,6 +31,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         public const string WallSweepExcludedLabel = "壁スイープ(除外)";
         public const string SteelStairExcludedLabel = "鉄骨階段(除外)";
         public const string AlcEcpPanelExcludedLabel = "ALC/ECPパネル(除外)";
+        public const string LgsWallExcludedLabel = "LGS壁(除外)";
 
         // View Filter のグループキー。除外要素は全て同じキー・色・フィルタを共有し、
         // 解析ビュー上では既定で非表示（ユーザーが手動で ON にすると確認可能）。

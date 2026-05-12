@@ -53,6 +53,15 @@ namespace Tools28.Commands.FormworkCalculator.Models
         // 暗黙挙動として常に true。デバッグ時のみ false にできる (UI には露出しない)。
         public bool ExcludeAlcEcpPanels { get; set; } = true;
 
+        // 壁カテゴリから LGS壁・乾式壁 (壁構造に石膏ボード層が含まれ、コンクリート層が無い壁)
+        // を自動除外する。LGS = Light Gauge Steel (軽量鉄骨)。
+        // 暗黙挙動として常に true。デバッグ時のみ false にできる (UI には露出しない)。
+        public bool ExcludeLgsWalls { get; set; } = true;
+
+        // 壁の天端が斜めの場合、斜面の幅（横方向射影）が以下のしきい値 (mm) 以上であれば
+        // 型枠不要 (天端扱い) として控除する。0 以下にすると無効。
+        public double SlopedWallTopWidthThresholdMm { get; set; } = 30.0;
+
         public List<string> IncludedCategories { get; set; } = new List<string>
         {
             "StructuralColumns",

@@ -48,12 +48,14 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             bool exclude = settings?.ExcludeSteelMembers ?? true;
             bool excludeStair = settings?.ExcludeSteelStairs ?? true;
             bool excludeAlcEcp = settings?.ExcludeAlcEcpPanels ?? true;
+            bool excludeLgs = settings?.ExcludeLgsWalls ?? true;
 
-            FormworkDebugLog.Section("Exclusion Detection (Steel + DeckSlab + SteelStair + AlcEcpPanel)");
+            FormworkDebugLog.Section("Exclusion Detection (Steel + DeckSlab + SteelStair + AlcEcpPanel + LgsWall)");
             int steelCount = 0;
             int deckCount = 0;
             int steelStairCount = 0;
             int alcEcpCount = 0;
+            int lgsCount = 0;
             foreach (var elem in raw)
             {
                 if (exclude)
@@ -134,6 +136,26 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                         }
                     }
 
+                    // 壁カテゴリ → LGS壁判定 (CompoundStructure に石膏ボード層があり、コンクリート層が無い)
+                    if (excludeLgs && IsWallDetectionTarget(elem))
+                    {
+                        if (LgsWallDetector.IsLgsWall(elem, doc, out string lgsReason))
+                        {
+                            cr.Excluded.Add(new ExcludedEntry
+                            {
+                                Element = elem,
+                                Kind = ExclusionKind.LgsWall,
+                                Layer = "CompoundStructure",
+                                Reason = lgsReason,
+                            });
+                            FormworkDebugLog.Log(
+                                $"  [LgsExclude] E{elem.Id.IntValue()} " +
+                                $"Cat={elem.Category?.Name} reason={lgsReason}");
+                            lgsCount++;
+                            continue;
+                        }
+                    }
+
                     // 床カテゴリ → デッキスラブ判定 (タイプ名/要素名に "DS" を含む)
                     if (IsDeckSlabDetectionTarget(elem))
                     {
@@ -159,7 +181,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             FormworkDebugLog.Log(
                 $"  Exclusion detection: total={raw.Count} steelExcluded={steelCount} " +
                 $"deckSlabExcluded={deckCount} steelStairExcluded={steelStairCount} " +
-                $"alcEcpExcluded={alcEcpCount} kept={cr.Targets.Count}");
+                $"alcEcpExcluded={alcEcpCount} lgsExcluded={lgsCount} kept={cr.Targets.Count}");
             FormworkDebugLog.Flush();
 
             return cr;
