@@ -100,6 +100,7 @@ namespace Tools28.Commands.FormworkCalculator.Models
         DeckSlab,   // デッキスラブ (タイプ名に "DS" を含む床)
         WallSweep,  // 壁スイープ・リビール (壁の天端や面に付帯する成形)
         SteelStair, // 鉄骨階段 (タイプ名・マテリアルに鉄骨キーワードを含む階段)
+        AlcEcpPanel, // ALC/ECP パネル (タイプ名に "ALC" / "ECP" を含む壁)
     }
 
     /// <summary>

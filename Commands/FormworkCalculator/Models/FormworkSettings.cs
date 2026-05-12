@@ -48,6 +48,11 @@ namespace Tools28.Commands.FormworkCalculator.Models
         // 暗黙挙動として常に true。デバッグ時のみ false にできる (UI には露出しない)。
         public bool ExcludeSteelStairs { get; set; } = true;
 
+        // 壁カテゴリから ALC/ECP パネル (タイプ名に "ALC" または "ECP" を含む) を自動除外する。
+        // 工場製品の取付パネルで型枠不要のため。
+        // 暗黙挙動として常に true。デバッグ時のみ false にできる (UI には露出しない)。
+        public bool ExcludeAlcEcpPanels { get; set; } = true;
+
         public List<string> IncludedCategories { get; set; } = new List<string>
         {
             "StructuralColumns",

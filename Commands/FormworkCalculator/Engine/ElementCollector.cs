@@ -47,11 +47,13 @@ namespace Tools28.Commands.FormworkCalculator.Engine
 
             bool exclude = settings?.ExcludeSteelMembers ?? true;
             bool excludeStair = settings?.ExcludeSteelStairs ?? true;
+            bool excludeAlcEcp = settings?.ExcludeAlcEcpPanels ?? true;
 
-            FormworkDebugLog.Section("Exclusion Detection (Steel + DeckSlab + SteelStair)");
+            FormworkDebugLog.Section("Exclusion Detection (Steel + DeckSlab + SteelStair + AlcEcpPanel)");
             int steelCount = 0;
             int deckCount = 0;
             int steelStairCount = 0;
+            int alcEcpCount = 0;
             foreach (var elem in raw)
             {
                 if (exclude)
@@ -112,6 +114,26 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                         }
                     }
 
+                    // 壁カテゴリ → ALC/ECP パネル判定 (タイプ名に "ALC" / "ECP" を含む)
+                    if (excludeAlcEcp && IsWallDetectionTarget(elem))
+                    {
+                        if (AlcEcpPanelDetector.IsAlcEcpPanel(elem, doc, out string alcReason))
+                        {
+                            cr.Excluded.Add(new ExcludedEntry
+                            {
+                                Element = elem,
+                                Kind = ExclusionKind.AlcEcpPanel,
+                                Layer = "NamePattern",
+                                Reason = alcReason,
+                            });
+                            FormworkDebugLog.Log(
+                                $"  [AlcEcpExclude] E{elem.Id.IntValue()} " +
+                                $"Cat={elem.Category?.Name} reason={alcReason}");
+                            alcEcpCount++;
+                            continue;
+                        }
+                    }
+
                     // 床カテゴリ → デッキスラブ判定 (タイプ名/要素名に "DS" を含む)
                     if (IsDeckSlabDetectionTarget(elem))
                     {
@@ -137,7 +159,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             FormworkDebugLog.Log(
                 $"  Exclusion detection: total={raw.Count} steelExcluded={steelCount} " +
                 $"deckSlabExcluded={deckCount} steelStairExcluded={steelStairCount} " +
-                $"kept={cr.Targets.Count}");
+                $"alcEcpExcluded={alcEcpCount} kept={cr.Targets.Count}");
             FormworkDebugLog.Flush();
 
             return cr;
@@ -170,6 +192,16 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         {
             if (elem?.Category == null) return false;
             return elem.Category.Id.IntValue() == (int)BuiltInCategory.OST_Stairs;
+        }
+
+        /// <summary>
+        /// ALC/ECP パネル検出の対象カテゴリ判定。壁本体 (Wall) のみ対象とする。
+        /// </summary>
+        private static bool IsWallDetectionTarget(Element elem)
+        {
+            if (elem == null) return false;
+            if (elem is WallSweep) return false;
+            return elem is Wall;
         }
 
         internal static List<Element> Collect(Document doc, FormworkSettings settings, View activeView)

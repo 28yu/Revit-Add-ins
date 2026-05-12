@@ -379,6 +379,7 @@ namespace Tools28.Localization
             { "Formwork.DeckSlabExcluded", "Excluded {0} deck slabs (floor type name contains \"DS\")" },
             { "Formwork.WallSweepExcluded", "Excluded {0} wall sweeps/reveals (no formwork needed)" },
             { "Formwork.SteelStairExcluded", "Excluded {0} steel stairs (type/material contains steel keyword)" },
+            { "Formwork.AlcEcpExcluded", "Excluded {0} ALC/ECP panels (wall type name contains \"ALC\" / \"ECP\")" },
             { "Formwork.ExcludedFilterNote", "(Excluded elements are hidden by the \"Formwork_Excluded\" filter in the analysis 3D view. Toggle the filter ON to inspect them.)" },
 
             // === Excel Export Category Names ===
