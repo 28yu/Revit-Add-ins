@@ -3,18 +3,12 @@ using Autodesk.Revit.DB;
 namespace Tools28.Commands.FormworkCalculator.Engine
 {
     /// <summary>
-    /// Revit 2024 で ElementId は long 化、Revit 2026 では IntegerValue プロパティが
-    /// 削除された。両バージョンを跨いで int 値が取得できるよう拡張メソッドを提供する。
+    /// FormworkCalculator 内で Tools28.RevitCompatibility.IntValue() へアクセスできるよう
+    /// 同名の拡張メソッドを中継する。実装は RevitCompatibility.cs に集約。
     /// </summary>
     internal static class ElementIdHelper
     {
-        public static int IntValue(this ElementId id)
-        {
-#if REVIT2026
-            return (int)id.Value;
-#else
-            return id.IntegerValue;
-#endif
-        }
+        public static int IntValue(this ElementId id) => RevitCompatibility.IntValue(id);
     }
 }
+

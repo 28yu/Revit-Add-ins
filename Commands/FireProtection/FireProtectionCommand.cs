@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
+using Tools28;
 using Autodesk.Revit.UI;
 using Tools28.Localization;
 
@@ -99,9 +100,9 @@ namespace Tools28.Commands.FireProtection
                 }
 
                 // 重複要素を除去（複数ビューに同じ要素が表示される場合）
-                allBeams = allBeams.GroupBy(e => e.Id.IntegerValue)
+                allBeams = allBeams.GroupBy(e => e.Id.IntValue())
                     .Select(g => g.First()).ToList();
-                allColumns = allColumns.GroupBy(e => e.Id.IntegerValue)
+                allColumns = allColumns.GroupBy(e => e.Id.IntValue())
                     .Select(g => g.First()).ToList();
 
                 if (allBeams.Count == 0 && allColumns.Count == 0)
@@ -354,7 +355,7 @@ namespace Tools28.Commands.FireProtection
                                 var beamBBoxes = new List<BoundingBoxXYZ>();
                                 foreach (var b in viewTargets)
                                 {
-                                    if (b.Category.Id.IntegerValue !=
+                                    if (b.Category.Id.IntValue() !=
                                         (int)BuiltInCategory.OST_StructuralFraming) continue;
                                     var bbb = b.get_BoundingBox(view)
                                               ?? b.get_BoundingBox(null);
@@ -466,7 +467,7 @@ namespace Tools28.Commands.FireProtection
                                 {
                                     System.IO.File.AppendAllText(
                                         @"C:\temp\FireProtection_debug.txt",
-                                        $"\n凡例配置: VP={vp?.Id?.IntegerValue} pos=({vpCX * 304.8:F0},{vpCY * 304.8:F0})\n");
+                                        $"\n凡例配置: VP={vp?.Id?.IntValue()} pos=({vpCX * 304.8:F0},{vpCY * 304.8:F0})\n");
                                 }
                                 catch { }
                             }

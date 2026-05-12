@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Autodesk.Revit.DB;
+using Tools28;
 using Tools28.Commands.ExcelExportImport.Models;
 
 namespace Tools28.Commands.ExcelExportImport.Services
@@ -121,7 +122,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
 #if REVIT2026
                     return param.AsValueString() ?? param.AsElementId().Value.ToString();
 #else
-                    return param.AsValueString() ?? param.AsElementId().IntegerValue.ToString();
+                    return param.AsValueString() ?? param.AsElementId().IntValue().ToString();
 #endif
                 default:
                     return "";
@@ -339,7 +340,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
             if (param.Id.Value == (long)BuiltInParameter.ELEM_TYPE_PARAM)
                 return true;
 #else
-            if (param.Id.IntegerValue == (int)BuiltInParameter.ELEM_TYPE_PARAM)
+            if (param.Id.IntValue() == (int)BuiltInParameter.ELEM_TYPE_PARAM)
                 return true;
 #endif
 

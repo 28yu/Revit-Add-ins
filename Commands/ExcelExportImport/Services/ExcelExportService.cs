@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Autodesk.Revit.DB;
+using Tools28;
 using ClosedXML.Excel;
 using Tools28.Commands.ExcelExportImport.Models;
 
@@ -115,7 +116,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
 #if REVIT2026
                     worksheet.Cell(row, 1).Value = elem.Id.Value;
 #else
-                    worksheet.Cell(row, 1).Value = elem.Id.IntegerValue;
+                    worksheet.Cell(row, 1).Value = elem.Id.IntValue();
 #endif
                     worksheet.Cell(row, 2).Value = category.Name;
 
@@ -218,7 +219,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
 #if REVIT2026
                     worksheet.Cell(row, 1).Value = elem.Id.Value;
 #else
-                    worksheet.Cell(row, 1).Value = elem.Id.IntegerValue;
+                    worksheet.Cell(row, 1).Value = elem.Id.IntValue();
 #endif
                     worksheet.Cell(row, 2).Value = category.Name;
 

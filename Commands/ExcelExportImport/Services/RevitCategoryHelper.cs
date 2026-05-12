@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using Autodesk.Revit.DB;
+using Tools28;
 using Tools28.Commands.ExcelExportImport.Models;
 
 namespace Tools28.Commands.ExcelExportImport.Services
@@ -34,7 +35,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
 #if REVIT2026
                     selectedCatIds.Add(e.Category.Id.Value);
 #else
-                    selectedCatIds.Add(e.Category.Id.IntegerValue);
+                    selectedCatIds.Add(e.Category.Id.IntValue());
 #endif
                 }
             }
@@ -55,8 +56,8 @@ namespace Tools28.Commands.ExcelExportImport.Services
                 var builtInCat = (BuiltInCategory)cat.Id.Value;
                 long catIdValue = cat.Id.Value;
 #else
-                var builtInCat = (BuiltInCategory)cat.Id.IntegerValue;
-                long catIdValue = cat.Id.IntegerValue;
+                var builtInCat = (BuiltInCategory)cat.Id.IntValue();
+                long catIdValue = cat.Id.IntValue();
 #endif
 
                 // 注釈カテゴリはパラメータエクスポートに有用なものだけ残す

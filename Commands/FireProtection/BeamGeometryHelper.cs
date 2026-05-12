@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Autodesk.Revit.DB;
+using Tools28;
 
 namespace Tools28.Commands.FireProtection
 {
@@ -25,7 +26,7 @@ namespace Tools28.Commands.FireProtection
             var fi = element as FamilyInstance;
             if (fi == null) return null;
 
-            if (element.Category.Id.IntegerValue ==
+            if (element.Category.Id.IntValue() ==
                 (int)BuiltInCategory.OST_StructuralFraming)
             {
                 var outline = GetBeamOutlineFromCurve(fi, offsetFeet);
@@ -33,7 +34,7 @@ namespace Tools28.Commands.FireProtection
             }
 
             // 柱: 下部オフセットなし
-            bool isColumn = element.Category.Id.IntegerValue ==
+            bool isColumn = element.Category.Id.IntValue() ==
                 (int)BuiltInCategory.OST_StructuralColumns;
             return GetOutlineFromBoundingBox(element, view, offsetFeet, isColumn);
         }
@@ -84,7 +85,7 @@ namespace Tools28.Commands.FireProtection
                 if (vp.Y > maxY) maxY = vp.Y;
             }
 
-            bool isCol = element.Category.Id.IntegerValue ==
+            bool isCol = element.Category.Id.IntValue() ==
                 (int)BuiltInCategory.OST_StructuralColumns;
 
             if (isCol)
