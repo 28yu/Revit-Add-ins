@@ -27,7 +27,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
             { BuiltInCategory.OST_StructuralFraming, "Category.StructuralFraming" },
             { BuiltInCategory.OST_StructuralFoundation, "Category.StructuralFoundation" },
             { BuiltInCategory.OST_StructuralTruss, "Category.StructuralTruss" },
-            { BuiltInCategory.OST_StructuralRebar, "Category.Rebar" },
+            { BuiltInCategory.OST_Rebar, "Category.Rebar" },
             { BuiltInCategory.OST_StructuralStiffener, "Category.Stiffener" },
             { BuiltInCategory.OST_Rooms, "Category.Rooms" },
             { BuiltInCategory.OST_Areas, "Category.Areas" },
