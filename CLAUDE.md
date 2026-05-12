@@ -1425,3 +1425,61 @@ Phase 1（有効期限）があれば自然解決:
 1. `Licensing/ExpiryManager.cs` の `ExpiryDate` を **1年後** に更新
 2. 上記更新を `Properties/AssemblyInfo.cs` のバージョン番号更新と同時に行う
 3. リリースノートに有効期限を明記
+
+## 多言語対応のよくあるバグパターン（開発知見）
+
+### ❌ 最頻出バグ: ローカライゼーションキー名の不一致
+
+**症状**: ダイアログに `Export.SelectCategory.Header` のようなキー文字列がそのまま表示される（英語に見える）
+
+**原因**: `ApplyLocalization()` 内の `Loc.S("...")` に渡すキー名が、辞書（StringsJP/EN/CN.cs）に実際に存在するキー名と違う
+
+**Loc.S() のフォールバック順**: 現在の言語辞書 → JP辞書 → キー文字列そのもの
+- キーが見つからないとキー文字列を返すため「英語っぽい」見た目になる
+
+**修正パターン**:
+```csharp
+// ❌ 辞書にないキー名
+grpCategory.Header = Loc.S("Export.SelectCategory.Header");  // 表示: "Export.SelectCategory.Header"
+// ✅ 辞書にあるキー名
+grpCategory.Header = Loc.S("Export.Category");              // 表示: "カテゴリ選択" / "Category" / "类别"
+```
+
+**チェック方法**: `ApplyLocalization()` 内の全 `Loc.S("...")` キーが `StringsJP.cs` に存在するか grep で確認
+```bash
+grep -o '"[^"]*"' YourDialog.xaml.cs | grep Loc.S | while read key; do grep $key Localization/StringsJP.cs; done
+```
+
+**過去に発生した不一致例**:
+| ダイアログ内の誤ったキー | 正しいキー |
+|---|---|
+| `Export.SelectCategory.Header` | `Export.Category` |
+| `Export.SplitByCategory` | `Export.SeparateSheets` |
+| `Export.ResetSettings` | `Export.RestoreSettings` |
+| `Import.OpenFiles` | `Import.OpenFile` |
+| `Import.SelectExcelFile` | `Import.SelectFile` |
+| `Import.ChangePreview` | `Import.Preview` |
+| `Import.Column.ElementId` | `Import.ColElementId` |
+| `Import.Column.Category` | `Import.ColCategory` |
+| `Import.Column.Parameter` | `Import.ColParameter` |
+| `Import.Column.CurrentValue` | `Import.ColCurrentValue` |
+| `Import.Column.NewValue` | `Import.ColNewValue` |
+
+### カテゴリ名ローカライズのアーキテクチャ（ExcelExportImport）
+
+- **`CategoryInfo.Name`**: Revit が提供するカテゴリ名（英語）。設定保存・サービス内部での使用に利用。**変更しないこと**。
+- **`CategoryInfo.DisplayLabel`**: UI 表示用。`CategoryLocalizer.GetLocalizedName()` 経由でローカライズ済み名 + 件数を返す。
+- **`CategoryLocalizer`** (`Commands/ExcelExportImport/Services/CategoryLocalizer.cs`): BuiltInCategory → `Category.*` Loc.S キーのマッピング。約60カテゴリをカバー。マッピングにないカテゴリは Revit 名（英語）にフォールバック。
+- **検索も DisplayLabel を含む**: `ExportDialog.xaml.cs` でフィルタ入力時は `Name` と `DisplayLabel` の両方を OR 検索。
+
+### テストビルドで `build/test` が 403 になる問題
+
+- `build/test` ブランチへの push はプロキシ制限で 403 エラーになる場合がある
+- **回避策**: 常に `build/test2` ブランチを使用する
+
+### 符号ON/OFFパネルのアイコンサイズ（GridBubble）
+
+- リボン通り芯・レベルパネルは `AddStackedItems()` で3ボタンを縦並びにしている
+- 使用アイコン: `both_16.png`, `left_16.png`, `right_16.png`（16×16px）
+- ボタンデータには `.Image`（16px）と `.LargeImage`（既存の大きいアイコン）の両方を設定
+- `_buttons["GridBubble*"]` は `stackedItems[i] as RibbonItem` でキャスト
