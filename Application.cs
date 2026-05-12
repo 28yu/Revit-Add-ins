@@ -202,13 +202,35 @@ namespace Tools28
             try
             {
                 string assemblyName = new AssemblyName(args.Name).Name;
+
+                // System/Framework アセンブリは解決しない（.NET 8 の resolver と競合してデッドロックの可能性）
+                if (assemblyName.StartsWith("System.", StringComparison.OrdinalIgnoreCase) ||
+                    assemblyName.StartsWith("Microsoft.", StringComparison.OrdinalIgnoreCase) ||
+                    assemblyName.StartsWith("Autodesk.", StringComparison.OrdinalIgnoreCase) ||
+                    assemblyName.StartsWith("PresentationCore", StringComparison.OrdinalIgnoreCase) ||
+                    assemblyName.StartsWith("PresentationFramework", StringComparison.OrdinalIgnoreCase) ||
+                    assemblyName.StartsWith("WindowsBase", StringComparison.OrdinalIgnoreCase) ||
+                    assemblyName.StartsWith("mscorlib", StringComparison.OrdinalIgnoreCase) ||
+                    assemblyName.StartsWith("netstandard", StringComparison.OrdinalIgnoreCase) ||
+                    assemblyName.EndsWith(".resources", StringComparison.OrdinalIgnoreCase))
+                {
+                    return null;
+                }
+
                 string assemblyDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+                if (string.IsNullOrEmpty(assemblyDir)) return null;
                 string dllPath = Path.Combine(assemblyDir, assemblyName + ".dll");
 
                 if (File.Exists(dllPath))
+                {
+                    DiagLog.Write($"AssemblyResolve: {assemblyName} を {dllPath} から読込");
                     return Assembly.LoadFrom(dllPath);
+                }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                DiagLog.Write($"AssemblyResolve 例外: {ex.Message}");
+            }
             return null;
         }
 

@@ -28,16 +28,14 @@ namespace Tools28.Commands.SheetCreation
 
         public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
         {
+            DiagLog.Cmd("SheetCreation", "Execute 開始");
             UIApplication uiapp = commandData.Application;
             UIDocument uidoc = uiapp.ActiveUIDocument;
             Document doc = uidoc.Document;
 
             try
             {
-                LogDebug("========================================");
-                LogDebug("=== シート一括作成コマンド実行開始 ===");
-                LogDebug("========================================");
-
+                DiagLog.Cmd("SheetCreation", "図枠検索開始");
                 // 図枠の存在確認
                 var titleBlocks = new FilteredElementCollector(doc)
                     .OfCategory(BuiltInCategory.OST_TitleBlocks)
@@ -45,7 +43,7 @@ namespace Tools28.Commands.SheetCreation
                     .Cast<FamilySymbol>()
                     .ToList();
 
-                LogDebug($"プロジェクト内の図枠数: {titleBlocks.Count}");
+                DiagLog.Cmd("SheetCreation", $"図枠数: {titleBlocks.Count}");
 
                 if (titleBlocks.Count == 0)
                 {
@@ -60,13 +58,13 @@ namespace Tools28.Commands.SheetCreation
                     return Result.Cancelled;
                 }
 
-                // ダイアログを表示
-                LogDebug("ダイアログ表示");
+                DiagLog.Cmd("SheetCreation", "Dialog コンストラクタ 直前");
                 SheetCreationDialog dialog = new SheetCreationDialog(doc);
+                DiagLog.Cmd("SheetCreation", "Dialog コンストラクタ 完了");
                 dialog.SetRevitOwner(commandData);
+                DiagLog.Cmd("SheetCreation", "SetRevitOwner 完了, ShowDialog 直前");
                 bool? dialogResult = dialog.ShowDialog();
-
-                LogDebug($"ダイアログ結果: {dialogResult}");
+                DiagLog.Cmd("SheetCreation", $"ShowDialog 戻り: {dialogResult}");
 
                 if (dialogResult != true)
                 {
