@@ -377,6 +377,11 @@ namespace Tools28.Localization
             { "Formwork.DeckSlabExcluded", "デッキスラブ {0} 個を型枠不要として除外しました（タイプ名に \"DS\" を含む床）" },
             { "Formwork.WallSweepExcluded", "壁スイープ・リビール {0} 個を型枠不要として除外しました" },
             { "Formwork.ExcludedFilterNote", "（除外要素は解析3Dビューの「型枠_除外」フィルタで非表示。表示 ON で確認可能）" },
+
+            { "Expiry.Title", "28 Tools - 使用期限" },
+            { "Expiry.ExpiredMessage", "このバージョンの使用期限（{0}）が切れました。\n\n最新版を以下からダウンロードしてください：\nhttps://28tools.com/addins.html" },
+            { "Expiry.WarningTitle", "28 Tools - 期限切れ間近" },
+            { "Expiry.WarningMessage", "このバージョンの使用期限まで残り {0} 日です（期限: {1}）。\n\n最新版へのアップデートをご検討ください：\nhttps://28tools.com/addins.html" },
         };
     }
 }

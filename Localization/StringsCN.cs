@@ -377,6 +377,11 @@ namespace Tools28.Localization
             { "Formwork.DeckSlabExcluded", "已排除 {0} 个压型钢板楼板（类型名称包含 \"DS\"）" },
             { "Formwork.WallSweepExcluded", "已排除 {0} 个墙饰条/凹槽（无需模板）" },
             { "Formwork.ExcludedFilterNote", "（排除的构件在分析三维视图中由「型枠_除外」过滤器隐藏，开启过滤器即可查看）" },
+
+            { "Expiry.Title", "28 Tools - 使用期限已到" },
+            { "Expiry.ExpiredMessage", "此版本的使用期限（{0}）已过。\n\n请从以下链接下载最新版本：\nhttps://28tools.com/addins.html" },
+            { "Expiry.WarningTitle", "28 Tools - 即将到期" },
+            { "Expiry.WarningMessage", "此版本将在 {0} 天后到期（到期日：{1}）。\n\n建议尽快更新到最新版本：\nhttps://28tools.com/addins.html" },
         };
     }
 }

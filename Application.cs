@@ -4,6 +4,7 @@ using Autodesk.Revit.UI;
 using System.Reflection;
 using System.Windows.Media.Imaging;
 using System.IO;
+using Tools28.Licensing;
 using Tools28.Localization;
 
 namespace Tools28
@@ -92,6 +93,15 @@ namespace Tools28
                 }
                 catch { }
 
+                if (ExpiryManager.IsExpired)
+                {
+                    TaskDialog.Show(
+                        Loc.S("Expiry.Title"),
+                        string.Format(Loc.S("Expiry.ExpiredMessage"),
+                            ExpiryManager.ExpiryDate.ToString("yyyy-MM-dd")));
+                    return Result.Succeeded;
+                }
+
                 string tabName = "28 Tools";
                 application.CreateRibbonTab(tabName);
 
@@ -108,6 +118,15 @@ namespace Tools28
 
                 Loc.LanguageChanged += UpdateRibbonLanguage;
                 UpdateRibbonLanguage();
+
+                if (ExpiryManager.ShouldShowWarning)
+                {
+                    TaskDialog.Show(
+                        Loc.S("Expiry.WarningTitle"),
+                        string.Format(Loc.S("Expiry.WarningMessage"),
+                            ExpiryManager.DaysRemaining,
+                            ExpiryManager.ExpiryDate.ToString("yyyy-MM-dd")));
+                }
 
                 return Result.Succeeded;
             }

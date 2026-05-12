@@ -377,6 +377,11 @@ namespace Tools28.Localization
             { "Formwork.DeckSlabExcluded", "Excluded {0} deck slabs (floor type name contains \"DS\")" },
             { "Formwork.WallSweepExcluded", "Excluded {0} wall sweeps/reveals (no formwork needed)" },
             { "Formwork.ExcludedFilterNote", "(Excluded elements are hidden by the \"Formwork_Excluded\" filter in the analysis 3D view. Toggle the filter ON to inspect them.)" },
+
+            { "Expiry.Title", "28 Tools - License Expired" },
+            { "Expiry.ExpiredMessage", "This version expired on {0}.\n\nPlease download the latest version from:\nhttps://28tools.com/addins.html" },
+            { "Expiry.WarningTitle", "28 Tools - Expiring Soon" },
+            { "Expiry.WarningMessage", "This version will expire in {0} days (on {1}).\n\nPlease consider updating to the latest version:\nhttps://28tools.com/addins.html" },
         };
     }
 }
