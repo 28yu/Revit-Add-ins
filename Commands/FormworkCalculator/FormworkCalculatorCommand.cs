@@ -31,6 +31,7 @@ namespace Tools28.Commands.FormworkCalculator
             try
             {
                 var dialog = new FormworkDialog(doc);
+                dialog.SetRevitOwner(commandData);
                 if (dialog.ShowDialog() != true)
                     return Result.Cancelled;
 

@@ -131,6 +131,7 @@ namespace Tools28.Commands.BeamUnderLevel
                 };
 
                 var dialog = new BeamUnderLevelDialog(dialogData);
+                dialog.SetRevitOwner(commandData);
                 bool? dialogResult = dialog.ShowDialog();
 
                 if (dialogResult != true)

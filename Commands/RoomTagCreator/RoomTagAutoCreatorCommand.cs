@@ -73,6 +73,7 @@ namespace Tools28.Commands.RoomTagCreator
 
                 // WPFダイアログ表示
                 var dialog = new RoomTagUI(doc, rooms, sourceView.Name);
+                dialog.SetRevitOwner(commandData);
                 bool? dialogResult = dialog.ShowDialog();
 
                 if (dialogResult != true)

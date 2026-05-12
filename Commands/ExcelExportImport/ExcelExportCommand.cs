@@ -34,6 +34,7 @@ namespace Tools28.Commands.ExcelExportImport
 
                 // 範囲選択ダイアログ
                 var scopeDialog = new ScopeSelectionDialog(hasActiveView, hasSelection);
+                scopeDialog.SetRevitOwner(commandData);
                 if (scopeDialog.ShowDialog() != true)
                     return Result.Cancelled;
 
@@ -41,6 +42,7 @@ namespace Tools28.Commands.ExcelExportImport
 
                 // エクスポートダイアログを表示（スコープを渡す）
                 var dialog = new ExportDialog(doc, scope, activeView, selectionIds);
+                dialog.SetRevitOwner(commandData);
                 bool? result = dialog.ShowDialog();
 
                 if (result != true)
