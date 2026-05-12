@@ -11,11 +11,26 @@ echo.
 REM Revit 起動中チェック (DLL ファイルロック回避)
 tasklist /FI "IMAGENAME eq Revit.exe" 2>nul | find /I "Revit.exe" >nul
 if errorlevel 1 goto revit_ok
-echo [NG] Revit が起動しています。
-echo Revit を終了してから再度このスクリプトを実行してください。
+echo [NG] Revit プロセスが検出されました。
 echo.
+echo 起動中の Revit プロセス:
+tasklist /FI "IMAGENAME eq Revit.exe" 2>nul
+echo.
+echo Revit を終了してから再度実行するか、強制終了してインストールを続行できます。
+echo.
+set /p kill_choice=Revit を強制終了して続行しますか？ (Y/N):
+if /I "%kill_choice%"=="Y" goto kill_revit
+echo.
+echo インストールを中止しました。Revit を終了してから再度実行してください。
 pause
 exit /b 1
+:kill_revit
+echo.
+echo Revit を強制終了します...
+taskkill /F /IM Revit.exe 2>nul
+timeout /T 2 /NOBREAK >nul
+echo [OK] Revit を終了しました。
+echo.
 :revit_ok
 
 REM パス設定
