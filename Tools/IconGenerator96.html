@@ -184,7 +184,7 @@ function downloadPNG() {
       const pngWithDpi = injectDPI(new Uint8Array(reader.result), 288);
       const a = document.createElement('a');
       a.href = URL.createObjectURL(new Blob([pngWithDpi], {type:'image/png'}));
-      a.download = (currentPreset || 'icon') + '_96.png';
+      a.download = (currentPreset || 'icon') + '.png';
       a.click();
     };
     reader.readAsArrayBuffer(blob);
