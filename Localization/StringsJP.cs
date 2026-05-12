@@ -101,7 +101,9 @@ namespace Tools28.Localization
 
             // === About ===
             { "About.Title", "28 Tools について" },
-            { "About.Message", "28 Tools\nバージョン: {0}\n\nRevit 向け業務効率化アドイン" },
+            { "About.Message", "28 Tools\nバージョン: {0}\n有効期限: {1} {2}\n\nRevit 向け業務効率化アドイン" },
+            { "About.RemainingSuffix", "(残り {0} 日)" },
+            { "About.ExpiredSuffix", "(期限切れ)" },
 
             // === SheetCreation Dialog ===
             { "Sheet.Title", "シート一括作成" },

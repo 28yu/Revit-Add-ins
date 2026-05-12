@@ -101,7 +101,9 @@ namespace Tools28.Localization
 
             // === About ===
             { "About.Title", "About 28 Tools" },
-            { "About.Message", "28 Tools\nVersion: {0}\n\nProductivity add-in for Revit" },
+            { "About.Message", "28 Tools\nVersion: {0}\nExpires: {1} {2}\n\nProductivity add-in for Revit" },
+            { "About.RemainingSuffix", "({0} days remaining)" },
+            { "About.ExpiredSuffix", "(Expired)" },
 
             // === SheetCreation Dialog ===
             { "Sheet.Title", "Batch Sheet Creation" },
