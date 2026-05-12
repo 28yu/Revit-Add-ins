@@ -12,6 +12,7 @@ namespace Tools28.Commands.GridBubble
     {
         public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
         {
+            DiagLog.Cmd("GridBubbleBoth", "Execute 開始");
             UIDocument uidoc = commandData.Application.ActiveUIDocument;
             Document doc = uidoc.Document;
 
