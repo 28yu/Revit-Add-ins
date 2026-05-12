@@ -40,17 +40,16 @@ namespace Tools28.Commands.ExcelExportImport.Views
         {
             this.Title = Loc.S("Import.Title");
             grpExcelFile.Header = Loc.S("Import.ExcelFile");
-            btnOpenFiles.Content = Loc.S("Import.OpenFiles");
+            btnOpenFiles.Content = Loc.S("Import.OpenFile");
             btnBrowse.Content = Loc.S("Import.Browse");
             grpSheetInfo.Header = Loc.S("Import.SheetInfo");
-            SheetInfoText.Text = Loc.S("Import.SelectExcelFile");
-            grpPreview.Header = Loc.S("Import.ChangePreview");
-            // DataGrid column headers
-            PreviewDataGrid.Columns[0].Header = Loc.S("Import.Column.ElementId");
-            PreviewDataGrid.Columns[1].Header = Loc.S("Import.Column.Category");
-            PreviewDataGrid.Columns[2].Header = Loc.S("Import.Column.Parameter");
-            PreviewDataGrid.Columns[3].Header = Loc.S("Import.Column.CurrentValue");
-            PreviewDataGrid.Columns[4].Header = Loc.S("Import.Column.NewValue");
+            SheetInfoText.Text = Loc.S("Import.SelectFile");
+            grpPreview.Header = Loc.S("Import.Preview");
+            PreviewDataGrid.Columns[0].Header = Loc.S("Import.ColElementId");
+            PreviewDataGrid.Columns[1].Header = Loc.S("Import.ColCategory");
+            PreviewDataGrid.Columns[2].Header = Loc.S("Import.ColParameter");
+            PreviewDataGrid.Columns[3].Header = Loc.S("Import.ColCurrentValue");
+            PreviewDataGrid.Columns[4].Header = Loc.S("Import.ColNewValue");
             ImportButton.Content = Loc.S("Import.Execute");
             btnCancel.Content = Loc.S("Common.Cancel");
         }
