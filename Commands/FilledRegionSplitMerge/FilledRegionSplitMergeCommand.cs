@@ -51,6 +51,7 @@ namespace Tools28.Commands.FilledRegionSplitMerge
 
                 // ステップ5: ダイアログ表示
                 var dialog = new FilledRegionSplitMergeDialog(analysis);
+                dialog.SetRevitOwner(commandData);
                 var dialogResult = dialog.ShowDialog();
 
                 if (dialogResult != true)

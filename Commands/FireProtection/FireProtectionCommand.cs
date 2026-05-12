@@ -201,6 +201,7 @@ namespace Tools28.Commands.FireProtection
                 };
 
                 var dialog = new FireProtectionDialog(dialogData);
+                dialog.SetRevitOwner(commandData);
                 if (dialog.ShowDialog() != true)
                     return Result.Cancelled;
 

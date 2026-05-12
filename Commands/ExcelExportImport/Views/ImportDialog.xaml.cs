@@ -191,6 +191,7 @@ namespace Tools28.Commands.ExcelExportImport.Views
                 }
             };
 
+            selectWindow.Owner = this;
             if (selectWindow.ShowDialog() == true && selectedPath != null)
             {
                 _selectedFilePath = selectedPath;
@@ -207,7 +208,7 @@ namespace Tools28.Commands.ExcelExportImport.Views
                 DefaultExt = ".xlsx"
             };
 
-            if (dialog.ShowDialog() == true)
+            if (dialog.ShowDialog(this) == true)
             {
                 _selectedFilePath = dialog.FileName;
                 FilePathTextBox.Text = _selectedFilePath;

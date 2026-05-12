@@ -106,6 +106,7 @@ namespace Tools28.Commands.BeamTopLevel
                 };
 
                 var dialog = new BeamTopLevelDialog(dialogData);
+                dialog.SetRevitOwner(commandData);
                 bool? dialogResult = dialog.ShowDialog();
 
                 if (dialogResult != true)

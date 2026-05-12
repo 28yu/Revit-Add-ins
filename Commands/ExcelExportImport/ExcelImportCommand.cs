@@ -24,6 +24,7 @@ namespace Tools28.Commands.ExcelExportImport
             {
                 // インポートダイアログを表示
                 var dialog = new ImportDialog(doc);
+                dialog.SetRevitOwner(commandData);
                 bool? result = dialog.ShowDialog();
 
                 if (result != true || !dialog.ImportExecuted)

@@ -74,27 +74,38 @@ namespace Tools28
             { "Manual", "Ribbon.Settings.Manual.Tip" },
         };
 
+        private static readonly string DebugLogPath = @"C:\temp\Tools28_debug.txt";
+
+        private static void Log(string msg)
+        {
+            try
+            {
+                Directory.CreateDirectory(@"C:\temp");
+                File.AppendAllText(DebugLogPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {msg}\n");
+            }
+            catch { }
+        }
+
         public Result OnStartup(UIControlledApplication application)
         {
             AppDomain.CurrentDomain.AssemblyResolve += OnAssemblyResolve;
 
             try
             {
-                string debugLogPath = @"C:\temp\Tools28_debug.txt";
                 try
                 {
-                    Directory.CreateDirectory(@"C:\temp");
                     var asm = Assembly.GetExecutingAssembly();
-                    string logContent = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] OnStartup 開始\n"
-                        + $"  DLL場所: {asm.Location}\n"
-                        + $"  DLLバージョン: {asm.GetName().Version}\n"
-                        + $"  DLL更新日時: {File.GetLastWriteTime(asm.Location):yyyy-MM-dd HH:mm:ss}\n";
-                    File.AppendAllText(debugLogPath, logContent);
+                    Log("OnStartup 開始");
+                    Log($"  DLL場所: {asm.Location}");
+                    Log($"  DLLバージョン: {asm.GetName().Version}");
+                    Log($"  DLL更新日時: {File.GetLastWriteTime(asm.Location):yyyy-MM-dd HH:mm:ss}");
+                    Log($"  .NET ランタイム: {System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription}");
                 }
                 catch { }
 
                 if (ExpiryManager.IsExpired)
                 {
+                    Log("有効期限切れのため終了");
                     TaskDialog.Show(
                         Loc.S("Expiry.Title"),
                         string.Format(Loc.S("Expiry.ExpiredMessage"),
@@ -104,6 +115,7 @@ namespace Tools28
 
                 string tabName = "28 Tools";
                 application.CreateRibbonTab(tabName);
+                Log("リボンタブ作成完了");
 
                 string assemblyPath = Assembly.GetExecutingAssembly().Location;
 
@@ -115,9 +127,11 @@ namespace Tools28
                 CreateQuantityPanel(application, tabName, assemblyPath);
                 CreateExcelPanel(application, tabName, assemblyPath);
                 CreateSettingsPanel(application, tabName, assemblyPath);
+                Log("全パネル作成完了");
 
                 Loc.LanguageChanged += UpdateRibbonLanguage;
                 UpdateRibbonLanguage();
+                Log("OnStartup 完了");
 
                 if (ExpiryManager.ShouldShowWarning)
                 {
@@ -132,6 +146,7 @@ namespace Tools28
             }
             catch (Exception ex)
             {
+                Log($"OnStartup 例外: {ex}");
                 TaskDialog.Show(Loc.S("Common.Error"), string.Format(Loc.S("App.StartupFailed"), ex.Message));
                 return Result.Failed;
             }

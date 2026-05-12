@@ -301,7 +301,7 @@ namespace Tools28.Commands.ExcelExportImport.Views
                 FileName = "ExcelExportSettings"
             };
 
-            if (dialog.ShowDialog() == true)
+            if (dialog.ShowDialog(this) == true)
             {
                 try
                 {
@@ -325,7 +325,7 @@ namespace Tools28.Commands.ExcelExportImport.Views
                 DefaultExt = ".json"
             };
 
-            if (dialog.ShowDialog() == true)
+            if (dialog.ShowDialog(this) == true)
             {
                 try
                 {

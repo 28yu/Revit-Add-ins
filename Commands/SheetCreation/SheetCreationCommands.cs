@@ -63,6 +63,7 @@ namespace Tools28.Commands.SheetCreation
                 // ダイアログを表示
                 LogDebug("ダイアログ表示");
                 SheetCreationDialog dialog = new SheetCreationDialog(doc);
+                dialog.SetRevitOwner(commandData);
                 bool? dialogResult = dialog.ShowDialog();
 
                 LogDebug($"ダイアログ結果: {dialogResult}");
