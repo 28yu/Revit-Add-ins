@@ -262,6 +262,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 case CategoryGroup.Slab: return "スラブ";
                 case CategoryGroup.Foundation: return "基礎";
                 case CategoryGroup.Stairs: return "階段";
+                case CategoryGroup.Roof: return "屋根";
                 default: return "他";
             }
         }
@@ -398,6 +399,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             bool isFoundation = ElementCollector.ToCategoryGroup(elem) == CategoryGroup.Foundation;
             bool isSlab = ElementCollector.ToCategoryGroup(elem) == CategoryGroup.Slab;
             bool isWall = ElementCollector.ToCategoryGroup(elem) == CategoryGroup.Wall;
+            bool isRoof = ElementCollector.ToCategoryGroup(elem) == CategoryGroup.Roof;
 
             if (!isFoundation)
             {
@@ -410,11 +412,13 @@ namespace Tools28.Commands.FormworkCalculator.Engine
 
             // 床(スラブ)・構造基礎・壁の天端は常に型枠不要: 段差・凹み・リビール溝底を含め
             // 全ての上向き水平面を除外する (上側はコンクリート打設時に開放されているため)
-            if (isSlab || isFoundation || isWall)
+            // 屋根は勾配を持つ場合があるため、勾配付き上向き面 (nz>0.1) も上面とみなして除外する
+            if (isSlab || isFoundation || isWall || isRoof)
             {
+                double upTol = isRoof ? 0.1 : 0.99;
                 foreach (var fi in faceInfos)
                 {
-                    if (fi.Normal != null && fi.Normal.Z > 0.99 &&
+                    if (fi.Normal != null && fi.Normal.Z > upTol &&
                         fi.FaceType == FaceType.FormworkRequired)
                     {
                         fi.FaceType = FaceType.DeductedTop;
@@ -552,6 +556,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 bool isFoundation = ElementCollector.ToCategoryGroup(elem) == CategoryGroup.Foundation;
                 bool isSlab = ElementCollector.ToCategoryGroup(elem) == CategoryGroup.Slab;
                 bool isWall = ElementCollector.ToCategoryGroup(elem) == CategoryGroup.Wall;
+                bool isRoof = ElementCollector.ToCategoryGroup(elem) == CategoryGroup.Roof;
 
                 if (!isFoundation)
                 {
@@ -562,11 +567,12 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                     }
                 }
 
-                if (isSlab || isFoundation || isWall)
+                if (isSlab || isFoundation || isWall || isRoof)
                 {
+                    double upTol = isRoof ? 0.1 : 0.99;
                     foreach (var f in faces)
                     {
-                        if (f.Normal != null && f.Normal.Z > 0.99 &&
+                        if (f.Normal != null && f.Normal.Z > upTol &&
                             f.FaceType == FaceType.FormworkRequired)
                         {
                             f.FaceType = FaceType.DeductedTop;

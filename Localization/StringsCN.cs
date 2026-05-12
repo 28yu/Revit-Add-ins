@@ -342,7 +342,7 @@ namespace Tools28.Localization
             { "Formwork.Scope.Project", "整个项目" },
             { "Formwork.Scope.View", "当前视图中可见的构件" },
             { "Formwork.Group.Header", "汇总分组" },
-            { "Formwork.Group.Category", "按部位（柱·梁·墙·板·基础·楼梯）" },
+            { "Formwork.Group.Category", "按部位（柱·梁·墙·板·基础·楼梯·屋顶）" },
             { "Formwork.Group.Zone", "按施工区" },
             { "Formwork.Group.Type", "按模板种类" },
             { "Formwork.Group.ParamName", "参数名称:" },
@@ -378,6 +378,7 @@ namespace Tools28.Localization
             { "Formwork.SteelExcluded", "已排除 {0} 个钢构件（无需模板）" },
             { "Formwork.DeckSlabExcluded", "已排除 {0} 个压型钢板楼板（类型名称包含 \"DS\"）" },
             { "Formwork.WallSweepExcluded", "已排除 {0} 个墙饰条/凹槽（无需模板）" },
+            { "Formwork.SteelStairExcluded", "已排除 {0} 个钢楼梯（类型/材质包含钢相关关键字）" },
             { "Formwork.ExcludedFilterNote", "（排除的构件在分析三维视图中由「型枠_除外」过滤器隐藏，开启过滤器即可查看）" },
 
             // === Excel 导出类别名称 ===

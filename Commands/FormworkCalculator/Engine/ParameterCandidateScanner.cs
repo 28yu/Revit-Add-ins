@@ -58,6 +58,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 BuiltInCategory.OST_Floors,
                 BuiltInCategory.OST_StructuralFoundation,
                 BuiltInCategory.OST_Stairs,
+                BuiltInCategory.OST_Roofs,
                 BuiltInCategory.OST_Columns,
                 BuiltInCategory.OST_GenericModel,
             };

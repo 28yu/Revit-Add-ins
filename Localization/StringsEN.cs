@@ -342,7 +342,7 @@ namespace Tools28.Localization
             { "Formwork.Scope.Project", "Entire project" },
             { "Formwork.Scope.View", "Elements visible in the current view" },
             { "Formwork.Group.Header", "Grouping" },
-            { "Formwork.Group.Category", "By category (Columns / Beams / Walls / Slabs / Foundations / Stairs)" },
+            { "Formwork.Group.Category", "By category (Columns / Beams / Walls / Slabs / Foundations / Stairs / Roofs)" },
             { "Formwork.Group.Zone", "By zone" },
             { "Formwork.Group.Type", "By formwork type" },
             { "Formwork.Group.ParamName", "Parameter name:" },
@@ -378,6 +378,7 @@ namespace Tools28.Localization
             { "Formwork.SteelExcluded", "Excluded {0} steel members (no formwork needed)" },
             { "Formwork.DeckSlabExcluded", "Excluded {0} deck slabs (floor type name contains \"DS\")" },
             { "Formwork.WallSweepExcluded", "Excluded {0} wall sweeps/reveals (no formwork needed)" },
+            { "Formwork.SteelStairExcluded", "Excluded {0} steel stairs (type/material contains steel keyword)" },
             { "Formwork.ExcludedFilterNote", "(Excluded elements are hidden by the \"Formwork_Excluded\" filter in the analysis 3D view. Toggle the filter ON to inspect them.)" },
 
             // === Excel Export Category Names ===

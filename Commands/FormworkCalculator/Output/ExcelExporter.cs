@@ -206,6 +206,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 case CategoryGroup.Slab: return "スラブ";
                 case CategoryGroup.Foundation: return "基礎";
                 case CategoryGroup.Stairs: return "階段";
+                case CategoryGroup.Roof: return "屋根";
                 default: return "その他";
             }
         }

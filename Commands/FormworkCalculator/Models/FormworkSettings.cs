@@ -44,6 +44,10 @@ namespace Tools28.Commands.FormworkCalculator.Models
         // 暗黙挙動として常に true。デバッグ時のみ false にできる (UI には露出しない)。
         public bool ExcludeSteelMembers { get; set; } = true;
 
+        // 階段カテゴリから鉄骨階段 (タイプ名・マテリアルに鉄骨キーワードを含む) を自動除外する。
+        // 暗黙挙動として常に true。デバッグ時のみ false にできる (UI には露出しない)。
+        public bool ExcludeSteelStairs { get; set; } = true;
+
         public List<string> IncludedCategories { get; set; } = new List<string>
         {
             "StructuralColumns",
@@ -52,6 +56,7 @@ namespace Tools28.Commands.FormworkCalculator.Models
             "Floors",
             "StructuralFoundation",
             "Stairs",
+            "Roofs",
         };
 
         public string ExcelOutputPath { get; set; } = string.Empty;

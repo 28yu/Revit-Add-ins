@@ -34,6 +34,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 { CategoryGroup.Slab,       (250, 220, 60) },
                 { CategoryGroup.Foundation, (160, 100, 220) },
                 { CategoryGroup.Stairs,     (60, 200, 220) },
+                { CategoryGroup.Roof,       (220, 100, 140) },
                 { CategoryGroup.Other,      (180, 180, 180) },
             };
 
@@ -550,6 +551,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 case ExclusionKind.Steel: return FormworkParameterManager.SteelExcludedLabel;
                 case ExclusionKind.DeckSlab: return FormworkParameterManager.DeckSlabExcludedLabel;
                 case ExclusionKind.WallSweep: return FormworkParameterManager.WallSweepExcludedLabel;
+                case ExclusionKind.SteelStair: return FormworkParameterManager.SteelStairExcludedLabel;
                 default: return FormworkParameterManager.SteelExcludedLabel;
             }
         }
@@ -624,6 +626,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 case CategoryGroup.Slab: return "スラブ";
                 case CategoryGroup.Foundation: return "基礎";
                 case CategoryGroup.Stairs: return "階段";
+                case CategoryGroup.Roof: return "屋根";
                 default: return "その他";
             }
         }

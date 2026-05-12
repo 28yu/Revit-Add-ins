@@ -36,6 +36,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 { "Floors", BuiltInCategory.OST_Floors },
                 { "StructuralFoundation", BuiltInCategory.OST_StructuralFoundation },
                 { "Stairs", BuiltInCategory.OST_Stairs },
+                { "Roofs", BuiltInCategory.OST_Roofs },
             };
 
         internal static CollectionResult CollectAndClassify(
@@ -45,10 +46,12 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             var cr = new CollectionResult();
 
             bool exclude = settings?.ExcludeSteelMembers ?? true;
+            bool excludeStair = settings?.ExcludeSteelStairs ?? true;
 
-            FormworkDebugLog.Section("Exclusion Detection (Steel + DeckSlab)");
+            FormworkDebugLog.Section("Exclusion Detection (Steel + DeckSlab + SteelStair)");
             int steelCount = 0;
             int deckCount = 0;
+            int steelStairCount = 0;
             foreach (var elem in raw)
             {
                 if (exclude)
@@ -87,6 +90,28 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                         }
                     }
 
+                    // 階段カテゴリ → 鉄骨階段判定 (タイプ名・マテリアルに鉄骨キーワード)
+                    if (excludeStair && IsStairDetectionTarget(elem))
+                    {
+                        var stairRes = SteelStairDetector.Detect(elem, doc);
+                        if (stairRes != null && stairRes.IsSteel)
+                        {
+                            cr.Excluded.Add(new ExcludedEntry
+                            {
+                                Element = elem,
+                                Kind = ExclusionKind.SteelStair,
+                                Layer = stairRes.Layer,
+                                Reason = stairRes.Reason ?? string.Empty,
+                            });
+                            FormworkDebugLog.Log(
+                                $"  [SteelStairExclude] E{elem.Id.IntValue()} " +
+                                $"Cat={elem.Category?.Name} Name='{elem.Name}' " +
+                                $"L={stairRes.Layer} reason={stairRes.Reason}");
+                            steelStairCount++;
+                            continue;
+                        }
+                    }
+
                     // 床カテゴリ → デッキスラブ判定 (タイプ名/要素名に "DS" を含む)
                     if (IsDeckSlabDetectionTarget(elem))
                     {
@@ -111,7 +136,8 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             }
             FormworkDebugLog.Log(
                 $"  Exclusion detection: total={raw.Count} steelExcluded={steelCount} " +
-                $"deckSlabExcluded={deckCount} kept={cr.Targets.Count}");
+                $"deckSlabExcluded={deckCount} steelStairExcluded={steelStairCount} " +
+                $"kept={cr.Targets.Count}");
             FormworkDebugLog.Flush();
 
             return cr;
@@ -135,6 +161,15 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         {
             if (elem?.Category == null) return false;
             return elem.Category.Id.IntValue() == (int)BuiltInCategory.OST_Floors;
+        }
+
+        /// <summary>
+        /// 鉄骨階段検出の対象カテゴリ判定。階段のみ対象とする。
+        /// </summary>
+        private static bool IsStairDetectionTarget(Element elem)
+        {
+            if (elem?.Category == null) return false;
+            return elem.Category.Id.IntValue() == (int)BuiltInCategory.OST_Stairs;
         }
 
         internal static List<Element> Collect(Document doc, FormworkSettings settings, View activeView)
@@ -206,6 +241,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 case BuiltInCategory.OST_Floors: return CategoryGroup.Slab;
                 case BuiltInCategory.OST_StructuralFoundation: return CategoryGroup.Foundation;
                 case BuiltInCategory.OST_Stairs: return CategoryGroup.Stairs;
+                case BuiltInCategory.OST_Roofs: return CategoryGroup.Roof;
                 default: return CategoryGroup.Other;
             }
         }
