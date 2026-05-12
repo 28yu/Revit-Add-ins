@@ -101,7 +101,9 @@ namespace Tools28.Localization
 
             // === About ===
             { "About.Title", "关于 28 Tools" },
-            { "About.Message", "28 Tools\n版本: {0}\n\nRevit 业务效率化插件" },
+            { "About.Message", "28 Tools\n版本: {0}\n有效期至: {1} {2}\n\nRevit 业务效率化插件" },
+            { "About.RemainingSuffix", "(剩余 {0} 天)" },
+            { "About.ExpiredSuffix", "(已过期)" },
 
             // === SheetCreation Dialog ===
             { "Sheet.Title", "批量创建图纸" },
