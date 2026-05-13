@@ -127,7 +127,7 @@ namespace Tools28.Commands.FormworkCalculator
                             {
                                 // 結果に含まれる全ソース (ホスト・各リンク) を列挙し
                                 // それぞれに対して個別の集計表を作成する。
-                                // - リンクなし: 「型枠数量集計」(従来通り)
+                                // - リンクなし or ソース 1 種類のみ: 「型枠数量集計」 (従来通り)
                                 // - リンクあり: 「型枠数量集計 - ホスト」「型枠数量集計 - 構造_A棟」等
                                 var sources = result.ElementResults
                                     .Select(er => string.IsNullOrEmpty(er.SourceName)
@@ -138,6 +138,11 @@ namespace Tools28.Commands.FormworkCalculator
                                     .ThenBy(s => s)
                                     .ToList();
 
+                                FormworkDebugLog.Log(
+                                    $"  [Sched] schedule creation: sources={sources.Count} " +
+                                    $"[{string.Join(", ", sources)}] " +
+                                    $"elementResults={result.ElementResults.Count}");
+
                                 if (sources.Count <= 1)
                                 {
                                     // ホストのみ (リンク無し or リンク要素なし)
@@ -147,11 +152,28 @@ namespace Tools28.Commands.FormworkCalculator
                                 {
                                     // ホスト + リンク: ソース毎に個別の集計表を作る
                                     // メインの scheduleViewId はホストの集計表を指す
+                                    bool first = true;
                                     foreach (var srcName in sources)
                                     {
-                                        var id = ScheduleCreator.CreateSchedule(doc, result, srcName);
-                                        if (srcName == ElementSourceRegistry.HostSourceName)
+                                        ElementId id = null;
+                                        try
+                                        {
+                                            id = ScheduleCreator.CreateSchedule(doc, result, srcName);
+                                            FormworkDebugLog.Log(
+                                                $"  [Sched] created schedule for source '{srcName}': id={id?.IntValue() ?? -1}");
+                                        }
+                                        catch (Exception schEx)
+                                        {
+                                            FormworkDebugLog.Log(
+                                                $"  [Sched] FAILED to create schedule for '{srcName}': {schEx.Message}");
+                                        }
+                                        if (first && id != null)
+                                        {
+                                            // 最初のソースの集計表をメインの scheduleViewId として扱う
+                                            // (通常はホストが先頭に並ぶように OrderBy で並べている)
                                             scheduleViewId = id;
+                                            first = false;
+                                        }
                                     }
                                 }
                                 // 動的合計サマリ集計表 (ホスト・リンク別の小計 + 全体合計)

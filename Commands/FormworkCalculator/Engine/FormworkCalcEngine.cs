@@ -158,9 +158,11 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 }
             }
 
-            // 壁スイープ・リビールを ElementResults から除外し ExcludedResults に移す
-            // (Pass 2 で Wall の top 面に対する contact deduction を有効化した後に実施)
-            MoveWallSweepsToExcluded(collection.Registry, result);
+            // 壁スイープ・リビールの ElementResult はそのまま残す。
+            // スイープ自体の外側面 (前/上/下/端部) は型枠が必要な部分なので、
+            // 通常の躯体要素と同様に DirectShape として可視化・集計する。
+            // (旧実装では ExcludedResults に移していたが、スイープ面の型枠が
+            //  算出されない問題があったため除去)
 
             // 診断ログ: 各要素の集計結果を一覧出力 (⚠️ マーカーで疑わしい要素を強調)
             LogElementDiagnostics(collection.Registry, contexts, result);

@@ -69,15 +69,11 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 string sSrc = sourceByCtxId.TryGetValue(sCtx.ElementId, out var sn)
                     ? sn : ElementSourceRegistry.HostSourceName;
 
-                // リンク要素は対象外 (リンク内の wall は wall solid 自体に reveal カットが
-                // 反映されている前提で、groove 面を FormworkRequired のまま残す)。
-                // ホスト sweep ↔ host wall のペアのみ控除を実行。
-                if (sSrc != ElementSourceRegistry.HostSourceName) continue;
-
                 foreach (var wCtx in wallCtxs)
                 {
                     if (wCtx.BB == null) continue;
-                    // ソースが異なる場合はスキップ (host sweep ↔ link wall の誤マッチを防ぐ)
+                    // ソースが異なる場合はスキップ (host sweep ↔ link wall の誤マッチを防ぐ)。
+                    // ホスト同士・同一リンク同士のペアのみ控除を実行する。
                     string wSrc = sourceByCtxId.TryGetValue(wCtx.ElementId, out var wn)
                         ? wn : ElementSourceRegistry.HostSourceName;
                     if (sSrc != wSrc) continue;
