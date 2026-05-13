@@ -339,19 +339,18 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                         if (seenIds.Add(e.Id.IntValue())) result.Add(e);
                     }
 
-                    // WallSweep は host のみ追加 (リンクからは除外: 接触検出ロジックの依存を回避)
-                    if (!isLinked)
+                    // WallSweep (壁スイープ・リビール) も追加。リンクモデルの WallSweep も
+                    // 含めることで、リンクの壁にリビールが入っている場合の面分類・接触検出を
+                    // ホストの壁と同じロジックで処理できる。
+                    FilteredElementCollector swCol = useViewFilter
+                        ? new FilteredElementCollector(doc, activeView.Id)
+                        : new FilteredElementCollector(doc);
+                    var sweeps = swCol.OfClass(typeof(WallSweep))
+                        .WhereElementIsNotElementType()
+                        .ToList();
+                    foreach (var sw in sweeps)
                     {
-                        FilteredElementCollector swCol = useViewFilter
-                            ? new FilteredElementCollector(doc, activeView.Id)
-                            : new FilteredElementCollector(doc);
-                        var sweeps = swCol.OfClass(typeof(WallSweep))
-                            .WhereElementIsNotElementType()
-                            .ToList();
-                        foreach (var sw in sweeps)
-                        {
-                            if (seenIds.Add(sw.Id.IntValue())) result.Add(sw);
-                        }
+                        if (seenIds.Add(sw.Id.IntValue())) result.Add(sw);
                     }
                 }
                 else

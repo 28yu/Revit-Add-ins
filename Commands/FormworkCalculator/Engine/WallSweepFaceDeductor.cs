@@ -28,17 +28,25 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             if (contexts == null || contexts.Count == 0) return;
 
             // WallSweep / Wall を分離 (registry 経由 → fallback doc.GetElement)
+            // 各 context にソース名 (ホスト名 or リンク名) を付与し、同じソース内でのみ
+            // sweep⇔wall を組み合わせる (ホスト sweep がリンク wall を控除する誤動作を防ぐ)。
             var sweepCtxs = new List<ContactFaceDetector.ElementFacesContext>();
             var wallCtxs = new List<ContactFaceDetector.ElementFacesContext>();
+            var sourceByCtxId = new Dictionary<int, string>();
             foreach (var ctx in contexts)
             {
                 Element elem = null;
+                string sourceName = ElementSourceRegistry.HostSourceName;
                 if (srcByContext != null && srcByContext.TryGetValue(ctx.ElementId, out var src))
+                {
                     elem = src.Element;
+                    sourceName = src.SourceName ?? ElementSourceRegistry.HostSourceName;
+                }
                 if (elem == null)
                 {
                     try { elem = doc.GetElement(new ElementId(ctx.ElementId)); } catch { }
                 }
+                sourceByCtxId[ctx.ElementId] = sourceName;
                 if (elem is WallSweep) sweepCtxs.Add(ctx);
                 else if (elem is Wall) wallCtxs.Add(ctx);
             }
@@ -58,10 +66,16 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             {
                 if (sCtx.BB == null) continue;
                 var sBb = ExpandBox(sCtx.BB, BoxToleranceFeet);
+                string sSrc = sourceByCtxId.TryGetValue(sCtx.ElementId, out var sn)
+                    ? sn : ElementSourceRegistry.HostSourceName;
 
                 foreach (var wCtx in wallCtxs)
                 {
                     if (wCtx.BB == null) continue;
+                    // ソースが異なる場合はスキップ (host sweep ↔ link wall の誤マッチを防ぐ)
+                    string wSrc = sourceByCtxId.TryGetValue(wCtx.ElementId, out var wn)
+                        ? wn : ElementSourceRegistry.HostSourceName;
+                    if (sSrc != wSrc) continue;
                     if (!BoxesOverlap(sBb, wCtx.BB)) continue;
 
                     int wallChanges = 0;

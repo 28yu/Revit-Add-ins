@@ -214,16 +214,23 @@ namespace Tools28.Commands.FormworkCalculator.Output
 
             FormworkDebugLog.Section("Summary Schedule Creation");
 
-            // 件数 + 面積の 2 フィールド (面積は合計を計算)
+            // フィールド: 件数 / ソース / 面積。
+            // 「ソース」でグループ化することで、ホスト・各リンクモデル毎に 1 行ずつ表示し、
+            // 末尾に ShowGrandTotal による全体合計を表示する。
             var countField = AddCountField(def, schedulable);
+            var sourceField = AddField(doc, def, schedulable, paramIds, FormworkParameterManager.ParamSource);
             var areaField = AddField(doc, def, schedulable, paramIds, FormworkParameterManager.ParamArea);
 
-            // 列ヘッダーに styled なラベルを設定 (Revit API は Body 行 0 のスタイル変更を許可)
-            // 型枠オブジェクト削除に追従する動的値は、すぐ下のデータ行 (Body 行 1) で表示される
+            // 列ヘッダーに styled なラベルを設定
             if (countField != null)
             {
                 try { countField.ColumnHeading = "件数(合計)"; }
                 catch (Exception ex) { LogEx("countField.ColumnHeading", ex); }
+            }
+            if (sourceField != null)
+            {
+                try { sourceField.ColumnHeading = "ソース"; }
+                catch (Exception ex) { LogEx("summary sourceField.ColumnHeading", ex); }
             }
             if (areaField != null)
             {
@@ -249,10 +256,29 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 catch (Exception ex) { LogEx("summary marker filter", ex); }
             }
 
-            // 集計モード: アイテム別表示無効 + 総合計行は不要 (1 行で全件集計するため)
+            // ソースでソート (ホスト → リンク名順)。グループ見出し/フッターは非表示
+            // (IsItemized=false により、ソースごとに 1 行に集約される)
+            if (sourceField != null)
+            {
+                try
+                {
+                    var sortSource = new ScheduleSortGroupField(sourceField.FieldId)
+                    {
+                        ShowHeader = false,
+                        ShowFooter = false,
+                        ShowBlankLine = false,
+                        SortOrder = ScheduleSortOrder.Ascending,
+                    };
+                    def.AddSortGroupField(sortSource);
+                }
+                catch (Exception ex) { LogEx("summary sourceField sortGroup", ex); }
+            }
+
+            // 集計モード: アイテム別表示無効 + 総合計行を表示 (ソース毎の小計 + 全体合計)
             try { def.IsItemized = false; }
             catch (Exception ex) { LogEx("summary IsItemized=false", ex); }
-            try { def.ShowGrandTotal = false; } catch { }
+            try { def.ShowGrandTotal = true; } catch { }
+            SetGrandTotalTitle(def, "全体合計", showTitle: true, showCount: true);
 
             // フィールド追加後に再設定 (Revit が状態を上書きする場合の保険)
             if (areaField != null)
