@@ -172,11 +172,13 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 catLabelByKey.TryGetValue(key, out var catLabel);
                 catLabel = catLabel ?? CategoryLabel(er.Category);
 
-                // 要素のレベル名を取得
+                // 要素のレベル名を取得 (リンク要素はリンクドキュメント経由)
                 string levelName = string.Empty;
                 try
                 {
-                    var srcElem = doc.GetElement(new ElementId(er.ElementId));
+                    var registry = result.SourceRegistry as Engine.ElementSourceRegistry;
+                    var src = registry?.Get(er.ElementId);
+                    var srcElem = src?.Element ?? doc.GetElement(new ElementId(er.ElementId));
                     levelName = Engine.ElementCollector.GetElementLevelName(srcElem);
                 }
                 catch { }
@@ -298,7 +300,9 @@ namespace Tools28.Commands.FormworkCalculator.Output
                                 }
                                 string filterKey = IsDeducted(fi.FaceType) ? "控除面" : key;
                                 FormworkParameterManager.SetInstanceValues(
-                                    ds, catLabel, levelName, filterKey, areaM2, faceHasPartialContact);
+                                    ds, catLabel, levelName, filterKey, areaM2,
+                                    faceHasPartialContact,
+                                    sourceName: er.SourceName);
                                 areaM2ThisDs = areaM2;
                             }
                             catch { }
@@ -491,13 +495,24 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 return;
 
             int created = 0;
+            var registry = result.SourceRegistry as Engine.ElementSourceRegistry;
             foreach (var ex in result.ExcludedResults)
             {
                 Element src = null;
-                try { src = doc.GetElement(new ElementId(ex.ElementId)); } catch { }
+                Transform xform = Transform.Identity;
+                var elemSrc = registry?.Get(ex.ElementId);
+                if (elemSrc != null)
+                {
+                    src = elemSrc.Element;
+                    xform = elemSrc.Transform;
+                }
+                if (src == null)
+                {
+                    try { src = doc.GetElement(new ElementId(ex.ElementId)); } catch { }
+                }
                 if (src == null) continue;
 
-                var solids = SolidUnionProcessor.GetSolids(src);
+                var solids = SolidUnionProcessor.GetSolids(src, xform);
                 if (solids.Count == 0) continue;
 
                 // Union を試みる（複数 Solid を 1 シェイプにまとめる）。失敗時は個別に出す。
@@ -529,7 +544,8 @@ namespace Tools28.Commands.FormworkCalculator.Output
                                 levelName,
                                 FormworkParameterManager.ExcludedGroupKey,
                                 0.0,
-                                false);
+                                false,
+                                sourceName: ex.SourceName);
                         }
                         catch { }
 
@@ -857,13 +873,24 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 if (result.ExcludedResults != null)
                     foreach (var ex in result.ExcludedResults) ids.Add(ex.ElementId);
 
+                var registry = result.SourceRegistry as Engine.ElementSourceRegistry;
                 foreach (var id in ids)
                 {
-                    var elem = doc.GetElement(new ElementId(id));
+                    Element elem = null;
+                    Transform xform = Transform.Identity;
+                    var src = registry?.Get(id);
+                    if (src != null) { elem = src.Element; xform = src.Transform; }
+                    if (elem == null)
+                    {
+                        try { elem = doc.GetElement(new ElementId(id)); } catch { }
+                    }
                     if (elem == null) continue;
                     BoundingBoxXYZ bb = null;
                     try { bb = elem.get_BoundingBox(null); } catch { }
                     if (bb == null) continue;
+                    // リンク要素の BoundingBox はリンクローカル座標なのでホスト座標に変換
+                    if (xform != null && !xform.IsIdentity)
+                        bb = TransformBoundingBox(bb, xform);
                     if (minP == null)
                     {
                         minP = bb.Min;
@@ -968,10 +995,15 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     ogs.SetSurfaceForegroundPatternVisible(true);
                 }
 
+                // リンク要素はホスト側からは個別に override 不可なのでスキップ。
+                // ホスト要素のみ半透明グレーで表示。
+                var registry = result.SourceRegistry as Engine.ElementSourceRegistry;
                 foreach (var er in result.ElementResults)
                 {
                     try
                     {
+                        var src = registry?.Get(er.ElementId);
+                        if (src != null && src.IsLinked) continue;
                         var id = new ElementId(er.ElementId);
                         if (doc.GetElement(id) != null)
                             view.SetElementOverrides(id, ogs);
@@ -1007,6 +1039,44 @@ namespace Tools28.Commands.FormworkCalculator.Output
             double partialSum = 0;
             foreach (var pc in fi.PartialContacts) partialSum += pc.ContactArea;
             return (partialSum / faceArea) > 0.05;
+        }
+
+        /// <summary>
+        /// BoundingBoxXYZ をトランスフォーム適用後のワールド AABB に変換する (8 頂点を変換して再計算)。
+        /// リンク要素の BB をホスト座標系に正規化するのに使用。
+        /// </summary>
+        private static BoundingBoxXYZ TransformBoundingBox(BoundingBoxXYZ bb, Transform xform)
+        {
+            if (bb == null) return null;
+            if (xform == null || xform.IsIdentity) return bb;
+            var corners = new XYZ[]
+            {
+                new XYZ(bb.Min.X, bb.Min.Y, bb.Min.Z),
+                new XYZ(bb.Max.X, bb.Min.Y, bb.Min.Z),
+                new XYZ(bb.Min.X, bb.Max.Y, bb.Min.Z),
+                new XYZ(bb.Max.X, bb.Max.Y, bb.Min.Z),
+                new XYZ(bb.Min.X, bb.Min.Y, bb.Max.Z),
+                new XYZ(bb.Max.X, bb.Min.Y, bb.Max.Z),
+                new XYZ(bb.Min.X, bb.Max.Y, bb.Max.Z),
+                new XYZ(bb.Max.X, bb.Max.Y, bb.Max.Z),
+            };
+            double mnX = double.MaxValue, mnY = double.MaxValue, mnZ = double.MaxValue;
+            double mxX = double.MinValue, mxY = double.MinValue, mxZ = double.MinValue;
+            foreach (var c in corners)
+            {
+                var p = xform.OfPoint(c);
+                if (p.X < mnX) mnX = p.X;
+                if (p.Y < mnY) mnY = p.Y;
+                if (p.Z < mnZ) mnZ = p.Z;
+                if (p.X > mxX) mxX = p.X;
+                if (p.Y > mxY) mxY = p.Y;
+                if (p.Z > mxZ) mxZ = p.Z;
+            }
+            return new BoundingBoxXYZ
+            {
+                Min = new XYZ(mnX, mnY, mnZ),
+                Max = new XYZ(mxX, mxY, mxZ),
+            };
         }
 
         private static ElementId GetDraftingSolidFillPatternId(Document doc)

@@ -10,6 +10,15 @@ namespace Tools28.Commands.FormworkCalculator.Engine
 
         internal static List<Solid> GetSolids(Element elem)
         {
+            return GetSolids(elem, null);
+        }
+
+        /// <summary>
+        /// 要素の Solid を取得し、transform が指定されていれば各 Solid に適用する。
+        /// リンク要素の場合は GetTotalTransform を渡してホスト座標系に変換する。
+        /// </summary>
+        internal static List<Solid> GetSolids(Element elem, Transform transform)
+        {
             var result = new List<Solid>();
             if (elem == null) return result;
 
@@ -26,6 +35,23 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             if (geom == null) return result;
 
             CollectSolidsRecursive(geom, result);
+
+            // transform が Identity でなければ各 Solid を変換
+            if (transform != null && !transform.IsIdentity)
+            {
+                var transformed = new List<Solid>();
+                foreach (var s in result)
+                {
+                    if (s == null || s.Volume <= MinSolidVolume) continue;
+                    try
+                    {
+                        var ts = SolidUtils.CreateTransformed(s, transform);
+                        if (ts != null && ts.Volume > MinSolidVolume) transformed.Add(ts);
+                    }
+                    catch { }
+                }
+                result = transformed;
+            }
             return result;
         }
 

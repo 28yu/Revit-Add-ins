@@ -22,16 +22,23 @@ namespace Tools28.Commands.FormworkCalculator.Engine
 
         internal static void DeductWallFacesNearSweeps(
             Document doc,
-            List<ContactFaceDetector.ElementFacesContext> contexts)
+            List<ContactFaceDetector.ElementFacesContext> contexts,
+            Dictionary<int, ElementSource> srcByContext = null)
         {
             if (contexts == null || contexts.Count == 0) return;
 
-            // WallSweep / Wall を分離
+            // WallSweep / Wall を分離 (registry 経由 → fallback doc.GetElement)
             var sweepCtxs = new List<ContactFaceDetector.ElementFacesContext>();
             var wallCtxs = new List<ContactFaceDetector.ElementFacesContext>();
             foreach (var ctx in contexts)
             {
-                var elem = doc.GetElement(new ElementId(ctx.ElementId));
+                Element elem = null;
+                if (srcByContext != null && srcByContext.TryGetValue(ctx.ElementId, out var src))
+                    elem = src.Element;
+                if (elem == null)
+                {
+                    try { elem = doc.GetElement(new ElementId(ctx.ElementId)); } catch { }
+                }
                 if (elem is WallSweep) sweepCtxs.Add(ctx);
                 else if (elem is Wall) wallCtxs.Add(ctx);
             }

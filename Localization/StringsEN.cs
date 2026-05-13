@@ -357,6 +357,7 @@ namespace Tools28.Localization
             { "Formwork.Color.Type", "By formwork type" },
             { "Formwork.Option.Header", "Options" },
             { "Formwork.Option.ShowDeducted", "Show deducted faces" },
+            { "Formwork.Option.IncludeLinks", "Include linked models" },
             { "Formwork.Option.UseGL", "Deduct below-ground parts using GL elevation" },
             { "Formwork.NeedZoneParam", "Please enter the zone parameter name to enable grouping by zone." },
             { "Formwork.NeedTypeParam", "Please enter the formwork-type parameter name to enable grouping by type." },
@@ -380,6 +381,7 @@ namespace Tools28.Localization
             { "Formwork.WallSweepExcluded", "Excluded {0} wall sweeps/reveals (no formwork needed)" },
             { "Formwork.SteelStairExcluded", "Excluded {0} steel stairs (type/material contains steel keyword)" },
             { "Formwork.LgsExcluded", "Excluded {0} LGS walls (wall with gypsum-board layer and no concrete layer)" },
+            { "Formwork.LinkedIncluded", "Included {0} elements from linked models ({1} link instance(s))" },
             { "Formwork.ExcludedFilterNote", "(Excluded elements are hidden by the \"Formwork_Excluded\" filter in the analysis 3D view. Toggle the filter ON to inspect them.)" },
 
             // === Excel Export Category Names ===

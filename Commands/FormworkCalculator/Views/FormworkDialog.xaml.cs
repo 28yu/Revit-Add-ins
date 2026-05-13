@@ -50,6 +50,7 @@ namespace Tools28.Commands.FormworkCalculator.Views
 
             grpOption.Header = Loc.S("Formwork.Option.Header");
             txtShowDeducted.Text = Loc.S("Formwork.Option.ShowDeducted");
+            txtIncludeLinks.Text = Loc.S("Formwork.Option.IncludeLinks");
             txtUseGL.Text = Loc.S("Formwork.Option.UseGL");
 
             btnOK.Content = Loc.S("Common.Execute");
@@ -105,6 +106,7 @@ namespace Tools28.Commands.FormworkCalculator.Views
             }
 
             ChkShowDeducted.IsChecked = s.ShowDeductedFaces;
+            ChkIncludeLinks.IsChecked = s.IncludeLinkedModels;
             ChkUseGL.IsChecked = s.UseGLDeduction;
             TxtGL.Text = s.GLElevationMeters.ToString("F3");
         }
@@ -125,6 +127,7 @@ namespace Tools28.Commands.FormworkCalculator.Views
                 Create3DView = ChkCreate3DView.IsChecked == true,
                 CreateSheet = ChkCreateSheet.IsChecked == true,
                 ShowDeductedFaces = ChkShowDeducted.IsChecked == true,
+                IncludeLinkedModels = ChkIncludeLinks.IsChecked == true,
                 UseGLDeduction = ChkUseGL.IsChecked == true,
             };
 

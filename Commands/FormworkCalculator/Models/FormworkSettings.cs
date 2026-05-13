@@ -36,6 +36,12 @@ namespace Tools28.Commands.FormworkCalculator.Models
         public bool UseGLDeduction { get; set; }
         public double GLElevationMeters { get; set; }
 
+        /// <summary>
+        /// リンクモデルも算出対象に含める。
+        /// 「現在のビュー」モードの場合、ビューに表示されているリンクインスタンスの全対象要素を含める。
+        /// </summary>
+        public bool IncludeLinkedModels { get; set; } = false;
+
         // デバッグログ出力 (C:\temp\Formwork_debug.txt)
         // リリース時は false に変更すること
         public bool EnableDebugLog { get; set; } = true;

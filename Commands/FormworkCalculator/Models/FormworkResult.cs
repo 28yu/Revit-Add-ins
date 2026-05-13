@@ -31,6 +31,11 @@ namespace Tools28.Commands.FormworkCalculator.Models
         public string ElementName { get; set; } = string.Empty;
         public CategoryGroup Category { get; set; }
         public string CategoryName { get; set; } = string.Empty;
+
+        /// <summary>
+        /// 要素の出自 ("ホスト" or リンクファイル名)。リンクモデル対応で導入。
+        /// </summary>
+        public string SourceName { get; set; } = string.Empty;
         public string Zone { get; set; } = string.Empty;
         public string FormworkType { get; set; } = string.Empty;
         public double FormworkArea { get; set; }
@@ -113,6 +118,7 @@ namespace Tools28.Commands.FormworkCalculator.Models
         public string ElementName { get; set; } = string.Empty;
         public CategoryGroup Category { get; set; }
         public string CategoryName { get; set; } = string.Empty;
+        public string SourceName { get; set; } = string.Empty;
         public ExclusionKind Kind { get; set; }
         public string DetectionLayer { get; set; } = string.Empty;
         public string DetectionReason { get; set; } = string.Empty;
@@ -133,5 +139,15 @@ namespace Tools28.Commands.FormworkCalculator.Models
         public List<ErrorLogEntry> Errors { get; set; } = new List<ErrorLogEntry>();
         public List<ExcludedResult> ExcludedResults { get; set; }
             = new List<ExcludedResult>();
+
+        /// <summary>
+        /// 要素の出自情報レジストリ (ホスト + リンク)。FormworkCalcEngine が設定し、
+        /// FormworkVisualizer / ScheduleCreator が SurrogateId → Element/Document/Transform 解決に使う。
+        /// public ではなく internal 扱いとして利用者は触らない。
+        /// </summary>
+        internal object SourceRegistry { get; set; }
+
+        /// <summary>リンクモデルの統計 (実行サマリー表示用)。</summary>
+        public int LinkedInstanceCount { get; set; }
     }
 }

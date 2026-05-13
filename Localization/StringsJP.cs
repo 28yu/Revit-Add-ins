@@ -357,6 +357,7 @@ namespace Tools28.Localization
             { "Formwork.Color.Type", "型枠種別" },
             { "Formwork.Option.Header", "オプション" },
             { "Formwork.Option.ShowDeducted", "控除面も表示する" },
+            { "Formwork.Option.IncludeLinks", "リンクモデルも対象に含める" },
             { "Formwork.Option.UseGL", "GL 高さで地中部分を控除" },
             { "Formwork.NeedZoneParam", "工区別集計を有効にする場合は、工区パラメータ名を入力してください。" },
             { "Formwork.NeedTypeParam", "型枠種別集計を有効にする場合は、型枠種別パラメータ名を入力してください。" },
@@ -380,6 +381,7 @@ namespace Tools28.Localization
             { "Formwork.WallSweepExcluded", "壁スイープ・リビール {0} 個を型枠不要として除外しました" },
             { "Formwork.SteelStairExcluded", "鉄骨階段 {0} 個を型枠不要として除外しました（タイプ名・マテリアルに鉄骨キーワードを含む階段）" },
             { "Formwork.LgsExcluded", "LGS壁 {0} 個を型枠不要として除外しました（石膏ボード層を含みコンクリート層を含まない壁）" },
+            { "Formwork.LinkedIncluded", "リンクモデルから {0} 件の要素を対象に含めました（リンクインスタンス: {1} 個）" },
             { "Formwork.ExcludedFilterNote", "（除外要素は解析3Dビューの「型枠_除外」フィルタで非表示。表示 ON で確認可能）" },
 
             // === Excel エクスポート カテゴリ名（BuiltInCategory→ローカライズ）===

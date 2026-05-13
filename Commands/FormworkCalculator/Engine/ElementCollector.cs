@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using Autodesk.Revit.DB;
 using Tools28.Commands.FormworkCalculator.Models;
@@ -13,6 +14,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         internal class ExcludedEntry
         {
             public Element Element;
+            public ElementSource Source;
             public ExclusionKind Kind;
             public string Layer = string.Empty;
             public string Reason = string.Empty;
@@ -20,11 +22,16 @@ namespace Tools28.Commands.FormworkCalculator.Engine
 
         /// <summary>
         /// 要素収集結果。型枠算出対象の Targets と、除外された Excluded の 2 リスト。
+        /// 各要素は ElementSource にラップされており、ホスト/リンクの区別と
+        /// 配置トランスフォームを保持する。
         /// </summary>
         internal class CollectionResult
         {
-            public List<Element> Targets = new List<Element>();
+            public List<ElementSource> Targets = new List<ElementSource>();
             public List<ExcludedEntry> Excluded = new List<ExcludedEntry>();
+            public ElementSourceRegistry Registry = new ElementSourceRegistry();
+            public int LinkedInstanceCount;
+            public int LinkedDocumentCount;
         }
 
         private static readonly Dictionary<string, BuiltInCategory> _nameToCat
@@ -42,9 +49,101 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         internal static CollectionResult CollectAndClassify(
             Document doc, FormworkSettings settings, View activeView)
         {
-            var raw = Collect(doc, settings, activeView);
             var cr = new CollectionResult();
 
+            // 1) ホストドキュメントの要素を収集して登録
+            var hostRaw = CollectFromDoc(doc, settings, activeView, isLinked: false);
+            foreach (var elem in hostRaw)
+            {
+                cr.Registry.RegisterHost(elem, doc);
+            }
+
+            // 2) リンクモデルの要素を収集して登録
+            if (settings != null && settings.IncludeLinkedModels)
+            {
+                CollectFromLinkedModels(doc, settings, activeView, cr);
+            }
+
+            ClassifyAndFilter(doc, cr, settings);
+            return cr;
+        }
+
+        /// <summary>
+        /// リンクモデルから対象要素を収集して登録する。
+        /// 「現在のビュー」モードでは、リンクインスタンスがアクティブビューに表示されている
+        /// もののみ対象とする (リンク内の要素単位の可視判定は行わない簡易版)。
+        /// </summary>
+        private static void CollectFromLinkedModels(
+            Document hostDoc, FormworkSettings settings, View activeView, CollectionResult cr)
+        {
+            var linkInstances = new FilteredElementCollector(hostDoc)
+                .OfClass(typeof(RevitLinkInstance))
+                .Cast<RevitLinkInstance>()
+                .ToList();
+
+            int linkedDocCount = 0;
+            int instanceCount = 0;
+            foreach (var rli in linkInstances)
+            {
+                Document linkDoc = null;
+                try { linkDoc = rli.GetLinkDocument(); } catch { }
+                if (linkDoc == null) continue;
+
+                // 「現在のビュー」モードではリンクインスタンスがアクティブビューに表示されているか確認
+                if (settings.Scope == CalculationScope.CurrentView && activeView != null)
+                {
+                    bool hidden = true;
+                    try { hidden = rli.IsHidden(activeView); } catch { hidden = true; }
+                    if (hidden) continue;
+                }
+
+                Transform transform = null;
+                try { transform = rli.GetTotalTransform(); } catch { }
+                if (transform == null) transform = Transform.Identity;
+
+                string sourceName = MakeLinkSourceName(rli, linkDoc);
+
+                var linkedElems = CollectFromDoc(linkDoc, settings, null, isLinked: true);
+                foreach (var elem in linkedElems)
+                {
+                    cr.Registry.RegisterLinked(elem, linkDoc, transform, sourceName, rli.Id);
+                }
+                instanceCount++;
+                linkedDocCount++;
+                FormworkDebugLog.Log(
+                    $"  [LinkedCollect] {sourceName} elements={linkedElems.Count} " +
+                    $"transform=Translation({transform.Origin.X:F2},{transform.Origin.Y:F2},{transform.Origin.Z:F2})");
+            }
+
+            cr.LinkedInstanceCount = instanceCount;
+            cr.LinkedDocumentCount = linkedDocCount;
+        }
+
+        /// <summary>
+        /// リンクのソース名を生成する。リンクインスタンス名 (シンボル名 + コピー番号) を優先し、
+        /// 取得できない場合はリンクファイルのタイトルを使う。
+        /// </summary>
+        private static string MakeLinkSourceName(RevitLinkInstance rli, Document linkDoc)
+        {
+            string baseName = string.Empty;
+            try
+            {
+                baseName = Path.GetFileNameWithoutExtension(linkDoc?.Title ?? string.Empty);
+            }
+            catch { }
+            if (string.IsNullOrEmpty(baseName))
+            {
+                try { baseName = rli.Name ?? string.Empty; } catch { }
+            }
+            return string.IsNullOrEmpty(baseName) ? "リンク" : baseName;
+        }
+
+        /// <summary>
+        /// 鉄骨・デッキスラブ・鉄骨階段・LGS壁等の除外判定を行い、
+        /// cr.Registry に登録された全要素を Targets と Excluded に振り分ける。
+        /// </summary>
+        private static void ClassifyAndFilter(Document hostDoc, CollectionResult cr, FormworkSettings settings)
+        {
             bool exclude = settings?.ExcludeSteelMembers ?? true;
             bool excludeStair = settings?.ExcludeSteelStairs ?? true;
             bool excludeLgs = settings?.ExcludeLgsWalls ?? true;
@@ -54,115 +153,111 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             int deckCount = 0;
             int steelStairCount = 0;
             int lgsCount = 0;
-            foreach (var elem in raw)
+            int totalCount = 0;
+
+            foreach (var src in cr.Registry.All())
             {
+                totalCount++;
+                var elem = src.Element;
+                var srcDoc = src.SourceDoc;
+                string srcTag = src.IsLinked ? $"[link:{src.SourceName}]" : "[host]";
+
                 if (exclude)
                 {
-                    // 壁スイープ・リビールは Targets に含めて contact detection に参加させ、
-                    // 後段で ElementResult から除外する (FormworkCalcEngine.MoveWallSweepsToExcluded)。
-                    // 早期除外すると Wall の top 面に対する contact deduction が失われ、
-                    // reveal で切り取られた top 面が formwork として計上されてしまうため。
-
                     // 構造柱・構造フレーム → 鉄骨判定
                     if (IsSteelDetectionTarget(elem))
                     {
-                        var det = SteelMemberDetector.Detect(elem, doc);
+                        var det = SteelMemberDetector.Detect(elem, srcDoc);
                         if (det != null && det.IsSteel)
                         {
                             cr.Excluded.Add(new ExcludedEntry
                             {
                                 Element = elem,
+                                Source = src,
                                 Kind = ExclusionKind.Steel,
                                 Layer = det.Layer.ToString(),
                                 Reason = det.Reason ?? string.Empty,
                             });
                             FormworkDebugLog.Log(
-                                $"  [SteelExclude] E{elem.Id.IntValue()} " +
+                                $"  [SteelExclude] {srcTag} E{elem.Id.IntValue()} " +
                                 $"Cat={elem.Category?.Name} Name='{elem.Name}' " +
                                 $"L={det.Layer} reason={det.Reason}");
                             steelCount++;
                             continue;
                         }
-                        else if (det != null && FormworkDebugLog.Enabled)
-                        {
-                            FormworkDebugLog.Log(
-                                $"  [SteelKeep]    E{elem.Id.IntValue()} " +
-                                $"Cat={elem.Category?.Name} Name='{elem.Name}' " +
-                                $"reason={det.Reason}");
-                        }
                     }
 
-                    // 階段カテゴリ → 鉄骨階段判定 (タイプ名・マテリアルに鉄骨キーワード)
+                    // 階段 → 鉄骨階段判定
                     if (excludeStair && IsStairDetectionTarget(elem))
                     {
-                        var stairRes = SteelStairDetector.Detect(elem, doc);
+                        var stairRes = SteelStairDetector.Detect(elem, srcDoc);
                         if (stairRes != null && stairRes.IsSteel)
                         {
                             cr.Excluded.Add(new ExcludedEntry
                             {
                                 Element = elem,
+                                Source = src,
                                 Kind = ExclusionKind.SteelStair,
                                 Layer = stairRes.Layer,
                                 Reason = stairRes.Reason ?? string.Empty,
                             });
                             FormworkDebugLog.Log(
-                                $"  [SteelStairExclude] E{elem.Id.IntValue()} " +
-                                $"Cat={elem.Category?.Name} Name='{elem.Name}' " +
-                                $"L={stairRes.Layer} reason={stairRes.Reason}");
+                                $"  [SteelStairExclude] {srcTag} E{elem.Id.IntValue()} " +
+                                $"reason={stairRes.Reason}");
                             steelStairCount++;
                             continue;
                         }
                     }
 
-                    // 壁カテゴリ → LGS壁判定 (CompoundStructure に石膏ボード層があり、コンクリート層が無い)
+                    // 壁 → LGS壁判定
                     if (excludeLgs && IsWallDetectionTarget(elem))
                     {
-                        if (LgsWallDetector.IsLgsWall(elem, doc, out string lgsReason))
+                        if (LgsWallDetector.IsLgsWall(elem, srcDoc, out string lgsReason))
                         {
                             cr.Excluded.Add(new ExcludedEntry
                             {
                                 Element = elem,
+                                Source = src,
                                 Kind = ExclusionKind.LgsWall,
                                 Layer = "CompoundStructure",
                                 Reason = lgsReason,
                             });
                             FormworkDebugLog.Log(
-                                $"  [LgsExclude] E{elem.Id.IntValue()} " +
-                                $"Cat={elem.Category?.Name} reason={lgsReason}");
+                                $"  [LgsExclude] {srcTag} E{elem.Id.IntValue()} reason={lgsReason}");
                             lgsCount++;
                             continue;
                         }
                     }
 
-                    // 床カテゴリ → デッキスラブ判定 (タイプ名/要素名に "DS" を含む)
+                    // 床 → デッキスラブ判定
                     if (IsDeckSlabDetectionTarget(elem))
                     {
-                        if (DeckSlabDetector.IsDeckSlab(elem, doc, out string deckReason))
+                        if (DeckSlabDetector.IsDeckSlab(elem, srcDoc, out string deckReason))
                         {
                             cr.Excluded.Add(new ExcludedEntry
                             {
                                 Element = elem,
+                                Source = src,
                                 Kind = ExclusionKind.DeckSlab,
                                 Layer = "NamePattern",
                                 Reason = deckReason,
                             });
                             FormworkDebugLog.Log(
-                                $"  [DeckSlabExclude] E{elem.Id.IntValue()} " +
-                                $"Cat={elem.Category?.Name} reason={deckReason}");
+                                $"  [DeckSlabExclude] {srcTag} E{elem.Id.IntValue()} reason={deckReason}");
                             deckCount++;
                             continue;
                         }
                     }
                 }
-                cr.Targets.Add(elem);
+
+                cr.Targets.Add(src);
             }
             FormworkDebugLog.Log(
-                $"  Exclusion detection: total={raw.Count} steelExcluded={steelCount} " +
+                $"  Exclusion detection: total={totalCount} steelExcluded={steelCount} " +
                 $"deckSlabExcluded={deckCount} steelStairExcluded={steelStairCount} " +
-                $"lgsExcluded={lgsCount} kept={cr.Targets.Count}");
+                $"lgsExcluded={lgsCount} kept={cr.Targets.Count} " +
+                $"linkedInstances={cr.LinkedInstanceCount}");
             FormworkDebugLog.Flush();
-
-            return cr;
         }
 
         /// <summary>
@@ -204,17 +299,25 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             return elem is Wall;
         }
 
-        internal static List<Element> Collect(Document doc, FormworkSettings settings, View activeView)
+        /// <summary>
+        /// 単一ドキュメントから対象カテゴリの要素を収集する (ホスト・リンクで共通)。
+        /// activeView は host の現在ビューモード用。リンク収集時には null。
+        /// </summary>
+        internal static List<Element> CollectFromDoc(
+            Document doc, FormworkSettings settings, View activeView, bool isLinked)
         {
             var result = new List<Element>();
             var seenIds = new HashSet<int>();
+            bool useViewFilter = !isLinked
+                && settings.Scope == CalculationScope.CurrentView
+                && activeView != null;
 
             foreach (var key in settings.IncludedCategories)
             {
                 if (!_nameToCat.TryGetValue(key, out var bic))
                     continue;
 
-                FilteredElementCollector col = settings.Scope == CalculationScope.CurrentView
+                FilteredElementCollector col = useViewFilter
                     ? new FilteredElementCollector(doc, activeView.Id)
                     : new FilteredElementCollector(doc);
 
@@ -222,7 +325,6 @@ namespace Tools28.Commands.FormworkCalculator.Engine
 
                 if (bic == BuiltInCategory.OST_Walls)
                 {
-                    // 壁本体のみ（カーテンウォール等は除外）。WallSweep は別途追加する。
                     elems = elems.Where(e =>
                     {
                         if (!(e is Wall w)) return false;
@@ -237,16 +339,19 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                         if (seenIds.Add(e.Id.IntValue())) result.Add(e);
                     }
 
-                    // 壁スイープ・リビール（独立した WallSweep 要素として存在）も追加
-                    FilteredElementCollector swCol = settings.Scope == CalculationScope.CurrentView
-                        ? new FilteredElementCollector(doc, activeView.Id)
-                        : new FilteredElementCollector(doc);
-                    var sweeps = swCol.OfClass(typeof(WallSweep))
-                        .WhereElementIsNotElementType()
-                        .ToList();
-                    foreach (var sw in sweeps)
+                    // WallSweep は host のみ追加 (リンクからは除外: 接触検出ロジックの依存を回避)
+                    if (!isLinked)
                     {
-                        if (seenIds.Add(sw.Id.IntValue())) result.Add(sw);
+                        FilteredElementCollector swCol = useViewFilter
+                            ? new FilteredElementCollector(doc, activeView.Id)
+                            : new FilteredElementCollector(doc);
+                        var sweeps = swCol.OfClass(typeof(WallSweep))
+                            .WhereElementIsNotElementType()
+                            .ToList();
+                        foreach (var sw in sweeps)
+                        {
+                            if (seenIds.Add(sw.Id.IntValue())) result.Add(sw);
+                        }
                     }
                 }
                 else
@@ -258,6 +363,12 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 }
             }
             return result;
+        }
+
+        /// <summary>互換のため残しているが、新規コードからは呼ばない。CollectFromDoc を使う。</summary>
+        internal static List<Element> Collect(Document doc, FormworkSettings settings, View activeView)
+        {
+            return CollectFromDoc(doc, settings, activeView, isLinked: false);
         }
 
         internal static CategoryGroup ToCategoryGroup(Element elem)
@@ -290,7 +401,6 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             ElementId levelId = null;
             try
             {
-                // 要素型固有のプロパティ
                 if (elem is Wall w) levelId = w.LevelId;
                 else if (elem is Floor floor) levelId = floor.LevelId;
                 else if (elem.LevelId != null && elem.LevelId != ElementId.InvalidElementId)
@@ -300,7 +410,6 @@ namespace Tools28.Commands.FormworkCalculator.Engine
 
             if (levelId == null || levelId == ElementId.InvalidElementId)
             {
-                // 代表的なパラメータから取得
                 var candidates = new[]
                 {
                     BuiltInParameter.LEVEL_PARAM,

@@ -18,6 +18,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         public const string ParamGroupKey = "28Tools_Formwork_区分";   // 部位 or 工区 or 型枠種別の値
         public const string ParamArea = "28Tools_Formwork_面積";       // 面積（㎡, Length^2）
         public const string ParamPartialContact = "28Tools_Formwork_部分接触"; // "Yes"/"No" - T字結合等で主面の一部が他要素に接触
+        public const string ParamSource = "28Tools_Formwork_ソース";    // "ホスト" or リンクファイル名
 
         public const string MarkerValue = "28Tools_Formwork";
         // 型枠不要として除外された要素 DirectShape のマーカー値。集計表は MarkerValue のみを
@@ -70,6 +71,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 CreateAndBindText(defGroup, bindingMap, binding, ParamGroupKey);
                 CreateAndBindArea(defGroup, bindingMap, binding, ParamArea);
                 CreateAndBindText(defGroup, bindingMap, binding, ParamPartialContact);
+                CreateAndBindText(defGroup, bindingMap, binding, ParamSource);
             }
             finally
             {
@@ -79,15 +81,16 @@ namespace Tools28.Commands.FormworkCalculator.Engine
 
         internal static void SetInstanceValues(
             Element ds, string categoryLabel, string levelName, string groupKey, double areaM2,
-            bool hasPartialContact = false)
+            bool hasPartialContact = false, string sourceName = null)
         {
-            SetInstanceValues(ds, MarkerValue, categoryLabel, levelName, groupKey, areaM2, hasPartialContact);
+            SetInstanceValues(ds, MarkerValue, categoryLabel, levelName, groupKey, areaM2,
+                hasPartialContact, sourceName);
         }
 
         internal static void SetInstanceValues(
             Element ds, string markerValue,
             string categoryLabel, string levelName, string groupKey, double areaM2,
-            bool hasPartialContact = false)
+            bool hasPartialContact = false, string sourceName = null)
         {
             SetString(ds, ParamMarker, markerValue ?? MarkerValue);
             SetString(ds, ParamCategory, categoryLabel ?? string.Empty);
@@ -98,13 +101,14 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             SetDouble(ds, ParamArea, feetSq);
 
             SetString(ds, ParamPartialContact, hasPartialContact ? "Yes" : "No");
+            SetString(ds, ParamSource, sourceName ?? "ホスト");
         }
 
         private static bool IsAllBound(Document doc)
         {
             var map = doc.ParameterBindings;
             var it = map.ForwardIterator();
-            bool m = false, c = false, l = false, g = false, a = false, p = false;
+            bool m = false, c = false, l = false, g = false, a = false, p = false, s = false;
             while (it.MoveNext())
             {
                 var name = it.Key.Name;
@@ -114,8 +118,9 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 else if (name == ParamGroupKey) g = true;
                 else if (name == ParamArea) a = true;
                 else if (name == ParamPartialContact) p = true;
+                else if (name == ParamSource) s = true;
             }
-            return m && c && l && g && a && p;
+            return m && c && l && g && a && p && s;
         }
 
         private static string GetSharedParamFilePath()

@@ -57,8 +57,9 @@ namespace Tools28.Commands.FormworkCalculator.Output
             try { def.ShowGrandTotal = true; } catch (Exception ex) { LogEx("ShowGrandTotal=true (before)", ex); }
             LogDef(def, "after-set-itemized-before-fields");
 
-            // 列順: 件数 / レベル / 部位 / 区分 / 面積
+            // 列順: 件数 / ソース / レベル / 部位 / 区分 / 面積
             var countField = AddCountField(def, schedulable);
+            var sourceField = AddField(doc, def, schedulable, paramIds, FormworkParameterManager.ParamSource);
             var levelField = AddField(doc, def, schedulable, paramIds, FormworkParameterManager.ParamLevel);
             var partField = AddField(doc, def, schedulable, paramIds, FormworkParameterManager.ParamCategory);
             var groupField = AddField(doc, def, schedulable, paramIds, FormworkParameterManager.ParamGroupKey);
@@ -68,6 +69,11 @@ namespace Tools28.Commands.FormworkCalculator.Output
 
             // 列ヘッダーを短く設定 (パラメータ名 "28Tools_Formwork_xxx" が長いため
             // セル幅が大きくなりすぎないように短い見出しに置き換える)。
+            if (sourceField != null)
+            {
+                try { sourceField.ColumnHeading = "ソース"; }
+                catch (Exception ex) { LogEx("sourceField.ColumnHeading", ex); }
+            }
             if (levelField != null)
             {
                 try { levelField.ColumnHeading = "レベル"; }
@@ -115,7 +121,9 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 catch { }
             }
 
-            // 階層グループ化: レベル → 部位（見出しON / フッタOFF）
+            // 階層グループ化: ソース → レベル → 部位（見出しON / フッタOFF）
+            // ソースはホスト・各リンクで要素を分けて表示する最上位キー
+            AddGroupField(def, sourceField);
             AddGroupField(def, levelField);
             AddGroupField(def, partField);
             LogDef(def, "after-group-fields");

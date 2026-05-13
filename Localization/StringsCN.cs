@@ -357,6 +357,7 @@ namespace Tools28.Localization
             { "Formwork.Color.Type", "按模板种类" },
             { "Formwork.Option.Header", "选项" },
             { "Formwork.Option.ShowDeducted", "同时显示扣除面" },
+            { "Formwork.Option.IncludeLinks", "包括链接模型" },
             { "Formwork.Option.UseGL", "使用 GL 标高扣除地下部分" },
             { "Formwork.NeedZoneParam", "要按施工区分组时，请输入施工区参数名称。" },
             { "Formwork.NeedTypeParam", "要按模板种类分组时，请输入模板种类参数名称。" },
@@ -380,6 +381,7 @@ namespace Tools28.Localization
             { "Formwork.WallSweepExcluded", "已排除 {0} 个墙饰条/凹槽（无需模板）" },
             { "Formwork.SteelStairExcluded", "已排除 {0} 个钢楼梯（类型/材质包含钢相关关键字）" },
             { "Formwork.LgsExcluded", "已排除 {0} 个 LGS 墙（含石膏板层、不含混凝土层的墙）" },
+            { "Formwork.LinkedIncluded", "已从链接模型包含 {0} 个构件（链接实例：{1} 个）" },
             { "Formwork.ExcludedFilterNote", "（排除的构件在分析三维视图中由「型枠_除外」过滤器隐藏，开启过滤器即可查看）" },
 
             // === Excel 导出类别名称 ===

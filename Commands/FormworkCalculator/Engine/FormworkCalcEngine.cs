@@ -45,11 +45,14 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         {
             _progress?.Report("要素を収集中...");
             var collection = ElementCollector.CollectAndClassify(_doc, _settings, _activeView);
-            var elements = collection.Targets;
-            result.ProcessedElementCount = elements.Count;
+            var sources = collection.Targets;
+            result.ProcessedElementCount = sources.Count;
+            result.SourceRegistry = collection.Registry;
+            result.LinkedInstanceCount = collection.LinkedInstanceCount;
             FormworkDebugLog.Log(
-                $"Collected elements: targets={elements.Count} " +
-                $"excluded={collection.Excluded.Count}");
+                $"Collected elements: targets={sources.Count} " +
+                $"excluded={collection.Excluded.Count} " +
+                $"linkedInstances={collection.LinkedInstanceCount}");
 
             // 除外要素を ExcludedResult として記録 (集計には含めない)
             foreach (var ex in collection.Excluded)
@@ -57,51 +60,58 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 var e = ex.Element;
                 result.ExcludedResults.Add(new ExcludedResult
                 {
-                    ElementId = e.Id.IntValue(),
+                    ElementId = ex.Source != null ? ex.Source.SurrogateId : e.Id.IntValue(),
                     ElementName = e.Name ?? string.Empty,
                     Category = ElementCollector.ToCategoryGroup(e),
                     CategoryName = e.Category?.Name ?? string.Empty,
+                    SourceName = ex.Source?.SourceName ?? ElementSourceRegistry.HostSourceName,
                     Kind = ex.Kind,
                     DetectionLayer = ex.Layer,
                     DetectionReason = ex.Reason,
                 });
             }
 
-            if (elements.Count == 0) return result;
+            if (sources.Count == 0) return result;
 
             double? glFeet = null;
             if (_settings.UseGLDeduction)
                 glFeet = UnitUtils.ConvertToInternalUnits(_settings.GLElevationMeters, UnitTypeId.Meters);
 
-            var openingDeltas = OpeningProcessor.Compute(_doc, elements);
+            // 開口処理はホスト要素のみで完結 (リンク内の開口はリンク側に閉じる)
+            var hostElements = sources
+                .Where(s => !s.IsLinked)
+                .Select(s => s.Element)
+                .ToList();
+            var openingDeltas = OpeningProcessor.Compute(_doc, hostElements);
             var openingMap = openingDeltas.ToDictionary(o => o.HostElementId, o => o);
 
             // Pass 1: 要素毎に面を分類
-            _progress?.Report($"Pass 1: 面分類中... 0 / {elements.Count}");
+            _progress?.Report($"Pass 1: 面分類中... 0 / {sources.Count}");
             var contexts = new List<ContactFaceDetector.ElementFacesContext>();
-            var elemByContext = new Dictionary<int, Element>();
+            var srcByContext = new Dictionary<int, ElementSource>();
 
             int idx = 0;
-            foreach (var elem in elements)
+            foreach (var src in sources)
             {
                 idx++;
                 if (idx % 10 == 0)
-                    _progress?.Report($"Pass 1: 面分類中... {idx} / {elements.Count}");
+                    _progress?.Report($"Pass 1: 面分類中... {idx} / {sources.Count}");
 
+                var elem = src.Element;
                 try
                 {
-                    var ctx = ClassifyElementFaces(elem, glFeet);
+                    var ctx = ClassifyElementFaces(src, glFeet);
                     if (ctx != null)
                     {
                         contexts.Add(ctx);
-                        elemByContext[ctx.ElementId] = elem;
+                        srcByContext[ctx.ElementId] = src;
                     }
                 }
                 catch (Exception ex)
                 {
                     result.Errors.Add(new ErrorLogEntry
                     {
-                        ElementId = elem.Id.IntValue(),
+                        ElementId = src.SurrogateId,
                         CategoryName = elem.Category?.Name ?? string.Empty,
                         ElementName = elem.Name,
                         ErrorKind = "ClassifyError",
@@ -119,7 +129,8 @@ namespace Tools28.Commands.FormworkCalculator.Engine
 
             // Pass 2b: WallSweep (スイープ・リビール) の host 壁面を直接 DeductedContact 化
             // (Reveal 等で WallSweep 自身がソリッドを持たないケースに対応)
-            WallSweepFaceDeductor.DeductWallFacesNearSweeps(_doc, contexts);
+            // ※ リンク要素には WallSweep は含まれないため host doc のみで処理
+            WallSweepFaceDeductor.DeductWallFacesNearSweeps(_doc, contexts, srcByContext);
 
             // Pass 2 完了時: 最終 FormworkRequired 面数
             LogPostPass2Summary(contexts);
@@ -128,10 +139,10 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             _progress?.Report("Pass 3: 集計中...");
             foreach (var ctx in contexts)
             {
-                var elem = elemByContext[ctx.ElementId];
+                var src = srcByContext[ctx.ElementId];
                 try
                 {
-                    var er = BuildElementResult(elem, ctx, openingMap);
+                    var er = BuildElementResult(src, ctx, openingMap);
                     if (er != null) result.ElementResults.Add(er);
                 }
                 catch (Exception ex)
@@ -139,8 +150,8 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                     result.Errors.Add(new ErrorLogEntry
                     {
                         ElementId = ctx.ElementId,
-                        CategoryName = elem.Category?.Name ?? string.Empty,
-                        ElementName = elem.Name,
+                        CategoryName = src.Element.Category?.Name ?? string.Empty,
+                        ElementName = src.Element.Name,
                         ErrorKind = "AggregateError",
                         Message = ex.Message,
                     });
@@ -149,10 +160,10 @@ namespace Tools28.Commands.FormworkCalculator.Engine
 
             // 壁スイープ・リビールを ElementResults から除外し ExcludedResults に移す
             // (Pass 2 で Wall の top 面に対する contact deduction を有効化した後に実施)
-            MoveWallSweepsToExcluded(_doc, result);
+            MoveWallSweepsToExcluded(collection.Registry, result);
 
             // 診断ログ: 各要素の集計結果を一覧出力 (⚠️ マーカーで疑わしい要素を強調)
-            LogElementDiagnostics(_doc, contexts, result);
+            LogElementDiagnostics(collection.Registry, contexts, result);
 
             Aggregate(result);
             return result;
@@ -164,7 +175,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         /// 検索しやすいように 1 要素 1 行で出力。
         /// </summary>
         private static void LogElementDiagnostics(
-            Document doc,
+            ElementSourceRegistry registry,
             List<ContactFaceDetector.ElementFacesContext> contexts,
             FormworkResult result)
         {
@@ -184,10 +195,11 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 string typeName = "?";
                 try
                 {
-                    var elem = doc.GetElement(new ElementId(er.ElementId));
+                    var src = registry?.Get(er.ElementId);
+                    var elem = src?.Element;
                     if (elem != null)
                     {
-                        var t = doc.GetElement(elem.GetTypeId());
+                        var t = src.SourceDoc.GetElement(elem.GetTypeId());
                         typeName = t?.Name ?? "?";
                     }
                 }
@@ -314,19 +326,20 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         /// 早期除外せず Pass 1/2 に参加させる理由: Wall の top 面が reveal で切り取られた
         /// 部分を contact detection によって DeductedContact 化するため。
         /// </summary>
-        private static void MoveWallSweepsToExcluded(Document doc, FormworkResult result)
+        private static void MoveWallSweepsToExcluded(ElementSourceRegistry registry, FormworkResult result)
         {
             var toMove = new List<ElementResult>();
             foreach (var er in result.ElementResults)
             {
-                var elem = doc.GetElement(new ElementId(er.ElementId));
-                if (elem is WallSweep) toMove.Add(er);
+                var src = registry?.Get(er.ElementId);
+                if (src?.Element is WallSweep) toMove.Add(er);
             }
             if (toMove.Count == 0) return;
 
             foreach (var er in toMove)
             {
-                var elem = doc.GetElement(new ElementId(er.ElementId));
+                var src = registry?.Get(er.ElementId);
+                var elem = src?.Element;
                 result.ElementResults.Remove(er);
                 result.ExcludedResults.Add(new ExcludedResult
                 {
@@ -334,6 +347,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                     ElementName = er.ElementName,
                     Category = CategoryGroup.Wall,
                     CategoryName = elem?.Category?.Name ?? string.Empty,
+                    SourceName = src?.SourceName ?? ElementSourceRegistry.HostSourceName,
                     Kind = ExclusionKind.WallSweep,
                     DetectionLayer = "WallSweep",
                     DetectionReason = "壁スイープ・リビール (post-processed after contact detection)",
@@ -425,9 +439,10 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         }
 
         private ContactFaceDetector.ElementFacesContext ClassifyElementFaces(
-            Element elem, double? glFeet)
+            ElementSource src, double? glFeet)
         {
-            var solids = SolidUnionProcessor.GetSolids(elem);
+            var elem = src.Element;
+            var solids = SolidUnionProcessor.GetSolids(elem, src.Transform);
             if (solids.Count == 0) return null;
 
             Solid unioned = SolidUnionProcessor.Union(solids);
@@ -494,12 +509,12 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 }
             }
 
-            BoundingBoxXYZ bb = null;
-            try { bb = elem.get_BoundingBox(null); } catch { }
+            // BoundingBox を世界座標で計算する (ホスト・リンクとも統一)
+            BoundingBoxXYZ bb = ComputeWorldBoundingBox(finalSolids);
 
             return new ContactFaceDetector.ElementFacesContext
             {
-                ElementId = elem.Id.IntValue(),
+                ElementId = src.SurrogateId,
                 Category = ElementCollector.ToCategoryGroup(elem),
                 CategoryName = elem.Category?.Name ?? string.Empty,
                 BB = bb,
@@ -507,11 +522,48 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             };
         }
 
+        /// <summary>
+        /// 変換適用後の Solid 群からワールド座標系の BoundingBox を計算する。
+        /// </summary>
+        private static BoundingBoxXYZ ComputeWorldBoundingBox(IEnumerable<Solid> solids)
+        {
+            double minX = double.MaxValue, minY = double.MaxValue, minZ = double.MaxValue;
+            double maxX = double.MinValue, maxY = double.MinValue, maxZ = double.MinValue;
+            bool any = false;
+            foreach (var s in solids)
+            {
+                if (s == null) continue;
+                foreach (Edge e in s.Edges)
+                {
+                    var c = e.AsCurve();
+                    if (c == null) continue;
+                    for (int i = 0; i <= 1; i++)
+                    {
+                        var p = c.GetEndPoint(i);
+                        if (p.X < minX) minX = p.X;
+                        if (p.Y < minY) minY = p.Y;
+                        if (p.Z < minZ) minZ = p.Z;
+                        if (p.X > maxX) maxX = p.X;
+                        if (p.Y > maxY) maxY = p.Y;
+                        if (p.Z > maxZ) maxZ = p.Z;
+                        any = true;
+                    }
+                }
+            }
+            if (!any) return null;
+            return new BoundingBoxXYZ
+            {
+                Min = new XYZ(minX, minY, minZ),
+                Max = new XYZ(maxX, maxY, maxZ),
+            };
+        }
+
         private ElementResult BuildElementResult(
-            Element elem,
+            ElementSource src,
             ContactFaceDetector.ElementFacesContext ctx,
             Dictionary<int, OpeningProcessor.OpeningDelta> openingMap)
         {
+            var elem = src.Element;
             double formwork = 0, dedTop = 0, dedBottom = 0, dedContact = 0, inclined = 0;
 
             foreach (var fi in ctx.Faces)
@@ -576,6 +628,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 ElementName = elem.Name ?? string.Empty,
                 Category = ElementCollector.ToCategoryGroup(elem),
                 CategoryName = elem.Category?.Name ?? string.Empty,
+                SourceName = src.SourceName,
                 Zone = _settings.GroupByZone
                     ? NormalizeParamValue(ElementCollector.GetParameterString(elem, _settings.ZoneParameterName))
                     : string.Empty,
@@ -608,13 +661,21 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 glFeet = UnitUtils.ConvertToInternalUnits(settings.GLElevationMeters, UnitTypeId.Meters);
 
             var contexts = new List<ContactFaceDetector.ElementFacesContext>();
-            var elements = result.ElementResults
-                .Select(er => doc.GetElement(new ElementId(er.ElementId)))
-                .Where(e => e != null).ToList();
+            var registry = result.SourceRegistry as ElementSourceRegistry;
 
-            foreach (var elem in elements)
+            foreach (var er in result.ElementResults)
             {
-                var solids = SolidUnionProcessor.GetSolids(elem);
+                ElementSource src = registry?.Get(er.ElementId);
+                Element elem = src?.Element;
+                Transform xform = src?.Transform ?? Transform.Identity;
+                if (elem == null)
+                {
+                    // フォールバック: 旧来通り ID 解決 (リンクなし時の互換)
+                    try { elem = doc.GetElement(new ElementId(er.ElementId)); } catch { }
+                }
+                if (elem == null) continue;
+
+                var solids = SolidUnionProcessor.GetSolids(elem, xform);
                 if (solids.Count == 0) continue;
                 var unioned = SolidUnionProcessor.Union(solids);
                 var final = unioned != null ? new List<Solid> { unioned } : solids;
@@ -665,12 +726,11 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                     }
                 }
 
-                BoundingBoxXYZ bb = null;
-                try { bb = elem.get_BoundingBox(null); } catch { }
+                BoundingBoxXYZ bb = ComputeWorldBoundingBox(final);
 
                 contexts.Add(new ContactFaceDetector.ElementFacesContext
                 {
-                    ElementId = elem.Id.IntValue(),
+                    ElementId = er.ElementId,
                     Category = ElementCollector.ToCategoryGroup(elem),
                     CategoryName = elem.Category?.Name ?? string.Empty,
                     BB = bb,

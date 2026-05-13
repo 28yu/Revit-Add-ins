@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
@@ -251,6 +252,20 @@ namespace Tools28.Commands.FormworkCalculator
                                 sh.SheetNumber, sh.Name);
                     }
                     catch { }
+                }
+
+                // リンクモデル取り込み件数を表示
+                if (settings.IncludeLinkedModels)
+                {
+                    int linkedElemCount = result.ElementResults.Count(er =>
+                        !string.IsNullOrEmpty(er.SourceName)
+                        && er.SourceName != ElementSourceRegistry.HostSourceName);
+                    if (linkedElemCount > 0 || result.LinkedInstanceCount > 0)
+                    {
+                        summary += "\n\n" + string.Format(
+                            Loc.S("Formwork.LinkedIncluded"),
+                            linkedElemCount, result.LinkedInstanceCount);
+                    }
                 }
 
                 if (result.ExcludedResults != null && result.ExcludedResults.Count > 0)
