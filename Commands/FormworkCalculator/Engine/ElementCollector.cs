@@ -339,18 +339,25 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                         if (seenIds.Add(e.Id.IntValue())) result.Add(e);
                     }
 
-                    // WallSweep (壁スイープ・リビール) も追加。リンクモデルの WallSweep も
-                    // 含めることで、リンクの壁にリビールが入っている場合の面分類・接触検出を
-                    // ホストの壁と同じロジックで処理できる。
-                    FilteredElementCollector swCol = useViewFilter
-                        ? new FilteredElementCollector(doc, activeView.Id)
-                        : new FilteredElementCollector(doc);
-                    var sweeps = swCol.OfClass(typeof(WallSweep))
-                        .WhereElementIsNotElementType()
-                        .ToList();
-                    foreach (var sw in sweeps)
+                    // WallSweep (壁スイープ・リビール) はホストのみ収集する。
+                    // リンクから収集すると以下の問題が発生するため:
+                    //   - 接触検出 (ContactFaceDetector) がリンク内の WallSweep を
+                    //     リンク壁と接触判定し、リビール周辺の壁面を DeductedContact に
+                    //     変更してしまい、壁のリビール面の型枠が算出されなくなる
+                    //   - リンク内の壁は wall solid 自体にリビールのカットが反映されている
+                    //     前提で、groove 面を FormworkRequired のまま残す方が実態に合う
+                    if (!isLinked)
                     {
-                        if (seenIds.Add(sw.Id.IntValue())) result.Add(sw);
+                        FilteredElementCollector swCol = useViewFilter
+                            ? new FilteredElementCollector(doc, activeView.Id)
+                            : new FilteredElementCollector(doc);
+                        var sweeps = swCol.OfClass(typeof(WallSweep))
+                            .WhereElementIsNotElementType()
+                            .ToList();
+                        foreach (var sw in sweeps)
+                        {
+                            if (seenIds.Add(sw.Id.IntValue())) result.Add(sw);
+                        }
                     }
                 }
                 else

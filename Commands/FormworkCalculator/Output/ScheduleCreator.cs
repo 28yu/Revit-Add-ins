@@ -25,9 +25,29 @@ namespace Tools28.Commands.FormworkCalculator.Output
         internal const string ScheduleName = "型枠数量集計";
         internal const string SummaryScheduleName = "型枠数量集計_合計";
 
-        internal static ElementId CreateSchedule(Document doc, FormworkResult result = null)
+        /// <summary>
+        /// 型枠数量集計表を作成する。
+        /// sourceFilter が null の場合: 全ソース対象 (旧来の動作)
+        /// sourceFilter が指定された場合: その SourceName のみフィルタした集計表を作成
+        ///   (ホスト用 / 各リンク用に個別の集計表を作るための引数)
+        /// </summary>
+        internal static ElementId CreateSchedule(Document doc, FormworkResult result = null,
+            string sourceFilter = null)
         {
-            DeleteScheduleByName(doc, ScheduleName);
+            string scheduleName = string.IsNullOrEmpty(sourceFilter)
+                ? ScheduleName
+                : $"{ScheduleName} - {sourceFilter}";
+            // 同名の既存集計表に加え、過去実行で作成された "型枠数量集計 - xxx" 形式の
+            // 集計表もまとめて削除する (初回の "ホスト" 集計表生成時のみ実行)。
+            if (string.IsNullOrEmpty(sourceFilter)
+                || sourceFilter == ElementSourceRegistry.HostSourceName)
+            {
+                DeleteAllFormworkSchedules(doc);
+            }
+            else
+            {
+                DeleteScheduleByName(doc, scheduleName);
+            }
 
             ViewSchedule schedule;
             try
@@ -41,13 +61,13 @@ namespace Tools28.Commands.FormworkCalculator.Output
             }
             if (schedule == null) return null;
 
-            try { schedule.Name = ScheduleName; } catch { }
+            try { schedule.Name = scheduleName; } catch { }
 
             var def = schedule.Definition;
             var schedulable = def.GetSchedulableFields();
             var paramIds = GetFormworkSharedParamIds(doc);
 
-            FormworkDebugLog.Section("Schedule Creation");
+            FormworkDebugLog.Section($"Schedule Creation: {scheduleName}");
             LogDef(def, "after-create");
 
             // 集計表の基本設定 (フィールド追加前に設定する必要がある場合がある)
@@ -57,9 +77,9 @@ namespace Tools28.Commands.FormworkCalculator.Output
             try { def.ShowGrandTotal = true; } catch (Exception ex) { LogEx("ShowGrandTotal=true (before)", ex); }
             LogDef(def, "after-set-itemized-before-fields");
 
-            // 列順: 件数 / ソース / レベル / 部位 / 区分 / 面積
+            // 列順: 件数 / レベル / 部位 / 区分 / 面積
+            // ソース列はユーザー要望により非表示 (ホスト/リンク別の集計表として作成するため)
             var countField = AddCountField(def, schedulable);
-            var sourceField = AddField(doc, def, schedulable, paramIds, FormworkParameterManager.ParamSource);
             var levelField = AddField(doc, def, schedulable, paramIds, FormworkParameterManager.ParamLevel);
             var partField = AddField(doc, def, schedulable, paramIds, FormworkParameterManager.ParamCategory);
             var groupField = AddField(doc, def, schedulable, paramIds, FormworkParameterManager.ParamGroupKey);
@@ -67,13 +87,19 @@ namespace Tools28.Commands.FormworkCalculator.Output
             LogDef(def, "after-add-fields");
             LogField(areaField, "areaField after-add");
 
+            // ソースフィルタ用フィールド (非表示)
+            ScheduleField sourceField = null;
+            if (!string.IsNullOrEmpty(sourceFilter))
+            {
+                sourceField = AddField(doc, def, schedulable, paramIds, FormworkParameterManager.ParamSource);
+                if (sourceField != null)
+                {
+                    try { sourceField.IsHidden = true; } catch { }
+                }
+            }
+
             // 列ヘッダーを短く設定 (パラメータ名 "28Tools_Formwork_xxx" が長いため
             // セル幅が大きくなりすぎないように短い見出しに置き換える)。
-            if (sourceField != null)
-            {
-                try { sourceField.ColumnHeading = "ソース"; }
-                catch (Exception ex) { LogEx("sourceField.ColumnHeading", ex); }
-            }
             if (levelField != null)
             {
                 try { levelField.ColumnHeading = "レベル"; }
@@ -121,11 +147,23 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 catch { }
             }
 
-            // 階層グループ化: ソース → レベル → 部位（見出しON / フッタOFF）
-            // ソースはホスト・各リンクで要素を分けて表示する最上位キー
-            AddGroupField(def, sourceField);
+            // 階層グループ化: レベル → 部位（見出しON / フッタOFF）
             AddGroupField(def, levelField);
             AddGroupField(def, partField);
+
+            // ソースフィルタ (sourceField が指定されている場合のみ)
+            if (sourceField != null && !string.IsNullOrEmpty(sourceFilter))
+            {
+                try
+                {
+                    var sourceFlt = new ScheduleFilter(
+                        sourceField.FieldId,
+                        ScheduleFilterType.Equal,
+                        sourceFilter);
+                    def.AddFilter(sourceFlt);
+                }
+                catch (Exception ex) { LogEx("source filter", ex); }
+            }
             LogDef(def, "after-group-fields");
             LogField(areaField, "areaField after-group");
 
@@ -712,6 +750,27 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 .OfClass(typeof(ViewSchedule))
                 .Cast<ViewSchedule>()
                 .Where(v => !v.IsTemplate && v.Name == name)
+                .Select(v => v.Id)
+                .ToList();
+            foreach (var id in existing)
+            {
+                try { doc.Delete(id); } catch { }
+            }
+        }
+
+        /// <summary>
+        /// 「型枠数量集計」および「型枠数量集計 - {ソース名}」形式の集計表をまとめて削除する。
+        /// 再実行時の前段クリーンアップに使う (リンク構成が変わって不要な集計表が残るのを防ぐ)。
+        /// サマリ集計表 (型枠数量集計_合計) は別途 CreateSummarySchedule で削除される。
+        /// </summary>
+        private static void DeleteAllFormworkSchedules(Document doc)
+        {
+            var existing = new FilteredElementCollector(doc)
+                .OfClass(typeof(ViewSchedule))
+                .Cast<ViewSchedule>()
+                .Where(v => !v.IsTemplate
+                    && (v.Name == ScheduleName
+                        || v.Name.StartsWith(ScheduleName + " - ")))
                 .Select(v => v.Id)
                 .ToList();
             foreach (var id in existing)

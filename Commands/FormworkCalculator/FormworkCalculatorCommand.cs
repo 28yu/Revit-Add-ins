@@ -125,8 +125,36 @@ namespace Tools28.Commands.FormworkCalculator
 
                             if (settings.CreateSchedule)
                             {
-                                scheduleViewId = ScheduleCreator.CreateSchedule(doc, result);
-                                // 動的合計サマリ集計表 (IsItemized=false で 1 行で全件集約)
+                                // 結果に含まれる全ソース (ホスト・各リンク) を列挙し
+                                // それぞれに対して個別の集計表を作成する。
+                                // - リンクなし: 「型枠数量集計」(従来通り)
+                                // - リンクあり: 「型枠数量集計 - ホスト」「型枠数量集計 - 構造_A棟」等
+                                var sources = result.ElementResults
+                                    .Select(er => string.IsNullOrEmpty(er.SourceName)
+                                        ? ElementSourceRegistry.HostSourceName
+                                        : er.SourceName)
+                                    .Distinct()
+                                    .OrderBy(s => s != ElementSourceRegistry.HostSourceName)
+                                    .ThenBy(s => s)
+                                    .ToList();
+
+                                if (sources.Count <= 1)
+                                {
+                                    // ホストのみ (リンク無し or リンク要素なし)
+                                    scheduleViewId = ScheduleCreator.CreateSchedule(doc, result);
+                                }
+                                else
+                                {
+                                    // ホスト + リンク: ソース毎に個別の集計表を作る
+                                    // メインの scheduleViewId はホストの集計表を指す
+                                    foreach (var srcName in sources)
+                                    {
+                                        var id = ScheduleCreator.CreateSchedule(doc, result, srcName);
+                                        if (srcName == ElementSourceRegistry.HostSourceName)
+                                            scheduleViewId = id;
+                                    }
+                                }
+                                // 動的合計サマリ集計表 (ホスト・リンク別の小計 + 全体合計)
                                 summaryScheduleId = ScheduleCreator.CreateSummarySchedule(doc);
                             }
 
