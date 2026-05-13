@@ -216,42 +216,42 @@ function downloadPNG() {
 // Inject pHYs chunk into PNG for DPI metadata
 function injectDPI(pngData, dpi) {
   const ppm = Math.round(dpi / 0.0254); // pixels per meter
-  // pHYs chunk: 4 bytes X ppm + 4 bytes Y ppm + 1 byte unit(1=meter)
-  const phys = new Uint8Array(25); // 4 len + 4 type + 9 data + 4 crc
+  // pHYs chunk: 4 len + 4 type + 9 data + 4 crc = 21 bytes exactly
+  const phys = new Uint8Array(21);
   const view = new DataView(phys.buffer);
-  view.setUint32(0, 9); // data length
+  view.setUint32(0, 9); // data length = 9
   phys[4]=0x70; phys[5]=0x48; phys[6]=0x59; phys[7]=0x73; // "pHYs"
   view.setUint32(8, ppm);
   view.setUint32(12, ppm);
   phys[16] = 1; // unit = meter
 
-  // CRC32 of type+data
+  // CRC32 over type(4) + data(9) = bytes 4..16
   const crcData = phys.slice(4, 17);
   view.setUint32(17, crc32(crcData));
 
-  // Insert pHYs before first IDAT chunk
-  const result = [];
-  let i = 8; // skip PNG signature
-  result.push(...pngData.slice(0, 8)); // signature
+  // Build result: avoid spread on large arrays (use concat-style loop)
+  const physArr = Array.from(phys);
+  const sigArr  = Array.from(pngData.slice(0, 8));
+  const result  = sigArr;
 
+  let i = 8; // skip PNG signature
   let inserted = false;
   while (i < pngData.length) {
-    const chunkLen = (pngData[i]<<24)|(pngData[i+1]<<16)|(pngData[i+2]<<8)|pngData[i+3];
+    const chunkLen = ((pngData[i] << 24) | (pngData[i+1] << 16) | (pngData[i+2] << 8) | pngData[i+3]) >>> 0;
     const chunkType = String.fromCharCode(pngData[i+4], pngData[i+5], pngData[i+6], pngData[i+7]);
     const totalChunkSize = 12 + chunkLen;
 
     if (chunkType === 'pHYs') {
-      // Skip existing pHYs
       i += totalChunkSize;
       continue;
     }
 
     if (!inserted && chunkType === 'IDAT') {
-      result.push(...phys);
+      for (let b = 0; b < physArr.length; b++) result.push(physArr[b]);
       inserted = true;
     }
 
-    result.push(...pngData.slice(i, i + totalChunkSize));
+    for (let b = i; b < i + totalChunkSize; b++) result.push(pngData[b]);
     i += totalChunkSize;
   }
 
@@ -1512,8 +1512,8 @@ async function batchDownload() {
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    URL.revokeObjectURL(url);
     await sleep(400);
+    URL.revokeObjectURL(url); // sleep後に解放してブラウザが読み込み完了するのを待つ
   }
   statusEl.textContent = `完了 (${downloads.length}件)`;
 }
