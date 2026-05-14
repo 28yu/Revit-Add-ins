@@ -91,6 +91,9 @@ namespace Tools28.Commands.FormworkCalculator
                 ElementId view3DId = null;
                 ElementId sheetId = null;
                 List<ElementId> createdShapeIds = null;
+                // ホスト集計表 (先頭) + 各リンク集計表をシート配置用に保持。
+                // 横並びで並べるためリスト形式で保持する。
+                var allMainScheduleIds = new List<ElementId>();
 
                 if (settings.CreateSchedule || settings.Create3DView)
                 {
@@ -147,11 +150,15 @@ namespace Tools28.Commands.FormworkCalculator
                                 {
                                     // ホストのみ (リンク無し or リンク要素なし)
                                     scheduleViewId = ScheduleCreator.CreateSchedule(doc, result);
+                                    if (scheduleViewId != null && scheduleViewId != ElementId.InvalidElementId)
+                                        allMainScheduleIds.Add(scheduleViewId);
                                 }
                                 else
                                 {
                                     // ホスト + リンク: ソース毎に個別の集計表を作る
                                     // メインの scheduleViewId はホストの集計表を指す
+                                    // allMainScheduleIds にはホスト → リンク順で全集計表を蓄積し、
+                                    // シート配置時に横並びで並べる
                                     bool first = true;
                                     foreach (var srcName in sources)
                                     {
@@ -167,12 +174,16 @@ namespace Tools28.Commands.FormworkCalculator
                                             FormworkDebugLog.Log(
                                                 $"  [Sched] FAILED to create schedule for '{srcName}': {schEx.Message}");
                                         }
-                                        if (first && id != null)
+                                        if (id != null && id != ElementId.InvalidElementId)
                                         {
-                                            // 最初のソースの集計表をメインの scheduleViewId として扱う
-                                            // (通常はホストが先頭に並ぶように OrderBy で並べている)
-                                            scheduleViewId = id;
-                                            first = false;
+                                            allMainScheduleIds.Add(id);
+                                            if (first)
+                                            {
+                                                // 最初のソースの集計表をメインの scheduleViewId として扱う
+                                                // (通常はホストが先頭に並ぶように OrderBy で並べている)
+                                                scheduleViewId = id;
+                                                first = false;
+                                            }
                                         }
                                     }
                                 }
@@ -221,7 +232,7 @@ namespace Tools28.Commands.FormworkCalculator
                             try
                             {
                                 sheetId = FormworkSheetCreator.CreateSheet(
-                                    doc, view3DId, scheduleViewId, summaryScheduleId);
+                                    doc, view3DId, allMainScheduleIds, summaryScheduleId);
                                 tSheet.Commit();
                             }
                             catch (Exception ex)

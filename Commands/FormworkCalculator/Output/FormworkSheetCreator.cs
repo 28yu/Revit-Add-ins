@@ -11,7 +11,11 @@ namespace Tools28.Commands.FormworkCalculator.Output
     ///
     /// 仕様:
     ///   - 既存シートで最も多く使われている図枠 (TitleBlock FamilySymbol) を採用
-    ///   - レイアウト: 集計表を左上から縦に並べ、3Dビューを右下に配置
+    ///   - レイアウト:
+    ///       上: サマリ集計表 (型枠数量集計_合計)
+    ///       中段: ホスト集計表 + 各リンク集計表を左から右へ並べる
+    ///             (シート幅を超える場合は次の行に折り返し)
+    ///       右下: 3D ビュー
     ///   - シート名: 「型枠数量集計」, シート番号: 自動 (型枠-NNN)
     /// </summary>
     internal static class FormworkSheetCreator
@@ -21,10 +25,14 @@ namespace Tools28.Commands.FormworkCalculator.Output
         /// <summary>
         /// 集計シートを作成し、ビュー・集計表を配置する。
         /// </summary>
+        /// <param name="mainScheduleIds">
+        /// ホスト集計表 (先頭) + 各リンク集計表 (続き) の ID リスト。
+        /// 横並びで配置され、幅が足りなければ次行に折り返す。
+        /// </param>
         internal static ElementId CreateSheet(
             Document doc,
             ElementId view3DId,
-            ElementId mainScheduleId,
+            IList<ElementId> mainScheduleIds,
             ElementId summaryScheduleId)
         {
             if (doc == null) return null;
@@ -53,24 +61,58 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 $"  [Sheet] drawArea U=[{draw.Min.U:F2}..{draw.Max.U:F2}] V=[{draw.Min.V:F2}..{draw.Max.V:F2}] ft");
 
             const double margin = 0.082;  // ≈25mm
+            const double gap = 0.05;      // ≈15mm (集計表間の隙間)
 
-            // 左上から集計表を縦に並べる
+            // 左上から
             double leftX = draw.Min.U + margin;
             double topY = draw.Max.V - margin;
+            double rightX = draw.Max.U - margin;
             double currentTopY = topY;
 
             // サマリ集計表を先に配置（小さく、識別しやすい合計を上に）
             if (summaryScheduleId != null && summaryScheduleId != ElementId.InvalidElementId)
             {
-                currentTopY = PlaceSchedule(doc, sheet, summaryScheduleId,
-                    leftX, currentTopY, margin);
+                var sumRes = PlaceScheduleAt(doc, sheet, summaryScheduleId, leftX, currentTopY);
+                if (sumRes.HasValue) currentTopY = sumRes.Value.bottomY - gap;
             }
 
-            // メイン集計表を下に配置
-            if (mainScheduleId != null && mainScheduleId != ElementId.InvalidElementId)
+            // メイン集計表 (ホスト + 各リンク) を中段に横並びで配置
+            double schedulesBottomY = currentTopY;
+            if (mainScheduleIds != null && mainScheduleIds.Count > 0)
             {
-                currentTopY = PlaceSchedule(doc, sheet, mainScheduleId,
-                    leftX, currentTopY, margin);
+                double rowTopY = currentTopY;
+                double rowLeftX = leftX;
+                double rowMaxBottomY = rowTopY;
+
+                foreach (var id in mainScheduleIds)
+                {
+                    if (id == null || id == ElementId.InvalidElementId) continue;
+
+                    var res = PlaceScheduleAt(doc, sheet, id, rowLeftX, rowTopY);
+                    if (!res.HasValue) continue;
+
+                    double placedRight = res.Value.rightX;
+                    double placedBottom = res.Value.bottomY;
+
+                    // 配置後の右端がシートの右マージンを超えたら、その集計表を次の行に移動
+                    if (placedRight > rightX && rowLeftX > leftX)
+                    {
+                        // 既存の集計表で行を確定し、新しい行を開始
+                        try { doc.Delete(res.Value.instanceId); } catch { }
+                        rowTopY = rowMaxBottomY - gap;
+                        rowLeftX = leftX;
+                        rowMaxBottomY = rowTopY;
+
+                        var res2 = PlaceScheduleAt(doc, sheet, id, rowLeftX, rowTopY);
+                        if (!res2.HasValue) continue;
+                        placedRight = res2.Value.rightX;
+                        placedBottom = res2.Value.bottomY;
+                    }
+
+                    if (placedBottom < rowMaxBottomY) rowMaxBottomY = placedBottom;
+                    rowLeftX = placedRight + gap;
+                }
+                schedulesBottomY = rowMaxBottomY;
             }
 
             // 3Dビューを右下に配置
@@ -79,7 +121,9 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 PlaceViewportBottomRight(doc, sheet, view3DId, draw, margin);
             }
 
-            FormworkDebugLog.Log($"  [Sheet] created: '{sheet.SheetNumber} - {sheet.Name}'");
+            FormworkDebugLog.Log(
+                $"  [Sheet] created: '{sheet.SheetNumber} - {sheet.Name}' " +
+                $"schedules={mainScheduleIds?.Count ?? 0}");
             return sheet.Id;
         }
 
@@ -202,12 +246,13 @@ namespace Tools28.Commands.FormworkCalculator.Output
         }
 
         /// <summary>
-        /// 集計表をシート左上基準で配置し、配置後の下端 Y 座標を返す
-        /// (次の集計表を下に積むため)。
+        /// 集計表をシート上の指定位置 (top-left 基準) に配置し、
+        /// 配置インスタンスの ID と実 BoundingBox の右端 X / 下端 Y を返す。
+        /// 失敗時は null。
         /// </summary>
-        private static double PlaceSchedule(
+        private static (ElementId instanceId, double rightX, double bottomY)? PlaceScheduleAt(
             Document doc, ViewSheet sheet, ElementId scheduleId,
-            double leftX, double topY, double gap)
+            double leftX, double topY)
         {
             ScheduleSheetInstance inst;
             try
@@ -218,26 +263,26 @@ namespace Tools28.Commands.FormworkCalculator.Output
             catch (Exception ex)
             {
                 FormworkDebugLog.Log($"  [Sheet] PlaceSchedule {scheduleId.IntValue()} EX: {ex.Message}");
-                return topY;
+                return null;
             }
-            if (inst == null) return topY;
+            if (inst == null) return null;
 
-            // 配置後の bb から下端を取得して次の Y を返す
+            double right = leftX + 0.7;   // フォールバック: 約 213mm
+            double bottom = topY - 0.328; // フォールバック: 約 100mm
             try
             {
                 var bb = inst.get_BoundingBox(sheet);
-                if (bb != null && bb.Min != null)
+                if (bb != null && bb.Min != null && bb.Max != null)
                 {
-                    double bottom = bb.Min.Y;
-                    FormworkDebugLog.Log(
-                        $"  [Sheet] schedule {scheduleId.IntValue()} placed top={topY:F2} bottom={bottom:F2}");
-                    return bottom - gap;
+                    right = bb.Max.X;
+                    bottom = bb.Min.Y;
                 }
             }
             catch { }
-
-            // bb 取得失敗時は概算で下げる (約 100mm)
-            return topY - 0.328;
+            FormworkDebugLog.Log(
+                $"  [Sheet] schedule {scheduleId.IntValue()} placed at " +
+                $"L={leftX:F2}/T={topY:F2} → R={right:F2}/B={bottom:F2}");
+            return (inst.Id, right, bottom);
         }
 
         /// <summary>

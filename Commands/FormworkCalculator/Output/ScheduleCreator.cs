@@ -340,8 +340,12 @@ namespace Tools28.Commands.FormworkCalculator.Output
         }
 
         /// <summary>
-        /// メイン集計表の列幅を、各列の実際のセル内容の最大文字幅に応じて自動調整する。
-        /// 全角 (CJK) は半角の2倍幅として概算し、両側に一定の余白を加える。
+        /// メイン集計表の列幅を、各列の実際のセル内容に応じて自動調整する。
+        /// 優先順位:
+        ///   1. データ行の値が最大幅となる場合 → 値の幅に合わせる (改行防止)
+        ///   2. 値が見出しより短い場合 → 見出しの幅に合わせる (見出し改行防止)
+        /// 全角 (CJK) は半角の2倍幅として概算し、Revit のフォント描画に合うよう
+        /// パディングと文字幅係数を控えめではなく余裕を持たせる。
         /// </summary>
         private static void SetMainScheduleColumnWidths(ViewSchedule schedule)
         {
@@ -361,22 +365,39 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 // 列順: 件数 / レベル / 部位 / 区分 / 面積。
                 double[] minWidthsFeet = { 0.075, 0.080, 0.075, 0.085, 0.090 };
                 // 各列の最大幅 (mm) を制限 (異常に広がるのを抑止)
-                const double maxColumnWidthMm = 200.0;
+                const double maxColumnWidthMm = 250.0;
 
                 for (int c = 0; c < colCount; c++)
                 {
-                    double maxUnits = 0;
-                    for (int r = 0; r < rowCount; r++)
+                    // 行 0 = 列ヘッダー、行 1+ = データ行 (グループ見出し・データ・合計を含む)
+                    double headerUnits = 0;
+                    if (rowCount > 0)
+                    {
+                        string headerText = string.Empty;
+                        try { headerText = body.GetCellText(0, c) ?? string.Empty; } catch { }
+                        headerUnits = MeasureTextUnits(headerText);
+                    }
+
+                    double maxValueUnits = 0;
+                    for (int r = 1; r < rowCount; r++)
                     {
                         string text = string.Empty;
                         try { text = body.GetCellText(r, c) ?? string.Empty; } catch { }
                         double u = MeasureTextUnits(text);
-                        if (u > maxUnits) maxUnits = u;
+                        if (u > maxValueUnits) maxValueUnits = u;
                     }
 
-                    // 単位 → mm 換算: 半角 1 単位 = 約 2.0mm (Revit 既定 2.5mm フォント想定)
-                    // 余白: 両側合計 7mm を加える
-                    double widthMm = maxUnits * 2.0 + 7.0;
+                    // 優先順位:
+                    //   1. 値の最大幅で改行されない幅を確保
+                    //   2. 値が小さい場合は見出しの幅にフォールバック
+                    double effectiveUnits = Math.Max(maxValueUnits, headerUnits);
+
+                    // 単位 → mm 換算: 半角 1 単位 = 約 2.6mm (Revit 既定フォント想定、
+                    // 旧 2.0mm は実描画より小さく改行が発生していたため)
+                    // パディング: 両側合計 12mm (旧 7mm は左右各 3.5mm 程度しか無く狭かった)
+                    const double mmPerUnit = 2.6;
+                    const double paddingMm = 12.0;
+                    double widthMm = effectiveUnits * mmPerUnit + paddingMm;
                     double widthFeet = widthMm / 304.8;
 
                     double minFeet = c < minWidthsFeet.Length ? minWidthsFeet[c] : 0.080;
@@ -388,7 +409,8 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     {
                         body.SetColumnWidth(c, widthFeet);
                         FormworkDebugLog.Log(
-                            $"  [Sched] col {c} maxUnits={maxUnits:F1} → width={widthFeet:F3} ft (~{widthFeet * 304.8:F0}mm)");
+                            $"  [Sched] col {c} header={headerUnits:F1} maxValue={maxValueUnits:F1} " +
+                            $"→ width={widthFeet:F3} ft (~{widthFeet * 304.8:F0}mm)");
                     }
                     catch (Exception ex)
                     {
@@ -449,25 +471,35 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     $"  [Sched:Summary] body rows={rowCount} cols={colCount}");
                 if (colCount <= 0 || rowCount <= 0) return;
 
-                // 列幅を内容に応じて自動調整 (文字と罫線の余白を保ちつつ改行を防ぐ)
+                // 列幅を内容に応じて自動調整 (値優先・見出し幅フォールバック)。
+                // 優先順位: 値の最大幅 > 見出し幅。両方を比較して大きい方に合わせる。
                 for (int c = 0; c < colCount; c++)
                 {
-                    double maxUnits = 0;
-                    for (int r = 0; r < rowCount; r++)
+                    double headerUnits = 0;
+                    if (rowCount > 0)
+                    {
+                        string headerText = string.Empty;
+                        try { headerText = body.GetCellText(0, c) ?? string.Empty; } catch { }
+                        headerUnits = MeasureTextUnits(headerText);
+                    }
+                    double maxValueUnits = 0;
+                    for (int r = 1; r < rowCount; r++)
                     {
                         string text = string.Empty;
                         try { text = body.GetCellText(r, c) ?? string.Empty; } catch { }
                         double u = MeasureTextUnits(text);
-                        if (u > maxUnits) maxUnits = u;
+                        if (u > maxValueUnits) maxValueUnits = u;
                     }
-                    // 余白: 両側合計 7mm。件数(合計)・型枠面積(合計) は最小幅 30mm 確保
-                    double widthMm = Math.Max(30.0, maxUnits * 2.0 + 7.0);
+                    double effectiveUnits = Math.Max(maxValueUnits, headerUnits);
+                    // 文字幅 2.6mm/単位、パディング 12mm、最低幅 30mm
+                    double widthMm = Math.Max(30.0, effectiveUnits * 2.6 + 12.0);
                     double widthFeet = widthMm / 304.8;
                     try
                     {
                         body.SetColumnWidth(c, widthFeet);
                         FormworkDebugLog.Log(
-                            $"  [Sched:Summary] col {c} maxUnits={maxUnits:F1} → width={widthFeet:F3} ft (~{widthFeet * 304.8:F0}mm)");
+                            $"  [Sched:Summary] col {c} header={headerUnits:F1} maxValue={maxValueUnits:F1} " +
+                            $"→ width={widthFeet:F3} ft (~{widthFeet * 304.8:F0}mm)");
                     }
                     catch (Exception ex)
                     {
