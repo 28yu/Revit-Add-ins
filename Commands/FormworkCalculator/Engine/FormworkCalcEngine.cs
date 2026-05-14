@@ -7,7 +7,7 @@ using Tools28.Commands.FormworkCalculator.Models;
 namespace Tools28.Commands.FormworkCalculator.Engine
 {
     /// <summary>
-    /// 型枠数量算出のメインクラス。
+    /// 型枠数量算出のメインクラス。リンクモデル対応・壁スイープ面の型枠算出対応済み。
     /// Pass 1: 要素毎の Solid 取得・面分類
     /// Pass 2: 幾何学的な接触面検出 → DeductedContact
     /// Pass 3: 開口加算・集計
