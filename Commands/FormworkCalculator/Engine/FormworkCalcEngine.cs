@@ -73,37 +73,6 @@ namespace Tools28.Commands.FormworkCalculator.Engine
 
             if (sources.Count == 0) return result;
 
-            // WallSweep (壁スイープ・リビール) は型枠計算から除外する。
-            // ユーザー仕様: スイープと壁の接触面は壁側で型枠として算入されるため、
-            // スイープ自体の面は型枠不要。
-            // 早期除外することで:
-            // - スイープ自体に DirectShape (外側面の型枠) が作られない
-            // - ContactFaceDetector が壁面を deduct することもない (sweep solid が
-            //   contexts に含まれないため壁の外面が FormworkRequired のまま残る)
-            var sweepsToExclude = sources.Where(s => s.Element is WallSweep).ToList();
-            if (sweepsToExclude.Count > 0)
-            {
-                foreach (var src in sweepsToExclude)
-                {
-                    var elem = src.Element;
-                    result.ExcludedResults.Add(new ExcludedResult
-                    {
-                        ElementId = src.SurrogateId,
-                        ElementName = elem.Name ?? string.Empty,
-                        Category = CategoryGroup.Wall,
-                        CategoryName = elem.Category?.Name ?? string.Empty,
-                        SourceName = src.SourceName,
-                        Kind = ExclusionKind.WallSweep,
-                        DetectionLayer = "WallSweep",
-                        DetectionReason = "壁スイープ (型枠は壁面側で算入)",
-                    });
-                }
-                sources.RemoveAll(s => s.Element is WallSweep);
-                FormworkDebugLog.Log(
-                    $"  Excluded {sweepsToExclude.Count} WallSweep elements " +
-                    $"(formwork accounted on wall side)");
-            }
-
             double? glFeet = null;
             if (_settings.UseGLDeduction)
                 glFeet = UnitUtils.ConvertToInternalUnits(_settings.GLElevationMeters, UnitTypeId.Meters);
@@ -163,10 +132,10 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             LogLinkSweepFaceTypeDelta(
                 contexts, srcByContext, linkSweepFaceSnapshot, "post-RefineContactFaces");
 
-            // Pass 2b: 旧実装では WallSweep の host 壁面を直接 DeductedContact 化していたが、
-            // 現在は WallSweep を Pass 1 前に Excluded に移しているため不要。
-            // 壁の外面は WallSweep の接触領域も含めて FormworkRequired のまま保持される。
-            // (互換のため WallSweepFaceDeductor クラス自体は残しておく)
+            // Pass 2b: WallSweep (スイープ・リビール) の host 壁面を直接 DeductedContact 化
+            // (Reveal 等で WallSweep 自身がソリッドを持たないケースに対応)
+            // ※ リンク要素には WallSweep は含まれないため host doc のみで処理
+            WallSweepFaceDeductor.DeductWallFacesNearSweeps(_doc, contexts, srcByContext);
             LogLinkSweepFaceTypeDelta(
                 contexts, srcByContext, linkSweepFaceSnapshot, "post-WallSweepFaceDeductor");
 
