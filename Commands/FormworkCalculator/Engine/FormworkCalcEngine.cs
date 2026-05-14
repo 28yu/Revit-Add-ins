@@ -1112,6 +1112,12 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                     }
                 }
 
+                // スラブのボイド/開口内部の縦面を除外 (ClassifyElementFaces と同じロジック)
+                if (isSlab)
+                {
+                    ExcludeSlabInteriorVoidFaces(elem, faces, final);
+                }
+
                 BoundingBoxXYZ bb = ComputeWorldBoundingBox(final);
 
                 contexts.Add(new ContactFaceDetector.ElementFacesContext
