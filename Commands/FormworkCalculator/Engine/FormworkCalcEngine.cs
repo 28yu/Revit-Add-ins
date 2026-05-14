@@ -798,10 +798,18 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             }
             if (minX == double.MaxValue) return;
 
-            // 床外周のわずかな曲線や接合ずれを誤判定しないためのマージン (100mm)
-            double margin = UnitUtils.ConvertToInternalUnits(100, UnitTypeId.Millimeters);
-            // 縦面を外向きにオフセットする距離 (面が確実に「外側」を指すよう)
-            double normalOffset = UnitUtils.ConvertToInternalUnits(20, UnitTypeId.Millimeters);
+            // 外周からのマージン: 外周縦面は外向きオフセット後に BBox 外に出るが、
+            // 開口縦面は BBox 内部に留まる。マージンは外周面の誤検出防止用 (50mm)。
+            double margin = UnitUtils.ConvertToInternalUnits(50, UnitTypeId.Millimeters);
+            // 縦面を外向きにオフセットする距離 (外周面が BBox 境界を少し超えるよう)
+            double normalOffset = UnitUtils.ConvertToInternalUnits(10, UnitTypeId.Millimeters);
+
+            FormworkDebugLog.Log(
+                $"  [SlabVoidExclude] E{elem.Id.IntValue()} start: " +
+                $"topFace={(topFace != null ? "found" : "null")} " +
+                $"BBox X=[{minX * 304.8:F0},{maxX * 304.8:F0}]mm " +
+                $"Y=[{minY * 304.8:F0},{maxY * 304.8:F0}]mm " +
+                $"margin={margin * 304.8:F0}mm offset={normalOffset * 304.8:F0}mm");
 
             int excludedCount = 0;
             foreach (var fi in faceInfos)
@@ -810,9 +818,11 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 if (fi.Normal == null) continue;
 
                 double nz = fi.Normal.Z;
+                // 縦面のみ処理する。下向き面 (床底面) は常に型枠必要のため除外しない。
+                // 理由: 下向き面の中心は定義上 BBox 内部にあるため、BBox 判定が常に TRUE に
+                //       なってしまい、床底面まで型枠不要と誤判定される。
                 bool isVertical = Math.Abs(nz) < 0.1;
-                bool isDownward = nz < -0.5;
-                if (!isVertical && !isDownward) continue;
+                if (!isVertical) continue;
 
                 // 面中心を取得
                 XYZ center = null;
@@ -825,27 +835,25 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 catch { }
                 if (center == null) continue;
 
-                // 縦面は外向きに少し移動した位置で、下向き面は面中心の真上で判定
-                double checkX, checkY;
-                if (isVertical)
-                {
-                    checkX = center.X + fi.Normal.X * normalOffset;
-                    checkY = center.Y + fi.Normal.Y * normalOffset;
-                }
-                else
-                {
-                    checkX = center.X;
-                    checkY = center.Y;
-                }
+                // 縦面を外向きに少し移動した位置で判定する:
+                //   - 外周縦面: 外向きオフセット後に BBox 外へ出る → 除外されない
+                //   - 開口縦面: 外向きオフセット後も BBox 内部に留まる → 除外される
+                double checkX = center.X + fi.Normal.X * normalOffset;
+                double checkY = center.Y + fi.Normal.Y * normalOffset;
 
-                // 判定 1: 天端面に対して Project が成功すれば、その XY 位置は床材料の真下
-                //         (= ボイド/開口でない通常領域) なので、その面はボイド境界 → 除外
+                // 判定: 外向きオフセット後の XY 位置が床 BBox の内側 (マージン分) に収まるか
+                bool insideByBBox =
+                    checkX > minX + margin && checkX < maxX - margin &&
+                    checkY > minY + margin && checkY < maxY - margin;
+
+                // 補助判定: 天端面への Project が成功 = XY 位置が床材料の上にある (開口の上ではない)
+                // ただし貫通開口では topFace に穴があるため Project が失敗する場合もある。
+                // insideByBBox が TRUE であれば補助判定不要。FALSE の場合のみ使用。
                 bool insideByTopProject = false;
-                if (topFace != null)
+                if (!insideByBBox && topFace != null)
                 {
                     try
                     {
-                        // 天端面の少し上の点を渡す (天端は法線 +Z なので上から投影される)
                         var probe = new XYZ(checkX, checkY, center.Z + 1.0);
                         var ir = topFace.Project(probe);
                         if (ir != null) insideByTopProject = true;
@@ -853,26 +861,20 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                     catch { }
                 }
 
-                // 判定 2 (フォールバック): 床 XY バウンディングボックスからマージン分内側にあるか
-                //         貫通開口の場合 topFace の穴部分で Project が失敗するため、
-                //         BoundingBox 判定で補完する (矩形床+矩形開口の典型ケースをカバー)
-                bool insideByBBox =
-                    checkX > minX + margin && checkX < maxX - margin &&
-                    checkY > minY + margin && checkY < maxY - margin;
-
-                if (insideByTopProject || insideByBBox)
+                if (insideByBBox || insideByTopProject)
                 {
+                    FormworkDebugLog.Log(
+                        $"  [SlabVoidExclude]   exclude face n=({fi.Normal.X:F0},{fi.Normal.Y:F0},{fi.Normal.Z:F0}) " +
+                        $"center=({center.X * 304.8:F0},{center.Y * 304.8:F0})mm " +
+                        $"check=({checkX * 304.8:F0},{checkY * 304.8:F0})mm " +
+                        $"bbox={insideByBBox} proj={insideByTopProject}");
                     fi.FaceType = FaceType.DeductedTop;
                     excludedCount++;
                 }
             }
 
-            if (excludedCount > 0)
-            {
-                FormworkDebugLog.Log(
-                    $"  [SlabVoidExclude] E{elem.Id.IntValue()} excluded {excludedCount} " +
-                    $"interior void faces (vertical/downward inside slab footprint)");
-            }
+            FormworkDebugLog.Log(
+                $"  [SlabVoidExclude] E{elem.Id.IntValue()} done: excluded={excludedCount}");
         }
 
         /// <summary>
