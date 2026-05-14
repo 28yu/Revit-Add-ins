@@ -54,6 +54,25 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 $"excluded={collection.Excluded.Count} " +
                 $"linkedInstances={collection.LinkedInstanceCount}");
 
+            // [LinkMap] リンク要素の real ID → surrogate ID マッピングを 1 行ずつ出力。
+            // リンク要素の SurrogateId は負値で、[ElemDiag] / [FaceDetail] / [Pair] 等の
+            // 診断ログがそれを使うため、real ID で grep しても直接ヒットしない。
+            // この対応表を介して real ID から surrogate ID を引いて再 grep する。
+            if (FormworkDebugLog.Enabled)
+            {
+                int linkMapCount = 0;
+                foreach (var src in collection.Registry.All())
+                {
+                    if (!src.IsLinked) continue;
+                    FormworkDebugLog.Log(
+                        $"  [LinkMap] srg={src.SurrogateId} real={src.Element.Id.IntValue()} " +
+                        $"cat='{src.Element.Category?.Name}' src='{src.SourceName}' " +
+                        $"name='{src.Element.Name}'");
+                    linkMapCount++;
+                }
+                FormworkDebugLog.Log($"  [LinkMap] total linked elements mapped: {linkMapCount}");
+            }
+
             // 除外要素を ExcludedResult として記録 (集計には含めない)
             foreach (var ex in collection.Excluded)
             {
