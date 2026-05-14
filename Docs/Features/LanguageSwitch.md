@@ -86,7 +86,7 @@
 |---|---|
 | 通り芯・レベル | [符号表示切替](./GridBubble.md) |
 | シート | [シート一括作成](./SheetCreation.md) |
-| ビュー | [ビューポート位置コピー](./ViewportPosition.md)、[トリミング領域コピー](./CropBoxCopy.md)、[3Dビュー視点コピー](./ViewCopy.md)、[セクションボックスコピー](./SectionBoxCopy.md) |
+| ビュー | [ビュー コピー＆ペースト](./ViewCopyPaste.md)（視点・切断ボックス・VP位置・トリミング） |
 | 注釈・詳細 | [部屋タグ自動配置](./RoomTagCreator.md)、[塗潰し領域 分割/統合](./FilledRegionSplitMerge.md) |
-| 構造 | [梁下端色分け](./BeamUnderLevel.md)、[梁天端色分け](./BeamTopLevel.md)、[耐火被覆色分け](./FireProtection.md)、[型枠数量算出](./FormworkCalculator.md) |
+| 構造 | [梁レベル色分け](./BeamLevelColor.md)（梁天端・梁下端）、[耐火被覆色分け](./FireProtection.md)、[型枠数量算出](./FormworkCalculator.md) |
 | データ | [EXCELエクスポート/インポート](./ExcelExportImport.md) |
