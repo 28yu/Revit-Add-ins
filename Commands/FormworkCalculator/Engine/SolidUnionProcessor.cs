@@ -16,6 +16,11 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         /// <summary>
         /// 要素の Solid を取得し、transform が指定されていれば各 Solid に適用する。
         /// リンク要素の場合は GetTotalTransform を渡してホスト座標系に変換する。
+        ///
+        /// WallSweep フォールバック: 通常の Options で solid が 0 個だった場合、
+        /// IncludeNonVisibleObjects=true で再試行する。リンクドキュメント内の
+        /// WallSweep は「非表示要素」扱いされて geometry が空で返ることが多いため
+        /// (Revit API の既知の挙動)。WallSweep 以外には適用しない。
         /// </summary>
         internal static List<Solid> GetSolids(Element elem, Transform transform)
         {
@@ -31,10 +36,29 @@ namespace Tools28.Commands.FormworkCalculator.Engine
 
             GeometryElement geom;
             try { geom = elem.get_Geometry(opt); }
-            catch { return result; }
-            if (geom == null) return result;
+            catch { geom = null; }
+            if (geom != null) CollectSolidsRecursive(geom, result);
 
-            CollectSolidsRecursive(geom, result);
+            // WallSweep フォールバック: 空だったら IncludeNonVisibleObjects=true で再取得
+            if (result.Count == 0 && elem is WallSweep)
+            {
+                Options opt2 = new Options
+                {
+                    ComputeReferences = false,
+                    IncludeNonVisibleObjects = true,
+                    DetailLevel = ViewDetailLevel.Fine,
+                };
+                GeometryElement geom2;
+                try { geom2 = elem.get_Geometry(opt2); }
+                catch { geom2 = null; }
+                if (geom2 != null) CollectSolidsRecursive(geom2, result);
+                if (result.Count > 0 && FormworkDebugLog.Enabled)
+                {
+                    FormworkDebugLog.Log(
+                        $"  [LinkSweepDiag] WallSweep fallback E{elem.Id.IntValue()} " +
+                        $"IncludeNonVisibleObjects=true → recovered {result.Count} solids");
+                }
+            }
 
             // transform が Identity でなければ各 Solid を変換
             if (transform != null && !transform.IsIdentity)
