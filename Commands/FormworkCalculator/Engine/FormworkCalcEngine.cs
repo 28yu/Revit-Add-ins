@@ -92,6 +92,43 @@ namespace Tools28.Commands.FormworkCalculator.Engine
 
             if (sources.Count == 0) return result;
 
+            // 壁の化粧目地 (Reveal, OST_Reveals — subtractive WallSweep) を型枠計算から除外する。
+            // 化粧目地は壁を切り欠く feature であり、独立した躯体要素ではない。
+            // - 壁の solid は化粧目地によってカットされ、切欠き面 (cut face) は wall solid 側に含まれる
+            // - 切欠き面の型枠は ContactFaceDetector のアシメトリ保護 + SlopedWallTop の絞り込みで
+            //   wall 側に FormworkRequired として残る
+            // - 化粧目地 element 自体は cut volume を表現する「ファントム」であり、
+            //   露出面に型枠を生成すべきではない
+            // ※ Sweep 型 (OST_Cornices — 装飾的な加算 sweep) は除外しない (露出面の型枠は必要)
+            var revealsToExclude = sources.Where(s =>
+                s.Element is WallSweep &&
+                s.Element.Category?.Id.IntValue() == (int)BuiltInCategory.OST_Reveals
+            ).ToList();
+            if (revealsToExclude.Count > 0)
+            {
+                foreach (var src in revealsToExclude)
+                {
+                    var elem = src.Element;
+                    result.ExcludedResults.Add(new ExcludedResult
+                    {
+                        ElementId = src.SurrogateId,
+                        ElementName = elem.Name ?? string.Empty,
+                        Category = CategoryGroup.Wall,
+                        CategoryName = elem.Category?.Name ?? string.Empty,
+                        SourceName = src.SourceName,
+                        Kind = ExclusionKind.WallSweep,
+                        DetectionLayer = "Reveal",
+                        DetectionReason = "壁の化粧目地 (型枠は壁の切欠き面で算入)",
+                    });
+                }
+                sources.RemoveAll(s =>
+                    s.Element is WallSweep &&
+                    s.Element.Category?.Id.IntValue() == (int)BuiltInCategory.OST_Reveals);
+                FormworkDebugLog.Log(
+                    $"  Excluded {revealsToExclude.Count} Reveal (化粧目地) elements " +
+                    $"(formwork accounted on wall cut-face side)");
+            }
+
             double? glFeet = null;
             if (_settings.UseGLDeduction)
                 glFeet = UnitUtils.ConvertToInternalUnits(_settings.GLElevationMeters, UnitTypeId.Meters);
