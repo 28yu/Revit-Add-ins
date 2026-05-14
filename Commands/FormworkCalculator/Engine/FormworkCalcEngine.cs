@@ -152,9 +152,11 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 contexts, srcByContext, linkSweepFaceSnapshot, "post-RefineContactFaces");
 
             // Pass 2b: WallSweep (スイープ・リビール) の host 壁面を直接 DeductedContact 化
-            // (Reveal 等で WallSweep 自身がソリッドを持たないケースに対応)
-            // ※ リンク要素には WallSweep は含まれないため host doc のみで処理
-            WallSweepFaceDeductor.DeductWallFacesNearSweeps(_doc, contexts, srcByContext);
+            // していたが、ユーザー仕様「壁と化粧目地の接触面に型枠を残す」のため無効化。
+            // ContactFaceDetector 側で WallSweep 接触の壁側を FormworkRequired のまま保持する
+            // ようになったので、本処理は不要 (WallSweep が solid を持つ場合は ContactFaceDetector
+            // が処理、持たない場合は wall 面が単純に FormworkRequired のまま残るのが望ましい)。
+            // WallSweepFaceDeductor.DeductWallFacesNearSweeps(_doc, contexts, srcByContext);
             LogLinkSweepFaceTypeDelta(
                 contexts, srcByContext, linkSweepFaceSnapshot, "post-WallSweepFaceDeductor");
 
@@ -613,10 +615,16 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             // 壁の斜めの天端: 斜面の水平射影の短辺 (壁厚方向の幅) が
             // しきい値 (既定 30mm) 以上なら型枠不要 (天端扱い) として控除する。
             // 小さな面取り (< 30mm) は型枠必要のまま残す。
+            //
+            // ⚠️ 追加条件: 面中心 z が壁の最高点近く (上位 15% 領域) に限定する。
+            // これがないと leaning wall (傾斜壁) の主側面 (nz が少し正) まで誤って
+            // 天端扱いされる問題があった (壁 E4551240 等)。
             if (isWall && _settings.SlopedWallTopWidthThresholdMm > 0)
             {
                 double thresholdFeet = UnitUtils.ConvertToInternalUnits(
                     _settings.SlopedWallTopWidthThresholdMm, UnitTypeId.Millimeters);
+                double wallHeight = maxZ - minZ;
+                double topZThreshold = minZ + wallHeight * 0.85;
                 foreach (var fi in faceInfos)
                 {
                     if (fi.FaceType != FaceType.FormworkRequired) continue;
@@ -625,13 +633,24 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                     // 上向き斜面のみ対象 (水平面は既存ルールで処理済み)
                     if (nz <= 0.1 || nz >= 0.99) continue;
 
+                    // 面中心 z が壁の上位 15% 以内にあることを要求
+                    double faceCenterZ = TryGetFaceCenterZ(fi.Face);
+                    if (double.IsNaN(faceCenterZ) || faceCenterZ < topZThreshold)
+                    {
+                        FormworkDebugLog.Log(
+                            $"  [SlopedWallTop-Skip] E{elem.Id.IntValue()} face nz={nz:F3} " +
+                            $"centerZmm={faceCenterZ * 304.8:F0} topThr={topZThreshold * 304.8:F0} " +
+                            $"(壁中央〜下の側面のためスキップ)");
+                        continue;
+                    }
+
                     double widthFeet = ComputeFaceHorizontalShortDim(fi.Face);
                     if (widthFeet >= thresholdFeet)
                     {
                         fi.FaceType = FaceType.DeductedTop;
                         FormworkDebugLog.Log(
                             $"  [SlopedWallTop] E{elem.Id.IntValue()} face nz={nz:F3} " +
-                            $"widthMm={widthFeet * 304.8:F1} → DeductedTop");
+                            $"widthMm={widthFeet * 304.8:F1} centerZmm={faceCenterZ * 304.8:F0} → DeductedTop");
                     }
                 }
             }
@@ -668,7 +687,26 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 CategoryName = elem.Category?.Name ?? string.Empty,
                 BB = bb,
                 Faces = faceInfos,
+                IsWallSweep = elem is WallSweep,
             };
+        }
+
+        /// <summary>
+        /// 面の中心点 (UV bounding box の中点を Evaluate) の Z 座標を取得する。
+        /// 取得失敗時は double.NaN を返す。
+        /// </summary>
+        private static double TryGetFaceCenterZ(Face face)
+        {
+            if (face == null) return double.NaN;
+            try
+            {
+                var bb = face.GetBoundingBox();
+                if (bb == null) return double.NaN;
+                var midUV = (bb.Min + bb.Max) * 0.5;
+                var p = face.Evaluate(midUV);
+                return p?.Z ?? double.NaN;
+            }
+            catch { return double.NaN; }
         }
 
         /// <summary>
@@ -872,12 +910,16 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 {
                     double thresholdFeet = UnitUtils.ConvertToInternalUnits(
                         settings.SlopedWallTopWidthThresholdMm, UnitTypeId.Millimeters);
+                    double wallHeight = maxZ - minZ;
+                    double topZThreshold = minZ + wallHeight * 0.85;
                     foreach (var f in faces)
                     {
                         if (f.FaceType != FaceType.FormworkRequired) continue;
                         if (f.Normal == null) continue;
                         double nz = f.Normal.Z;
                         if (nz <= 0.1 || nz >= 0.99) continue;
+                        double faceCenterZ = TryGetFaceCenterZ(f.Face);
+                        if (double.IsNaN(faceCenterZ) || faceCenterZ < topZThreshold) continue;
                         double widthFeet = ComputeFaceHorizontalShortDim(f.Face);
                         if (widthFeet >= thresholdFeet)
                             f.FaceType = FaceType.DeductedTop;
@@ -893,6 +935,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                     CategoryName = elem.Category?.Name ?? string.Empty,
                     BB = bb,
                     Faces = faces,
+                    IsWallSweep = elem is WallSweep,
                 });
             }
 

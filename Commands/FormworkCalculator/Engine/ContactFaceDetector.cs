@@ -30,6 +30,11 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             public string CategoryName;
             public BoundingBoxXYZ BB;
             public List<FaceClassifier.FaceInfo> Faces = new List<FaceClassifier.FaceInfo>();
+            /// <summary>
+            /// この要素が WallSweep (壁スイープ・化粧目地リビール) かどうか。
+            /// 壁本体側の接触面控除を抑制するために使用。
+            /// </summary>
+            public bool IsWallSweep;
         }
 
         private const double CoincidenceTolFeet = 0.05;   // ≈ 15mm
@@ -93,6 +98,12 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                         // FormworkRequired 面のみが対象
                         if (fi.FaceType != FaceType.FormworkRequired) continue;
 
+                        // 壁本体 vs WallSweep (化粧目地・スイープ等) の接触では、
+                        // 壁本体側の面を DeductedContact に降格させない (FormworkRequired のまま保持)。
+                        // ユーザー仕様: 壁と化粧目地の接触面に型枠が必要なため。
+                        // 逆方向 (WallSweep 側) は通常通り deduct する。
+                        bool wallVsSweepProtect = !ci.IsWallSweep && cj.IsWallSweep;
+
                         // 既に Full Contact 化された面は以降スキップ
                         bool fullyContacted = false;
 
@@ -107,12 +118,25 @@ namespace Tools28.Commands.FormworkCalculator.Engine
 
                             if (result.Kind == ContactKind.Full)
                             {
-                                fi.FaceType = FaceType.DeductedContact;
-                                contactChanges++;
-                                fullyContacted = true;
+                                if (wallVsSweepProtect)
+                                {
+                                    // 壁面を FormworkRequired のまま保持
+                                    FormworkDebugLog.Log(
+                                        $"  [WallVsSweepProtect] E{ci.ElementId} face[{fiIdx}] " +
+                                        $"vs E{cj.ElementId} face[{fjIdx}] → 壁面は FormworkRequired のまま保持");
+                                    fullyContacted = true;  // この面は今後の検出をスキップ
+                                }
+                                else
+                                {
+                                    fi.FaceType = FaceType.DeductedContact;
+                                    contactChanges++;
+                                    fullyContacted = true;
+                                }
                             }
                             else if (result.Kind == ContactKind.Partial)
                             {
+                                // 壁本体 vs WallSweep の部分接触も保護対象
+                                if (wallVsSweepProtect) continue;
                                 // 重複を防ぐ (同じ相手要素・同じ面を2回加算しない)
                                 bool dup = false;
                                 foreach (var pc in fi.PartialContacts)
