@@ -165,7 +165,21 @@ namespace Tools28.Commands.FormworkCalculator.Output
 
             foreach (var er in result.ElementResults)
             {
-                if (!facesByElement.TryGetValue(er.ElementId, out var faces)) continue;
+                if (!facesByElement.TryGetValue(er.ElementId, out var faces))
+                {
+                    // [LinkSweepDiag] facesByElement に該当 ID が無いと DirectShape が作られない
+                    var regChk = result.SourceRegistry as Engine.ElementSourceRegistry;
+                    var sChk = regChk?.Get(er.ElementId);
+                    if (sChk != null && sChk.IsLinked && sChk.Element is WallSweep
+                        && FormworkDebugLog.Enabled)
+                    {
+                        FormworkDebugLog.Log(
+                            $"  [LinkSweepDiag] Visualizer-SKIP E{sChk.Element.Id.IntValue()} " +
+                            $"src='{sChk.SourceName}' surrogateId={er.ElementId} " +
+                            $"reason='facesByElement に該当 ID 無し (RecomputeFaces で取れていない)'");
+                    }
+                    continue;
+                }
 
                 string key = GetKey(er, settings);
                 typeIdByKey.TryGetValue(key, out var typeId);
@@ -174,14 +188,20 @@ namespace Tools28.Commands.FormworkCalculator.Output
 
                 // 要素のレベル名を取得 (リンク要素はリンクドキュメント経由)
                 string levelName = string.Empty;
+                Engine.ElementSource srcForDiag = null;
                 try
                 {
                     var registry = result.SourceRegistry as Engine.ElementSourceRegistry;
                     var src = registry?.Get(er.ElementId);
+                    srcForDiag = src;
                     var srcElem = src?.Element ?? doc.GetElement(new ElementId(er.ElementId));
                     levelName = Engine.ElementCollector.GetElementLevelName(srcElem);
                 }
                 catch { }
+
+                bool isLinkSweepDiag =
+                    srcForDiag != null && srcForDiag.IsLinked && srcForDiag.Element is WallSweep;
+                int linkSweepDsCreated = 0;
 
                 // 各 FormworkRequired 面の有効面積 (fi.EffectiveAreaM2) を、その面に対応する
                 // DirectShape (Clipper 分割なら最初の 1 個) に割り当てる。
@@ -314,6 +334,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
                         if (dsId != null)
                         {
                             vr.CreatedShapeIds.Add(dsId);
+                            if (isLinkSweepDiag && isFormworkRequired) linkSweepDsCreated++;
                             if (isFormworkRequired)
                             {
                                 assignedAreaM2 += areaM2ThisDs;
@@ -364,6 +385,15 @@ namespace Tools28.Commands.FormworkCalculator.Output
                         }
                         catch { }
                     }
+                }
+
+                if (isLinkSweepDiag && FormworkDebugLog.Enabled)
+                {
+                    FormworkDebugLog.Log(
+                        $"  [LinkSweepDiag] Visualizer-done E{srcForDiag.Element.Id.IntValue()} " +
+                        $"src='{srcForDiag.SourceName}' surrogateId={er.ElementId} " +
+                        $"FormworkArea={er.FormworkArea:F4}m² faceCount={faces.Count} " +
+                        $"createdFormworkDS={linkSweepDsCreated}");
                 }
             }
 

@@ -123,14 +123,21 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             // Pass 1 完了時: 各要素の面分類内訳をログ
             LogPass1Summary(contexts);
 
+            // [LinkSweepDiag] Pass 2 前後の face type 変化を追跡するためのスナップショット
+            var linkSweepFaceSnapshot = SnapshotLinkSweepFaceTypes(contexts, srcByContext);
+
             // Pass 2: 幾何学的な直接検査で接触面を検出して控除
             _progress?.Report("Pass 2: 接触面を検出中...");
             ContactFaceDetector.RefineContactFaces(contexts);
+            LogLinkSweepFaceTypeDelta(
+                contexts, srcByContext, linkSweepFaceSnapshot, "post-RefineContactFaces");
 
             // Pass 2b: WallSweep (スイープ・リビール) の host 壁面を直接 DeductedContact 化
             // (Reveal 等で WallSweep 自身がソリッドを持たないケースに対応)
             // ※ リンク要素には WallSweep は含まれないため host doc のみで処理
             WallSweepFaceDeductor.DeductWallFacesNearSweeps(_doc, contexts, srcByContext);
+            LogLinkSweepFaceTypeDelta(
+                contexts, srcByContext, linkSweepFaceSnapshot, "post-WallSweepFaceDeductor");
 
             // Pass 2 完了時: 最終 FormworkRequired 面数
             LogPostPass2Summary(contexts);
@@ -391,6 +398,71 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             FormworkDebugLog.Flush();
         }
 
+        /// <summary>
+        /// [LinkSweepDiag] Pass 2 前のリンク WallSweep の face type 一覧を撮影する。
+        /// </summary>
+        private static Dictionary<int, List<FaceType>> SnapshotLinkSweepFaceTypes(
+            List<ContactFaceDetector.ElementFacesContext> contexts,
+            Dictionary<int, ElementSource> srcByContext)
+        {
+            var snap = new Dictionary<int, List<FaceType>>();
+            if (!FormworkDebugLog.Enabled) return snap;
+            foreach (var ctx in contexts)
+            {
+                if (!srcByContext.TryGetValue(ctx.ElementId, out var src)) continue;
+                if (!src.IsLinked) continue;
+                if (!(src.Element is WallSweep)) continue;
+                var copy = new List<FaceType>(ctx.Faces.Count);
+                foreach (var f in ctx.Faces) copy.Add(f.FaceType);
+                snap[ctx.ElementId] = copy;
+            }
+            return snap;
+        }
+
+        /// <summary>
+        /// [LinkSweepDiag] スナップショットと比較して、各リンク WallSweep の face type が
+        /// 何個 → 何個に変化したかをログ出力する。
+        /// </summary>
+        private static void LogLinkSweepFaceTypeDelta(
+            List<ContactFaceDetector.ElementFacesContext> contexts,
+            Dictionary<int, ElementSource> srcByContext,
+            Dictionary<int, List<FaceType>> snap,
+            string stageLabel)
+        {
+            if (!FormworkDebugLog.Enabled || snap == null || snap.Count == 0) return;
+            foreach (var ctx in contexts)
+            {
+                if (!snap.TryGetValue(ctx.ElementId, out var before)) continue;
+                if (!srcByContext.TryGetValue(ctx.ElementId, out var src)) continue;
+                int reqB = before.Count(t => t == FaceType.FormworkRequired);
+                int conB = before.Count(t => t == FaceType.DeductedContact);
+                int reqA = 0, conA = 0;
+                foreach (var f in ctx.Faces)
+                {
+                    if (f.FaceType == FaceType.FormworkRequired) reqA++;
+                    else if (f.FaceType == FaceType.DeductedContact) conA++;
+                }
+                FormworkDebugLog.Log(
+                    $"  [LinkSweepDiag] {stageLabel} E{src.Element.Id.IntValue()} src='{src.SourceName}' " +
+                    $"FormworkRequired {reqB}→{reqA}  DeductedContact {conB}→{conA}");
+                // 各 face の遷移詳細 (面数 ≤ 8 のみ詳細出力)
+                if (ctx.Faces.Count <= 8)
+                {
+                    for (int i = 0; i < ctx.Faces.Count && i < before.Count; i++)
+                    {
+                        if (before[i] != ctx.Faces[i].FaceType)
+                        {
+                            FormworkDebugLog.Log(
+                                $"    face[{i}] {before[i]} → {ctx.Faces[i].FaceType} " +
+                                $"(area={ctx.Faces[i].Area:F4}ft², partials={ctx.Faces[i].PartialContacts.Count})");
+                        }
+                    }
+                }
+                // スナップショットを最新状態に更新 (次の stage の比較用)
+                snap[ctx.ElementId] = ctx.Faces.Select(f => f.FaceType).ToList();
+            }
+        }
+
         private static void LogPostPass2Summary(List<ContactFaceDetector.ElementFacesContext> contexts)
         {
             if (!FormworkDebugLog.Enabled) return;
@@ -444,8 +516,42 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             ElementSource src, double? glFeet)
         {
             var elem = src.Element;
+
+            // [LinkSweepDiag] リンク要素の WallSweep について solid 取得の詳細を診断
+            bool isLinkSweep = src.IsLinked && elem is WallSweep;
+            List<Solid> rawSolids = null;
+            if (isLinkSweep && FormworkDebugLog.Enabled)
+            {
+                rawSolids = SolidUnionProcessor.GetSolids(elem, null);
+                double rawVol = 0;
+                foreach (var s in rawSolids) rawVol += s?.Volume ?? 0;
+                double det = 0;
+                try { det = src.Transform?.Determinant ?? 0; } catch { }
+                FormworkDebugLog.Log(
+                    $"  [LinkSweepDiag] Pass1-pre E{elem.Id.IntValue()} src='{src.SourceName}' " +
+                    $"rawSolids={rawSolids.Count} rawVol={rawVol:F4}ft³ " +
+                    $"xformDet={det:F4} xformOrigin=({src.Transform?.Origin.X:F2},{src.Transform?.Origin.Y:F2},{src.Transform?.Origin.Z:F2})");
+            }
+
             var solids = SolidUnionProcessor.GetSolids(elem, src.Transform);
-            if (solids.Count == 0) return null;
+            if (solids.Count == 0)
+            {
+                if (isLinkSweep && FormworkDebugLog.Enabled)
+                {
+                    FormworkDebugLog.Log(
+                        $"  [LinkSweepDiag] Pass1-ABORT E{elem.Id.IntValue()} src='{src.SourceName}' " +
+                        $"transformedSolids=0 → ctx will be null (no DirectShape will be created)");
+                }
+                return null;
+            }
+            if (isLinkSweep && FormworkDebugLog.Enabled)
+            {
+                double txVol = 0;
+                foreach (var s in solids) txVol += s?.Volume ?? 0;
+                FormworkDebugLog.Log(
+                    $"  [LinkSweepDiag] Pass1-postXform E{elem.Id.IntValue()} src='{src.SourceName}' " +
+                    $"transformedSolids={solids.Count} txVol={txVol:F4}ft³");
+            }
 
             Solid unioned = SolidUnionProcessor.Union(solids);
             var finalSolids = unioned != null ? new List<Solid> { unioned } : solids;
@@ -513,6 +619,28 @@ namespace Tools28.Commands.FormworkCalculator.Engine
 
             // BoundingBox を世界座標で計算する (ホスト・リンクとも統一)
             BoundingBoxXYZ bb = ComputeWorldBoundingBox(finalSolids);
+
+            if (isLinkSweep && FormworkDebugLog.Enabled)
+            {
+                int req = 0, top = 0, bot = 0, con = 0, bgl = 0, inc = 0, err = 0;
+                foreach (var f in faceInfos)
+                {
+                    switch (f.FaceType)
+                    {
+                        case FaceType.FormworkRequired: req++; break;
+                        case FaceType.DeductedTop: top++; break;
+                        case FaceType.DeductedBottom: bot++; break;
+                        case FaceType.DeductedContact: con++; break;
+                        case FaceType.DeductedBelowGL: bgl++; break;
+                        case FaceType.Inclined: inc++; break;
+                        case FaceType.Error: err++; break;
+                    }
+                }
+                FormworkDebugLog.Log(
+                    $"  [LinkSweepDiag] Pass1-classified E{elem.Id.IntValue()} src='{src.SourceName}' " +
+                    $"surrogateId={src.SurrogateId} totalFaces={faceInfos.Count} " +
+                    $"Req={req} Top={top} Bot={bot} Con={con} BGL={bgl} Inc={inc} Err={err}");
+            }
 
             return new ContactFaceDetector.ElementFacesContext
             {
@@ -622,6 +750,15 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             {
                 if (fi.FaceType == FaceType.FormworkRequired && fi.PartialContacts.Count > 0)
                 { hasPartialContact = true; break; }
+            }
+
+            if (src.IsLinked && elem is WallSweep && FormworkDebugLog.Enabled)
+            {
+                FormworkDebugLog.Log(
+                    $"  [LinkSweepDiag] Pass3-result E{elem.Id.IntValue()} src='{src.SourceName}' " +
+                    $"FormworkArea={formwork:F4}m² dedTop={dedTop:F4} dedBot={dedBottom:F4} " +
+                    $"dedCon={dedContact:F4} openingDed={openingDeducted:F4} openingAdd={openingAdded:F4} " +
+                    $"hasPartial={hasPartialContact}");
             }
 
             return new ElementResult

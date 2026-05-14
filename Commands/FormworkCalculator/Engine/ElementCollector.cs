@@ -350,9 +350,16 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                     var sweeps = swCol.OfClass(typeof(WallSweep))
                         .WhereElementIsNotElementType()
                         .ToList();
+                    int addedSweeps = 0;
                     foreach (var sw in sweeps)
                     {
-                        if (seenIds.Add(sw.Id.IntValue())) result.Add(sw);
+                        if (seenIds.Add(sw.Id.IntValue())) { result.Add(sw); addedSweeps++; }
+                    }
+                    if (isLinked && FormworkDebugLog.Enabled)
+                    {
+                        FormworkDebugLog.Log(
+                            $"  [LinkSweepDiag] CollectFromDoc(linkDoc='{doc?.Title}') " +
+                            $"WallSweep found={sweeps.Count} added={addedSweeps}");
                     }
                 }
                 else
