@@ -82,8 +82,14 @@ namespace Tools28.Commands.FormworkCalculator.Engine
 
         /// <summary>
         /// 要素を 4 層のロジックで判定する。鉄骨と判断されなければ IsSteel=false を返す。
+        ///
+        /// skipShapeAnalysis=true の場合、L2 (断面形状分析 = get_Geometry 呼び出し) をスキップする。
+        /// BIM360 ワークシェアリングのリンク要素では get_Geometry がクラウド同期待ちでブロックする
+        /// 可能性があるため、リンク要素の除外検出フェーズでは skipShapeAnalysis=true を渡すこと。
+        /// なお、除外されなかったリンク要素は Pass 1 (ClassifyElementFaces) で改めて
+        /// get_Geometry が呼ばれるため、鉄骨の見逃しは最小限に抑えられる。
         /// </summary>
-        internal static DetectionResult Detect(Element elem, Document doc)
+        internal static DetectionResult Detect(Element elem, Document doc, bool skipShapeAnalysis = false)
         {
             if (elem == null) return new DetectionResult();
 
@@ -106,15 +112,18 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             }
             catch { }
 
-            // L2: 断面形状分析
-            try
+            // L2: 断面形状分析 (get_Geometry を使用 — リンク要素では skipShapeAnalysis=true でスキップ)
+            if (!skipShapeAnalysis)
             {
-                var shapeRes = AnalyzeShape(elem);
-                if (shapeRes != null && shapeRes.IsSteel) return shapeRes;
-            }
-            catch (Exception ex)
-            {
-                FormworkDebugLog.Log($"  [SteelDetect] L2 shape analysis exception: {ex.Message}");
+                try
+                {
+                    var shapeRes = AnalyzeShape(elem);
+                    if (shapeRes != null && shapeRes.IsSteel) return shapeRes;
+                }
+                catch (Exception ex)
+                {
+                    FormworkDebugLog.Log($"  [SteelDetect] L2 shape analysis exception: {ex.Message}");
+                }
             }
 
             // L3: マテリアルクラス / 名前

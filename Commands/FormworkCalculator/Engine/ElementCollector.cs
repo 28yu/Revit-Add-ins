@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -72,6 +73,12 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         /// リンクモデルから対象要素を収集して登録する。
         /// 「現在のビュー」モードでは、リンクインスタンスがアクティブビューに表示されている
         /// もののみ対象とする (リンク内の要素単位の可視判定は行わない簡易版)。
+        ///
+        /// BIM360 ワークシェアリングモデル対応:
+        ///   リンクドキュメントがワークシェアリング (IsWorkshared=true) の場合、
+        ///   全要素を走査すると `get_Geometry()` 等がクラウド同期を待機してフリーズすることがある。
+        ///   対策として CurrentView モードでは 3D ビューのセクションボックスを使い、
+        ///   リンクモデル座標系に逆変換した BoundingBoxIntersectsFilter で要素数を絞り込む。
         /// </summary>
         private static void CollectFromLinkedModels(
             Document hostDoc, FormworkSettings settings, View activeView, CollectionResult cr)
@@ -105,7 +112,32 @@ namespace Tools28.Commands.FormworkCalculator.Engine
 
                 string sourceName = MakeLinkSourceName(rli, linkDoc);
 
-                var linkedElems = CollectFromDoc(linkDoc, settings, null, isLinked: true);
+                // ワークシェアリング診断ログ
+                bool isWorkshared = false;
+                try { isWorkshared = linkDoc.IsWorkshared; } catch { }
+                if (isWorkshared)
+                {
+                    FormworkDebugLog.Log(
+                        $"  [LinkedCollect] ⚠️ {sourceName}: IsWorkshared=true (BIM360 or Revit Server). " +
+                        $"セクションボックスフィルタで要素数を絞り込みます。");
+                }
+
+                // CurrentView + 3D セクションボックスがあればリンクローカル座標系に変換した
+                // BoundingBoxIntersectsFilter を生成し、大規模モデルの要素数を絞り込む。
+                Outline linkLocalOutline = null;
+                if (settings.Scope == CalculationScope.CurrentView)
+                {
+                    linkLocalOutline = GetLinkLocalSectionBoxOutline(activeView, transform);
+                    if (linkLocalOutline != null)
+                    {
+                        FormworkDebugLog.Log(
+                            $"  [LinkedCollect] {sourceName}: セクションボックスフィルタ適用 " +
+                            $"link-local=[({linkLocalOutline.MinimumPoint.X:F2},{linkLocalOutline.MinimumPoint.Y:F2},{linkLocalOutline.MinimumPoint.Z:F2}) - " +
+                            $"({linkLocalOutline.MaximumPoint.X:F2},{linkLocalOutline.MaximumPoint.Y:F2},{linkLocalOutline.MaximumPoint.Z:F2})]");
+                    }
+                }
+
+                var linkedElems = CollectFromDoc(linkDoc, settings, null, isLinked: true, linkLocalOutline: linkLocalOutline);
                 foreach (var elem in linkedElems)
                 {
                     cr.Registry.RegisterLinked(elem, linkDoc, transform, sourceName, rli.Id);
@@ -114,11 +146,69 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 linkedDocCount++;
                 FormworkDebugLog.Log(
                     $"  [LinkedCollect] {sourceName} elements={linkedElems.Count} " +
+                    $"isWorkshared={isWorkshared} " +
                     $"transform=Translation({transform.Origin.X:F2},{transform.Origin.Y:F2},{transform.Origin.Z:F2})");
             }
 
             cr.LinkedInstanceCount = instanceCount;
             cr.LinkedDocumentCount = linkedDocCount;
+        }
+
+        /// <summary>
+        /// アクティブビュー (3D) のセクションボックスをリンクモデルのローカル座標系に変換した
+        /// Outline を返す。セクションボックスが無効 / 取得失敗の場合は null を返す。
+        /// </summary>
+        private static Outline GetLinkLocalSectionBoxOutline(View activeView, Transform linkTransform)
+        {
+            if (!(activeView is View3D v3d)) return null;
+
+            BoundingBoxXYZ sb = null;
+            try
+            {
+                if (v3d.IsSectionBoxActive)
+                    sb = v3d.GetSectionBox();
+            }
+            catch { }
+            if (sb == null) return null;
+
+            Transform invLink = null;
+            try { invLink = linkTransform.Inverse; } catch { return null; }
+
+            // セクションボックスは独自のローカル Transform を持つため、
+            // 8 コーナーを sbTransform でワールド座標 → invLink でリンクローカル座標 に変換する
+            Transform sbTrans = sb.Transform ?? Transform.Identity;
+
+            double minX = double.MaxValue, minY = double.MaxValue, minZ = double.MaxValue;
+            double maxX = double.MinValue, maxY = double.MinValue, maxZ = double.MinValue;
+
+            bool valid = false;
+            foreach (double cx in new[] { sb.Min.X, sb.Max.X })
+            foreach (double cy in new[] { sb.Min.Y, sb.Max.Y })
+            foreach (double cz in new[] { sb.Min.Z, sb.Max.Z })
+            {
+                XYZ world;
+                try { world = sbTrans.OfPoint(new XYZ(cx, cy, cz)); } catch { return null; }
+                XYZ local;
+                try { local = invLink.OfPoint(world); } catch { return null; }
+                minX = Math.Min(minX, local.X);
+                minY = Math.Min(minY, local.Y);
+                minZ = Math.Min(minZ, local.Z);
+                maxX = Math.Max(maxX, local.X);
+                maxY = Math.Max(maxY, local.Y);
+                maxZ = Math.Max(maxZ, local.Z);
+                valid = true;
+            }
+            if (!valid) return null;
+
+            // 境界要素が欠けないよう 500mm のマージンを追加
+            double tol = UnitUtils.ConvertToInternalUnits(500, UnitTypeId.Millimeters);
+            try
+            {
+                return new Outline(
+                    new XYZ(minX - tol, minY - tol, minZ - tol),
+                    new XYZ(maxX + tol, maxY + tol, maxZ + tol));
+            }
+            catch { return null; }
         }
 
         /// <summary>
@@ -167,9 +257,13 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 if (exclude)
                 {
                     // 構造柱・構造フレーム → 鉄骨判定
+                    // リンク要素は skipShapeAnalysis=true: L2 の get_Geometry を除外フェーズで呼ばない。
+                    // BIM360 ワークシェアリングモデルでは get_Geometry がクラウド待ちでブロックする
+                    // 可能性があるため。L2 で見逃した鉄骨は Pass 1 (ClassifyElementFaces) の
+                    // get_Geometry 呼び出しで solid が 0 になるため、自然に除外される。
                     if (IsSteelDetectionTarget(elem))
                     {
-                        var det = SteelMemberDetector.Detect(elem, srcDoc);
+                        var det = SteelMemberDetector.Detect(elem, srcDoc, skipShapeAnalysis: src.IsLinked);
                         if (det != null && det.IsSteel)
                         {
                             cr.Excluded.Add(new ExcludedEntry
@@ -304,9 +398,12 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         /// <summary>
         /// 単一ドキュメントから対象カテゴリの要素を収集する (ホスト・リンクで共通)。
         /// activeView は host の現在ビューモード用。リンク収集時には null。
+        /// linkLocalOutline が非 null の場合、BoundingBoxIntersectsFilter で要素範囲を絞り込む
+        /// (BIM360/大規模リンクモデルでのフリーズ防止)。
         /// </summary>
         internal static List<Element> CollectFromDoc(
-            Document doc, FormworkSettings settings, View activeView, bool isLinked)
+            Document doc, FormworkSettings settings, View activeView, bool isLinked,
+            Outline linkLocalOutline = null)
         {
             var result = new List<Element>();
             var seenIds = new HashSet<int>();
@@ -323,7 +420,20 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                     ? new FilteredElementCollector(doc, activeView.Id)
                     : new FilteredElementCollector(doc);
 
-                var elems = col.OfCategory(bic).WhereElementIsNotElementType().ToList();
+                IList<Element> elems;
+                if (linkLocalOutline != null)
+                {
+                    // セクションボックス範囲フィルタ: BIM360 等の大規模リンクモデルで
+                    // ビュー内の要素のみに絞り込み、不要な geometry アクセスを回避する
+                    elems = col.OfCategory(bic)
+                        .WhereElementIsNotElementType()
+                        .WherePasses(new BoundingBoxIntersectsFilter(linkLocalOutline))
+                        .ToList();
+                }
+                else
+                {
+                    elems = col.OfCategory(bic).WhereElementIsNotElementType().ToList();
+                }
 
                 if (bic == BuiltInCategory.OST_Walls)
                 {
@@ -347,9 +457,20 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                     FilteredElementCollector swCol = useViewFilter
                         ? new FilteredElementCollector(doc, activeView.Id)
                         : new FilteredElementCollector(doc);
-                    var sweeps = swCol.OfClass(typeof(WallSweep))
-                        .WhereElementIsNotElementType()
-                        .ToList();
+                    ICollection<Element> sweeps;
+                    if (linkLocalOutline != null)
+                    {
+                        sweeps = swCol.OfClass(typeof(WallSweep))
+                            .WhereElementIsNotElementType()
+                            .WherePasses(new BoundingBoxIntersectsFilter(linkLocalOutline))
+                            .ToList();
+                    }
+                    else
+                    {
+                        sweeps = swCol.OfClass(typeof(WallSweep))
+                            .WhereElementIsNotElementType()
+                            .ToList();
+                    }
                     int addedSweeps = 0;
                     foreach (var sw in sweeps)
                     {
