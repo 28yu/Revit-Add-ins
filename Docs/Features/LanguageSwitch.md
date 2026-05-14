@@ -89,4 +89,4 @@
 | ビュー | [ビュー コピー＆ペースト](./ViewCopyPaste.md)（視点・切断ボックス・VP位置・トリミング） |
 | 注釈・詳細 | [部屋タグ自動配置](./RoomTagCreator.md)、[塗潰し領域 分割/統合](./FilledRegionSplitMerge.md) |
 | 構造 | [梁レベル色分け](./BeamLevelColor.md)（梁天端・梁下端）、[耐火被覆色分け](./FireProtection.md)、[型枠数量算出](./FormworkCalculator.md) |
-| データ | [EXCELエクスポート/インポート](./ExcelExportImport.md) |
+| データ | [EXCELエクスポート](./ExcelExport.md)、[EXCELインポート](./ExcelImport.md) |
