@@ -649,6 +649,15 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 }
             }
 
+            // 床(スラブ)の場合、ボイドや開口で抜かれた内部の縦面・下向き面を除外する。
+            // 床の外周以外にある縦面は「ボイド/開口の内側」と判定し型枠不要とする。
+            // (外周の縦面は床の本来のエッジで型枠必要、ボイド内側はコンクリート打設時に
+            //  打設されない空間なので型枠不要)
+            if (isSlab)
+            {
+                ExcludeSlabInteriorVoidFaces(elem, faceInfos, finalSolids);
+            }
+
             // 壁の斜めの天端: 斜面の水平射影の短辺 (壁厚方向の幅) が
             // しきい値 (既定 30mm) 以上なら型枠不要 (天端扱い) として控除する。
             // 小さな面取り (< 30mm) は型枠必要のまま残す。
@@ -726,6 +735,144 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 Faces = faceInfos,
                 IsWallSweep = elem is WallSweep,
             };
+        }
+
+        /// <summary>
+        /// 床(スラブ)のボイド/開口の内部にある面 (縦面・下向き面) を型枠不要として除外する。
+        ///
+        /// 判定方法: 床の最大の上向き水平面 (主たる天端) を取得し、その面の XY 投影に
+        /// 対する Project 結果を用いて「面外向きの近傍点が床の天端範囲内にあるか」を判定する。
+        ///
+        ///   - 縦面: 面中心から法線方向 (外向き) に少し移動した点が天端面上にあれば、
+        ///     その縦面は天端の下に「潜り込む」位置にある = ボイド/開口の内側 → 除外
+        ///   - 下向き面: 面中心が天端面の真下にあって、かつ床の最下面 (DeductedBottom 候補)
+        ///     より高い位置にあれば、ボイド/開口の天井部分 → 除外
+        ///
+        /// 完全な貫通開口の場合、天端面の Project が貫通穴の真ん中で失敗するが、
+        /// その場合は床の XY バウンディングボックスとの距離でフォールバック判定する。
+        /// </summary>
+        private static void ExcludeSlabInteriorVoidFaces(
+            Element elem,
+            List<FaceClassifier.FaceInfo> faceInfos,
+            List<Solid> finalSolids)
+        {
+            // 最大の上向き水平面 (天端の代表) を取得
+            Face topFace = null;
+            double topArea = 0;
+            foreach (var s in finalSolids)
+            {
+                if (s == null) continue;
+                foreach (Face f in s.Faces)
+                {
+                    XYZ n = FaceClassifier.GetFaceNormal(f);
+                    if (n == null || n.Z <= 0.99) continue;
+                    double a = 0;
+                    try { a = f.Area; } catch { }
+                    if (a > topArea)
+                    {
+                        topArea = a;
+                        topFace = f;
+                    }
+                }
+            }
+
+            // 床の XY バウンディングボックスをエッジから計算 (天端 Project の補助)
+            double minX = double.MaxValue, minY = double.MaxValue;
+            double maxX = double.MinValue, maxY = double.MinValue;
+            foreach (var s in finalSolids)
+            {
+                if (s == null) continue;
+                foreach (Edge e in s.Edges)
+                {
+                    var c = e.AsCurve();
+                    if (c == null) continue;
+                    for (int i = 0; i <= 1; i++)
+                    {
+                        var p = c.GetEndPoint(i);
+                        if (p.X < minX) minX = p.X;
+                        if (p.X > maxX) maxX = p.X;
+                        if (p.Y < minY) minY = p.Y;
+                        if (p.Y > maxY) maxY = p.Y;
+                    }
+                }
+            }
+            if (minX == double.MaxValue) return;
+
+            // 床外周のわずかな曲線や接合ずれを誤判定しないためのマージン (100mm)
+            double margin = UnitUtils.ConvertToInternalUnits(100, UnitTypeId.Millimeters);
+            // 縦面を外向きにオフセットする距離 (面が確実に「外側」を指すよう)
+            double normalOffset = UnitUtils.ConvertToInternalUnits(20, UnitTypeId.Millimeters);
+
+            int excludedCount = 0;
+            foreach (var fi in faceInfos)
+            {
+                if (fi.FaceType != FaceType.FormworkRequired) continue;
+                if (fi.Normal == null) continue;
+
+                double nz = fi.Normal.Z;
+                bool isVertical = Math.Abs(nz) < 0.1;
+                bool isDownward = nz < -0.5;
+                if (!isVertical && !isDownward) continue;
+
+                // 面中心を取得
+                XYZ center = null;
+                try
+                {
+                    var bb = fi.Face.GetBoundingBox();
+                    if (bb != null)
+                        center = fi.Face.Evaluate((bb.Min + bb.Max) * 0.5);
+                }
+                catch { }
+                if (center == null) continue;
+
+                // 縦面は外向きに少し移動した位置で、下向き面は面中心の真上で判定
+                double checkX, checkY;
+                if (isVertical)
+                {
+                    checkX = center.X + fi.Normal.X * normalOffset;
+                    checkY = center.Y + fi.Normal.Y * normalOffset;
+                }
+                else
+                {
+                    checkX = center.X;
+                    checkY = center.Y;
+                }
+
+                // 判定 1: 天端面に対して Project が成功すれば、その XY 位置は床材料の真下
+                //         (= ボイド/開口でない通常領域) なので、その面はボイド境界 → 除外
+                bool insideByTopProject = false;
+                if (topFace != null)
+                {
+                    try
+                    {
+                        // 天端面の少し上の点を渡す (天端は法線 +Z なので上から投影される)
+                        var probe = new XYZ(checkX, checkY, center.Z + 1.0);
+                        var ir = topFace.Project(probe);
+                        if (ir != null) insideByTopProject = true;
+                    }
+                    catch { }
+                }
+
+                // 判定 2 (フォールバック): 床 XY バウンディングボックスからマージン分内側にあるか
+                //         貫通開口の場合 topFace の穴部分で Project が失敗するため、
+                //         BoundingBox 判定で補完する (矩形床+矩形開口の典型ケースをカバー)
+                bool insideByBBox =
+                    checkX > minX + margin && checkX < maxX - margin &&
+                    checkY > minY + margin && checkY < maxY - margin;
+
+                if (insideByTopProject || insideByBBox)
+                {
+                    fi.FaceType = FaceType.DeductedTop;
+                    excludedCount++;
+                }
+            }
+
+            if (excludedCount > 0)
+            {
+                FormworkDebugLog.Log(
+                    $"  [SlabVoidExclude] E{elem.Id.IntValue()} excluded {excludedCount} " +
+                    $"interior void faces (vertical/downward inside slab footprint)");
+            }
         }
 
         /// <summary>

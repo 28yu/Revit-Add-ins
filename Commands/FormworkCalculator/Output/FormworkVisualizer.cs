@@ -122,10 +122,12 @@ namespace Tools28.Commands.FormworkCalculator.Output
             else
                 EnableSectionBox(doc, view, result);
 
-            // [4] CurrentView スコープでソースビューが指定されていれば、V/G 上書き
-            // (モデル/注釈カテゴリの表示/非表示・色等) をターゲット 3D ビューに継承。
-            // それ以外はノイズになる切断ボックスのアウトラインとレベル線を非表示化。
-            if (settings.Scope == CalculationScope.CurrentView && sourceView != null)
+            // [4] ソースが 3D ビューならその V/G 上書き (カテゴリの表示/色 + フィルタ)
+            // をターゲット 3D ビューに継承する。スコープに関わらず常に継承し、
+            // ユーザーが元の 3D ビューで設定した表示状態をベースに型枠色分けを重ねる。
+            // ソースが 3D ビューでない場合は、ノイズになる切断ボックスのアウトラインと
+            // レベル線のみ非表示化。
+            if (sourceView is View3D)
                 CopyCategoryVisibilityAndOverrides(doc, sourceView, view);
             else
                 HideClutterCategories(view);
@@ -854,6 +856,13 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 FormworkDebugLog.Log($"  [Visual] CopyCategoryVisibility EX: {ex.Message}");
             }
 
+            // ソースビューのフィルタ設定 (フィルタ一覧 + 上書き + 表示/非表示) を継承する。
+            // 型枠色分け用の新規フィルタ「型枠_*」は後段で
+            // FormworkFilterManager.ApplyColorFilters が追加で適用する
+            // (同マネージャは「型枠_」プレフィックスのフィルタのみ削除して再作成するため、
+            //  ここでコピーした既存フィルタは上書きされずそのまま残る)。
+            CopyFilterSettings(doc, source, target);
+
             // DirectShape (OST_GenericModel) は型枠表示の主役なので強制的に表示状態に上書き
             try
             {
@@ -865,6 +874,56 @@ namespace Tools28.Commands.FormworkCalculator.Output
 
             // 切断ボックスのアウトライン・レベル線は解析ビューで邪魔なので強制非表示
             HideClutterCategories(target);
+        }
+
+        /// <summary>
+        /// ソースビューに適用されているフィルタを一覧でターゲットビューにコピーする。
+        /// 各フィルタの上書き設定 (OverrideGraphicSettings) と表示/非表示状態も継承する。
+        /// 型枠色分け用のフィルタ「型枠_*」は後段の FormworkFilterManager で
+        /// 追加適用されるため、ここでは触れない。
+        /// </summary>
+        private static void CopyFilterSettings(Document doc, View source, View3D target)
+        {
+            try
+            {
+                var srcFilterIds = source.GetFilters();
+                if (srcFilterIds == null || srcFilterIds.Count == 0) return;
+
+                int copied = 0;
+                foreach (var fid in srcFilterIds)
+                {
+                    if (fid == null || fid == ElementId.InvalidElementId) continue;
+                    try
+                    {
+                        // ターゲットに同じフィルタを追加 (既に存在する場合は AddFilter が例外)
+                        var existing = target.GetFilters();
+                        if (!existing.Contains(fid))
+                            target.AddFilter(fid);
+
+                        // 上書きをコピー
+                        var ogs = source.GetFilterOverrides(fid);
+                        if (ogs != null)
+                            target.SetFilterOverrides(fid, ogs);
+
+                        // 表示/非表示をコピー
+                        bool vis = source.GetFilterVisibility(fid);
+                        target.SetFilterVisibility(fid, vis);
+
+                        copied++;
+                    }
+                    catch (Exception exFilter)
+                    {
+                        FormworkDebugLog.Log(
+                            $"  [Visual] CopyFilter fid={fid.IntValue()} EX: {exFilter.Message}");
+                    }
+                }
+                FormworkDebugLog.Log(
+                    $"  [Visual] copied {copied}/{srcFilterIds.Count} filters from source view");
+            }
+            catch (Exception ex)
+            {
+                FormworkDebugLog.Log($"  [Visual] CopyFilterSettings EX: {ex.Message}");
+            }
         }
 
         /// <summary>
