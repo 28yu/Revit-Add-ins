@@ -3,8 +3,7 @@
 ## TODO
 
 ### 優先度: 高
-- [ ] LanguageSwitch: Revit環境での動作確認
-- [ ] RoomTagCreator: Application.cs へのリボン登録確認
+（完了済み項目なし）
 
 ### 優先度: 中
 - [ ] 28tools-download リポジトリとの連携方法の検討
@@ -17,6 +16,9 @@
 - [x] 2026-05-15: CLAUDE.md スリム化・ドキュメント分離
 - [x] 2026-05-15: Stop hook で STATUS.md 自動更新を設定
 - [x] 2026-05-15: アイコンジェネレーターを Docs/tools/ に移動し GitHub Pages 公開
+- [x] 2026-05-15: LanguageSwitch: Application.cs に登録済みで対応完了
+- [x] 2026-05-15: RoomTagCreator: Application.cs へのリボン登録済みを確認
+- [x] 2026-05-15: 未使用の IconGenerator.html を削除
 
 ## 意思決定ログ
 
