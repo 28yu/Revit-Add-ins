@@ -91,6 +91,11 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 $"[Engine] Run() 開始 Scope={_settings?.Scope} " +
                 $"IncludeLinks={_settings?.IncludeLinkedModels} " +
                 $"EnableDebugLog={_settings?.EnableDebugLog}");
+            // 切断ボックスSolid状態を Initialize 後にログ（コンストラクタで構築済み）
+            if (_sectionBoxSolid != null)
+                FormworkDebugLog.Log($"[Engine] 切断ボックスSolid: 有効 vol={_sectionBoxSolid.Volume:F3}ft³");
+            else
+                FormworkDebugLog.Log($"[Engine] 切断ボックスSolid: なし (Scope={_settings?.Scope} / SectionBox未設定またはCurrentView以外)");
             FormworkDebugLog.Flush();
             // 注: ここで Close() しない。後続の CreateVisualization / CreateSchedule もログ出力するため、
             // クローズは Command 側 (FormworkCalculatorCommand) で全処理完了後に行う。
@@ -678,6 +683,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             // straddle 要素 (切断ボックス境界をまたぐ要素) 残るため、host も同様にクリップする。
             if (_sectionBoxSolid != null && src.IsLinked && solids.Count > 0)
             {
+                double volBefore = solids.Sum(s => s?.Volume ?? 0);
                 var clipped = new List<Solid>();
                 foreach (var s in solids)
                 {
@@ -697,11 +703,17 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                         clipped.Add(s);
                     }
                 }
-                if (clipped.Count == 0 && FormworkDebugLog.Enabled)
+                if (FormworkDebugLog.Enabled)
                 {
-                    FormworkDebugLog.Log(
-                        $"  [SectionBoxClip] E{elem.Id.IntValue()} src='{src.SourceName}' " +
-                        $"切断ボックス外 → スキップ");
+                    double volAfter = clipped.Sum(s => s?.Volume ?? 0);
+                    if (clipped.Count == 0)
+                        FormworkDebugLog.Log(
+                            $"  [SectionBoxClip] E{elem.Id.IntValue()} src='{src.SourceName}' " +
+                            $"切断ボックス外 → スキップ (vol_before={volBefore:F3}ft³)");
+                    else
+                        FormworkDebugLog.Log(
+                            $"  [SectionBoxClip] E{elem.Id.IntValue()} src='{src.SourceName}' " +
+                            $"クリップ完了 vol {volBefore:F3}→{volAfter:F3}ft³ clipped={clipped.Count}");
                 }
                 solids = clipped;
             }

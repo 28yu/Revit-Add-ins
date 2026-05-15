@@ -349,37 +349,84 @@ namespace Tools28.Commands.FormworkCalculator.Output
         ///   1. 名前に「タイトルなし」「No Title」を含む既存タイプ
         ///   2. パラメータ VIEWPORT_ATTR_SHOW_LABEL=0 のタイプ
         ///   3. 既定タイプを複製して SHOW_LABEL=0 に設定 (フォールバック)
+        ///   4. 同名が既に存在する場合は既存タイプを取得して再設定
         /// </summary>
         private static void ApplyNoTitleViewportType(Document doc, Viewport vp)
         {
             if (doc == null || vp == null) return;
             try
             {
-                ElementId noTitleId = FindNoTitleViewportType(doc);
+                ElementId noTitleId = FindNoTitleViewportType(doc, out string foundReason);
+                FormworkDebugLog.Log($"  [Sheet] FindNoTitleViewportType → id={noTitleId?.IntValue()} reason='{foundReason}'");
 
                 // 既存に見つからなければ、現在タイプを複製して SHOW_LABEL=0 に設定
                 if (noTitleId == ElementId.InvalidElementId)
                 {
+                    ElementId currentTypeId = null;
+                    string currentTypeName = null;
                     try
                     {
-                        var currentTypeId = vp.GetTypeId();
+                        currentTypeId = vp.GetTypeId();
                         var currentType = doc.GetElement(currentTypeId) as ElementType;
+                        currentTypeName = currentType?.Name;
+                        FormworkDebugLog.Log($"  [Sheet] currentType id={currentTypeId?.IntValue()} name='{currentTypeName}'");
+
                         if (currentType != null)
                         {
-                            var dup = currentType.Duplicate("Viewport_NoTitle_28Tools");
-                            var p = dup.get_Parameter(BuiltInParameter.VIEWPORT_ATTR_SHOW_LABEL);
-                            if (p != null && !p.IsReadOnly && p.StorageType == StorageType.Integer)
+                            ElementType dup = null;
+                            try
                             {
-                                p.Set(0);
+                                dup = currentType.Duplicate("Viewport_NoTitle_28Tools") as ElementType;
+                                FormworkDebugLog.Log($"  [Sheet] Duplicate OK id={dup?.Id?.IntValue()}");
+                            }
+                            catch (Exception dupEx)
+                            {
+                                FormworkDebugLog.Log($"  [Sheet] Duplicate EX: {dupEx.Message} → 既存タイプを検索");
+                                // 同名タイプが既存 → 直接検索
+                                dup = new FilteredElementCollector(doc)
+                                    .OfCategory(BuiltInCategory.OST_Viewports)
+                                    .WhereElementIsElementType()
+                                    .Cast<ElementType>()
+                                    .FirstOrDefault(t => { try { return t.Name == "Viewport_NoTitle_28Tools"; } catch { return false; } });
+                                FormworkDebugLog.Log($"  [Sheet] 既存タイプ直接検索 → id={dup?.Id?.IntValue()} name='{dup?.Name}'");
+                            }
+
+                            if (dup != null)
+                            {
                                 noTitleId = dup.Id;
-                                FormworkDebugLog.Log(
-                                    $"  [Sheet] duplicated viewport type → no-title id={noTitleId.IntValue()}");
+                                // SHOW_LABEL=0 を確実に設定
+                                var p = dup.get_Parameter(BuiltInParameter.VIEWPORT_ATTR_SHOW_LABEL);
+                                FormworkDebugLog.Log($"  [Sheet] SHOW_LABEL on dup: exists={p != null} isReadOnly={p?.IsReadOnly} storageType={p?.StorageType} value={p?.AsInteger()}");
+                                if (p != null && !p.IsReadOnly && p.StorageType == StorageType.Integer)
+                                {
+                                    p.Set(0);
+                                    FormworkDebugLog.Log($"  [Sheet] SHOW_LABEL=0 設定完了 (dup)");
+                                }
                             }
                         }
                     }
                     catch (Exception ex)
                     {
-                        FormworkDebugLog.Log($"  [Sheet] duplicate viewport type EX: {ex.Message}");
+                        FormworkDebugLog.Log($"  [Sheet] duplicate/create viewport type EX: {ex.Message}");
+                    }
+                }
+                else
+                {
+                    // 既存タイプでも SHOW_LABEL=0 を確認・再設定
+                    try
+                    {
+                        var existingType = doc.GetElement(noTitleId) as ElementType;
+                        var p = existingType?.get_Parameter(BuiltInParameter.VIEWPORT_ATTR_SHOW_LABEL);
+                        FormworkDebugLog.Log($"  [Sheet] SHOW_LABEL on existing: exists={p != null} isReadOnly={p?.IsReadOnly} value={p?.AsInteger()}");
+                        if (p != null && !p.IsReadOnly && p.StorageType == StorageType.Integer && p.AsInteger() != 0)
+                        {
+                            p.Set(0);
+                            FormworkDebugLog.Log($"  [Sheet] SHOW_LABEL=0 再設定完了 (existing)");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        FormworkDebugLog.Log($"  [Sheet] SHOW_LABEL再設定 EX: {ex.Message}");
                     }
                 }
 
@@ -388,12 +435,16 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     try
                     {
                         vp.ChangeTypeId(noTitleId);
-                        FormworkDebugLog.Log($"  [Sheet] viewport type → no-title id={noTitleId.IntValue()}");
+                        FormworkDebugLog.Log($"  [Sheet] ChangeTypeId OK → no-title id={noTitleId.IntValue()}");
                     }
                     catch (Exception ex)
                     {
                         FormworkDebugLog.Log($"  [Sheet] ChangeTypeId EX: {ex.Message}");
                     }
+                }
+                else
+                {
+                    FormworkDebugLog.Log($"  [Sheet] タイトルなしタイプ未設定 → ビューポートタイトルが表示される");
                 }
             }
             catch (Exception ex)
@@ -402,13 +453,25 @@ namespace Tools28.Commands.FormworkCalculator.Output
             }
         }
 
-        private static ElementId FindNoTitleViewportType(Document doc)
+        private static ElementId FindNoTitleViewportType(Document doc, out string reason)
         {
+            reason = "not found";
             var types = new FilteredElementCollector(doc)
                 .OfCategory(BuiltInCategory.OST_Viewports)
                 .WhereElementIsElementType()
                 .Cast<ElementType>()
                 .ToList();
+
+            FormworkDebugLog.Log($"  [Sheet] viewport types found: {types.Count}");
+            foreach (var vt in types)
+            {
+                try
+                {
+                    var p = vt.get_Parameter(BuiltInParameter.VIEWPORT_ATTR_SHOW_LABEL);
+                    FormworkDebugLog.Log($"  [Sheet]   type id={vt.Id.IntValue()} name='{vt.Name}' SHOW_LABEL={p?.AsInteger()}");
+                }
+                catch { }
+            }
 
             // 1. 名前で「タイトルなし」「No Title」を含むタイプ
             foreach (var vt in types)
@@ -422,6 +485,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     name.Contains("無し") ||
                     name.Contains("無タイトル"))
                 {
+                    reason = $"name match: '{name}'";
                     return vt.Id;
                 }
             }
@@ -433,7 +497,10 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 {
                     var p = vt.get_Parameter(BuiltInParameter.VIEWPORT_ATTR_SHOW_LABEL);
                     if (p != null && p.StorageType == StorageType.Integer && p.AsInteger() == 0)
+                    {
+                        reason = $"SHOW_LABEL=0: '{vt.Name}'";
                         return vt.Id;
+                    }
                 }
                 catch { }
             }
