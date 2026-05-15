@@ -242,6 +242,44 @@ _buttonTipKeys["FeatureName"] = "Ribbon.FeatureName.Button.Tip";
 
 ※ SDK-style csproj のため `.cs` ファイルは自動認識される（`<Compile Include>` は不要）
 
+### 5. マニュアルの作成
+
+`Docs/Features/FeatureName.md` を作成する（日本語）。
+
+### 6. features.json に追加（必須）
+
+`Docs/features.json` の `features` 配列に1エントリ追加する。**これを忘れると配布サイトのカードが追加されない。**
+
+```json
+{
+  "id": "FeatureName",
+  "category": "structure",
+  "icon": "icons/features/feature_name.png",
+  "manual": "Features/FeatureName.md",
+  "added_in": "2.2",
+  "names": {
+    "ja": "機能名（日本語）",
+    "en": "Feature Name",
+    "zh": "功能名称"
+  }
+}
+```
+
+**`added_in` はそのリリースバージョンを入れる（例: `"2.2"`）。**  
+これにより、そのバージョンのリリース本文に「⭐新機能」として自動掲載される。
+
+**カテゴリ ID 一覧**（追加可能、変更・削除は禁止）:
+
+| ID | 日本語名 |
+|--|--|
+| `grid` | 通り芯・レベル |
+| `sheet` | シート |
+| `view` | ビュー |
+| `annotation` | 注釈・詳細 |
+| `structure` | 構造 |
+| `data` | データ連携 |
+| `settings` | 設定 |
+
 ## 外部参照
 
 - **マニュアル**: https://28tools.com/addins.html

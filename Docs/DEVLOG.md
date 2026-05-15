@@ -5,6 +5,63 @@
 
 ---
 
+## 28tools-download 連携自動化（2026-05-15）
+
+### 改善前の課題
+
+| 課題 | 内容 |
+|------|------|
+| 機能情報の分散 | ボタン名・アイコン・説明・マニュアルが別々のファイルに存在 |
+| リリース本文の二重管理 | `build-and-release.yml` に機能一覧を手書き（2箇所・約80行） |
+| 配布サイトのアイコン | `Resources/Icons/` は Web 非公開。配布サイト側で別途用意 |
+| 配布サイトの更新 | 新機能追加時に配布サイト側のコードも手動変更が必要 |
+
+### 実施した変更
+
+**Step A: アイコンを GitHub Pages で公開**
+- `deploy-pages.yml` を改修。ビルド時に `Resources/Icons/*.png` を `_site/icons/features/` にコピー
+- 公開 URL: `https://28yu.github.io/Revit-Add-ins/icons/features/<file>.png`
+- トリガーに `Resources/Icons/**` を追加（アイコン更新でも Pages 再デプロイ）
+
+**Step B: `Docs/features.json` を作成（機能カタログの単一ソース）**
+- 14機能 × 7カテゴリ × 3言語のマッピングを1ファイルに集約
+- 各エントリ: `id` / `category` / `icon` / `manual` / `added_in` / `names(ja/en/zh)`
+- `added_in` フィールド: そのバージョンで初登場した機能に付与。リリース本文の「⭐新機能」判定に使用
+
+**Step C: リリース本文を自動生成**
+- `scripts/generate-release-body.py` を新規作成（約60行）
+- `features.json` を読み、カテゴリ別機能一覧と新機能セクションを Markdown 生成
+- `build-and-release.yml` の release ジョブに checkout + スクリプト実行ステップを追加
+- `body:` 手書きブロック（×2箇所）を `body_path: release-body.md` に置換
+
+**Step D: 配布サイト側の実装（別リポジトリ）**
+- 実装指示書を `Docs/INTEGRATION-28tools-download.md` として作成
+- 28tools-download 側で fetch → 動的カード描画 + marked.js による MD レンダリングを実装
+
+### 改善後の運用フロー
+
+新機能追加時にやること：
+1. コマンドクラス作成
+2. 多言語リソース追加（JP/EN/CN）
+3. `Application.cs` にリボン登録
+4. `Resources/Icons/` にアイコン追加
+5. `Docs/Features/FeatureName.md` にマニュアル作成
+6. **`Docs/features.json` に `added_in: "バージョン"` 付きでエントリ追加** ← 新規手順
+
+これだけで次のリリース時に：
+- GitHub Releases 本文に「⭐新機能」として自動掲載
+- 配布サイトに自動でカード追加
+- 配布サイトのマニュアルページから自動でアクセス可能
+
+### 注意事項
+
+- `features.json` の **カテゴリ ID は変更・削除禁止**（配布サイトの分類が崩れる）
+- 過去バージョンで追加した機能の **`added_in` は変更禁止**
+- Pages へのアイコン反映は main マージ後、数分かかる場合あり
+- 配布サイト側のページ構造を大幅変更した場合は `INTEGRATION-28tools-download.md` との整合性確認が必要
+
+---
+
 ## AutoBuild 開発知見
 
 ### 管理者権限

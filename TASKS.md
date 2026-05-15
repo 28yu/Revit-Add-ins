@@ -6,7 +6,6 @@
 （完了済み項目なし）
 
 ### 優先度: 中
-- [ ] 28tools-download リポジトリとの連携方法の検討
 - [ ] FormworkCalculator: 特殊形状の接触面検出漏れ改善
 
 ### 優先度: 低
@@ -19,6 +18,7 @@
 - [x] 2026-05-15: LanguageSwitch: Application.cs に登録済みで対応完了
 - [x] 2026-05-15: RoomTagCreator: Application.cs へのリボン登録済みを確認
 - [x] 2026-05-15: 未使用の IconGenerator.html を削除
+- [x] 2026-05-15: 28tools-download 連携を完全自動化（features.json 単一ソース化・アイコン Pages 公開・リリース本文自動生成・配布サイト動的描画）
 
 ## 意思決定ログ
 
