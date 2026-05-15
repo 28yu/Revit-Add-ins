@@ -12,6 +12,18 @@
           }
         ]
       }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/home/user/Revit-Add-ins/.claude/update-status.sh",
+            "timeout": 15,
+            "statusMessage": "STATUS.mdを更新中..."
+          }
+        ]
+      }
     ]
   }
 }
