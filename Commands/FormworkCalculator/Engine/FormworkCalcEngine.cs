@@ -19,6 +19,10 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         private readonly View _activeView;
         private readonly IProgress<string> _progress;
 
+        // アクティブビューに切断ボックスがある場合の Solid (ホスト世界座標)。
+        // CurrentView モードでリンク要素の solid をこの範囲にクリップする。
+        private Solid _sectionBoxSolid;
+
         internal FormworkCalcEngine(
             Document doc,
             FormworkSettings settings,
@@ -29,6 +33,51 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             _settings = settings;
             _activeView = activeView;
             _progress = progress;
+            _sectionBoxSolid = BuildSectionBoxSolid(activeView, settings);
+        }
+
+        /// <summary>
+        /// CurrentView モードでアクティブな 3D ビューに切断ボックスがある場合、
+        /// その切断ボックスをホスト世界座標系の Solid として構築する。
+        /// 該当しない場合は null を返す。
+        /// </summary>
+        private static Solid BuildSectionBoxSolid(View view, FormworkSettings settings)
+        {
+            if (settings == null || settings.Scope != CalculationScope.CurrentView) return null;
+            if (!(view is View3D v3d)) return null;
+            BoundingBoxXYZ sb = null;
+            try { if (v3d.IsSectionBoxActive) sb = v3d.GetSectionBox(); }
+            catch { }
+            if (sb == null) return null;
+
+            try
+            {
+                var min = sb.Min;
+                var max = sb.Max;
+                var p0 = new XYZ(min.X, min.Y, min.Z);
+                var p1 = new XYZ(max.X, min.Y, min.Z);
+                var p2 = new XYZ(max.X, max.Y, min.Z);
+                var p3 = new XYZ(min.X, max.Y, min.Z);
+                var loop = new CurveLoop();
+                loop.Append(Line.CreateBound(p0, p1));
+                loop.Append(Line.CreateBound(p1, p2));
+                loop.Append(Line.CreateBound(p2, p3));
+                loop.Append(Line.CreateBound(p3, p0));
+                double height = max.Z - min.Z;
+                Solid s = GeometryCreationUtilities.CreateExtrusionGeometry(
+                    new[] { loop }, XYZ.BasisZ, height);
+                var tr = sb.Transform;
+                if (tr != null && !tr.IsIdentity)
+                    s = SolidUtils.CreateTransformed(s, tr);
+                FormworkDebugLog.Log(
+                    $"[Engine] 切断ボックスSolid構築: vol={s?.Volume:F3}ft³");
+                return s;
+            }
+            catch (Exception ex)
+            {
+                FormworkDebugLog.Log($"[Engine] BuildSectionBoxSolid EX: {ex.Message}");
+                return null;
+            }
         }
 
         internal FormworkResult Run()
@@ -623,6 +672,40 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             var solids = SolidUnionProcessor.GetSolids(elem, src.Transform,
                 skipWallSweepRetry: src.IsLinked);
             bool isLinkSweep = src.IsLinked && elem is WallSweep;
+
+            // リンク要素のみ: アクティブビューの切断ボックスでクリップする。
+            // ホスト要素は FilteredElementCollector(doc, viewId) が切断ボックス外を除外するが、
+            // straddle 要素 (切断ボックス境界をまたぐ要素) 残るため、host も同様にクリップする。
+            if (_sectionBoxSolid != null && src.IsLinked && solids.Count > 0)
+            {
+                var clipped = new List<Solid>();
+                foreach (var s in solids)
+                {
+                    if (s == null) continue;
+                    try
+                    {
+                        var c = BooleanOperationsUtils.ExecuteBooleanOperation(
+                            s, _sectionBoxSolid, BooleanOperationsType.Intersect);
+                        if (c != null && c.Volume > 1e-6) clipped.Add(c);
+                    }
+                    catch (Exception ex)
+                    {
+                        if (FormworkDebugLog.Enabled)
+                            FormworkDebugLog.Log(
+                                $"  [SectionBoxClip] E{elem.Id.IntValue()} src='{src.SourceName}' " +
+                                $"intersect EX: {ex.Message} → 元のSolidを保持");
+                        clipped.Add(s);
+                    }
+                }
+                if (clipped.Count == 0 && FormworkDebugLog.Enabled)
+                {
+                    FormworkDebugLog.Log(
+                        $"  [SectionBoxClip] E{elem.Id.IntValue()} src='{src.SourceName}' " +
+                        $"切断ボックス外 → スキップ");
+                }
+                solids = clipped;
+            }
+
             if (solids.Count == 0)
             {
                 if (isLinkSweep && FormworkDebugLog.Enabled)
