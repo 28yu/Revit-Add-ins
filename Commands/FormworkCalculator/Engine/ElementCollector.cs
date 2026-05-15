@@ -520,6 +520,23 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                     }
                 }
             }
+
+            // 個別非表示 (右クリック「ビューで非表示 > 要素」) の除外。
+            // FilteredElementCollector(doc, viewId) はカテゴリ・ワークセット非表示は
+            // 除外するが、個別要素レベルの非表示は除外しないため、ここで明示的に除く。
+            if (useViewFilter)
+            {
+                int before = result.Count;
+                result = result.Where(e =>
+                {
+                    try { return !e.IsHidden(activeView); }
+                    catch { return true; }
+                }).ToList();
+                int hidden = before - result.Count;
+                if (hidden > 0 && FormworkDebugLog.Enabled)
+                    FormworkDebugLog.Log(
+                        $"  [HostCollect] 個別非表示要素を除外: {hidden} 要素 (view='{activeView.Name}')");
+            }
             return result;
         }
 
