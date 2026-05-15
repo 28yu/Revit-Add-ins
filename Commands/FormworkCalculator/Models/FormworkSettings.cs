@@ -6,6 +6,7 @@ namespace Tools28.Commands.FormworkCalculator.Models
     {
         EntireProject,
         CurrentView,
+        SelectedViews,
     }
 
     public enum ColorSchemeType

@@ -12,14 +12,37 @@ namespace Tools28.Commands.FormworkCalculator.Views
         public FormworkSettings Settings { get; private set; }
 
         private readonly Document _doc;
+        private readonly int _selectedViewsCount;
 
-        public FormworkDialog(Document doc = null, FormworkSettings defaults = null)
+        public FormworkDialog(Document doc = null, FormworkSettings defaults = null,
+            int selectedViewsCount = 0)
         {
             _doc = doc;
+            _selectedViewsCount = selectedViewsCount;
             InitializeComponent();
             ApplyLocalization();
             PopulateParameterCandidates();
+            ApplySelectedViewsState();
             Load(defaults ?? new FormworkSettings());
+        }
+
+        /// <summary>
+        /// プロジェクトブラウザで 3D ビューが選択されている場合は「選択のビュー」を有効化し
+        /// 初期選択にする。選択数を選択肢ラベルに付記する。選択されていない場合は無効化。
+        /// </summary>
+        private void ApplySelectedViewsState()
+        {
+            if (_selectedViewsCount > 0)
+            {
+                RadioSelectedViews.IsEnabled = true;
+                RadioSelectedViews.IsChecked = true;
+                RadioCurrentView.IsChecked = false;
+                txtScopeSelectedViews.Text = $"{Loc.S("Formwork.Scope.SelectedViews")} ({_selectedViewsCount})";
+            }
+            else
+            {
+                RadioSelectedViews.IsEnabled = false;
+            }
         }
 
         private void ApplyLocalization()
@@ -29,6 +52,10 @@ namespace Tools28.Commands.FormworkCalculator.Views
             grpScope.Header = Loc.S("Formwork.Scope.Header");
             txtScopeProject.Text = Loc.S("Formwork.Scope.Project");
             txtScopeView.Text = Loc.S("Formwork.Scope.View");
+            // 選択のビュー: ラベルは ApplySelectedViewsState で件数付きで上書きするため
+            // 件数0時のフォールバックとして初期ラベルを設定
+            if (_selectedViewsCount == 0)
+                txtScopeSelectedViews.Text = Loc.S("Formwork.Scope.SelectedViews");
 
             grpGrouping.Header = Loc.S("Formwork.Group.Header");
             txtByCategory.Text = Loc.S("Formwork.Group.Category");
@@ -82,8 +109,15 @@ namespace Tools28.Commands.FormworkCalculator.Views
 
         private void Load(FormworkSettings s)
         {
-            if (s.Scope == CalculationScope.EntireProject)
+            // ApplySelectedViewsState で既に SelectedViews が選択されていれば上書きしない
+            if (_selectedViewsCount > 0 && RadioSelectedViews.IsChecked == true)
+            {
+                // 何もしない (選択のビューを優先)
+            }
+            else if (s.Scope == CalculationScope.EntireProject)
                 RadioEntireProject.IsChecked = true;
+            else if (s.Scope == CalculationScope.SelectedViews && _selectedViewsCount > 0)
+                RadioSelectedViews.IsChecked = true;
             else
                 RadioCurrentView.IsChecked = true;
 
@@ -113,10 +147,17 @@ namespace Tools28.Commands.FormworkCalculator.Views
 
         private void BtnOk_Click(object sender, RoutedEventArgs e)
         {
+            CalculationScope chosenScope;
+            if (RadioEntireProject.IsChecked == true)
+                chosenScope = CalculationScope.EntireProject;
+            else if (RadioSelectedViews.IsChecked == true)
+                chosenScope = CalculationScope.SelectedViews;
+            else
+                chosenScope = CalculationScope.CurrentView;
+
             var s = new FormworkSettings
             {
-                Scope = RadioEntireProject.IsChecked == true
-                    ? CalculationScope.EntireProject : CalculationScope.CurrentView,
+                Scope = chosenScope,
                 GroupByCategory = ChkByCategory.IsChecked == true,
                 GroupByZone = ChkByZone.IsChecked == true,
                 ZoneParameterName = CmbZoneParam.Text?.Trim() ?? string.Empty,

@@ -659,6 +659,66 @@ namespace Tools28.Commands.FormworkCalculator.Output
             }
         }
 
+        /// <summary>
+        /// プロジェクト内の全型枠 DirectShape について、ParamSourceView で対応する分析ビュー以外で
+        /// 非表示にする。複数3Dビュー対応のポストパス: 新規作成された分析ビューが
+        /// 過去実行の他ビュー DirectShape を巻き込んでしまうのを防ぐ。
+        /// </summary>
+        internal static void HideAllFormworkShapesInOtherViews(Document doc)
+        {
+            // ソースビュー名 → 分析ビュー ID マッピング
+            var analysisViewByName = new Dictionary<string, ElementId>();
+            var analysisViews = new FilteredElementCollector(doc)
+                .OfClass(typeof(View3D))
+                .Cast<View3D>()
+                .Where(v => !v.IsTemplate && v.Name.StartsWith(AnalysisViewPrefix))
+                .ToList();
+            foreach (var av in analysisViews)
+            {
+                string srcViewName = av.Name.Substring(AnalysisViewPrefix.Length);
+                analysisViewByName[srcViewName] = av.Id;
+            }
+            FormworkDebugLog.Log($"  [Hide] analysisViews found: {analysisViewByName.Count}");
+
+            // ソースビュー名 → DirectShape Id 群
+            var shapesByView = new Dictionary<string, List<ElementId>>();
+            var collector = new FilteredElementCollector(doc)
+                .OfClass(typeof(DirectShape))
+                .OfCategory(BuiltInCategory.OST_GenericModel);
+            foreach (Element e in collector)
+            {
+                try
+                {
+                    var pm = e.LookupParameter(FormworkParameterManager.ParamMarker);
+                    if (pm == null || pm.StorageType != StorageType.String) continue;
+                    string mv = pm.AsString();
+                    if (string.IsNullOrEmpty(mv) ||
+                        !mv.StartsWith(FormworkParameterManager.MarkerValue)) continue;
+
+                    var pv = e.LookupParameter(FormworkParameterManager.ParamSourceView);
+                    string sv = pv?.AsString() ?? string.Empty;
+                    if (string.IsNullOrEmpty(sv)) continue; // タグなしはスキップ
+
+                    if (!shapesByView.TryGetValue(sv, out var list))
+                    {
+                        list = new List<ElementId>();
+                        shapesByView[sv] = list;
+                    }
+                    list.Add(e.Id);
+                }
+                catch { }
+            }
+            FormworkDebugLog.Log($"  [Hide] tagged shapes by view: " +
+                string.Join(", ", shapesByView.Select(kv => $"{kv.Key}={kv.Value.Count}")));
+
+            // 各ソースビュー群を、対応する分析ビュー以外で非表示にする
+            foreach (var kv in shapesByView)
+            {
+                if (!analysisViewByName.TryGetValue(kv.Key, out var avId)) continue;
+                HideInOtherViews(doc, kv.Value, avId);
+            }
+        }
+
         private static DirectShapeType GetOrCreateDirectShapeType(Document doc, string typeName)
         {
             var existing = new FilteredElementCollector(doc)
@@ -1045,6 +1105,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
         internal static void CleanupExistingFormworkShapes(Document doc, string sourceViewNameFilter = null)
         {
             var toDelete = new List<ElementId>();
+            int total = 0, taggedMatch = 0, untagged = 0, otherView = 0;
             var collector = new FilteredElementCollector(doc)
                 .OfClass(typeof(DirectShape))
                 .OfCategory(BuiltInCategory.OST_GenericModel);
@@ -1058,13 +1119,27 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     if (string.IsNullOrEmpty(val) ||
                         !val.StartsWith(FormworkParameterManager.MarkerValue)) continue;
 
-                    // ソースビューフィルタが指定されている場合は、ParamSourceView が一致するもののみ削除。
-                    // 一致しない (= 他のソースビューで作成された) DirectShape はそのまま残す。
+                    total++;
+
+                    // ソースビューフィルタが指定されている場合: 一致するもの + タグなし (旧形式・移行)
+                    // を削除。一致しない (他のソースビュー) はそのまま残す。
                     if (!string.IsNullOrEmpty(sourceViewNameFilter))
                     {
                         var pv = e.LookupParameter(FormworkParameterManager.ParamSourceView);
                         string viewVal = pv?.AsString() ?? string.Empty;
-                        if (viewVal != sourceViewNameFilter) continue;
+                        if (string.IsNullOrEmpty(viewVal))
+                        {
+                            // タグなし (旧バージョン・パラメータ未バインドの場合) → 削除
+                            untagged++;
+                            toDelete.Add(e.Id);
+                            continue;
+                        }
+                        if (viewVal != sourceViewNameFilter)
+                        {
+                            otherView++;
+                            continue;
+                        }
+                        taggedMatch++;
                     }
 
                     toDelete.Add(e.Id);
@@ -1076,7 +1151,8 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 try { doc.Delete(id); } catch { }
             }
             FormworkDebugLog.Log(
-                $"  [Visual] CleanupExistingFormworkShapes filter='{sourceViewNameFilter ?? "(all)"}' deleted={toDelete.Count}");
+                $"  [Visual] CleanupExistingFormworkShapes filter='{sourceViewNameFilter ?? "(all)"}' " +
+                $"total={total} match={taggedMatch} untagged={untagged} otherView={otherView} deleted={toDelete.Count}");
         }
 
         /// <summary>

@@ -27,6 +27,9 @@
                 <RadioButton x:Name="RadioCurrentView" GroupName="Scope" IsChecked="True" Margin="0,3">
                     <TextBlock x:Name="txtScopeView" Text="現在のビューに表示されている要素"/>
                 </RadioButton>
+                <RadioButton x:Name="RadioSelectedViews" GroupName="Scope" Margin="0,3">
+                    <TextBlock x:Name="txtScopeSelectedViews" Text="選択のビュー"/>
+                </RadioButton>
                 <RadioButton x:Name="RadioEntireProject" GroupName="Scope" Margin="0,3">
                     <TextBlock x:Name="txtScopeProject" Text="プロジェクト全体"/>
                 </RadioButton>

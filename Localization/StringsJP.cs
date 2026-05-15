@@ -341,6 +341,7 @@ namespace Tools28.Localization
             { "Formwork.Scope.Header", "計算範囲" },
             { "Formwork.Scope.Project", "プロジェクト全体" },
             { "Formwork.Scope.View", "現在のビューに表示されている要素" },
+            { "Formwork.Scope.SelectedViews", "選択のビュー" },
             { "Formwork.Group.Header", "集計区分" },
             { "Formwork.Group.Category", "部位別（柱・梁・壁・スラブ・基礎・階段・屋根）" },
             { "Formwork.Group.Zone", "工区別" },

@@ -31,20 +31,32 @@ namespace Tools28.Commands.FormworkCalculator
 
             try
             {
-                var dialog = new FormworkDialog(doc);
+                // ダイアログ表示前にプロジェクトブラウザの 3D ビュー選択を検出。
+                // 検出した場合、ダイアログの「選択のビュー」を有効化・初期選択にする。
+                var selectedView3Ds = CollectSelectedView3Ds(uidoc) ?? new List<View3D>();
+
+                var dialog = new FormworkDialog(doc, defaults: null,
+                    selectedViewsCount: selectedView3Ds.Count);
                 dialog.SetRevitOwner(commandData);
                 if (dialog.ShowDialog() != true)
                     return Result.Cancelled;
 
                 var settings = dialog.Settings;
 
-                // プロジェクトブラウザで選択された 3D ビューを検出する。
-                // - 複数選択時: それぞれを別ソースビューとして処理し、まとめて 1 シートに配置する [1]
-                // - 未選択時: アクティブビューが 3D ならそれを使う (従来動作)
-                // - 単一選択時 = アクティブビュー: そのビューのみ再計算 (他ビューはそのまま) [2]
-                var sourceViews = CollectSelectedView3Ds(uidoc) ?? new List<View3D>();
-                if (sourceViews.Count == 0 && activeView is View3D v3dActive)
-                    sourceViews.Add(v3dActive);
+                // 計算範囲モードに従って対象ソースビュー群を確定する:
+                //   - SelectedViews: プロジェクトブラウザ選択の 3D ビュー群
+                //   - CurrentView / EntireProject: アクティブビュー (3D の場合のみ)
+                List<View3D> sourceViews;
+                if (settings.Scope == CalculationScope.SelectedViews)
+                {
+                    sourceViews = selectedView3Ds;
+                }
+                else
+                {
+                    sourceViews = new List<View3D>();
+                    if (activeView is View3D v3dActive)
+                        sourceViews.Add(v3dActive);
+                }
 
                 if (sourceViews.Count == 0)
                 {
@@ -76,13 +88,23 @@ namespace Tools28.Commands.FormworkCalculator
                 // 分析ビュー Id → そのビューで作成された DirectShape Id 群
                 var perAnalysisViewShapeIds = new Dictionary<ElementId, List<ElementId>>();
 
+                // エンジン用に正規化したスコープを使う:
+                // SelectedViews モードは、ループ内で各ビューを CurrentView として処理する。
+                bool isMultiViewMode = settings.Scope == CalculationScope.SelectedViews;
                 FormworkResult firstResult = null;
                 foreach (var sv in sourceViews)
                 {
+                    var engineSettings = settings;
+                    if (isMultiViewMode)
+                    {
+                        // SelectedViews は CurrentView と同じ視点フィルタリングを使う
+                        engineSettings = CloneWithScope(settings, CalculationScope.CurrentView);
+                    }
+
                     FormworkResult r;
                     try
                     {
-                        var calc = new FormworkCalcEngine(doc, settings, sv);
+                        var calc = new FormworkCalcEngine(doc, engineSettings, sv);
                         r = calc.Run();
                     }
                     catch (Exception ex)
@@ -207,24 +229,22 @@ namespace Tools28.Commands.FormworkCalculator
                         }
                     }
 
-                    // 各ビューの DirectShape を、自身の分析ビュー以外で非表示にする。
-                    if (perAnalysisViewShapeIds.Count > 0)
+                    // 全ソースビューの DirectShape を、それぞれの分析ビュー以外で非表示にする。
+                    // 過去実行で作成された他ビューの DirectShape (ParamSourceView でタグ済) も含めて
+                    // 再ラベリングする。これにより、本実行で新規作成された分析ビューに
+                    // 過去の他ビュー DirectShape が紛れ込む問題を防ぐ。
+                    using (var tHide = new Transaction(doc, "型枠数量算出 - 他ビュー非表示"))
                     {
-                        using (var tHide = new Transaction(doc, "型枠数量算出 - 他ビュー非表示"))
+                        tHide.Start();
+                        try
                         {
-                            tHide.Start();
-                            try
-                            {
-                                foreach (var kv in perAnalysisViewShapeIds)
-                                {
-                                    FormworkVisualizer.HideInOtherViews(doc, kv.Value, kv.Key);
-                                }
-                                tHide.Commit();
-                            }
-                            catch
-                            {
-                                tHide.RollBack();
-                            }
+                            FormworkVisualizer.HideAllFormworkShapesInOtherViews(doc);
+                            tHide.Commit();
+                        }
+                        catch (Exception ex)
+                        {
+                            tHide.RollBack();
+                            FormworkDebugLog.Log($"  [Hide] HideAllFormworkShapesInOtherViews EX: {ex.Message}");
                         }
                     }
 
@@ -398,6 +418,38 @@ namespace Tools28.Commands.FormworkCalculator
                     + "\n\n" + ex.StackTrace;
                 return Result.Failed;
             }
+        }
+
+        /// <summary>
+        /// Scope のみ変更したコピーを返す。元の settings は変更しない。
+        /// </summary>
+        private static FormworkSettings CloneWithScope(FormworkSettings src, CalculationScope newScope)
+        {
+            return new FormworkSettings
+            {
+                Scope = newScope,
+                GroupByCategory = src.GroupByCategory,
+                GroupByZone = src.GroupByZone,
+                ZoneParameterName = src.ZoneParameterName,
+                GroupByFormworkType = src.GroupByFormworkType,
+                FormworkTypeParameterName = src.FormworkTypeParameterName,
+                ExportToExcel = src.ExportToExcel,
+                CreateSchedule = src.CreateSchedule,
+                Create3DView = src.Create3DView,
+                CreateSheet = src.CreateSheet,
+                ColorScheme = src.ColorScheme,
+                ShowDeductedFaces = src.ShowDeductedFaces,
+                UseGLDeduction = src.UseGLDeduction,
+                GLElevationMeters = src.GLElevationMeters,
+                IncludeLinkedModels = src.IncludeLinkedModels,
+                EnableDebugLog = src.EnableDebugLog,
+                ExcludeSteelMembers = src.ExcludeSteelMembers,
+                ExcludeSteelStairs = src.ExcludeSteelStairs,
+                ExcludeLgsWalls = src.ExcludeLgsWalls,
+                SlopedWallTopWidthThresholdMm = src.SlopedWallTopWidthThresholdMm,
+                IncludedCategories = src.IncludedCategories,
+                ExcelOutputPath = src.ExcelOutputPath,
+            };
         }
 
         /// <summary>

@@ -341,6 +341,7 @@ namespace Tools28.Localization
             { "Formwork.Scope.Header", "Calculation Scope" },
             { "Formwork.Scope.Project", "Entire project" },
             { "Formwork.Scope.View", "Elements visible in the current view" },
+            { "Formwork.Scope.SelectedViews", "Selected views" },
             { "Formwork.Group.Header", "Grouping" },
             { "Formwork.Group.Category", "By category (Columns / Beams / Walls / Slabs / Foundations / Stairs / Roofs)" },
             { "Formwork.Group.Zone", "By zone" },

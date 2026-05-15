@@ -111,7 +111,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         {
             var map = doc.ParameterBindings;
             var it = map.ForwardIterator();
-            bool m = false, c = false, l = false, g = false, a = false, p = false, s = false;
+            bool m = false, c = false, l = false, g = false, a = false, p = false, s = false, sv = false;
             while (it.MoveNext())
             {
                 var name = it.Key.Name;
@@ -122,8 +122,9 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 else if (name == ParamArea) a = true;
                 else if (name == ParamPartialContact) p = true;
                 else if (name == ParamSource) s = true;
+                else if (name == ParamSourceView) sv = true;
             }
-            return m && c && l && g && a && p && s;
+            return m && c && l && g && a && p && s && sv;
         }
 
         private static string GetSharedParamFilePath()

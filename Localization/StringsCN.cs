@@ -341,6 +341,7 @@ namespace Tools28.Localization
             { "Formwork.Scope.Header", "计算范围" },
             { "Formwork.Scope.Project", "整个项目" },
             { "Formwork.Scope.View", "当前视图中可见的构件" },
+            { "Formwork.Scope.SelectedViews", "选中的视图" },
             { "Formwork.Group.Header", "汇总分组" },
             { "Formwork.Group.Category", "按部位（柱·梁·墙·板·基础·楼梯·屋顶）" },
             { "Formwork.Group.Zone", "按施工区" },
