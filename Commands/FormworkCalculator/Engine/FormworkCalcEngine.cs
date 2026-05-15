@@ -36,6 +36,13 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             var result = new FormworkResult();
 
             FormworkDebugLog.Initialize(_settings?.EnableDebugLog == true);
+            // エンジン開始直後に即フラッシュ: フリーズ→強制終了してもログ開始が残る。
+            // これ以前にログが無ければフリーズはダイアログ内か Initialize 前で発生している。
+            FormworkDebugLog.Log(
+                $"[Engine] Run() 開始 Scope={_settings?.Scope} " +
+                $"IncludeLinks={_settings?.IncludeLinkedModels} " +
+                $"EnableDebugLog={_settings?.EnableDebugLog}");
+            FormworkDebugLog.Flush();
             // 注: ここで Close() しない。後続の CreateVisualization / CreateSchedule もログ出力するため、
             // クローズは Command 側 (FormworkCalculatorCommand) で全処理完了後に行う。
             return RunCore(result);
@@ -44,6 +51,8 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         private FormworkResult RunCore(FormworkResult result)
         {
             _progress?.Report("要素を収集中...");
+            FormworkDebugLog.Log("[Engine] CollectAndClassify 開始");
+            FormworkDebugLog.Flush();
             var collection = ElementCollector.CollectAndClassify(_doc, _settings, _activeView);
             var sources = collection.Targets;
             result.ProcessedElementCount = sources.Count;
@@ -53,24 +62,32 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 $"Collected elements: targets={sources.Count} " +
                 $"excluded={collection.Excluded.Count} " +
                 $"linkedInstances={collection.LinkedInstanceCount}");
+            FormworkDebugLog.Flush(); // 収集完了確認ポイント
 
-            // [LinkMap] リンク要素の real ID → surrogate ID マッピングを 1 行ずつ出力。
-            // リンク要素の SurrogateId は負値で、[ElemDiag] / [FaceDetail] / [Pair] 等の
-            // 診断ログがそれを使うため、real ID で grep しても直接ヒットしない。
-            // この対応表を介して real ID から surrogate ID を引いて再 grep する。
+            // [LinkMap] リンクソースごとの集計を 1 行で出力 (要素数節約のため per-element ログは廃止)。
+            // 個別 real ID → surrogate ID マッピングが必要な場合は Pass 1 の [Pass1] ログを参照。
             if (FormworkDebugLog.Enabled)
             {
-                int linkMapCount = 0;
+                var linkSummary = new System.Collections.Generic.Dictionary<string, (int count, int minSrg, int maxSrg)>();
                 foreach (var src in collection.Registry.All())
                 {
                     if (!src.IsLinked) continue;
-                    FormworkDebugLog.Log(
-                        $"  [LinkMap] srg={src.SurrogateId} real={src.Element.Id.IntValue()} " +
-                        $"cat='{src.Element.Category?.Name}' src='{src.SourceName}' " +
-                        $"name='{src.Element.Name}'");
-                    linkMapCount++;
+                    if (!linkSummary.TryGetValue(src.SourceName, out var s))
+                        s = (0, src.SurrogateId, src.SurrogateId);
+                    linkSummary[src.SourceName] = (
+                        s.count + 1,
+                        Math.Min(s.minSrg, src.SurrogateId),
+                        Math.Max(s.maxSrg, src.SurrogateId));
                 }
-                FormworkDebugLog.Log($"  [LinkMap] total linked elements mapped: {linkMapCount}");
+                int linkMapTotal = 0;
+                foreach (var kv in linkSummary)
+                {
+                    FormworkDebugLog.Log(
+                        $"  [LinkMap] src='{kv.Key}' count={kv.Value.count} " +
+                        $"srgRange=[{kv.Value.minSrg}..{kv.Value.maxSrg}]");
+                    linkMapTotal += kv.Value.count;
+                }
+                FormworkDebugLog.Log($"  [LinkMap] total linked elements mapped: {linkMapTotal}");
                 FormworkDebugLog.Flush(); // 収集完了確認ポイント
             }
 

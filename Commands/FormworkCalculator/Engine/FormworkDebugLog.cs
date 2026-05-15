@@ -16,7 +16,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
     internal static class FormworkDebugLog
     {
         private const string DefaultPath = @"C:\temp\Formwork_debug.txt";
-        private const int MaxLines = 200000;
+        private const int MaxLines = 500000;
 
         private static readonly object _lock = new object();
         private static StreamWriter _writer;
