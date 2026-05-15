@@ -160,19 +160,13 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                         catch { return true; }
                     }).ToList();
                     int hiddenCat = beforeCat - linkedElems.Count;
-                    if (hiddenCat > 0)
-                        FormworkDebugLog.Log(
-                            $"  [LinkedCollect] {sourceName}: カテゴリ非表示除外 {hiddenCat} 要素");
+                    FormworkDebugLog.Log(
+                        $"  [VisFilter] {sourceName}: カテゴリ非表示除外 {hiddenCat}/{beforeCat}");
 
                     // (B) ワークセット非表示: V/G → ワークセット / Revitリンク → ワークセット
-                    // ・View.GetWorksetVisibility(ws.Id) で取得 (Hidden なら除外)
-                    // ・WorksetDefaultVisibilitySettings でリンクDoc既定値を補完
-                    // 注: V/G → Revitリンク → カスタムのカテゴリ上書きは Revit 2021 API
-                    //     では RevitLinkGraphicsSettings へのアクセス手段が公開されていないため
-                    //     対応不可 (リンク全体非表示は rli.IsHidden で除外済み)。
                     if (isWorkshared)
                     {
-                        var hiddenWorksets = BuildHiddenWorksetIds(linkDoc, activeView);
+                        var hiddenWorksets = BuildHiddenWorksetIds(linkDoc, activeView, sourceName);
                         if (hiddenWorksets.Count > 0)
                         {
                             int beforeWs = linkedElems.Count;
@@ -182,9 +176,39 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                                 catch { return true; }
                             }).ToList();
                             int hiddenWs = beforeWs - linkedElems.Count;
-                            if (hiddenWs > 0)
+                            FormworkDebugLog.Log(
+                                $"  [VisFilter] {sourceName}: ワークセット非表示除外 {hiddenWs}/{beforeWs}");
+                        }
+                    }
+
+                    // (C) IsHidden チェック (Revitバージョンによってはリンク要素にも有効)
+                    int beforeIH = linkedElems.Count;
+                    linkedElems = linkedElems.Where(e =>
+                    {
+                        try { return !e.IsHidden(activeView); }
+                        catch { return true; }
+                    }).ToList();
+                    int hiddenIH = beforeIH - linkedElems.Count;
+                    if (hiddenIH > 0)
+                        FormworkDebugLog.Log(
+                            $"  [VisFilter] {sourceName}: IsHidden 除外 {hiddenIH}/{beforeIH}");
+
+                    // (D) 診断ログ: 残った要素のサンプル (先頭5件) のワークセット情報
+                    if (linkedElems.Count > 0 && isWorkshared)
+                    {
+                        var samples = linkedElems.Take(5).ToList();
+                        foreach (var s in samples)
+                        {
+                            try
+                            {
+                                int wsInt = s.WorksetId.IntegerValue;
+                                Workset ws = null;
+                                try { ws = linkDoc.GetWorksetTable().GetWorkset(s.WorksetId); } catch { }
                                 FormworkDebugLog.Log(
-                                    $"  [LinkedCollect] {sourceName}: ワークセット非表示除外 {hiddenWs} 要素");
+                                    $"  [VisFilter:sample] {sourceName} E{s.Id.IntValue()} cat='{s.Category?.Name}' " +
+                                    $"workset=[{wsInt}'{ws?.Name ?? "?"}']");
+                            }
+                            catch { }
                         }
                     }
                 }
@@ -215,15 +239,22 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         ///   2. WorksetDefaultVisibilitySettings.IsWorksetVisible() が false のもの
         ///      (リンク文書自身の既定値; V/G ホスト側カスタム上書きは反映されない)
         /// </summary>
-        private static HashSet<int> BuildHiddenWorksetIds(Document linkDoc, View hostView)
+        private static HashSet<int> BuildHiddenWorksetIds(Document linkDoc, View hostView, string sourceName)
         {
             var hidden = new HashSet<int>();
             if (linkDoc == null || !linkDoc.IsWorkshared) return hidden;
 
             WorksetDefaultVisibilitySettings wdvs = null;
             try { wdvs = WorksetDefaultVisibilitySettings.GetWorksetDefaultVisibilitySettings(linkDoc); }
-            catch { }
+            catch (Exception ex)
+            {
+                FormworkDebugLog.Log($"  [WsCheck] {sourceName}: WorksetDefaultVisibilitySettings 取得失敗: {ex.Message}");
+            }
 
+            int total = 0;
+            int hostVisHidden = 0;
+            int defaultHidden = 0;
+            int hostVisException = 0;
             try
             {
                 var wsCol = new FilteredWorksetCollector(linkDoc)
@@ -231,30 +262,62 @@ namespace Tools28.Commands.FormworkCalculator.Engine
 
                 foreach (Workset ws in wsCol)
                 {
+                    total++;
                     bool isHidden = false;
+                    string reason = "visible";
 
                     // 手順1: ホストビューのワークセット可視性を問い合わせ
-                    if (hostView != null && !isHidden)
+                    if (hostView != null)
                     {
                         try
                         {
                             WorksetVisibility vis = hostView.GetWorksetVisibility(ws.Id);
-                            if (vis == WorksetVisibility.Hidden) isHidden = true;
+                            if (vis == WorksetVisibility.Hidden)
+                            {
+                                isHidden = true;
+                                reason = "hostView.Hidden";
+                                hostVisHidden++;
+                            }
                         }
-                        catch { }
+                        catch (Exception ex)
+                        {
+                            hostVisException++;
+                            if (hostVisException <= 2)
+                                FormworkDebugLog.Log(
+                                    $"  [WsCheck] {sourceName}: hostView.GetWorksetVisibility(ws='{ws.Name}',id={ws.Id.IntegerValue}) 例外: {ex.GetType().Name}: {ex.Message}");
+                        }
                     }
 
                     // 手順2: リンク文書の既定値を補完
                     if (!isHidden && wdvs != null)
                     {
-                        try { isHidden = !wdvs.IsWorksetVisible(ws.Id); }
+                        try
+                        {
+                            if (!wdvs.IsWorksetVisible(ws.Id))
+                            {
+                                isHidden = true;
+                                reason = "linkDoc.default.Hidden";
+                                defaultHidden++;
+                            }
+                        }
                         catch { }
                     }
+
+                    FormworkDebugLog.Log(
+                        $"  [WsCheck] {sourceName} ws='{ws.Name}' id={ws.Id.IntegerValue} → {reason}");
 
                     if (isHidden) hidden.Add(ws.Id.IntegerValue);
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                FormworkDebugLog.Log($"  [WsCheck] {sourceName}: ワークセット列挙失敗: {ex.Message}");
+            }
+
+            FormworkDebugLog.Log(
+                $"  [WsCheck] {sourceName}: ワークセット総計={total} " +
+                $"hostView非表示={hostVisHidden} 既定非表示={defaultHidden} " +
+                $"hostView例外={hostVisException} → 除外対象={hidden.Count}");
 
             return hidden;
         }
