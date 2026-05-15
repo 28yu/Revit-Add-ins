@@ -147,6 +147,26 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 FormworkDebugLog.Flush();
 
                 var linkedElems = CollectFromDoc(linkDoc, settings, null, isLinked: true, linkLocalOutline: linkLocalOutline);
+
+                // ビュービジビリティフィルタ: ホストビューでカテゴリが非表示の要素を除外。
+                // FilteredElementCollector(linkDoc, hostViewId) はリンク文書には使用不可のため、
+                // ホストビューの GetCategoryHidden でカテゴリ単位のフィルタリングを行う。
+                if (activeView != null && settings.Scope == CalculationScope.CurrentView)
+                {
+                    int beforeCount = linkedElems.Count;
+                    linkedElems = linkedElems.Where(e =>
+                    {
+                        var cat = e?.Category;
+                        if (cat == null) return true;
+                        try { return !activeView.GetCategoryHidden(cat.Id); }
+                        catch { return true; }
+                    }).ToList();
+                    int hiddenCount = beforeCount - linkedElems.Count;
+                    if (hiddenCount > 0)
+                        FormworkDebugLog.Log(
+                            $"  [LinkedCollect] {sourceName}: カテゴリ非表示除外 {hiddenCount} 要素");
+                }
+
                 foreach (var elem in linkedElems)
                 {
                     cr.Registry.RegisterLinked(elem, linkDoc, transform, sourceName, rli.Id);
