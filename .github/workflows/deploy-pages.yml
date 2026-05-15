@@ -6,6 +6,7 @@ on:
     branches: [main]
     paths:
       - 'Docs/**'
+      - 'Resources/Icons/**'
   workflow_dispatch:
 
 permissions:
@@ -31,10 +32,17 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v4
 
+      - name: Assemble Pages site
+        run: |
+          mkdir -p _site
+          cp -r Docs/. _site/
+          mkdir -p _site/icons/features
+          cp Resources/Icons/*.png _site/icons/features/
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: Docs
+          path: _site
 
       - name: Deploy to GitHub Pages
         id: deployment
