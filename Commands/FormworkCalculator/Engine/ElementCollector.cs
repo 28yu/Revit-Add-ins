@@ -101,8 +101,63 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 // 「現在のビュー」モードではリンクインスタンスがアクティブビューに表示されているか確認
                 if (settings.Scope == CalculationScope.CurrentView && activeView != null)
                 {
+                    string rliName = MakeLinkSourceName(rli, linkDoc);
+
+                    // (1) 個別非表示・カテゴリ非表示チェック
                     bool hidden = true;
                     try { hidden = rli.IsHidden(activeView); } catch { hidden = true; }
+
+                    // (2) ワークセット経由の非表示チェック
+                    // IsHidden() はワークセット非表示を検出しない。
+                    // RevitLinkInstance はホストドキュメントの要素なので、ホストビューの
+                    // GetWorksetVisibility() で判定できる (クロスドキュメント問題なし)。
+                    if (!hidden)
+                    {
+                        try
+                        {
+                            if (hostDoc.IsWorkshared)
+                            {
+                                WorksetVisibility wsVis = activeView.GetWorksetVisibility(rli.WorksetId);
+                                if (wsVis == WorksetVisibility.Hidden)
+                                {
+                                    hidden = true;
+                                    FormworkDebugLog.Log(
+                                        $"  [LinkInstVis] {rliName}: " +
+                                        $"ワークセット非表示 wsId={rli.WorksetId.IntegerValue} → スキップ");
+                                }
+                                else if (wsVis == WorksetVisibility.UseGlobalSetting)
+                                {
+                                    var wdvs = WorksetDefaultVisibilitySettings
+                                        .GetWorksetDefaultVisibilitySettings(hostDoc);
+                                    if (wdvs != null && !wdvs.IsWorksetVisible(rli.WorksetId))
+                                    {
+                                        hidden = true;
+                                        FormworkDebugLog.Log(
+                                            $"  [LinkInstVis] {rliName}: " +
+                                            $"ワークセット既定非表示 wsId={rli.WorksetId.IntegerValue} → スキップ");
+                                    }
+                                    else if (FormworkDebugLog.Enabled)
+                                    {
+                                        FormworkDebugLog.Log(
+                                            $"  [LinkInstVis] {rliName}: " +
+                                            $"wsId={rli.WorksetId.IntegerValue} UseGlobalSetting→visible");
+                                    }
+                                }
+                                else if (FormworkDebugLog.Enabled)
+                                {
+                                    FormworkDebugLog.Log(
+                                        $"  [LinkInstVis] {rliName}: " +
+                                        $"wsId={rli.WorksetId.IntegerValue} wsVis={wsVis} → visible");
+                                }
+                            }
+                        }
+                        catch { }
+                    }
+                    else if (FormworkDebugLog.Enabled)
+                    {
+                        FormworkDebugLog.Log($"  [LinkInstVis] {rliName}: IsHidden=true → スキップ");
+                    }
+
                     if (hidden) continue;
                 }
 
