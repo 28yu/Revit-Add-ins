@@ -23,6 +23,234 @@ namespace Tools28.Commands.FormworkCalculator.Output
         internal const string SheetName = "型枠数量集計";
 
         /// <summary>
+        /// プロジェクト内の全 型枠分析 3D ビュー (「型枠分析」「型枠分析 - xxx」) を収集する。
+        /// </summary>
+        internal static List<ElementId> CollectAllAnalysisViewIds(Document doc)
+        {
+            var list = new FilteredElementCollector(doc)
+                .OfClass(typeof(View3D))
+                .Cast<View3D>()
+                .Where(v => !v.IsTemplate &&
+                    (v.Name == FormworkVisualizer.AnalysisViewName ||
+                     v.Name.StartsWith(FormworkVisualizer.AnalysisViewPrefix)))
+                .OrderBy(v => v.Name)
+                .Select(v => v.Id)
+                .ToList();
+            FormworkDebugLog.Log($"  [Sheet] CollectAllAnalysisViewIds: {list.Count}件");
+            return list;
+        }
+
+        /// <summary>
+        /// プロジェクト内の全 ビュー別 型枠集計表 (「型枠数量集計 - xxx」) を収集する。
+        /// サマリ (「型枠数量集計_合計」) は除く。
+        /// </summary>
+        internal static List<ElementId> CollectAllPerViewScheduleIds(Document doc)
+        {
+            var list = new FilteredElementCollector(doc)
+                .OfClass(typeof(ViewSchedule))
+                .Cast<ViewSchedule>()
+                .Where(v => !v.IsTemplate
+                    && v.Name != ScheduleCreator.SummaryScheduleName
+                    && (v.Name == ScheduleCreator.ScheduleName
+                        || v.Name.StartsWith(ScheduleCreator.ScheduleName + " - ")))
+                .OrderBy(v => v.Name)
+                .Select(v => v.Id)
+                .ToList();
+            FormworkDebugLog.Log($"  [Sheet] CollectAllPerViewScheduleIds: {list.Count}件");
+            return list;
+        }
+
+        /// <summary>
+        /// 既存の型枠数量集計シートがあれば削除して、現在のビュー・集計表で再構築する。
+        /// 既存シート名 / 番号は保持して同一の位置に再作成する。
+        /// </summary>
+        internal static ElementId CreateOrUpdateSheet(
+            Document doc,
+            IList<ElementId> analysisViewIds,
+            IList<ElementId> mainScheduleIds,
+            ElementId summaryScheduleId)
+        {
+            if (doc == null) return null;
+
+            // 既存の型枠シートを検索し、シート名・番号を保存してから削除
+            string existingName = null;
+            string existingNumber = null;
+            try
+            {
+                var existing = new FilteredElementCollector(doc)
+                    .OfClass(typeof(ViewSheet))
+                    .Cast<ViewSheet>()
+                    .FirstOrDefault(s => !s.IsTemplate && !s.IsPlaceholder
+                        && (s.Name == SheetName || s.Name.StartsWith(SheetName + " ")));
+                if (existing != null)
+                {
+                    existingName = existing.Name;
+                    existingNumber = existing.SheetNumber;
+                    doc.Delete(existing.Id);
+                    FormworkDebugLog.Log($"  [Sheet] 既存シート削除: '{existingNumber} - {existingName}'");
+                }
+            }
+            catch (Exception ex)
+            {
+                FormworkDebugLog.Log($"  [Sheet] 既存シート削除 EX: {ex.Message}");
+            }
+
+            return CreateSheetMulti(doc, analysisViewIds, mainScheduleIds, summaryScheduleId,
+                preferredName: existingName, preferredNumber: existingNumber);
+        }
+
+        /// <summary>
+        /// 複数の 3D ビュー (型枠分析ビュー) を配置可能な集計シートを作成する。
+        /// レイアウト:
+        ///   上段: サマリ集計表
+        ///   中段: ビュー別集計表を横並び配置 (折り返しあり)
+        ///   下段: 各 3D ビューのビューポートをグリッドで配置 (タイトル非表示)
+        /// </summary>
+        internal static ElementId CreateSheetMulti(
+            Document doc,
+            IList<ElementId> view3DIds,
+            IList<ElementId> mainScheduleIds,
+            ElementId summaryScheduleId,
+            string preferredName = null,
+            string preferredNumber = null)
+        {
+            if (doc == null) return null;
+
+            ElementId titleBlockTypeId = FindMostUsedTitleBlock(doc);
+            ViewSheet sheet;
+            try
+            {
+                sheet = ViewSheet.Create(doc, titleBlockTypeId ?? ElementId.InvalidElementId);
+            }
+            catch (Exception ex)
+            {
+                FormworkDebugLog.Log($"  [Sheet] Create EX: {ex.Message}");
+                return null;
+            }
+            if (sheet == null) return null;
+
+            try { sheet.Name = !string.IsNullOrEmpty(preferredName) ? preferredName : UniqueSheetName(doc, SheetName); } catch { }
+            try { sheet.SheetNumber = !string.IsNullOrEmpty(preferredNumber) ? preferredNumber : FindNextSheetNumber(doc); } catch { }
+
+            var draw = GetDrawableArea(doc, sheet);
+            const double margin = 0.082;
+            const double gap = 0.05;
+
+            double leftX = draw.Min.U + margin;
+            double topY = draw.Max.V - margin;
+            double rightX = draw.Max.U - margin;
+            double bottomY = draw.Min.V + margin;
+            double currentTopY = topY;
+
+            // サマリ集計表
+            if (summaryScheduleId != null && summaryScheduleId != ElementId.InvalidElementId)
+            {
+                var sumRes = PlaceScheduleAt(doc, sheet, summaryScheduleId, leftX, currentTopY);
+                if (sumRes.HasValue) currentTopY = sumRes.Value.bottomY - gap;
+            }
+
+            // ビュー別集計表を横並び (折り返しあり)
+            if (mainScheduleIds != null && mainScheduleIds.Count > 0)
+            {
+                double rowTopY = currentTopY;
+                double rowLeftX = leftX;
+                double rowMaxBottomY = rowTopY;
+
+                foreach (var id in mainScheduleIds)
+                {
+                    if (id == null || id == ElementId.InvalidElementId) continue;
+                    var res = PlaceScheduleAt(doc, sheet, id, rowLeftX, rowTopY);
+                    if (!res.HasValue) continue;
+                    double placedRight = res.Value.rightX;
+                    double placedBottom = res.Value.bottomY;
+                    if (placedRight > rightX && rowLeftX > leftX)
+                    {
+                        try { doc.Delete(res.Value.instanceId); } catch { }
+                        rowTopY = rowMaxBottomY - gap;
+                        rowLeftX = leftX;
+                        rowMaxBottomY = rowTopY;
+                        var res2 = PlaceScheduleAt(doc, sheet, id, rowLeftX, rowTopY);
+                        if (!res2.HasValue) continue;
+                        placedRight = res2.Value.rightX;
+                        placedBottom = res2.Value.bottomY;
+                    }
+                    if (placedBottom < rowMaxBottomY) rowMaxBottomY = placedBottom;
+                    rowLeftX = placedRight + gap;
+                }
+                currentTopY = rowMaxBottomY - gap;
+            }
+
+            // 3D ビューをグリッド配置 (集計表の下、シート下端まで)
+            if (view3DIds != null && view3DIds.Count > 0)
+            {
+                PlaceViewportGrid(doc, sheet, view3DIds,
+                    leftX, rightX, currentTopY, bottomY);
+            }
+
+            FormworkDebugLog.Log(
+                $"  [Sheet] created: '{sheet.SheetNumber} - {sheet.Name}' " +
+                $"views={view3DIds?.Count ?? 0} schedules={mainScheduleIds?.Count ?? 0}");
+            return sheet.Id;
+        }
+
+        /// <summary>
+        /// 3D ビューをグリッド状に配置する。指定領域内に均等に並ぶよう列数を計算する。
+        /// </summary>
+        private static void PlaceViewportGrid(
+            Document doc, ViewSheet sheet, IList<ElementId> viewIds,
+            double leftX, double rightX, double topY, double bottomY)
+        {
+            int n = viewIds.Count;
+            if (n == 0) return;
+
+            // 列数を決定 (1-3 件は 1 列、4-6 件は 2 列、7+ は 3 列)
+            int cols = n <= 3 ? 1 : (n <= 6 ? 2 : 3);
+            int rows = (int)Math.Ceiling((double)n / cols);
+
+            double areaW = rightX - leftX;
+            double areaH = topY - bottomY;
+            if (areaW <= 0 || areaH <= 0) return;
+
+            double cellW = areaW / cols;
+            double cellH = areaH / rows;
+
+            for (int i = 0; i < n; i++)
+            {
+                int row = i / cols;
+                int col = i % cols;
+                double cx = leftX + cellW * (col + 0.5);
+                double cy = topY - cellH * (row + 0.5);
+
+                Viewport vp;
+                try
+                {
+                    vp = Viewport.Create(doc, sheet.Id, viewIds[i], new XYZ(cx, cy, 0));
+                }
+                catch (Exception ex)
+                {
+                    FormworkDebugLog.Log($"  [Sheet] Viewport.Create EX (grid {i}): {ex.Message}");
+                    continue;
+                }
+                if (vp == null) continue;
+                ApplyNoTitleViewportType(doc, vp);
+
+                // 配置後に中心位置を調整 (タイトル非表示で配置後の中心がずれることがあるため)
+                try
+                {
+                    var ol = vp.GetBoxOutline();
+                    if (ol != null)
+                    {
+                        double curCx = (ol.MinimumPoint.X + ol.MaximumPoint.X) / 2.0;
+                        double curCy = (ol.MinimumPoint.Y + ol.MaximumPoint.Y) / 2.0;
+                        ElementTransformUtils.MoveElement(doc, vp.Id,
+                            new XYZ(cx - curCx, cy - curCy, 0));
+                    }
+                }
+                catch { }
+            }
+        }
+
+        /// <summary>
         /// 集計シートを作成し、ビュー・集計表を配置する。
         /// </summary>
         /// <param name="mainScheduleIds">
@@ -473,7 +701,23 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 catch { }
             }
 
-            // 1. 名前で「タイトルなし」「No Title」を含むタイプ
+            // 1. VIEWPORT_ATTR_SHOW_LABEL = 0 のタイプを最優先で採用
+            //    （既存プロジェクトで「タイトル表示=いいえ」のタイプがあればそれを使う）
+            foreach (var vt in types)
+            {
+                try
+                {
+                    var p = vt.get_Parameter(BuiltInParameter.VIEWPORT_ATTR_SHOW_LABEL);
+                    if (p != null && p.StorageType == StorageType.Integer && p.AsInteger() == 0)
+                    {
+                        reason = $"SHOW_LABEL=0: '{vt.Name}'";
+                        return vt.Id;
+                    }
+                }
+                catch { }
+            }
+
+            // 2. 名前で「タイトルなし」「No Title」を含むタイプ（フォールバック）
             foreach (var vt in types)
             {
                 string name = null;
@@ -488,21 +732,6 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     reason = $"name match: '{name}'";
                     return vt.Id;
                 }
-            }
-
-            // 2. VIEWPORT_ATTR_SHOW_LABEL = 0 のタイプ
-            foreach (var vt in types)
-            {
-                try
-                {
-                    var p = vt.get_Parameter(BuiltInParameter.VIEWPORT_ATTR_SHOW_LABEL);
-                    if (p != null && p.StorageType == StorageType.Integer && p.AsInteger() == 0)
-                    {
-                        reason = $"SHOW_LABEL=0: '{vt.Name}'";
-                        return vt.Id;
-                    }
-                }
-                catch { }
             }
 
             return ElementId.InvalidElementId;

@@ -38,6 +38,21 @@ namespace Tools28.Commands.FormworkCalculator
 
                 var settings = dialog.Settings;
 
+                // プロジェクトブラウザで選択された 3D ビューを検出する。
+                // - 複数選択時: それぞれを別ソースビューとして処理し、まとめて 1 シートに配置する [1]
+                // - 未選択時: アクティブビューが 3D ならそれを使う (従来動作)
+                // - 単一選択時 = アクティブビュー: そのビューのみ再計算 (他ビューはそのまま) [2]
+                var sourceViews = CollectSelectedView3Ds(uidoc) ?? new List<View3D>();
+                if (sourceViews.Count == 0 && activeView is View3D v3dActive)
+                    sourceViews.Add(v3dActive);
+
+                if (sourceViews.Count == 0)
+                {
+                    TaskDialog.Show(Loc.S("Common.Warning"),
+                        "型枠数量算出は 3D ビューで実行してください。\nプロジェクトブラウザで複数の 3D ビューを選択すると、それらをまとめて 1 シートに集約できます。");
+                    return Result.Cancelled;
+                }
+
                 if (settings.ExportToExcel)
                 {
                     using (var sfd = new SaveFileDialog
@@ -53,21 +68,37 @@ namespace Tools28.Commands.FormworkCalculator
                     }
                 }
 
-                FormworkResult result;
-                try
+                // 各ソースビューの計算結果と出力IDを保持
+                var perViewResults = new List<FormworkResult>();
+                var perViewSourceNames = new List<string>();
+                var perViewAnalysisViewIds = new List<ElementId>();
+                var perViewScheduleIds = new List<ElementId>();
+                // 分析ビュー Id → そのビューで作成された DirectShape Id 群
+                var perAnalysisViewShapeIds = new Dictionary<ElementId, List<ElementId>>();
+
+                FormworkResult firstResult = null;
+                foreach (var sv in sourceViews)
                 {
-                    var calc = new FormworkCalcEngine(doc, settings, activeView);
-                    result = calc.Run();
-                }
-                catch (Exception ex)
-                {
-                    TaskDialog.Show(Loc.S("Common.Error"),
-                        string.Format(Loc.S("Formwork.CalcFailed"), ex.Message));
-                    return Result.Failed;
+                    FormworkResult r;
+                    try
+                    {
+                        var calc = new FormworkCalcEngine(doc, settings, sv);
+                        r = calc.Run();
+                    }
+                    catch (Exception ex)
+                    {
+                        TaskDialog.Show(Loc.S("Common.Error"),
+                            string.Format(Loc.S("Formwork.CalcFailed"), $"[{sv.Name}] {ex.Message}"));
+                        return Result.Failed;
+                    }
+                    if (r == null) continue;
+                    perViewResults.Add(r);
+                    perViewSourceNames.Add(sv.Name);
+                    if (firstResult == null) firstResult = r;
                 }
 
-                if (result == null ||
-                    (result.ProcessedElementCount == 0 && result.ExcludedResults.Count == 0))
+                if (firstResult == null ||
+                    perViewResults.All(r => r.ProcessedElementCount == 0 && r.ExcludedResults.Count == 0))
                 {
                     TaskDialog.Show(Loc.S("Common.Warning"), Loc.S("Formwork.NoElements"));
                     return Result.Cancelled;
@@ -77,7 +108,8 @@ namespace Tools28.Commands.FormworkCalculator
                 {
                     try
                     {
-                        ExcelExporter.Export(settings.ExcelOutputPath, settings, result);
+                        // Excel 出力は最初のビューの結果を使う (複数ビューの場合は最初の選択のみ)
+                        ExcelExporter.Export(settings.ExcelOutputPath, settings, firstResult);
                     }
                     catch (Exception ex)
                     {
@@ -86,13 +118,10 @@ namespace Tools28.Commands.FormworkCalculator
                     }
                 }
 
-                ElementId scheduleViewId = null;
                 ElementId summaryScheduleId = null;
-                ElementId view3DId = null;
                 ElementId sheetId = null;
-                List<ElementId> createdShapeIds = null;
-                // ホスト集計表 (先頭) + 各リンク集計表をシート配置用に保持。
-                // 横並びで並べるためリスト形式で保持する。
+                int totalShapesCreated = 0;
+                // 集計表IDをシート配置用に保持
                 var allMainScheduleIds = new List<ElementId>();
 
                 if (settings.CreateSchedule || settings.Create3DView)
@@ -116,78 +145,55 @@ namespace Tools28.Commands.FormworkCalculator
                         t.Start();
                         try
                         {
-                            if (settings.Create3DView)
+                            // 選択された各 3D ビューについて個別に処理する。
+                            // ParamSourceView でタグ付けされるため、各ビューの DirectShape は分離管理可能。
+                            for (int i = 0; i < perViewResults.Count; i++)
                             {
-                                var v3d = FormworkVisualizer.CreateVisualization(doc, result, settings, activeView);
-                                if (v3d?.AnalysisView != null)
+                                var r = perViewResults[i];
+                                var sv = sourceViews[i];
+                                var svName = perViewSourceNames[i];
+
+                                if (settings.Create3DView)
                                 {
-                                    view3DId = v3d.AnalysisView.Id;
-                                    createdShapeIds = v3d.CreatedShapeIds;
+                                    var v3d = FormworkVisualizer.CreateVisualization(doc, r, settings, sv);
+                                    if (v3d?.AnalysisView != null)
+                                    {
+                                        perViewAnalysisViewIds.Add(v3d.AnalysisView.Id);
+                                        if (v3d.CreatedShapeIds != null)
+                                        {
+                                            totalShapesCreated += v3d.CreatedShapeIds.Count;
+                                            perAnalysisViewShapeIds[v3d.AnalysisView.Id] =
+                                                new List<ElementId>(v3d.CreatedShapeIds);
+                                        }
+                                    }
+                                }
+
+                                if (settings.CreateSchedule)
+                                {
+                                    // 1ビュー1集計表: ParamSourceView でフィルタ
+                                    // 名前: 「型枠数量集計 - {ビュー名}」
+                                    ElementId sid = null;
+                                    try
+                                    {
+                                        sid = ScheduleCreator.CreateSchedule(doc, r,
+                                            sourceFilter: null, sourceViewFilter: svName);
+                                    }
+                                    catch (Exception schEx)
+                                    {
+                                        FormworkDebugLog.Log(
+                                            $"  [Sched] FAILED schedule for view '{svName}': {schEx.Message}");
+                                    }
+                                    if (sid != null && sid != ElementId.InvalidElementId)
+                                    {
+                                        perViewScheduleIds.Add(sid);
+                                        allMainScheduleIds.Add(sid);
+                                    }
                                 }
                             }
 
                             if (settings.CreateSchedule)
                             {
-                                // 結果に含まれる全ソース (ホスト・各リンク) を列挙し
-                                // それぞれに対して個別の集計表を作成する。
-                                // - リンクなし or ソース 1 種類のみ: 「型枠数量集計」 (従来通り)
-                                // - リンクあり: 「型枠数量集計 - ホスト」「型枠数量集計 - 構造_A棟」等
-                                var sources = result.ElementResults
-                                    .Select(er => string.IsNullOrEmpty(er.SourceName)
-                                        ? ElementSourceRegistry.HostSourceName
-                                        : er.SourceName)
-                                    .Distinct()
-                                    .OrderBy(s => s != ElementSourceRegistry.HostSourceName)
-                                    .ThenBy(s => s)
-                                    .ToList();
-
-                                FormworkDebugLog.Log(
-                                    $"  [Sched] schedule creation: sources={sources.Count} " +
-                                    $"[{string.Join(", ", sources)}] " +
-                                    $"elementResults={result.ElementResults.Count}");
-
-                                if (sources.Count <= 1)
-                                {
-                                    // ホストのみ (リンク無し or リンク要素なし)
-                                    scheduleViewId = ScheduleCreator.CreateSchedule(doc, result);
-                                    if (scheduleViewId != null && scheduleViewId != ElementId.InvalidElementId)
-                                        allMainScheduleIds.Add(scheduleViewId);
-                                }
-                                else
-                                {
-                                    // ホスト + リンク: ソース毎に個別の集計表を作る
-                                    // メインの scheduleViewId はホストの集計表を指す
-                                    // allMainScheduleIds にはホスト → リンク順で全集計表を蓄積し、
-                                    // シート配置時に横並びで並べる
-                                    bool first = true;
-                                    foreach (var srcName in sources)
-                                    {
-                                        ElementId id = null;
-                                        try
-                                        {
-                                            id = ScheduleCreator.CreateSchedule(doc, result, srcName);
-                                            FormworkDebugLog.Log(
-                                                $"  [Sched] created schedule for source '{srcName}': id={id?.IntValue() ?? -1}");
-                                        }
-                                        catch (Exception schEx)
-                                        {
-                                            FormworkDebugLog.Log(
-                                                $"  [Sched] FAILED to create schedule for '{srcName}': {schEx.Message}");
-                                        }
-                                        if (id != null && id != ElementId.InvalidElementId)
-                                        {
-                                            allMainScheduleIds.Add(id);
-                                            if (first)
-                                            {
-                                                // 最初のソースの集計表をメインの scheduleViewId として扱う
-                                                // (通常はホストが先頭に並ぶように OrderBy で並べている)
-                                                scheduleViewId = id;
-                                                first = false;
-                                            }
-                                        }
-                                    }
-                                }
-                                // 動的合計サマリ集計表 (ホスト・リンク別の小計 + 全体合計)
+                                // 動的合計サマリ集計表 (全ビュー横断の合計)
                                 summaryScheduleId = ScheduleCreator.CreateSummarySchedule(doc);
                             }
 
@@ -201,14 +207,18 @@ namespace Tools28.Commands.FormworkCalculator
                         }
                     }
 
-                    if (createdShapeIds != null && createdShapeIds.Count > 0)
+                    // 各ビューの DirectShape を、自身の分析ビュー以外で非表示にする。
+                    if (perAnalysisViewShapeIds.Count > 0)
                     {
                         using (var tHide = new Transaction(doc, "型枠数量算出 - 他ビュー非表示"))
                         {
                             tHide.Start();
                             try
                             {
-                                FormworkVisualizer.HideInOtherViews(doc, createdShapeIds, view3DId);
+                                foreach (var kv in perAnalysisViewShapeIds)
+                                {
+                                    FormworkVisualizer.HideInOtherViews(doc, kv.Value, kv.Key);
+                                }
                                 tHide.Commit();
                             }
                             catch
@@ -218,11 +228,12 @@ namespace Tools28.Commands.FormworkCalculator
                         }
                     }
 
-                    // 3Dビューと集計表が両方できていればシートに自動配置 (別トランザクション:
-                    // ScheduleSheetInstance.Create は元の集計表がコミット済みである必要があるため)
+                    // シートにはプロジェクト内に存在する全型枠分析ビュー + 全型枠集計表を配置する。
+                    // これにより [2] 「特定ビューのみ再実行」時も、過去に作成した他ビューの
+                    // 解析ビュー・集計表をそのまま保持しつつシートも再構成できる。
                     bool haveAnyOutput =
-                        (view3DId != null && view3DId != ElementId.InvalidElementId) ||
-                        (scheduleViewId != null && scheduleViewId != ElementId.InvalidElementId) ||
+                        perViewAnalysisViewIds.Count > 0 ||
+                        allMainScheduleIds.Count > 0 ||
                         (summaryScheduleId != null && summaryScheduleId != ElementId.InvalidElementId);
                     if (settings.CreateSheet && haveAnyOutput)
                     {
@@ -231,8 +242,11 @@ namespace Tools28.Commands.FormworkCalculator
                             tSheet.Start();
                             try
                             {
-                                sheetId = FormworkSheetCreator.CreateSheet(
-                                    doc, view3DId, allMainScheduleIds, summaryScheduleId);
+                                // プロジェクト内の全型枠分析ビュー・集計表を収集
+                                var allAnalysisViewIds = FormworkSheetCreator.CollectAllAnalysisViewIds(doc);
+                                var allScheduleIds = FormworkSheetCreator.CollectAllPerViewScheduleIds(doc);
+                                sheetId = FormworkSheetCreator.CreateOrUpdateSheet(
+                                    doc, allAnalysisViewIds, allScheduleIds, summaryScheduleId);
                                 tSheet.Commit();
                             }
                             catch (Exception ex)
@@ -247,11 +261,13 @@ namespace Tools28.Commands.FormworkCalculator
                 // ビュータブを順に開く: 集計表系 → 最後に 3D ビュー (最終アクティブ)。
                 // 3D ビューがユーザーにとってのメインビューなので、実行後はそこに遷移する。
                 // メイン集計表は Project Browser から手動で開く。
-                if (scheduleViewId != null && scheduleViewId != ElementId.InvalidElementId)
+                ElementId firstScheduleId = perViewScheduleIds.FirstOrDefault();
+                ElementId firstAnalysisViewId = perViewAnalysisViewIds.FirstOrDefault();
+                if (firstScheduleId != null && firstScheduleId != ElementId.InvalidElementId)
                 {
                     try
                     {
-                        var v = doc.GetElement(scheduleViewId) as View;
+                        var v = doc.GetElement(firstScheduleId) as View;
                         if (v != null) uidoc.ActiveView = v;
                     }
                     catch { }
@@ -265,11 +281,11 @@ namespace Tools28.Commands.FormworkCalculator
                     }
                     catch { }
                 }
-                if (view3DId != null && view3DId != ElementId.InvalidElementId)
+                if (firstAnalysisViewId != null && firstAnalysisViewId != ElementId.InvalidElementId)
                 {
                     try
                     {
-                        var v = doc.GetElement(view3DId) as View;
+                        var v = doc.GetElement(firstAnalysisViewId) as View;
                         if (v != null) uidoc.ActiveView = v;
                     }
                     catch { }
@@ -285,20 +301,29 @@ namespace Tools28.Commands.FormworkCalculator
                     catch { }
                 }
 
+                // 全ビューの合算で集計を表示
+                int totalProcessed = perViewResults.Sum(r => r.ProcessedElementCount);
+                double totalFormworkArea = perViewResults.Sum(r => r.TotalFormworkArea);
+                double totalDeductedArea = perViewResults.Sum(r => r.TotalDeductedArea);
+                double totalInclinedArea = perViewResults.Sum(r => r.InclinedFaceArea);
+
                 string summary =
                     string.Format(Loc.S("Formwork.DoneMsg"),
-                        result.ProcessedElementCount,
-                        result.TotalFormworkArea,
-                        result.TotalDeductedArea,
-                        result.InclinedFaceArea);
+                        totalProcessed,
+                        totalFormworkArea,
+                        totalDeductedArea,
+                        totalInclinedArea);
+
+                if (sourceViews.Count > 1)
+                    summary = $"対象3Dビュー: {sourceViews.Count}件\n[{string.Join(", ", perViewSourceNames)}]\n\n" + summary;
 
                 if (settings.ExportToExcel && !string.IsNullOrEmpty(settings.ExcelOutputPath))
                     summary += "\n\n" + string.Format(Loc.S("Formwork.ExcelAt"), settings.ExcelOutputPath);
 
-                if (createdShapeIds != null && createdShapeIds.Count > 0)
-                    summary += "\n\n" + string.Format(Loc.S("Formwork.ShapesCreated"), createdShapeIds.Count);
+                if (totalShapesCreated > 0)
+                    summary += "\n\n" + string.Format(Loc.S("Formwork.ShapesCreated"), totalShapesCreated);
 
-                if (scheduleViewId != null)
+                if (perViewScheduleIds.Count > 0)
                     summary += "\n" + Loc.S("Formwork.ScheduleCreated");
                 if (summaryScheduleId != null)
                     summary += "\n" + Loc.S("Formwork.SummaryScheduleCreated");
@@ -318,21 +343,26 @@ namespace Tools28.Commands.FormworkCalculator
                 // リンクモデル取り込み件数を表示
                 if (settings.IncludeLinkedModels)
                 {
-                    int linkedElemCount = result.ElementResults.Count(er =>
+                    int linkedElemCount = perViewResults.Sum(r => r.ElementResults.Count(er =>
                         !string.IsNullOrEmpty(er.SourceName)
-                        && er.SourceName != ElementSourceRegistry.HostSourceName);
-                    if (linkedElemCount > 0 || result.LinkedInstanceCount > 0)
+                        && er.SourceName != ElementSourceRegistry.HostSourceName));
+                    int linkedInstanceCount = perViewResults.Sum(r => r.LinkedInstanceCount);
+                    if (linkedElemCount > 0 || linkedInstanceCount > 0)
                     {
                         summary += "\n\n" + string.Format(
                             Loc.S("Formwork.LinkedIncluded"),
-                            linkedElemCount, result.LinkedInstanceCount);
+                            linkedElemCount, linkedInstanceCount);
                     }
                 }
 
-                if (result.ExcludedResults != null && result.ExcludedResults.Count > 0)
+                var allExcluded = perViewResults
+                    .Where(r => r.ExcludedResults != null)
+                    .SelectMany(r => r.ExcludedResults)
+                    .ToList();
+                if (allExcluded.Count > 0)
                 {
                     int steelN = 0, deckN = 0, sweepN = 0, steelStairN = 0, lgsN = 0;
-                    foreach (var ex in result.ExcludedResults)
+                    foreach (var ex in allExcluded)
                     {
                         if (ex.Kind == ExclusionKind.Steel) steelN++;
                         else if (ex.Kind == ExclusionKind.DeckSlab) deckN++;
@@ -353,8 +383,9 @@ namespace Tools28.Commands.FormworkCalculator
                     summary += "\n" + Loc.S("Formwork.ExcludedFilterNote");
                 }
 
-                if (result.Errors.Count > 0)
-                    summary += "\n\n" + string.Format(Loc.S("Formwork.ErrorCount"), result.Errors.Count);
+                int totalErrors = perViewResults.Sum(r => r.Errors?.Count ?? 0);
+                if (totalErrors > 0)
+                    summary += "\n\n" + string.Format(Loc.S("Formwork.ErrorCount"), totalErrors);
 
                 TaskDialog.Show(Loc.S("Formwork.DoneTitle"), summary);
                 FormworkDebugLog.Close();
@@ -366,6 +397,32 @@ namespace Tools28.Commands.FormworkCalculator
                 message = string.Format(Loc.S("Formwork.Fatal"), ex.Message)
                     + "\n\n" + ex.StackTrace;
                 return Result.Failed;
+            }
+        }
+
+        /// <summary>
+        /// プロジェクトブラウザで選択されている 3D ビューを収集する。
+        /// 1 つも 3D ビューが選択されていない場合は null を返す。
+        /// </summary>
+        private static List<View3D> CollectSelectedView3Ds(UIDocument uidoc)
+        {
+            try
+            {
+                var sel = uidoc.Selection.GetElementIds();
+                if (sel == null || sel.Count == 0) return null;
+
+                var doc = uidoc.Document;
+                var views = new List<View3D>();
+                foreach (var id in sel)
+                {
+                    var v3d = doc.GetElement(id) as View3D;
+                    if (v3d != null && !v3d.IsTemplate) views.Add(v3d);
+                }
+                return views.Count > 0 ? views : null;
+            }
+            catch
+            {
+                return null;
             }
         }
     }

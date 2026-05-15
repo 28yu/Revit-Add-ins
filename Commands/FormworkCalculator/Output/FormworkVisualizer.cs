@@ -78,8 +78,11 @@ namespace Tools28.Commands.FormworkCalculator.Output
             // 既存の同名ビューを削除 (このソースビューのもののみ)
             DeleteViewByName(doc, analysisName);
 
-            // 既存の型枠 DirectShape を削除 (再実行時の累積を防ぐ)
-            CleanupExistingFormworkShapes(doc);
+            // 既存の型枠 DirectShape を削除。
+            // ソースビュー名が指定されている場合は、そのビュー由来の DirectShape のみ削除し、
+            // 他のソースビューで作成した DirectShape はそのまま残す（[2] 機能）。
+            // ソースビュー名が空 (互換モード) の場合は全 DirectShape を削除する（従来動作）。
+            CleanupExistingFormworkShapes(doc, sourceViewName);
 
             var view3DType = new FilteredElementCollector(doc)
                 .OfClass(typeof(ViewFamilyType))
@@ -344,7 +347,8 @@ namespace Tools28.Commands.FormworkCalculator.Output
                                 FormworkParameterManager.SetInstanceValues(
                                     ds, catLabel, levelName, filterKey, areaM2,
                                     faceHasPartialContact,
-                                    sourceName: er.SourceName);
+                                    sourceName: er.SourceName,
+                                    sourceViewName: sourceViewName);
                                 areaM2ThisDs = areaM2;
                             }
                             catch { }
@@ -439,7 +443,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
             DiagnoseFormworkShapes(doc, vr.CreatedShapeIds, result);
 
             // 除外要素 (鉄骨・デッキスラブ) を別マーカーの DirectShape として作成（オレンジ）
-            CreateExcludedShapes(doc, result, vr);
+            CreateExcludedShapes(doc, result, vr, sourceViewName);
             int excludedShapesCount = vr.CreatedShapeIds.Count - formworkShapesCount;
             FormworkDebugLog.Log(
                 $"  [Visual] total DirectShapes: {vr.CreatedShapeIds.Count} " +
@@ -541,7 +545,8 @@ namespace Tools28.Commands.FormworkCalculator.Output
         private static void CreateExcludedShapes(
             Document doc,
             FormworkResult result,
-            VisualizerResult vr)
+            VisualizerResult vr,
+            string sourceViewName)
         {
             if (result.ExcludedResults == null || result.ExcludedResults.Count == 0)
                 return;
@@ -597,7 +602,8 @@ namespace Tools28.Commands.FormworkCalculator.Output
                                 FormworkParameterManager.ExcludedGroupKey,
                                 0.0,
                                 false,
-                                sourceName: ex.SourceName);
+                                sourceName: ex.SourceName,
+                                sourceViewName: sourceViewName);
                         }
                         catch { }
 
@@ -1036,7 +1042,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
         /// （再実行時の累積を防ぐ）。MarkerValue / MarkerValueExcluded / 旧バージョンの
         /// "28Tools_Formwork_Steel" 等を全てカバーする。
         /// </summary>
-        private static void CleanupExistingFormworkShapes(Document doc)
+        internal static void CleanupExistingFormworkShapes(Document doc, string sourceViewNameFilter = null)
         {
             var toDelete = new List<ElementId>();
             var collector = new FilteredElementCollector(doc)
@@ -1047,15 +1053,21 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 try
                 {
                     var p = e.LookupParameter(FormworkParameterManager.ParamMarker);
-                    if (p != null && p.StorageType == StorageType.String)
+                    if (p == null || p.StorageType != StorageType.String) continue;
+                    string val = p.AsString();
+                    if (string.IsNullOrEmpty(val) ||
+                        !val.StartsWith(FormworkParameterManager.MarkerValue)) continue;
+
+                    // ソースビューフィルタが指定されている場合は、ParamSourceView が一致するもののみ削除。
+                    // 一致しない (= 他のソースビューで作成された) DirectShape はそのまま残す。
+                    if (!string.IsNullOrEmpty(sourceViewNameFilter))
                     {
-                        string val = p.AsString();
-                        if (!string.IsNullOrEmpty(val) &&
-                            val.StartsWith(FormworkParameterManager.MarkerValue))
-                        {
-                            toDelete.Add(e.Id);
-                        }
+                        var pv = e.LookupParameter(FormworkParameterManager.ParamSourceView);
+                        string viewVal = pv?.AsString() ?? string.Empty;
+                        if (viewVal != sourceViewNameFilter) continue;
                     }
+
+                    toDelete.Add(e.Id);
                 }
                 catch { }
             }
@@ -1063,6 +1075,8 @@ namespace Tools28.Commands.FormworkCalculator.Output
             {
                 try { doc.Delete(id); } catch { }
             }
+            FormworkDebugLog.Log(
+                $"  [Visual] CleanupExistingFormworkShapes filter='{sourceViewNameFilter ?? "(all)"}' deleted={toDelete.Count}");
         }
 
         /// <summary>

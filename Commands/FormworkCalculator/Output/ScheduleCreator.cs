@@ -30,16 +30,31 @@ namespace Tools28.Commands.FormworkCalculator.Output
         /// sourceFilter が null の場合: 全ソース対象 (旧来の動作)
         /// sourceFilter が指定された場合: その SourceName のみフィルタした集計表を作成
         ///   (ホスト用 / 各リンク用に個別の集計表を作るための引数)
+        /// sourceViewFilter が指定された場合: ParamSourceView も合わせてフィルタし、
+        ///   名前を "型枠数量集計 - {viewName}" 形式とする (複数3Dビュー対応)。
+        ///   この場合は他ビューの既存集計表は削除せず、自身の名前のみクリア。
         /// </summary>
         internal static ElementId CreateSchedule(Document doc, FormworkResult result = null,
-            string sourceFilter = null)
+            string sourceFilter = null, string sourceViewFilter = null)
         {
-            string scheduleName = string.IsNullOrEmpty(sourceFilter)
-                ? ScheduleName
-                : $"{ScheduleName} - {sourceFilter}";
+            // ビュー名フィルタが指定されている場合はビュー名を集計表名に使う
+            string scheduleName;
+            if (!string.IsNullOrEmpty(sourceViewFilter))
+                scheduleName = $"{ScheduleName} - {sourceViewFilter}";
+            else if (!string.IsNullOrEmpty(sourceFilter))
+                scheduleName = $"{ScheduleName} - {sourceFilter}";
+            else
+                scheduleName = ScheduleName;
+
             // 同名の既存集計表に加え、過去実行で作成された "型枠数量集計 - xxx" 形式の
             // 集計表もまとめて削除する (初回の "ホスト" 集計表生成時のみ実行)。
-            if (string.IsNullOrEmpty(sourceFilter)
+            // ただし、sourceViewFilter が指定されている場合は他ビューの集計表を保持する。
+            if (!string.IsNullOrEmpty(sourceViewFilter))
+            {
+                // 自身のビュー名の集計表のみ削除
+                DeleteScheduleByName(doc, scheduleName);
+            }
+            else if (string.IsNullOrEmpty(sourceFilter)
                 || sourceFilter == ElementSourceRegistry.HostSourceName)
             {
                 DeleteAllFormworkSchedules(doc);
@@ -95,6 +110,17 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 if (sourceField != null)
                 {
                     try { sourceField.IsHidden = true; } catch { }
+                }
+            }
+
+            // ソースビューフィルタ用フィールド (非表示)
+            ScheduleField sourceViewField = null;
+            if (!string.IsNullOrEmpty(sourceViewFilter))
+            {
+                sourceViewField = AddField(doc, def, schedulable, paramIds, FormworkParameterManager.ParamSourceView);
+                if (sourceViewField != null)
+                {
+                    try { sourceViewField.IsHidden = true; } catch { }
                 }
             }
 
@@ -163,6 +189,20 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     def.AddFilter(sourceFlt);
                 }
                 catch (Exception ex) { LogEx("source filter", ex); }
+            }
+
+            // ソースビューフィルタ
+            if (sourceViewField != null && !string.IsNullOrEmpty(sourceViewFilter))
+            {
+                try
+                {
+                    var viewFlt = new ScheduleFilter(
+                        sourceViewField.FieldId,
+                        ScheduleFilterType.Equal,
+                        sourceViewFilter);
+                    def.AddFilter(viewFlt);
+                }
+                catch (Exception ex) { LogEx("sourceView filter", ex); }
             }
             LogDef(def, "after-group-fields");
             LogField(areaField, "areaField after-group");

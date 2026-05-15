@@ -19,6 +19,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         public const string ParamArea = "28Tools_Formwork_面積";       // 面積（㎡, Length^2）
         public const string ParamPartialContact = "28Tools_Formwork_部分接触"; // "Yes"/"No" - T字結合等で主面の一部が他要素に接触
         public const string ParamSource = "28Tools_Formwork_ソース";    // "ホスト" or リンクファイル名
+        public const string ParamSourceView = "28Tools_Formwork_ソースビュー"; // 算出元の3Dビュー名
 
         public const string MarkerValue = "28Tools_Formwork";
         // 型枠不要として除外された要素 DirectShape のマーカー値。集計表は MarkerValue のみを
@@ -72,6 +73,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 CreateAndBindArea(defGroup, bindingMap, binding, ParamArea);
                 CreateAndBindText(defGroup, bindingMap, binding, ParamPartialContact);
                 CreateAndBindText(defGroup, bindingMap, binding, ParamSource);
+                CreateAndBindText(defGroup, bindingMap, binding, ParamSourceView);
             }
             finally
             {
@@ -81,16 +83,16 @@ namespace Tools28.Commands.FormworkCalculator.Engine
 
         internal static void SetInstanceValues(
             Element ds, string categoryLabel, string levelName, string groupKey, double areaM2,
-            bool hasPartialContact = false, string sourceName = null)
+            bool hasPartialContact = false, string sourceName = null, string sourceViewName = null)
         {
             SetInstanceValues(ds, MarkerValue, categoryLabel, levelName, groupKey, areaM2,
-                hasPartialContact, sourceName);
+                hasPartialContact, sourceName, sourceViewName);
         }
 
         internal static void SetInstanceValues(
             Element ds, string markerValue,
             string categoryLabel, string levelName, string groupKey, double areaM2,
-            bool hasPartialContact = false, string sourceName = null)
+            bool hasPartialContact = false, string sourceName = null, string sourceViewName = null)
         {
             SetString(ds, ParamMarker, markerValue ?? MarkerValue);
             SetString(ds, ParamCategory, categoryLabel ?? string.Empty);
@@ -102,6 +104,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
 
             SetString(ds, ParamPartialContact, hasPartialContact ? "Yes" : "No");
             SetString(ds, ParamSource, sourceName ?? "ホスト");
+            SetString(ds, ParamSourceView, sourceViewName ?? string.Empty);
         }
 
         private static bool IsAllBound(Document doc)
