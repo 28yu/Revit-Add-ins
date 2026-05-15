@@ -418,6 +418,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 if (string.IsNullOrEmpty(name)) continue;
                 if (name.Contains("タイトルなし") ||
                     name.IndexOf("No Title", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    name.IndexOf("NoTitle", StringComparison.OrdinalIgnoreCase) >= 0 ||
                     name.Contains("無し") ||
                     name.Contains("無タイトル"))
                 {
