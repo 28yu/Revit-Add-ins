@@ -21,8 +21,12 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         /// IncludeNonVisibleObjects=true で再試行する。リンクドキュメント内の
         /// WallSweep は「非表示要素」扱いされて geometry が空で返ることが多いため
         /// (Revit API の既知の挙動)。WallSweep 以外には適用しない。
+        ///
+        /// skipWallSweepRetry=true: BIM360ワークシェアリングのリンク要素では
+        /// IncludeNonVisibleObjects=true の再取得が非常に遅い場合があるためスキップ。
         /// </summary>
-        internal static List<Solid> GetSolids(Element elem, Transform transform)
+        internal static List<Solid> GetSolids(Element elem, Transform transform,
+            bool skipWallSweepRetry = false)
         {
             var result = new List<Solid>();
             if (elem == null) return result;
@@ -40,7 +44,8 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             if (geom != null) CollectSolidsRecursive(geom, result);
 
             // WallSweep フォールバック: 空だったら IncludeNonVisibleObjects=true で再取得
-            if (result.Count == 0 && elem is WallSweep)
+            // リンク要素の場合はスキップ (BIM360ワークシェアリングで非常に遅くなる)
+            if (!skipWallSweepRetry && result.Count == 0 && elem is WallSweep)
             {
                 Options opt2 = new Options
                 {

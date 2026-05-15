@@ -184,16 +184,16 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 else if (idx % 10 == 0)
                     _progress?.Report($"Pass 1: 面分類中... {idx} / {sources.Count}");
 
-                // フリーズ診断: リンク要素の GetSolids (= get_Geometry) 呼び出し前に
-                // ログ+フラッシュ。BIM360 ワークシェアリングでここが止まると特定できる。
+                // フリーズ診断: リンク要素の GetSolids (= get_Geometry) 呼び出し前にログ。
+                // 100要素ごとにフラッシュ (全件フラッシュはI/O過多でかえって遅くなるため)。
                 if (src.IsLinked && FormworkDebugLog.Enabled)
                 {
                     FormworkDebugLog.Log(
                         $"[Pass1] リンク [{linkedIdx}/{linkedCount}] " +
                         $"E{src.Element.Id.IntValue()} " +
                         $"cat='{src.Element.Category?.Name}' " +
-                        $"name='{src.Element.Name}' src='{src.SourceName}' → GetSolids開始");
-                    FormworkDebugLog.Flush();
+                        $"src='{src.SourceName}' → GetSolids開始");
+                    if (linkedIdx % 100 == 0) FormworkDebugLog.Flush();
                 }
 
                 var elem = src.Element;
@@ -618,30 +618,18 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         {
             var elem = src.Element;
 
-            // [LinkSweepDiag] リンク要素の WallSweep について solid 取得の詳細を診断
+            // リンク要素は WallSweep フォールバック (IncludeNonVisibleObjects=true) をスキップ:
+            // BIM360ワークシェアリング環境では2回目の get_Geometry が非常に遅いため。
+            var solids = SolidUnionProcessor.GetSolids(elem, src.Transform,
+                skipWallSweepRetry: src.IsLinked);
             bool isLinkSweep = src.IsLinked && elem is WallSweep;
-            List<Solid> rawSolids = null;
-            if (isLinkSweep && FormworkDebugLog.Enabled)
-            {
-                rawSolids = SolidUnionProcessor.GetSolids(elem, null);
-                double rawVol = 0;
-                foreach (var s in rawSolids) rawVol += s?.Volume ?? 0;
-                double det = 0;
-                try { det = src.Transform?.Determinant ?? 0; } catch { }
-                FormworkDebugLog.Log(
-                    $"  [LinkSweepDiag] Pass1-pre E{elem.Id.IntValue()} src='{src.SourceName}' " +
-                    $"rawSolids={rawSolids.Count} rawVol={rawVol:F4}ft³ " +
-                    $"xformDet={det:F4} xformOrigin=({src.Transform?.Origin.X:F2},{src.Transform?.Origin.Y:F2},{src.Transform?.Origin.Z:F2})");
-            }
-
-            var solids = SolidUnionProcessor.GetSolids(elem, src.Transform);
             if (solids.Count == 0)
             {
                 if (isLinkSweep && FormworkDebugLog.Enabled)
                 {
                     FormworkDebugLog.Log(
                         $"  [LinkSweepDiag] Pass1-ABORT E{elem.Id.IntValue()} src='{src.SourceName}' " +
-                        $"transformedSolids=0 → ctx will be null (no DirectShape will be created)");
+                        $"transformedSolids=0 → skipped (no retry for linked WallSweep)");
                 }
                 return null;
             }

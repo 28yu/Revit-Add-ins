@@ -44,6 +44,20 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                     if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
                         Directory.CreateDirectory(dir);
 
+                    // 前回のログをタイムスタンプ付きでバックアップ (上書きによるフリーズログ消失を防止)
+                    if (File.Exists(filePath))
+                    {
+                        try
+                        {
+                            string ts = DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss");
+                            string ext = Path.GetExtension(filePath);
+                            string stem = Path.GetFileNameWithoutExtension(filePath);
+                            string bk = Path.Combine(dir, $"{stem}_{ts}{ext}");
+                            File.Move(filePath, bk);
+                        }
+                        catch { }
+                    }
+
                     _writer = new StreamWriter(filePath, false, new UTF8Encoding(false))
                     {
                         // AutoFlush=true: フリーズ時にプロセスを強制終了してもバッファが消えないようにする。
