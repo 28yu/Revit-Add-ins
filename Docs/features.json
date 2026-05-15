@@ -1,0 +1,170 @@
+{
+  "version": 1,
+  "description": "28 Tools 機能カタログ（単一ソース）。28tools-download サイトはこのファイルを参照してカード生成・マニュアル表示を行う。新機能追加時はこの配列に1エントリ追加する。",
+  "baseUrl": "https://28yu.github.io/Revit-Add-ins",
+  "categories": {
+    "grid": { "ja": "通り芯・レベル", "en": "Grid & Level", "zh": "轴网与标高" },
+    "sheet": { "ja": "シート", "en": "Sheet", "zh": "图纸" },
+    "view": { "ja": "ビュー", "en": "View", "zh": "视图" },
+    "annotation": { "ja": "注釈・詳細", "en": "Annotation & Detail", "zh": "注释·详图" },
+    "structure": { "ja": "構造", "en": "Structure", "zh": "结构" },
+    "data": { "ja": "データ連携", "en": "Data", "zh": "数据" },
+    "settings": { "ja": "設定", "en": "Settings", "zh": "设置" }
+  },
+  "features": [
+    {
+      "id": "GridBubble",
+      "category": "grid",
+      "icon": "icons/features/both.png",
+      "manual": "Features/GridBubble.md",
+      "names": {
+        "ja": "通り芯・レベル 符号 ON/OFF",
+        "en": "Grid & Level Bubble On/Off",
+        "zh": "轴网·标高符号 ON/OFF"
+      }
+    },
+    {
+      "id": "SheetCreation",
+      "category": "sheet",
+      "icon": "icons/features/sheet_creation.png",
+      "manual": "Features/SheetCreation.md",
+      "names": {
+        "ja": "シート一括作成",
+        "en": "Sheet Batch Create",
+        "zh": "图纸批量创建"
+      }
+    },
+    {
+      "id": "ViewportPosition",
+      "category": "view",
+      "icon": "icons/features/viewport_copy.png",
+      "manual": "Features/ViewportPosition.md",
+      "names": {
+        "ja": "ビューポート位置コピペ",
+        "en": "Viewport Position Copy/Paste",
+        "zh": "视口位置复制粘贴"
+      }
+    },
+    {
+      "id": "CropBoxCopy",
+      "category": "view",
+      "icon": "icons/features/cropbox_copy.png",
+      "manual": "Features/CropBoxCopy.md",
+      "names": {
+        "ja": "トリミング領域コピペ",
+        "en": "Crop Region Copy/Paste",
+        "zh": "裁剪区域复制粘贴"
+      }
+    },
+    {
+      "id": "ViewCopy3D",
+      "category": "view",
+      "icon": "icons/features/view_copy.png",
+      "manual": "Features/ViewCopy3D.md",
+      "names": {
+        "ja": "3D視点コピペ",
+        "en": "3D View Copy/Paste",
+        "zh": "3D视点复制粘贴"
+      }
+    },
+    {
+      "id": "SectionBoxCopy",
+      "category": "view",
+      "icon": "icons/features/sectionbox_copy.png",
+      "manual": "Features/SectionBoxCopy.md",
+      "names": {
+        "ja": "切断ボックスコピペ",
+        "en": "Section Box Copy/Paste",
+        "zh": "剖面框复制粘贴"
+      }
+    },
+    {
+      "id": "RoomTagCreator",
+      "category": "annotation",
+      "icon": "icons/features/room_tag.png",
+      "manual": "Features/RoomTagCreator.md",
+      "names": {
+        "ja": "部屋タグ自動配置",
+        "en": "Room Tag Auto Place",
+        "zh": "房间标签自动放置"
+      }
+    },
+    {
+      "id": "FilledRegionSplitMerge",
+      "category": "annotation",
+      "icon": "icons/features/filled_region.png",
+      "manual": "Features/FilledRegionSplitMerge.md",
+      "names": {
+        "ja": "塗潰し領域 分割・統合",
+        "en": "Filled Region Split/Merge",
+        "zh": "填充区域 拆分·合并"
+      }
+    },
+    {
+      "id": "BeamLevelColor",
+      "category": "structure",
+      "icon": "icons/features/beam_top_level.png",
+      "manual": "Features/BeamLevelColor.md",
+      "names": {
+        "ja": "梁レベル色分け（天端／下端）",
+        "en": "Beam Level Color Code (Top/Bottom)",
+        "zh": "梁标高色分（顶/底）"
+      }
+    },
+    {
+      "id": "FireProtection",
+      "category": "structure",
+      "icon": "icons/features/fire_protection.png",
+      "manual": "Features/FireProtection.md",
+      "names": {
+        "ja": "耐火被覆色分け",
+        "en": "Fireproofing Color Code",
+        "zh": "防火涂层色分"
+      }
+    },
+    {
+      "id": "FormworkCalculator",
+      "category": "structure",
+      "icon": "icons/features/formwork.png",
+      "manual": "Features/FormworkCalculator.md",
+      "names": {
+        "ja": "型枠数量算出",
+        "en": "Formwork Quantity",
+        "zh": "模板数量计算"
+      }
+    },
+    {
+      "id": "ExcelExport",
+      "category": "data",
+      "icon": "icons/features/excel_export.png",
+      "manual": "Features/ExcelExport.md",
+      "names": {
+        "ja": "Excelエクスポート",
+        "en": "Excel Export",
+        "zh": "Excel 导出"
+      }
+    },
+    {
+      "id": "ExcelImport",
+      "category": "data",
+      "icon": "icons/features/excel_import.png",
+      "manual": "Features/ExcelImport.md",
+      "names": {
+        "ja": "Excelインポート",
+        "en": "Excel Import",
+        "zh": "Excel 导入"
+      }
+    },
+    {
+      "id": "LanguageSwitch",
+      "category": "settings",
+      "icon": "icons/features/flag_jp_32.png",
+      "manual": "Features/LanguageSwitch.md",
+      "names": {
+        "ja": "言語切替（JP / US / CN）",
+        "en": "Language Switch (JP / US / CN)",
+        "zh": "语言切换（JP / US / CN）"
+      }
+    }
+  ]
+}
