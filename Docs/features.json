@@ -116,6 +116,7 @@
       "category": "structure",
       "icon": "icons/features/fire_protection.png",
       "manual": "Features/FireProtection.md",
+      "added_in": "2.1",
       "names": {
         "ja": "耐火被覆色分け",
         "en": "Fireproofing Color Code",
@@ -127,6 +128,7 @@
       "category": "structure",
       "icon": "icons/features/formwork.png",
       "manual": "Features/FormworkCalculator.md",
+      "added_in": "2.1",
       "names": {
         "ja": "型枠数量算出",
         "en": "Formwork Quantity",
@@ -160,6 +162,7 @@
       "category": "settings",
       "icon": "icons/features/flag_jp_32.png",
       "manual": "Features/LanguageSwitch.md",
+      "added_in": "2.1",
       "names": {
         "ja": "言語切替（JP / US / CN）",
         "en": "Language Switch (JP / US / CN)",
