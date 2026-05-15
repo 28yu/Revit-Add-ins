@@ -17,12 +17,26 @@ namespace Tools28.Commands.FormworkCalculator.Output
     internal static class FormworkVisualizer
     {
         internal const string AnalysisViewName = "型枠分析";
+        internal const string AnalysisViewPrefix = "型枠分析 - ";
+
+        /// <summary>
+        /// ソースビュー名からこのビューに対応する解析ビュー名を生成する。
+        /// ソース名なし: "型枠分析" (互換性のため)
+        /// ソース名あり: "型枠分析 - {sourceViewName}"
+        /// </summary>
+        internal static string BuildAnalysisViewName(string sourceViewName)
+        {
+            if (string.IsNullOrEmpty(sourceViewName)) return AnalysisViewName;
+            return AnalysisViewPrefix + sourceViewName;
+        }
         internal class VisualizerResult
         {
             public View3D AnalysisView;
             public List<ElementId> CreatedShapeIds = new List<ElementId>();
             public Dictionary<string, (byte R, byte G, byte B)> KeyColors
                 = new Dictionary<string, (byte, byte, byte)>();
+            // このソースビューの DirectShape を識別するマーカー値
+            public string MarkerValue;
         }
 
         private static readonly Dictionary<CategoryGroup, (byte R, byte G, byte B)> _categoryColors
@@ -56,10 +70,15 @@ namespace Tools28.Commands.FormworkCalculator.Output
         {
             var vr = new VisualizerResult();
 
-            // 既存の同名ビューを削除
-            DeleteViewByName(doc, AnalysisViewName);
+            // ソースビュー名を含む解析ビュー名を生成 (ソース毎に独立した分析ビューを作成)
+            string sourceViewName = sourceView?.Name;
+            string analysisName = BuildAnalysisViewName(sourceViewName);
+            string markerValue = FormworkParameterManager.MarkerValue;
 
-            // 既存の型枠 DirectShape を削除（再実行時の累積を防ぐ）
+            // 既存の同名ビューを削除 (このソースビューのもののみ)
+            DeleteViewByName(doc, analysisName);
+
+            // 既存の型枠 DirectShape を削除 (再実行時の累積を防ぐ)
             CleanupExistingFormworkShapes(doc);
 
             var view3DType = new FilteredElementCollector(doc)
@@ -69,8 +88,9 @@ namespace Tools28.Commands.FormworkCalculator.Output
             if (view3DType == null) return vr;
 
             var view = View3D.CreateIsometric(doc, view3DType.Id);
-            try { view.Name = AnalysisViewName; } catch { }
+            try { view.Name = analysisName; } catch { }
             vr.AnalysisView = view;
+            vr.MarkerValue = markerValue;
 
             // 表示スタイルを Shading に明示設定 (Realistic では OverrideGraphicSettings の
             // 透過・色オーバーライドが期待通りに反映されない場合があるため)。
