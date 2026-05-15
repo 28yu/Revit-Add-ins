@@ -46,7 +46,9 @@ namespace Tools28.Commands.FormworkCalculator.Engine
 
                     _writer = new StreamWriter(filePath, false, new UTF8Encoding(false))
                     {
-                        AutoFlush = false,
+                        // AutoFlush=true: フリーズ時にプロセスを強制終了してもバッファが消えないようにする。
+                        // (false にすると Revit がフリーズ→強制終了した場合にログが全て失われる)
+                        AutoFlush = true,
                     };
 
                     _writer.WriteLine($"==== Formwork Debug Log Start [{DateTime.Now:yyyy-MM-dd HH:mm:ss}] ====");

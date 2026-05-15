@@ -137,6 +137,15 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                     }
                 }
 
+                // フリーズ診断: CollectFromDoc 呼び出し前にフラッシュ。
+                // BIM360 ワークシェアリング doc では FilteredElementCollector.ToList() が
+                // クラウド同期待ちでここで止まる場合があるため、呼び出し直前ログを残す。
+                FormworkDebugLog.Log(
+                    $"  [LinkedCollect] {sourceName}: CollectFromDoc 開始" +
+                    $" cats={settings.IncludedCategories.Count}" +
+                    $" outline={(linkLocalOutline != null ? "有" : "無(全要素対象)")}");
+                FormworkDebugLog.Flush();
+
                 var linkedElems = CollectFromDoc(linkDoc, settings, null, isLinked: true, linkLocalOutline: linkLocalOutline);
                 foreach (var elem in linkedElems)
                 {

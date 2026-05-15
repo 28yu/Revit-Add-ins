@@ -71,6 +71,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                     linkMapCount++;
                 }
                 FormworkDebugLog.Log($"  [LinkMap] total linked elements mapped: {linkMapCount}");
+                FormworkDebugLog.Flush(); // 収集完了確認ポイント
             }
 
             // 除外要素を ExcludedResult として記録 (集計には含めない)
@@ -143,15 +144,40 @@ namespace Tools28.Commands.FormworkCalculator.Engine
 
             // Pass 1: 要素毎に面を分類
             _progress?.Report($"Pass 1: 面分類中... 0 / {sources.Count}");
+            FormworkDebugLog.Log(
+                $"[Pass1] 開始: total={sources.Count} " +
+                $"linked={sources.Count(s => s.IsLinked)} host={sources.Count(s => !s.IsLinked)}");
+            FormworkDebugLog.Flush();
             var contexts = new List<ContactFaceDetector.ElementFacesContext>();
             var srcByContext = new Dictionary<int, ElementSource>();
 
             int idx = 0;
+            int linkedCount = sources.Count(s => s.IsLinked);
+            int linkedIdx = 0;
             foreach (var src in sources)
             {
                 idx++;
-                if (idx % 10 == 0)
+                if (src.IsLinked) linkedIdx++;
+
+                // プログレス表示: リンク要素は個別に更新してフリーズと区別できるようにする
+                if (src.IsLinked)
+                    _progress?.Report(
+                        $"Pass 1: リンク要素 {linkedIdx}/{linkedCount} 処理中... " +
+                        $"({src.Element.Category?.Name ?? "?"} E{src.Element.Id.IntValue()})");
+                else if (idx % 10 == 0)
                     _progress?.Report($"Pass 1: 面分類中... {idx} / {sources.Count}");
+
+                // フリーズ診断: リンク要素の GetSolids (= get_Geometry) 呼び出し前に
+                // ログ+フラッシュ。BIM360 ワークシェアリングでここが止まると特定できる。
+                if (src.IsLinked && FormworkDebugLog.Enabled)
+                {
+                    FormworkDebugLog.Log(
+                        $"[Pass1] リンク [{linkedIdx}/{linkedCount}] " +
+                        $"E{src.Element.Id.IntValue()} " +
+                        $"cat='{src.Element.Category?.Name}' " +
+                        $"name='{src.Element.Name}' src='{src.SourceName}' → GetSolids開始");
+                    FormworkDebugLog.Flush();
+                }
 
                 var elem = src.Element;
                 try
