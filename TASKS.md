@@ -5,8 +5,6 @@
 ### 優先度: 高
 - [ ] LanguageSwitch: Revit環境での動作確認
 - [ ] RoomTagCreator: Application.cs へのリボン登録確認
-- [ ] 開発環境整備: Stop hook 設定（STATUS.md 自動更新）
-- [ ] 開発環境整備: アイコンジェネレーター (Tools/IconGenerator.html) の GitHub Pages 公開
 
 ### 優先度: 中
 - [ ] 28tools-download リポジトリとの連携方法の検討
@@ -17,6 +15,8 @@
 
 ## 完了済み
 - [x] 2026-05-15: CLAUDE.md スリム化・ドキュメント分離
+- [x] 2026-05-15: Stop hook で STATUS.md 自動更新を設定
+- [x] 2026-05-15: アイコンジェネレーターを Docs/tools/ に移動し GitHub Pages 公開
 
 ## 意思決定ログ
 

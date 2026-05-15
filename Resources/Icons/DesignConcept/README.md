@@ -14,9 +14,9 @@
 - 座標・サイズはすべて `s()` 関数を通す（例: `s(16)` = 中央）
 
 ### 生成ツール
-- **メインツール**: `Tools/IconGenerator96.html`（ブラウザで開いてプレビュー＆ダウンロード）
+- **メインツール**: `Docs/tools/IconGenerator96.html`（GitHub Pages: https://28yu.github.io/Revit-Add-ins/tools/IconGenerator96.html）
 - **DPI 設定**: ツール内で pHYs チャンクを自動付与（288 DPI）
-- **Python 生成**: `Tools/generate_icons.py`（`python3 Tools/generate_icons.py` で全 PNG 一括出力）
+- **Python 生成**: `Docs/tools/generate_icons.py`（`python3 Docs/tools/generate_icons.py` で全 PNG 一括出力）
 
 ---
 
@@ -296,7 +296,7 @@ SX=26.75, SY=14.75, フォント s(10.5), 色 rgb(20,45,115)
 - `formwork_32.png`（小サイズ版）の視認性確認
 
 ### 再開手順
-1. `Tools/IconGenerator96.html` をブラウザで開く
+1. `Docs/tools/IconGenerator96.html` をブラウザで開く（または公開URL: https://28yu.github.io/Revit-Add-ins/tools/IconGenerator96.html）
 2. `formwork` プリセットを選択してプレビュー確認
 3. 必要があれば調整 → PNG ダウンロード → `Resources/Icons/` に配置
 4. `python3 Tools/generate_icons.py` で全 PNG 再生成
