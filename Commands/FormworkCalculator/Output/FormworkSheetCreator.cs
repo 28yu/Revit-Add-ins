@@ -194,7 +194,8 @@ namespace Tools28.Commands.FormworkCalculator.Output
         }
 
         /// <summary>
-        /// 3D ビューをグリッド状に配置する。指定領域内に均等に並ぶよう列数を計算する。
+        /// 3D ビューを横並びで配置し、シート幅を超えたら次の行に折り返す。
+        /// 各ビューポートの実サイズ (GetBoxOutline) を使って互いに重ならないよう配置する。
         /// </summary>
         private static void PlaceViewportGrid(
             Document doc, ViewSheet sheet, IList<ElementId> viewIds,
@@ -203,28 +204,21 @@ namespace Tools28.Commands.FormworkCalculator.Output
             int n = viewIds.Count;
             if (n == 0) return;
 
-            // 列数を決定 (1-3 件は 1 列、4-6 件は 2 列、7+ は 3 列)
-            int cols = n <= 3 ? 1 : (n <= 6 ? 2 : 3);
-            int rows = (int)Math.Ceiling((double)n / cols);
+            const double vpGap = 0.05; // ≈15mm
 
-            double areaW = rightX - leftX;
-            double areaH = topY - bottomY;
-            if (areaW <= 0 || areaH <= 0) return;
-
-            double cellW = areaW / cols;
-            double cellH = areaH / rows;
+            double rowTopY = topY;
+            double rowLeftX = leftX;
+            double rowMaxBottomY = rowTopY;
 
             for (int i = 0; i < n; i++)
             {
-                int row = i / cols;
-                int col = i % cols;
-                double cx = leftX + cellW * (col + 0.5);
-                double cy = topY - cellH * (row + 0.5);
-
+                // 仮配置 (シート外の安全な位置) で実サイズを測定
+                double tmpX = leftX + 1000.0;
+                double tmpY = topY;
                 Viewport vp;
                 try
                 {
-                    vp = Viewport.Create(doc, sheet.Id, viewIds[i], new XYZ(cx, cy, 0));
+                    vp = Viewport.Create(doc, sheet.Id, viewIds[i], new XYZ(tmpX, tmpY, 0));
                 }
                 catch (Exception ex)
                 {
@@ -234,19 +228,47 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 if (vp == null) continue;
                 ApplyNoTitleViewportType(doc, vp);
 
-                // 配置後に中心位置を調整 (タイトル非表示で配置後の中心がずれることがあるため)
+                double w = 0.7, h = 0.5; // フォールバック
+                double curCx = tmpX, curCy = tmpY;
                 try
                 {
                     var ol = vp.GetBoxOutline();
                     if (ol != null)
                     {
-                        double curCx = (ol.MinimumPoint.X + ol.MaximumPoint.X) / 2.0;
-                        double curCy = (ol.MinimumPoint.Y + ol.MaximumPoint.Y) / 2.0;
-                        ElementTransformUtils.MoveElement(doc, vp.Id,
-                            new XYZ(cx - curCx, cy - curCy, 0));
+                        w = ol.MaximumPoint.X - ol.MinimumPoint.X;
+                        h = ol.MaximumPoint.Y - ol.MinimumPoint.Y;
+                        curCx = (ol.MinimumPoint.X + ol.MaximumPoint.X) / 2.0;
+                        curCy = (ol.MinimumPoint.Y + ol.MaximumPoint.Y) / 2.0;
                     }
                 }
                 catch { }
+
+                // 行の右端を超えるなら次の行に折り返す (ただし行の先頭は折り返さない)
+                double targetLeft = rowLeftX;
+                double targetTop = rowTopY;
+                if (targetLeft + w > rightX && rowLeftX > leftX)
+                {
+                    rowTopY = rowMaxBottomY - vpGap;
+                    rowLeftX = leftX;
+                    targetLeft = rowLeftX;
+                    targetTop = rowTopY;
+                }
+
+                double targetCx = targetLeft + w / 2.0;
+                double targetCy = targetTop - h / 2.0;
+                try
+                {
+                    ElementTransformUtils.MoveElement(doc, vp.Id,
+                        new XYZ(targetCx - curCx, targetCy - curCy, 0));
+                }
+                catch (Exception ex)
+                {
+                    FormworkDebugLog.Log($"  [Sheet] Viewport move EX (grid {i}): {ex.Message}");
+                }
+
+                double placedBottom = targetTop - h;
+                if (placedBottom < rowMaxBottomY) rowMaxBottomY = placedBottom;
+                rowLeftX = targetLeft + w + vpGap;
             }
         }
 

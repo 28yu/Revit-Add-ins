@@ -108,8 +108,12 @@ namespace Tools28.Commands.FormworkCalculator.Output
             try { view.Scale = 200; }
             catch (Exception ex) { FormworkDebugLog.Log($"  [Visual] Scale set EX: {ex.Message}"); }
 
-            // 視点をビューキューブの青い角（右前上からのアイソメトリック）に設定
-            SetIsometricOrientation(view);
+            // 視点をビューキューブの青い角（右前上からのアイソメトリック）に設定。
+            // ソースが 3D ビューの場合はその視点を継承し、ソースと同じ見え方にする。
+            if (sourceView is View3D srcV3DForOrient)
+                CopyOrientationIfPossible(srcV3DForOrient, view);
+            else
+                SetIsometricOrientation(view);
 
             // OST_GenericModel (DirectShape のカテゴリ) を明示的に表示状態にする。
             // ビューテンプレートやデフォルト設定で非表示になっている場合への防御。
@@ -136,10 +140,12 @@ namespace Tools28.Commands.FormworkCalculator.Output
             // 接触検出込みで面を再計算（幾何学的検査なので rayView 不要）
             var facesByElement = FormworkCalcEngine.RecomputeFaces(doc, result, settings);
 
-            // [3] CurrentView スコープでソースが 3D ビューの場合は、ソースの切断ボックス
-            // (位置・有効/無効) をそのまま継承する。それ以外は要素 BoundingBox から自動算出。
-            bool useSourceSectionBox =
-                settings.Scope == CalculationScope.CurrentView && sourceView is View3D;
+            // [3] ソースが 3D ビューの場合 (CurrentView / SelectedViews モード) は、
+            // そのソースビューの切断ボックス (位置・有効/無効) をそのまま継承する。
+            // EntireProject 等は要素 BoundingBox から自動算出。
+            bool useSourceSectionBox = sourceView is View3D &&
+                (settings.Scope == CalculationScope.CurrentView ||
+                 settings.Scope == CalculationScope.SelectedViews);
             if (useSourceSectionBox)
                 CopySectionBoxFromSource((View3D)sourceView, view);
             else
