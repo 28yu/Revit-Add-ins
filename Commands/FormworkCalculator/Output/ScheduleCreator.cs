@@ -195,8 +195,8 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 catch (Exception ex) { LogEx("source sort group", ex); }
             }
 
-            // 階層グループ化: レベル（見出しON）→ 部位（見出しOFF [9]）
-            AddGroupField(def, levelField);
+            // 階層グループ化: レベル（見出しOFF）→ 部位（見出しOFF）
+            AddGroupField(def, levelField, showHeader: false);
             AddGroupField(def, partField, showHeader: false);
 
             // ソースフィルタ (sourceField が指定されている場合のみ)

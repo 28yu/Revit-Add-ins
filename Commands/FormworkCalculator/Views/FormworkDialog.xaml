@@ -24,23 +24,23 @@
         <!-- 計算範囲 -->
         <GroupBox x:Name="grpScope" Header="計算範囲" Grid.Row="0" Padding="10">
             <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
-                <StackPanel Grid.Column="0">
-                    <CheckBox x:Name="RadioCurrentView" IsChecked="True" Margin="0,3" Checked="OnScopeChecked">
-                        <TextBlock x:Name="txtScopeView" Text="現在のビューに表示されている要素"/>
-                    </CheckBox>
-                    <CheckBox x:Name="RadioEntireProject" Margin="0,3" Checked="OnScopeChecked">
-                        <TextBlock x:Name="txtScopeProject" Text="プロジェクト全体"/>
-                    </CheckBox>
-                </StackPanel>
-                <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                    <CheckBox x:Name="RadioSelectedViews" Margin="0,3" Checked="OnScopeChecked">
-                        <TextBlock x:Name="txtScopeSelectedViews" Text="選択のビュー"/>
-                    </CheckBox>
-                </StackPanel>
+                <CheckBox x:Name="RadioCurrentView" Grid.Row="0" Grid.Column="0" IsChecked="True" Margin="0,3,20,3" Checked="OnScopeChecked">
+                    <TextBlock x:Name="txtScopeView" Text="現在のビューに表示されている要素"/>
+                </CheckBox>
+                <CheckBox x:Name="RadioSelectedViews" Grid.Row="0" Grid.Column="1" Margin="0,3" Checked="OnScopeChecked">
+                    <TextBlock x:Name="txtScopeSelectedViews" Text="選択のビュー"/>
+                </CheckBox>
+                <CheckBox x:Name="RadioEntireProject" Grid.Row="1" Grid.Column="0" Margin="0,3" Checked="OnScopeChecked">
+                    <TextBlock x:Name="txtScopeProject" Text="プロジェクト全体"/>
+                </CheckBox>
             </Grid>
         </GroupBox>
 
