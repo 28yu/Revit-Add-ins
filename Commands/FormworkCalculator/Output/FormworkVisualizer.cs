@@ -185,22 +185,6 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     SetIsometricOrientation(view);
             }
 
-            // OST_GenericModel (DirectShape のカテゴリ) を明示的に表示状態にする。
-            // 更新モードでも防御的に実行 (idempotent)。
-            try
-            {
-                var gmCatId = new ElementId(BuiltInCategory.OST_GenericModel);
-                if (view.CanCategoryBeHidden(gmCatId))
-                {
-                    bool wasHidden = view.GetCategoryHidden(gmCatId);
-                    if (wasHidden) view.SetCategoryHidden(gmCatId, false);
-                }
-            }
-            catch (Exception ex)
-            {
-                FormworkDebugLog.Log($"  [Visual] OST_GenericModel category set EX: {ex.Message}");
-            }
-
             if (!reusedView)
             {
                 // 視点を固定アイソメトリックに設定し、ロックする（ユーザーが誤って回転しないよう）
@@ -234,6 +218,22 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     CopyCategoryVisibilityAndOverrides(doc, sourceView, view);
                 else
                     HideClutterCategories(view);
+            }
+
+            // OST_GenericModel (DirectShape のカテゴリ) を必ず表示状態にする。
+            // CopyCategoryVisibilityAndOverrides の後に実行することで、ソースビューが
+            // GenericModel を非表示にしていても型枠 DirectShape が確実に表示される。
+            // 更新モードでも防御的に実行 (idempotent)。
+            try
+            {
+                var gmCatId = new ElementId(BuiltInCategory.OST_GenericModel);
+                if (view.CanCategoryBeHidden(gmCatId))
+                    view.SetCategoryHidden(gmCatId, false);
+                FormworkDebugLog.Log("  [Visual] OST_GenericModel category set visible");
+            }
+            catch (Exception ex)
+            {
+                FormworkDebugLog.Log($"  [Visual] OST_GenericModel category set EX: {ex.Message}");
             }
 
             // 元躯体要素を 20% 透過 + RGB(94,94,94) で表示

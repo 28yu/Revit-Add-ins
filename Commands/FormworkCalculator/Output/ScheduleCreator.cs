@@ -61,6 +61,25 @@ namespace Tools28.Commands.FormworkCalculator.Output
                             sourceViewFilter);
                     }
                     catch { }
+
+                    // 既存集計表のソートグループ見出し設定を修正 (旧バージョンでは ShowHeader=true だった)。
+                    // Revit API: GetSortGroupField が返すオブジェクトは live reference のため直接変更可能。
+                    try
+                    {
+                        var def2 = existing.Definition;
+                        int sgCount = def2.GetSortGroupFieldCount();
+                        for (int i = 0; i < sgCount; i++)
+                        {
+                            try
+                            {
+                                var sgf = def2.GetSortGroupField(i);
+                                if (sgf.ShowHeader) sgf.ShowHeader = false;
+                            }
+                            catch { }
+                        }
+                    }
+                    catch { }
+
                     FormworkDebugLog.Log(
                         $"  [Sched] update mode: reusing existing schedule Id={existing.Id.IntValue()} Name='{existing.Name}'");
                     return existing.Id;
@@ -220,7 +239,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 {
                     var sortSource = new ScheduleSortGroupField(sourceField.FieldId)
                     {
-                        ShowHeader = true,
+                        ShowHeader = false,
                         ShowFooter = false,
                         ShowBlankLine = false,
                         SortOrder = ScheduleSortOrder.Ascending,
