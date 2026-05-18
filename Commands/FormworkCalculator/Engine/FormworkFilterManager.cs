@@ -52,25 +52,23 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 string filterName = FilterPrefix + ReplaceInvalidChars(key);
 
                 ParameterFilterElement filter = FindFilterByName(doc, filterName);
-                if (filter != null)
+                // 既存フィルタを再利用 (削除すると他の分析ビューの参照が切れるため)
+                if (filter == null)
                 {
-                    try { doc.Delete(filter.Id); } catch { }
-                    filter = null;
-                }
-
-                try
-                {
+                    try
+                    {
 #if REVIT2026
-                    FilterRule rule = ParameterFilterRuleFactory.CreateEqualsRule(paramElemId, key);
+                        FilterRule rule = ParameterFilterRuleFactory.CreateEqualsRule(paramElemId, key);
 #else
-                    FilterRule rule = ParameterFilterRuleFactory.CreateEqualsRule(paramElemId, key, false);
+                        FilterRule rule = ParameterFilterRuleFactory.CreateEqualsRule(paramElemId, key, false);
 #endif
-                    var elemFilter = new ElementParameterFilter(rule);
-                    filter = ParameterFilterElement.Create(doc, filterName, catIds, elemFilter);
-                }
-                catch
-                {
-                    continue;
+                        var elemFilter = new ElementParameterFilter(rule);
+                        filter = ParameterFilterElement.Create(doc, filterName, catIds, elemFilter);
+                    }
+                    catch
+                    {
+                        continue;
+                    }
                 }
 
                 try

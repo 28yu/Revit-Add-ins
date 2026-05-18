@@ -203,6 +203,44 @@ namespace Tools28.Commands.FormworkCalculator.Views
             DialogResult = true;
         }
 
+        private void OnScopeChecked(object sender, RoutedEventArgs e)
+        {
+            if (sender == RadioCurrentView)
+            {
+                RadioEntireProject.IsChecked = false;
+                RadioSelectedViews.IsChecked = false;
+            }
+            else if (sender == RadioEntireProject)
+            {
+                RadioCurrentView.IsChecked = false;
+                RadioSelectedViews.IsChecked = false;
+            }
+            else if (sender == RadioSelectedViews)
+            {
+                RadioCurrentView.IsChecked = false;
+                RadioEntireProject.IsChecked = false;
+            }
+        }
+
+        private void OnColorChecked(object sender, RoutedEventArgs e)
+        {
+            if (sender == RadioColorCategory)
+            {
+                RadioColorZone.IsChecked = false;
+                RadioColorType.IsChecked = false;
+            }
+            else if (sender == RadioColorZone)
+            {
+                RadioColorCategory.IsChecked = false;
+                RadioColorType.IsChecked = false;
+            }
+            else if (sender == RadioColorType)
+            {
+                RadioColorCategory.IsChecked = false;
+                RadioColorZone.IsChecked = false;
+            }
+        }
+
         private void BtnCancel_Click(object sender, RoutedEventArgs e)
         {
             DialogResult = false;

@@ -29,17 +29,17 @@
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0">
-                    <RadioButton x:Name="RadioCurrentView" GroupName="Scope" IsChecked="True" Margin="0,3">
+                    <CheckBox x:Name="RadioCurrentView" IsChecked="True" Margin="0,3" Checked="OnScopeChecked">
                         <TextBlock x:Name="txtScopeView" Text="現在のビューに表示されている要素"/>
-                    </RadioButton>
-                    <RadioButton x:Name="RadioEntireProject" GroupName="Scope" Margin="0,3">
+                    </CheckBox>
+                    <CheckBox x:Name="RadioEntireProject" Margin="0,3" Checked="OnScopeChecked">
                         <TextBlock x:Name="txtScopeProject" Text="プロジェクト全体"/>
-                    </RadioButton>
+                    </CheckBox>
                 </StackPanel>
                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                    <RadioButton x:Name="RadioSelectedViews" GroupName="Scope" Margin="0,3">
+                    <CheckBox x:Name="RadioSelectedViews" Margin="0,3" Checked="OnScopeChecked">
                         <TextBlock x:Name="txtScopeSelectedViews" Text="選択のビュー"/>
-                    </RadioButton>
+                    </CheckBox>
                 </StackPanel>
             </Grid>
         </GroupBox>
@@ -106,15 +106,15 @@
         <!-- 色分け -->
         <GroupBox x:Name="grpColor" Header="色分け区分" Grid.Row="6" Padding="10">
             <StackPanel Orientation="Horizontal">
-                <RadioButton x:Name="RadioColorCategory" GroupName="Color" IsChecked="True" Margin="0,0,15,0">
+                <CheckBox x:Name="RadioColorCategory" IsChecked="True" Margin="0,0,15,0" Checked="OnColorChecked">
                     <TextBlock x:Name="txtColorCat" Text="部位別"/>
-                </RadioButton>
-                <RadioButton x:Name="RadioColorZone" GroupName="Color" Margin="0,0,15,0">
+                </CheckBox>
+                <CheckBox x:Name="RadioColorZone" Margin="0,0,15,0" Checked="OnColorChecked">
                     <TextBlock x:Name="txtColorZone" Text="工区別"/>
-                </RadioButton>
-                <RadioButton x:Name="RadioColorType" GroupName="Color">
+                </CheckBox>
+                <CheckBox x:Name="RadioColorType" Checked="OnColorChecked">
                     <TextBlock x:Name="txtColorType" Text="型枠種別"/>
-                </RadioButton>
+                </CheckBox>
             </StackPanel>
         </GroupBox>
 

@@ -596,16 +596,33 @@ namespace Tools28.Commands.FormworkCalculator.Output
         /// <summary>
         /// ビューポートに「タイトルなし」タイプを適用する。
         /// 探索順:
-        ///   1. 名前に「タイトルなし」「No Title」を含む既存タイプ
-        ///   2. パラメータ VIEWPORT_ATTR_SHOW_LABEL=0 のタイプ
-        ///   3. 既定タイプを複製して SHOW_LABEL=0 に設定 (フォールバック)
-        ///   4. 同名が既に存在する場合は既存タイプを取得して再設定
+        ///   1. cachedId が有効な場合はそれを直接使用 (キャッシュ)
+        ///   2. 名前に「タイトルなし」「No Title」を含む既存タイプ
+        ///   3. パラメータ VIEWPORT_ATTR_SHOW_LABEL=0 のタイプ
+        ///   4. 既定タイプを複製して SHOW_LABEL=0 に設定 (フォールバック)
+        ///   5. 同名が既に存在する場合は既存タイプを取得して再設定
         /// </summary>
-        private static void ApplyNoTitleViewportType(Document doc, Viewport vp)
+        /// <returns>適用したタイプの ElementId (次回の cachedId として使用)。失敗時は InvalidElementId。</returns>
+        private static ElementId ApplyNoTitleViewportType(Document doc, Viewport vp, ElementId cachedId = null)
         {
-            if (doc == null || vp == null) return;
+            if (doc == null || vp == null) return ElementId.InvalidElementId;
             try
             {
+                // キャッシュ済みの ID が有効な場合はそれを直接使用
+                if (cachedId != null && cachedId != ElementId.InvalidElementId)
+                {
+                    try
+                    {
+                        vp.ChangeTypeId(cachedId);
+                        FormworkDebugLog.Log($"  [Sheet] ChangeTypeId (cached) OK → id={cachedId.IntValue()}");
+                        return cachedId;
+                    }
+                    catch (Exception ex)
+                    {
+                        FormworkDebugLog.Log($"  [Sheet] ChangeTypeId (cached) EX: {ex.Message} → 再検索");
+                    }
+                }
+
                 ElementId noTitleId = FindNoTitleViewportType(doc, out string foundReason);
                 FormworkDebugLog.Log($"  [Sheet] FindNoTitleViewportType → id={noTitleId?.IntValue()} reason='{foundReason}'");
 
@@ -686,6 +703,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     {
                         vp.ChangeTypeId(noTitleId);
                         FormworkDebugLog.Log($"  [Sheet] ChangeTypeId OK → no-title id={noTitleId.IntValue()}");
+                        return noTitleId;
                     }
                     catch (Exception ex)
                     {
@@ -701,18 +719,26 @@ namespace Tools28.Commands.FormworkCalculator.Output
             {
                 FormworkDebugLog.Log($"  [Sheet] ApplyNoTitleViewportType EX: {ex.Message}");
             }
+            return ElementId.InvalidElementId;
         }
 
         private static ElementId FindNoTitleViewportType(Document doc, out string reason)
         {
             reason = "not found";
+            // FilteredElementCollector.OfCategory(OST_Viewports).WhereElementIsElementType() は
+            // 環境によって 0 件を返すことがある。OfClass(typeof(ElementType)) で全タイプを取得し、
+            // VIEWPORT_ATTR_SHOW_LABEL パラメータを持つものだけをビューポートタイプとして扱う。
             var types = new FilteredElementCollector(doc)
-                .OfCategory(BuiltInCategory.OST_Viewports)
-                .WhereElementIsElementType()
+                .OfClass(typeof(ElementType))
                 .Cast<ElementType>()
+                .Where(t =>
+                {
+                    try { return t.get_Parameter(BuiltInParameter.VIEWPORT_ATTR_SHOW_LABEL) != null; }
+                    catch { return false; }
+                })
                 .ToList();
 
-            FormworkDebugLog.Log($"  [Sheet] viewport types found: {types.Count}");
+            FormworkDebugLog.Log($"  [Sheet] viewport types found (OfClass): {types.Count}");
             foreach (var vt in types)
             {
                 try
@@ -723,8 +749,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 catch { }
             }
 
-            // 1. VIEWPORT_ATTR_SHOW_LABEL = 0 のタイプを最優先で採用
-            //    （既存プロジェクトで「タイトル表示=いいえ」のタイプがあればそれを使う）
+            // 1. VIEWPORT_ATTR_SHOW_LABEL = 0 のタイプを最優先
             foreach (var vt in types)
             {
                 try
@@ -739,7 +764,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 catch { }
             }
 
-            // 2. 名前で「タイトルなし」「No Title」を含むタイプ（フォールバック）
+            // 2. 名前に「タイトルなし」「No Title」を含むタイプ
             foreach (var vt in types)
             {
                 string name = null;

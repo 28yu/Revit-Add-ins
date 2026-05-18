@@ -95,6 +95,21 @@ namespace Tools28.Commands.FormworkCalculator.Output
             vr.AnalysisView = view;
             vr.MarkerValue = markerValue;
 
+            // ビューテンプレートを解除する（テンプレートが適用されていると
+            // カテゴリ/フィルタ設定の変更がブロックされる場合がある）。
+            try
+            {
+                if (view.ViewTemplateId != null && view.ViewTemplateId != ElementId.InvalidElementId)
+                {
+                    view.ViewTemplateId = ElementId.InvalidElementId;
+                    FormworkDebugLog.Log("  [Visual] view template detached");
+                }
+            }
+            catch (Exception ex)
+            {
+                FormworkDebugLog.Log($"  [Visual] detach template EX: {ex.Message}");
+            }
+
             // 表示スタイルを Shading に明示設定 (Realistic では OverrideGraphicSettings の
             // 透過・色オーバーライドが期待通りに反映されない場合があるため)。
             try { view.DisplayStyle = DisplayStyle.Shading; }
@@ -459,6 +474,15 @@ namespace Tools28.Commands.FormworkCalculator.Output
             try
             {
                 FormworkFilterManager.ApplyColorFilters(doc, view, keyAssignment);
+            }
+            catch { }
+
+            // View Filter 適用後もGenericModelが確実に表示状態であることを確認
+            try
+            {
+                var gmId2 = new ElementId(BuiltInCategory.OST_GenericModel);
+                if (view.CanCategoryBeHidden(gmId2))
+                    view.SetCategoryHidden(gmId2, false);
             }
             catch { }
 
@@ -866,18 +890,28 @@ namespace Tools28.Commands.FormworkCalculator.Output
         {
             try
             {
+                // ソースの切断ボックスがアクティブな場合のみコピーする。
+                // アクティブでない場合はコピーしない（EnableSectionBoxで自動算出する）。
+                if (!source.IsSectionBoxActive)
+                {
+                    target.IsSectionBoxActive = false;
+                    return;
+                }
                 var sb = source.GetSectionBox();
                 if (sb != null)
                 {
+                    // 型枠 DirectShape (面から 15mm 押し出し) が境界でクリップされないよう
+                    // ソースの切断ボックスに小さなマージン (約 30mm) を追加する。
+                    double margin = 0.1; // ft
                     var copy = new BoundingBoxXYZ
                     {
-                        Min = sb.Min,
-                        Max = sb.Max,
+                        Min = new XYZ(sb.Min.X - margin, sb.Min.Y - margin, sb.Min.Z - margin),
+                        Max = new XYZ(sb.Max.X + margin, sb.Max.Y + margin, sb.Max.Z + margin),
                         Transform = sb.Transform,
                     };
                     target.SetSectionBox(copy);
                 }
-                target.IsSectionBoxActive = source.IsSectionBoxActive;
+                target.IsSectionBoxActive = true;
             }
             catch (Exception ex)
             {
