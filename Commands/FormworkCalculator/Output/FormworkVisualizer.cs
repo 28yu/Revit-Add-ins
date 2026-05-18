@@ -1076,12 +1076,10 @@ namespace Tools28.Commands.FormworkCalculator.Output
 
         /// <summary>
         /// ソースビューに適用されているフィルタを一覧でターゲットビューにコピーする。
-        /// 各フィルタの上書き設定 (OverrideGraphicSettings) と表示/非表示状態も継承する。
+        /// 各フィルタの上書き設定 (OverrideGraphicSettings) と表示/非表示状態を
+        /// そのまま継承する (visible=false のフィルタも同じ状態でコピー)。
         /// 型枠色分け用のフィルタ「型枠_*」は後段の FormworkFilterManager で
         /// 追加適用されるため、ここでは触れない。
-        /// [13] ソースで visible=false (要素を非表示) なフィルタは解析ビューにコピーしない。
-        /// 解析ビューは型枠表示が主目的なので、要素を隠すフィルタは引き継がない。
-        /// カテゴリレベルの表示/非表示は CopyCategoryVisibilityAndOverrides で継承済み。
         /// </summary>
         private static void CopyFilterSettings(Document doc, View source, View3D target)
         {
@@ -1091,28 +1089,9 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 if (srcFilterIds == null || srcFilterIds.Count == 0) return;
 
                 int copied = 0;
-                int skipped = 0;
                 foreach (var fid in srcFilterIds)
                 {
                     if (fid == null || fid == ElementId.InvalidElementId) continue;
-
-                    // [13] ソースで非表示 (visible=false) のフィルタはコピーしない。
-                    // これにより OST_GenericModel(型枠DirectShape)が隠れることを防ぐ。
-                    // カテゴリ可視性は CopyCategoryVisibilityAndOverrides で別途継承済み。
-                    try
-                    {
-                        bool srcVis = source.GetFilterVisibility(fid);
-                        if (!srcVis)
-                        {
-                            skipped++;
-                            var pfe = doc.GetElement(fid) as ParameterFilterElement;
-                            string fname = pfe?.Name ?? fid.IntValue().ToString();
-                            FormworkDebugLog.Log(
-                                $"  [Visual] skip hidden filter '{fname}' (visible=false in source)");
-                            continue;
-                        }
-                    }
-                    catch { }
 
                     try
                     {
@@ -1126,8 +1105,9 @@ namespace Tools28.Commands.FormworkCalculator.Output
                         if (ogs != null)
                             target.SetFilterOverrides(fid, ogs);
 
-                        // 表示状態をコピー (visible=true のみここに来る)
-                        target.SetFilterVisibility(fid, true);
+                        // 表示/非表示をソースのまま継承
+                        bool vis = source.GetFilterVisibility(fid);
+                        target.SetFilterVisibility(fid, vis);
 
                         copied++;
                     }
@@ -1138,7 +1118,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     }
                 }
                 FormworkDebugLog.Log(
-                    $"  [Visual] copied {copied}/{srcFilterIds.Count} filters from source view (skipped {skipped} hiding filters)");
+                    $"  [Visual] copied {copied}/{srcFilterIds.Count} filters from source view (visibility preserved)");
             }
             catch (Exception ex)
             {
