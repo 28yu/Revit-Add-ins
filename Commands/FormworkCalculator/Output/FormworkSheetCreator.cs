@@ -228,7 +228,11 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     FormworkDebugLog.Log($"  [Sheet] Viewport.Create EX (grid {i}): {ex.Message}");
                     continue;
                 }
-                if (vp == null) continue;
+                if (vp == null)
+                {
+                    FormworkDebugLog.Log($"  [Sheet] Viewport.Create returned null (grid {i}): viewId={viewIds[i].IntValue()}");
+                    continue;
+                }
                 ApplyNoTitleViewportType(doc, vp);
 
                 double w = 0.7, h = 0.5; // フォールバック

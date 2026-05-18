@@ -195,6 +195,10 @@ namespace Tools28.Commands.FormworkCalculator.Output
             // 接触検出込みで面を再計算（幾何学的検査なので rayView 不要）
             var facesByElement = FormworkCalcEngine.RecomputeFaces(doc, result, settings);
 
+            // [4] ソースが 3D ビューなら、後段でソースフィルタをコピーする必要があるかを記録する。
+            // フィルタは型枠フィルタ適用後に追加して優先度を低くする（型枠フィルタが上位）。
+            bool shouldCopySourceFilters = false;
+
             if (!reusedView)
             {
                 // [3] ソースが 3D ビューの場合 (CurrentView / SelectedViews モード) は、
@@ -209,13 +213,15 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 else
                     EnableSectionBox(doc, view, result);
 
-                // [4] ソースが 3D ビューならその V/G 上書き (カテゴリの表示/色 + フィルタ)
-                // をターゲット 3D ビューに継承する。スコープに関わらず常に継承し、
-                // ユーザーが元の 3D ビューで設定した表示状態をベースに型枠色分けを重ねる。
+                // [4] ソースが 3D ビューならその V/G 上書き (カテゴリの表示/色) を継承する。
+                // フィルタのコピーは ApplyColorFilters 後に実施し、型枠フィルタを高優先度に保つ。
                 // ソースが 3D ビューでない場合は、ノイズになる切断ボックスのアウトラインと
                 // レベル線のみ非表示化。
                 if (sourceView is View3D)
+                {
                     CopyCategoryVisibilityAndOverrides(doc, sourceView, view);
+                    shouldCopySourceFilters = true;
+                }
                 else
                     HideClutterCategories(view);
             }
@@ -539,6 +545,16 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 FormworkFilterManager.ApplyColorFilters(doc, view, keyAssignment);
             }
             catch { }
+
+            // ソースビューのフィルタ設定を型枠フィルタの後に追加する。
+            // 型枠フィルタ（OST_GenericModel + 区分パラメータ）を先に追加しておくことで
+            // 優先度が高くなり、ソースフィルタが GenericModel を非表示にしても
+            // 型枠 DirectShape は型枠フィルタで表示・色分けされる。
+            if (shouldCopySourceFilters && sourceView != null)
+            {
+                try { CopyFilterSettings(doc, sourceView, view); }
+                catch { }
+            }
 
             // View Filter 適用後もGenericModelが確実に表示状態であることを確認
             try
@@ -1054,12 +1070,10 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 FormworkDebugLog.Log($"  [Visual] CopyCategoryVisibility EX: {ex.Message}");
             }
 
-            // ソースビューのフィルタ設定 (フィルタ一覧 + 上書き + 表示/非表示) を継承する。
-            // 型枠色分け用の新規フィルタ「型枠_*」は後段で
-            // FormworkFilterManager.ApplyColorFilters が追加で適用する
-            // (同マネージャは「型枠_」プレフィックスのフィルタのみ削除して再作成するため、
-            //  ここでコピーした既存フィルタは上書きされずそのまま残る)。
-            CopyFilterSettings(doc, source, target);
+            // ※フィルタのコピーは CreateVisualization 内で ApplyColorFilters 後に実施する。
+            //   ソースフィルタを型枠フィルタより後に追加することで、型枠フィルタの優先度が
+            //   高くなり、ソースフィルタが OST_GenericModel を非表示にしていても
+            //   型枠 DirectShape が確実に表示・色分けされる。
 
             // DirectShape (OST_GenericModel) は型枠表示の主役なので強制的に表示状態に上書き
             try
@@ -1105,8 +1119,30 @@ namespace Tools28.Commands.FormworkCalculator.Output
                         if (ogs != null)
                             target.SetFilterOverrides(fid, ogs);
 
-                        // 表示/非表示をソースのまま継承
+                        // 表示/非表示をソースのまま継承。ただし OST_GenericModel を対象とする
+                        // フィルタが非表示になっていると型枠 DirectShape が隠れるため、
+                        // そのようなフィルタは強制的に visible=true にオーバーライドする。
                         bool vis = source.GetFilterVisibility(fid);
+                        if (!vis)
+                        {
+                            try
+                            {
+                                var pfe = doc.GetElement(fid) as ParameterFilterElement;
+                                if (pfe != null)
+                                {
+                                    var cats = pfe.GetCategories();
+                                    var gmId = new ElementId(BuiltInCategory.OST_GenericModel);
+                                    if (cats != null && cats.Contains(gmId))
+                                    {
+                                        FormworkDebugLog.Log(
+                                            $"  [Visual] filter '{pfe.Name}' (fid={fid.IntValue()}) " +
+                                            $"targets OST_GenericModel and is hidden: overriding to visible");
+                                        vis = true;
+                                    }
+                                }
+                            }
+                            catch { }
+                        }
                         target.SetFilterVisibility(fid, vis);
 
                         copied++;
