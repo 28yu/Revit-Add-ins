@@ -207,18 +207,18 @@ namespace Tools28.Commands.FormworkCalculator.Views
         {
             if (sender == RadioCurrentView)
             {
-                RadioEntireProject.IsChecked = false;
-                RadioSelectedViews.IsChecked = false;
+                if (RadioEntireProject != null) RadioEntireProject.IsChecked = false;
+                if (RadioSelectedViews != null) RadioSelectedViews.IsChecked = false;
             }
             else if (sender == RadioEntireProject)
             {
-                RadioCurrentView.IsChecked = false;
-                RadioSelectedViews.IsChecked = false;
+                if (RadioCurrentView != null) RadioCurrentView.IsChecked = false;
+                if (RadioSelectedViews != null) RadioSelectedViews.IsChecked = false;
             }
             else if (sender == RadioSelectedViews)
             {
-                RadioCurrentView.IsChecked = false;
-                RadioEntireProject.IsChecked = false;
+                if (RadioCurrentView != null) RadioCurrentView.IsChecked = false;
+                if (RadioEntireProject != null) RadioEntireProject.IsChecked = false;
             }
         }
 
@@ -226,18 +226,18 @@ namespace Tools28.Commands.FormworkCalculator.Views
         {
             if (sender == RadioColorCategory)
             {
-                RadioColorZone.IsChecked = false;
-                RadioColorType.IsChecked = false;
+                if (RadioColorZone != null) RadioColorZone.IsChecked = false;
+                if (RadioColorType != null) RadioColorType.IsChecked = false;
             }
             else if (sender == RadioColorZone)
             {
-                RadioColorCategory.IsChecked = false;
-                RadioColorType.IsChecked = false;
+                if (RadioColorCategory != null) RadioColorCategory.IsChecked = false;
+                if (RadioColorType != null) RadioColorType.IsChecked = false;
             }
             else if (sender == RadioColorType)
             {
-                RadioColorCategory.IsChecked = false;
-                RadioColorZone.IsChecked = false;
+                if (RadioColorCategory != null) RadioColorCategory.IsChecked = false;
+                if (RadioColorZone != null) RadioColorZone.IsChecked = false;
             }
         }
 
