@@ -78,6 +78,9 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     existingNumber = existing.SheetNumber;
                     doc.Delete(existing.Id);
                     FormworkDebugLog.Log($"  [Sheet] 既存シート削除: '{existingNumber} - {existingName}'");
+                    // 削除後に Regenerate してビューの「使用中」フラグを解放する。
+                    // これをしないと Viewport.Create が null を返すことがある。
+                    doc.Regenerate();
                 }
             }
             catch (Exception ex)
