@@ -285,14 +285,15 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         }
 
         /// <summary>
-        /// リンク文書のユーザーワークセットのうち、ホストビューで非表示とみなされる
+        /// リンク文書のユーザーワークセットのうち、リンク文書の既定値で非表示とみなされる
         /// ワークセット ID の集合を返す。
         ///
-        /// 優先順位:
-        ///   1. View.GetWorksetVisibility(ws.Id) で Hidden が返るもの
-        ///      (Revit が内部的にリンクのワークセット ID をホストビューに登録している場合に動作)
-        ///   2. WorksetDefaultVisibilitySettings.IsWorksetVisible() が false のもの
-        ///      (リンク文書自身の既定値; V/G ホスト側カスタム上書きは反映されない)
+        /// 注意: hostView.GetWorksetVisibility(ws.Id) はホストモデルのワークセット ID で
+        /// 動作する API であり、リンクモデルのワークセット ID をそのまま渡すと、
+        /// たまたま同じ整数値を持つホスト側ワークセットの状態を返してしまう。
+        /// 例: ホストとリンク両方に id=0 の「ワークセット1」があり、ホストビューで
+        ///     ホスト側を非表示にするとリンク要素まで除外される誤動作が発生する。
+        /// このためリンクモデルの可視性はリンク文書自身の既定値のみで判断する。
         /// </summary>
         private static HashSet<int> BuildHiddenWorksetIds(Document linkDoc, View hostView, string sourceName)
         {
@@ -307,9 +308,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             }
 
             int total = 0;
-            int hostVisHidden = 0;
             int defaultHidden = 0;
-            int hostVisException = 0;
             try
             {
                 var wsCol = new FilteredWorksetCollector(linkDoc)
@@ -321,30 +320,10 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                     bool isHidden = false;
                     string reason = "visible";
 
-                    // 手順1: ホストビューのワークセット可視性を問い合わせ
-                    if (hostView != null)
-                    {
-                        try
-                        {
-                            WorksetVisibility vis = hostView.GetWorksetVisibility(ws.Id);
-                            if (vis == WorksetVisibility.Hidden)
-                            {
-                                isHidden = true;
-                                reason = "hostView.Hidden";
-                                hostVisHidden++;
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            hostVisException++;
-                            if (hostVisException <= 2)
-                                FormworkDebugLog.Log(
-                                    $"  [WsCheck] {sourceName}: hostView.GetWorksetVisibility(ws='{ws.Name}',id={ws.Id.IntegerValue}) 例外: {ex.GetType().Name}: {ex.Message}");
-                        }
-                    }
-
-                    // 手順2: リンク文書の既定値を補完
-                    if (!isHidden && wdvs != null)
+                    // リンク文書の既定値で非表示かチェック。
+                    // hostView.GetWorksetVisibility() はホストモデルの API であり
+                    // リンクモデルのワークセット ID には使用しない (誤判定の原因となるため)。
+                    if (wdvs != null)
                     {
                         try
                         {
@@ -371,8 +350,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
 
             FormworkDebugLog.Log(
                 $"  [WsCheck] {sourceName}: ワークセット総計={total} " +
-                $"hostView非表示={hostVisHidden} 既定非表示={defaultHidden} " +
-                $"hostView例外={hostVisException} → 除外対象={hidden.Count}");
+                $"既定非表示={defaultHidden} → 除外対象={hidden.Count}");
 
             return hidden;
         }
