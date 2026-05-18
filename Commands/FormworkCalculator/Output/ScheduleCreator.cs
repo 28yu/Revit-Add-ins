@@ -890,7 +890,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 }
 
                 // FieldId のみ収集 (ShowFooter/ShowBlankLine/SortOrder のゲッターはバージョン依存のため読まない)
-                var fieldIds = new List<ElementId>();
+                var fieldIds = new List<ScheduleFieldId>();
                 int hadHeaderCount = 0;
                 for (int i = 0; i < sgCount; i++)
                 {
