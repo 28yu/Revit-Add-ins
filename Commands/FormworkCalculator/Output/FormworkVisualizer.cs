@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using Autodesk.Revit.DB;
 using Tools28.Commands.FormworkCalculator.Engine;
@@ -74,6 +75,8 @@ namespace Tools28.Commands.FormworkCalculator.Output
             string sourceViewName = sourceView?.Name;
             string analysisName = BuildAnalysisViewName(sourceViewName);
             string markerValue = FormworkParameterManager.MarkerValue;
+            // [8] ホストモデルの表示名 (実際のファイル名 or タイトル)
+            string hostDisplayName = GetDocumentDisplayName(doc);
 
             // 既存の同名ビューを削除 (このソースビューのもののみ)
             DeleteViewByName(doc, analysisName);
@@ -365,10 +368,12 @@ namespace Tools28.Commands.FormworkCalculator.Output
                                     firstPieceForThisFace = false;
                                 }
                                 string filterKey = IsDeducted(fi.FaceType) ? "控除面" : key;
+                                string srcDisplay = er.SourceName == ElementSourceRegistry.HostSourceName
+                                    ? hostDisplayName : er.SourceName;
                                 FormworkParameterManager.SetInstanceValues(
                                     ds, catLabel, levelName, filterKey, areaM2,
                                     faceHasPartialContact,
-                                    sourceName: er.SourceName,
+                                    sourceName: srcDisplay,
                                     sourceViewName: sourceViewName);
                                 areaM2ThisDs = areaM2;
                             }
@@ -624,6 +629,8 @@ namespace Tools28.Commands.FormworkCalculator.Output
 
                         try
                         {
+                            string srcDisplay = ex.SourceName == ElementSourceRegistry.HostSourceName
+                                ? hostDisplayName : ex.SourceName;
                             FormworkParameterManager.SetInstanceValues(
                                 ds,
                                 FormworkParameterManager.MarkerValueExcluded,
@@ -632,7 +639,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
                                 FormworkParameterManager.ExcludedGroupKey,
                                 0.0,
                                 false,
-                                sourceName: ex.SourceName,
+                                sourceName: srcDisplay,
                                 sourceViewName: sourceViewName);
                         }
                         catch { }
@@ -1794,6 +1801,23 @@ namespace Tools28.Commands.FormworkCalculator.Output
             {
                 return null;
             }
+        }
+
+        /// <summary>
+        /// ドキュメントの表示名を返す。パスがあればファイル名(拡張子なし)、なければタイトル。
+        /// </summary>
+        private static string GetDocumentDisplayName(Document doc)
+        {
+            try
+            {
+                if (doc == null) return ElementSourceRegistry.HostSourceName;
+                var path = doc.PathName;
+                if (!string.IsNullOrEmpty(path))
+                    return Path.GetFileNameWithoutExtension(path);
+                return !string.IsNullOrEmpty(doc.Title)
+                    ? doc.Title : ElementSourceRegistry.HostSourceName;
+            }
+            catch { return ElementSourceRegistry.HostSourceName; }
         }
     }
 }

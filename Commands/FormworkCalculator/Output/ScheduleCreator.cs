@@ -92,26 +92,31 @@ namespace Tools28.Commands.FormworkCalculator.Output
             try { def.ShowGrandTotal = true; } catch (Exception ex) { LogEx("ShowGrandTotal=true (before)", ex); }
             LogDef(def, "after-set-itemized-before-fields");
 
-            // 列順: 件数 / レベル / 部位 / 区分 / 面積
-            // ソース列はユーザー要望により非表示 (ホスト/リンク別の集計表として作成するため)
+            // 列順: 件数 / [ソース] / レベル / 部位 / 区分 / 面積
+            // ソース列: sourceFilter なし → 表示してリンクモデルを分離 ([10])
+            //           sourceFilter あり → 非表示フィルタ専用
             var countField = AddCountField(def, schedulable);
+
+            ScheduleField sourceField = AddField(doc, def, schedulable, paramIds, FormworkParameterManager.ParamSource);
+            if (sourceField != null)
+            {
+                if (string.IsNullOrEmpty(sourceFilter))
+                {
+                    try { sourceField.ColumnHeading = "ソース"; }
+                    catch (Exception ex) { LogEx("sourceField.ColumnHeading", ex); }
+                }
+                else
+                {
+                    try { sourceField.IsHidden = true; } catch { }
+                }
+            }
+
             var levelField = AddField(doc, def, schedulable, paramIds, FormworkParameterManager.ParamLevel);
             var partField = AddField(doc, def, schedulable, paramIds, FormworkParameterManager.ParamCategory);
             var groupField = AddField(doc, def, schedulable, paramIds, FormworkParameterManager.ParamGroupKey);
             var areaField = AddField(doc, def, schedulable, paramIds, FormworkParameterManager.ParamArea);
             LogDef(def, "after-add-fields");
             LogField(areaField, "areaField after-add");
-
-            // ソースフィルタ用フィールド (非表示)
-            ScheduleField sourceField = null;
-            if (!string.IsNullOrEmpty(sourceFilter))
-            {
-                sourceField = AddField(doc, def, schedulable, paramIds, FormworkParameterManager.ParamSource);
-                if (sourceField != null)
-                {
-                    try { sourceField.IsHidden = true; } catch { }
-                }
-            }
 
             // ソースビューフィルタ用フィールド (非表示)
             ScheduleField sourceViewField = null;
@@ -173,9 +178,26 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 catch { }
             }
 
-            // 階層グループ化: レベル → 部位（見出しON / フッタOFF）
+            // ソースでグループ化 ([10] リンクモデルを分けて表示) - レベル・部位グループより先に追加
+            if (sourceField != null && string.IsNullOrEmpty(sourceFilter))
+            {
+                try
+                {
+                    var sortSource = new ScheduleSortGroupField(sourceField.FieldId)
+                    {
+                        ShowHeader = true,
+                        ShowFooter = false,
+                        ShowBlankLine = false,
+                        SortOrder = ScheduleSortOrder.Ascending,
+                    };
+                    def.AddSortGroupField(sortSource);
+                }
+                catch (Exception ex) { LogEx("source sort group", ex); }
+            }
+
+            // 階層グループ化: レベル（見出しON）→ 部位（見出しOFF [9]）
             AddGroupField(def, levelField);
-            AddGroupField(def, partField);
+            AddGroupField(def, partField, showHeader: false);
 
             // ソースフィルタ (sourceField が指定されている場合のみ)
             if (sourceField != null && !string.IsNullOrEmpty(sourceFilter))
@@ -402,8 +424,11 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     $"  [Sched] AutoWidth: body rows={rowCount} cols={colCount}");
 
                 // 既定の最小幅 (文字数 0 でもこれ以上は確保)。
-                // 列順: 件数 / レベル / 部位 / 区分 / 面積。
-                double[] minWidthsFeet = { 0.075, 0.080, 0.075, 0.085, 0.090 };
+                // 6列 (ソース表示あり): 件数 / ソース / レベル / 部位 / 区分 / 面積
+                // 5列 (ソースフィルタあり): 件数 / レベル / 部位 / 区分 / 面積
+                double[] minWidthsFeet = (colCount >= 6)
+                    ? new double[] { 0.075, 0.085, 0.080, 0.075, 0.085, 0.090 }
+                    : new double[] { 0.075, 0.080, 0.075, 0.085, 0.090 };
                 // 各列の最大幅 (mm) を制限 (異常に広がるのを抑止)
                 const double maxColumnWidthMm = 250.0;
 
@@ -799,14 +824,14 @@ namespace Tools28.Commands.FormworkCalculator.Output
         /// <summary>
         /// グループフィールドとして追加（見出しON / フッタOFF）。
         /// </summary>
-        private static void AddGroupField(ScheduleDefinition def, ScheduleField field)
+        private static void AddGroupField(ScheduleDefinition def, ScheduleField field, bool showHeader = true)
         {
             if (field == null) return;
             try
             {
                 var sort = new ScheduleSortGroupField(field.FieldId)
                 {
-                    ShowHeader = true,
+                    ShowHeader = showHeader,
                     ShowFooter = false,
                     ShowBlankLine = false,
                     SortOrder = ScheduleSortOrder.Ascending,
@@ -861,6 +886,8 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 FormworkParameterManager.ParamLevel,
                 FormworkParameterManager.ParamGroupKey,
                 FormworkParameterManager.ParamArea,
+                FormworkParameterManager.ParamSource,
+                FormworkParameterManager.ParamSourceView,
             };
             try
             {
