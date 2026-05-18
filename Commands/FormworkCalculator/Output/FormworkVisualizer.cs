@@ -199,6 +199,11 @@ namespace Tools28.Commands.FormworkCalculator.Output
             // フィルタは型枠フィルタ適用後に追加して優先度を低くする（型枠フィルタが上位）。
             bool shouldCopySourceFilters = false;
 
+            FormworkDebugLog.Log(
+                $"  [Visual] CreateVisualization: sourceView='{sourceView?.Name}' " +
+                $"type={sourceView?.GetType().Name} reusedView={reusedView} " +
+                $"target='{view?.Name}'");
+
             if (!reusedView)
             {
                 // [3] ソースが 3D ビューの場合 (CurrentView / SelectedViews モード) は、
@@ -758,6 +763,9 @@ namespace Tools28.Commands.FormworkCalculator.Output
 
             var idsList = shapeIds.ToList();
 
+            int hideSuccess = 0, hideFail = 0;
+            string lastErr = null;
+            string failedViewSample = null;
             foreach (var v in allViews)
             {
                 if (v is ViewSchedule) continue;
@@ -766,9 +774,19 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 try
                 {
                     v.HideElements(idsList);
+                    hideSuccess++;
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    hideFail++;
+                    lastErr = ex.Message;
+                    if (failedViewSample == null) failedViewSample = v.Name;
+                }
             }
+            FormworkDebugLog.Log(
+                $"  [Hide] HideInOtherViews: shapes={idsList.Count} keepInViewId={analysisViewId.IntValue()} " +
+                $"success={hideSuccess} fail={hideFail}" +
+                (hideFail > 0 ? $" lastErr='{lastErr}' failedView='{failedViewSample}'" : ""));
         }
 
         /// <summary>
@@ -978,11 +996,15 @@ namespace Tools28.Commands.FormworkCalculator.Output
         {
             try
             {
+                bool srcActive = source.IsSectionBoxActive;
+                FormworkDebugLog.Log(
+                    $"  [Visual] CopySectionBoxFromSource: source='{source?.Name}' IsSectionBoxActive={srcActive}");
                 // ソースの切断ボックスがアクティブな場合のみコピーする。
                 // アクティブでない場合はコピーしない（EnableSectionBoxで自動算出する）。
-                if (!source.IsSectionBoxActive)
+                if (!srcActive)
                 {
                     target.IsSectionBoxActive = false;
+                    FormworkDebugLog.Log("  [Visual] CopySectionBoxFromSource: ソース非アクティブのため target も非アクティブ化");
                     return;
                 }
                 var sb = source.GetSectionBox();
@@ -998,6 +1020,9 @@ namespace Tools28.Commands.FormworkCalculator.Output
                         Transform = sb.Transform,
                     };
                     target.SetSectionBox(copy);
+                    FormworkDebugLog.Log(
+                        $"  [Visual] CopySectionBoxFromSource: copied sb min=({sb.Min.X:F2},{sb.Min.Y:F2},{sb.Min.Z:F2}) " +
+                        $"max=({sb.Max.X:F2},{sb.Max.Y:F2},{sb.Max.Z:F2})");
                 }
                 target.IsSectionBoxActive = true;
             }
@@ -1018,19 +1043,25 @@ namespace Tools28.Commands.FormworkCalculator.Output
         private static void CopyCategoryVisibilityAndOverrides(
             Document doc, View source, View3D target)
         {
+            int catTotal = 0, catCopied = 0, catSkipped = 0, catErrors = 0;
+            int hiddenCopied = 0;
+            FormworkDebugLog.Log($"  [Visual] CopyCategoryVisibility 開始: source='{source?.Name}' target='{target?.Name}'");
             try
             {
                 var allCategories = doc.Settings.Categories;
                 foreach (Category cat in allCategories)
                 {
                     if (cat == null) continue;
+                    catTotal++;
                     var catId = cat.Id;
-                    if (!target.CanCategoryBeHidden(catId)) continue;
+                    if (!target.CanCategoryBeHidden(catId)) { catSkipped++; continue; }
                     try
                     {
                         // 表示/非表示
                         bool srcHidden = source.GetCategoryHidden(catId);
                         target.SetCategoryHidden(catId, srcHidden);
+                        if (srcHidden) hiddenCopied++;
+                        catCopied++;
 
                         // V/G 上書き (色・線種・透過等)
                         if (target.IsCategoryOverridable(catId)
@@ -1041,7 +1072,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
                                 target.SetCategoryOverrides(catId, ogs);
                         }
                     }
-                    catch { /* per-category failures are non-fatal */ }
+                    catch { catErrors++; /* per-category failures are non-fatal */ }
 
                     // サブカテゴリも同様にコピー
                     foreach (Category sub in cat.SubCategories)
@@ -1069,6 +1100,9 @@ namespace Tools28.Commands.FormworkCalculator.Output
             {
                 FormworkDebugLog.Log($"  [Visual] CopyCategoryVisibility EX: {ex.Message}");
             }
+            FormworkDebugLog.Log(
+                $"  [Visual] CopyCategoryVisibility 完了: total={catTotal} copied={catCopied} " +
+                $"hiddenCopied={hiddenCopied} skipped={catSkipped} errors={catErrors}");
 
             // ※フィルタのコピーは CreateVisualization 内で ApplyColorFilters 後に実施する。
             //   ソースフィルタを型枠フィルタより後に追加することで、型枠フィルタの優先度が
@@ -1119,30 +1153,13 @@ namespace Tools28.Commands.FormworkCalculator.Output
                         if (ogs != null)
                             target.SetFilterOverrides(fid, ogs);
 
-                        // 表示/非表示をソースのまま継承。ただし OST_GenericModel を対象とする
-                        // フィルタが非表示になっていると型枠 DirectShape が隠れるため、
-                        // そのようなフィルタは強制的に visible=true にオーバーライドする。
+                        // 表示/非表示をソースのまま継承する。
+                        // 型枠フィルタは ApplyColorFilters により先に追加されているため、
+                        // ソースフィルタの優先度は型枠フィルタより低い。型枠 DirectShape は
+                        // 型枠フィルタ (高優先度) でマッチして visible=true となるため、
+                        // ソースフィルタが visible=false でも型枠 DirectShape は隠れない。
+                        // ソースフィルタ本来の挙動 (型枠以外の要素を非表示にする等) は維持される。
                         bool vis = source.GetFilterVisibility(fid);
-                        if (!vis)
-                        {
-                            try
-                            {
-                                var pfe = doc.GetElement(fid) as ParameterFilterElement;
-                                if (pfe != null)
-                                {
-                                    var cats = pfe.GetCategories();
-                                    var gmId = new ElementId(BuiltInCategory.OST_GenericModel);
-                                    if (cats != null && cats.Contains(gmId))
-                                    {
-                                        FormworkDebugLog.Log(
-                                            $"  [Visual] filter '{pfe.Name}' (fid={fid.IntValue()}) " +
-                                            $"targets OST_GenericModel and is hidden: overriding to visible");
-                                        vis = true;
-                                    }
-                                }
-                            }
-                            catch { }
-                        }
                         target.SetFilterVisibility(fid, vis);
 
                         copied++;
