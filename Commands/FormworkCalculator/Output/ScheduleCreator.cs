@@ -63,22 +63,9 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     catch { }
 
                     // 既存集計表のソートグループ見出し設定を修正 (旧バージョンでは ShowHeader=true だった)。
-                    // Revit API: GetSortGroupField が返すオブジェクトは live reference のため直接変更可能。
-                    try
-                    {
-                        var def2 = existing.Definition;
-                        int sgCount = def2.GetSortGroupFieldCount();
-                        for (int i = 0; i < sgCount; i++)
-                        {
-                            try
-                            {
-                                var sgf = def2.GetSortGroupField(i);
-                                if (sgf.ShowHeader) sgf.ShowHeader = false;
-                            }
-                            catch { }
-                        }
-                    }
-                    catch { }
+                    // Revit API では GetSortGroupField が返すオブジェクトの直接変更は反映されない場合があるため、
+                    // 全ソートグループを一旦削除して、設定を修正した状態で再追加する。
+                    FixSortGroupHeaders(existing);
 
                     FormworkDebugLog.Log(
                         $"  [Sched] update mode: reusing existing schedule Id={existing.Id.IntValue()} Name='{existing.Name}'");
@@ -883,6 +870,111 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 ? tie.InnerException : ex;
             FormworkDebugLog.Log(
                 $"  [Sched:EX] {action}: {inner.GetType().FullName}: {inner.Message}");
+        }
+
+        /// <summary>
+        /// 既存集計表のソートグループから ShowHeader=true となっているものを全て false に修正する。
+        /// 直接プロパティ変更が効かない Revit バージョンに備え、Remove+Add のフォールバックも試みる。
+        /// </summary>
+        private static void FixSortGroupHeaders(ViewSchedule schedule)
+        {
+            if (schedule == null) return;
+            try
+            {
+                var def = schedule.Definition;
+                int sgCount = def.GetSortGroupFieldCount();
+                if (sgCount == 0)
+                {
+                    FormworkDebugLog.Log("  [Sched] FixSortGroupHeaders: no sort groups");
+                    return;
+                }
+
+                // 既存ソートグループのスナップショットを取る
+                var snapshots = new List<(ElementId FieldId, bool ShowFooter, bool ShowBlankLine, ScheduleSortOrder SortOrder, bool HadHeader)>();
+                for (int i = 0; i < sgCount; i++)
+                {
+                    try
+                    {
+                        var sgf = def.GetSortGroupField(i);
+                        snapshots.Add((sgf.FieldId, sgf.ShowFooter, sgf.ShowBlankLine, sgf.SortOrder, sgf.ShowHeader));
+                    }
+                    catch (Exception ex) { LogEx($"FixSortGroup: snapshot[{i}]", ex); }
+                }
+
+                int hadHeaderCount = snapshots.Count(s => s.HadHeader);
+                FormworkDebugLog.Log(
+                    $"  [Sched] FixSortGroupHeaders: total={sgCount} withHeader={hadHeaderCount}");
+                if (hadHeaderCount == 0) return; // 全て既に false なら何もしない
+
+                // 直接プロパティ変更を試す
+                for (int i = 0; i < sgCount; i++)
+                {
+                    try
+                    {
+                        var sgf = def.GetSortGroupField(i);
+                        if (sgf.ShowHeader) sgf.ShowHeader = false;
+                    }
+                    catch { }
+                }
+
+                // 直接変更が効いたか確認 (GetSortGroupField で再読み込み)
+                bool stillHasHeader = false;
+                for (int i = 0; i < sgCount; i++)
+                {
+                    try
+                    {
+                        var sgf = def.GetSortGroupField(i);
+                        if (sgf.ShowHeader) { stillHasHeader = true; break; }
+                    }
+                    catch { }
+                }
+
+                if (!stillHasHeader)
+                {
+                    FormworkDebugLog.Log("  [Sched] FixSortGroupHeaders: direct mutation succeeded");
+                    return;
+                }
+
+                // 直接変更が効かない場合は Remove+Add フォールバック
+                FormworkDebugLog.Log("  [Sched] FixSortGroupHeaders: direct mutation failed, trying Remove+Add");
+                var removeMethod = def.GetType().GetMethod("RemoveSortGroupField", new[] { typeof(int) });
+                if (removeMethod == null)
+                {
+                    FormworkDebugLog.Log("  [Sched] FixSortGroupHeaders: RemoveSortGroupField not available");
+                    return;
+                }
+
+                // 逆順で削除 (インデックスがずれないように)
+                for (int i = sgCount - 1; i >= 0; i--)
+                {
+                    try { removeMethod.Invoke(def, new object[] { i }); }
+                    catch (Exception ex) { LogReflEx($"FixSortGroup: Remove[{i}]", ex); }
+                }
+
+                // 元の順序で ShowHeader=false の状態で再追加
+                int readded = 0;
+                foreach (var snap in snapshots)
+                {
+                    try
+                    {
+                        var newSgf = new ScheduleSortGroupField(snap.FieldId)
+                        {
+                            ShowHeader = false,
+                            ShowFooter = snap.ShowFooter,
+                            ShowBlankLine = snap.ShowBlankLine,
+                            SortOrder = snap.SortOrder,
+                        };
+                        def.AddSortGroupField(newSgf);
+                        readded++;
+                    }
+                    catch (Exception ex) { LogEx("FixSortGroup: re-add", ex); }
+                }
+                FormworkDebugLog.Log($"  [Sched] FixSortGroupHeaders: re-added {readded}/{snapshots.Count} sort groups");
+            }
+            catch (Exception ex)
+            {
+                FormworkDebugLog.Log($"  [Sched] FixSortGroupHeaders EX: {ex.GetType().Name}: {ex.Message}");
+            }
         }
 
         /// <summary>

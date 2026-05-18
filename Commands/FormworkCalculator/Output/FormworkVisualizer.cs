@@ -549,6 +549,35 @@ namespace Tools28.Commands.FormworkCalculator.Output
             }
             catch { }
 
+            // [13] 念のため、解析ビューに残っている全フィルタを走査し、
+            // OST_GenericModel を非表示にしているフィルタがあれば表示に戻す。
+            // (CopyFilterSettings でスキップ済みだが、防御的に最終チェック)
+            try
+            {
+                var gmId3 = new ElementId(BuiltInCategory.OST_GenericModel);
+                var viewFilterIds = view.GetFilters();
+                foreach (var fid in viewFilterIds)
+                {
+                    try
+                    {
+                        if (view.GetFilterVisibility(fid)) continue;
+                        var pfe = doc.GetElement(fid) as ParameterFilterElement;
+                        if (pfe == null) continue;
+                        // 型枠色分けフィルタ「型枠_除外」等は意図的に visible=false なのでスキップ
+                        if (!string.IsNullOrEmpty(pfe.Name) && pfe.Name.StartsWith("型枠_")) continue;
+                        var cats = pfe.GetCategories();
+                        if (cats != null && cats.Contains(gmId3))
+                        {
+                            view.SetFilterVisibility(fid, true);
+                            FormworkDebugLog.Log(
+                                $"  [Visual] forced visible: filter '{pfe.Name}' (was hiding OST_GenericModel)");
+                        }
+                    }
+                    catch { }
+                }
+            }
+            catch { }
+
             return vr;
         }
 
@@ -1079,6 +1108,8 @@ namespace Tools28.Commands.FormworkCalculator.Output
         /// 各フィルタの上書き設定 (OverrideGraphicSettings) と表示/非表示状態も継承する。
         /// 型枠色分け用のフィルタ「型枠_*」は後段の FormworkFilterManager で
         /// 追加適用されるため、ここでは触れない。
+        /// [13] OST_GenericModel (型枠DirectShape) を非表示にするフィルタはスキップする
+        /// (ソースビューが「リンクモデルのみ表示」フィルタを持っている場合に型枠が見えなくなるのを防ぐ)。
         /// </summary>
         private static void CopyFilterSettings(Document doc, View source, View3D target)
         {
@@ -1088,9 +1119,37 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 if (srcFilterIds == null || srcFilterIds.Count == 0) return;
 
                 int copied = 0;
+                int skipped = 0;
+                var genericModelId = new ElementId(BuiltInCategory.OST_GenericModel);
                 foreach (var fid in srcFilterIds)
                 {
                     if (fid == null || fid == ElementId.InvalidElementId) continue;
+
+                    // [13] 型枠DirectShape を非表示にする可能性のあるフィルタはスキップ:
+                    //   - ソースで非表示 (GetFilterVisibility=false)
+                    //   - フィルタの対象カテゴリに OST_GenericModel が含まれる
+                    try
+                    {
+                        bool srcVis = source.GetFilterVisibility(fid);
+                        if (!srcVis)
+                        {
+                            var pfe = doc.GetElement(fid) as ParameterFilterElement;
+                            if (pfe != null)
+                            {
+                                var cats = pfe.GetCategories();
+                                if (cats != null && cats.Contains(genericModelId))
+                                {
+                                    skipped++;
+                                    FormworkDebugLog.Log(
+                                        $"  [Visual] skip filter id={fid.IntValue()} name='{pfe.Name}' " +
+                                        "(hides OST_GenericModel which would hide formwork shapes)");
+                                    continue;
+                                }
+                            }
+                        }
+                    }
+                    catch { }
+
                     try
                     {
                         // ターゲットに同じフィルタを追加 (既に存在する場合は AddFilter が例外)
@@ -1116,7 +1175,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     }
                 }
                 FormworkDebugLog.Log(
-                    $"  [Visual] copied {copied}/{srcFilterIds.Count} filters from source view");
+                    $"  [Visual] copied {copied}/{srcFilterIds.Count} filters from source view (skipped {skipped} hiding OST_GenericModel)");
             }
             catch (Exception ex)
             {
