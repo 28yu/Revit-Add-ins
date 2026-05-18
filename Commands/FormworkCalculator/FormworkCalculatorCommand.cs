@@ -320,39 +320,9 @@ namespace Tools28.Commands.FormworkCalculator
                     }
                 }
 
-                // ビュータブを順に開く: 集計表系 → 最後に 3D ビュー (最終アクティブ)。
-                // 3D ビューがユーザーにとってのメインビューなので、実行後はそこに遷移する。
-                // メイン集計表は Project Browser から手動で開く。
-                ElementId firstScheduleId = perViewScheduleIds.FirstOrDefault();
-                ElementId firstAnalysisViewId = perViewAnalysisViewIds.FirstOrDefault();
-                if (firstScheduleId != null && firstScheduleId != ElementId.InvalidElementId)
-                {
-                    try
-                    {
-                        var v = doc.GetElement(firstScheduleId) as View;
-                        if (v != null) uidoc.ActiveView = v;
-                    }
-                    catch { }
-                }
-                if (summaryScheduleId != null && summaryScheduleId != ElementId.InvalidElementId)
-                {
-                    try
-                    {
-                        var v = doc.GetElement(summaryScheduleId) as View;
-                        if (v != null) uidoc.ActiveView = v;
-                    }
-                    catch { }
-                }
-                if (firstAnalysisViewId != null && firstAnalysisViewId != ElementId.InvalidElementId)
-                {
-                    try
-                    {
-                        var v = doc.GetElement(firstAnalysisViewId) as View;
-                        if (v != null) uidoc.ActiveView = v;
-                    }
-                    catch { }
-                }
-                // シートを最終アクティブにする (3Dビュー・集計表の上に配置した全体像が見える)
+                // 実行後にアクティブにするビュー:
+                //   - シート作成あり: シートのみを開く
+                //   - シート作成なし: 3Dビュー（複数の場合は全て）を開き、最初のビューを最終アクティブに
                 if (sheetId != null && sheetId != ElementId.InvalidElementId)
                 {
                     try
@@ -361,6 +331,19 @@ namespace Tools28.Commands.FormworkCalculator
                         if (v != null) uidoc.ActiveView = v;
                     }
                     catch { }
+                }
+                else if (perViewAnalysisViewIds.Count > 0)
+                {
+                    // 後ろから順に開いて最終的に先頭ビューがアクティブになるようにする
+                    for (int i = perViewAnalysisViewIds.Count - 1; i >= 0; i--)
+                    {
+                        try
+                        {
+                            var v = doc.GetElement(perViewAnalysisViewIds[i]) as View;
+                            if (v != null) uidoc.ActiveView = v;
+                        }
+                        catch { }
+                    }
                 }
 
                 // 全ビューの合算で集計を表示
