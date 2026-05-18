@@ -587,6 +587,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 return;
 
             int created = 0;
+            string hostDisplayName = GetDocumentDisplayName(doc);
             var registry = result.SourceRegistry as Engine.ElementSourceRegistry;
             foreach (var ex in result.ExcludedResults)
             {
