@@ -873,8 +873,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
         {
             return t == FaceType.DeductedTop ||
                    t == FaceType.DeductedBottom ||
-                   t == FaceType.DeductedContact ||
-                   t == FaceType.DeductedBelowGL;
+                   t == FaceType.DeductedContact;
         }
 
         private static string GetKey(ElementResult er, FormworkSettings s)

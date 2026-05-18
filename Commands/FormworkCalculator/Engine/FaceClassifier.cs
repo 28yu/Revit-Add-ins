@@ -14,7 +14,6 @@ namespace Tools28.Commands.FormworkCalculator.Engine
     ///   - その他の下向き面（リビールの天井など）→ FormworkRequired
     ///   - 垂直面 → FormworkRequired
     ///   - 傾斜面 → FormworkRequired (リビール/スイープの斜面など)
-    ///   - GL より下の垂直/下向き面 → DeductedBelowGL (オプション)
     /// </summary>
     internal static class FaceClassifier
     {
@@ -71,7 +70,6 @@ namespace Tools28.Commands.FormworkCalculator.Engine
 
         internal static List<FaceInfo> ClassifyAll(
             IEnumerable<Solid> unionedSolids,
-            double? glElevationFeet,
             double minBottomZ,
             double maxTopZ)
         {
@@ -81,7 +79,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 if (s == null) continue;
                 foreach (Face f in s.Faces)
                 {
-                    var info = Classify(f, glElevationFeet, minBottomZ, maxTopZ);
+                    var info = Classify(f, minBottomZ, maxTopZ);
                     if (info != null) list.Add(info);
                 }
             }
@@ -89,7 +87,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         }
 
         internal static FaceInfo Classify(
-            Face f, double? glElevationFeet, double minBottomZ, double maxTopZ)
+            Face f, double minBottomZ, double maxTopZ)
         {
             if (f == null) return null;
             XYZ n = GetFaceNormal(f);
@@ -120,29 +118,14 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             {
                 // 下向き水平面: 最下面のみ DeductedBottom。リビール天井などは FormworkRequired
                 if (pt != null && Math.Abs(pt.Z - minBottomZ) < TopBottomTol)
-                {
                     type = FaceType.DeductedBottom;
-                }
-                else if (glElevationFeet.HasValue && pt != null && pt.Z < glElevationFeet.Value - 1e-3)
-                {
-                    type = FaceType.DeductedBelowGL;
-                }
                 else
-                {
                     type = FaceType.FormworkRequired;
-                }
             }
             else
             {
                 // 垂直面 or 傾斜面 → 全て FormworkRequired (リビール/スイープの斜面も含む)
-                if (glElevationFeet.HasValue && pt != null && pt.Z < glElevationFeet.Value - 1e-3)
-                {
-                    type = FaceType.DeductedBelowGL;
-                }
-                else
-                {
-                    type = FaceType.FormworkRequired;
-                }
+                type = FaceType.FormworkRequired;
             }
 
             return new FaceInfo

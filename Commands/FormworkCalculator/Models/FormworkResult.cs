@@ -8,7 +8,6 @@ namespace Tools28.Commands.FormworkCalculator.Models
         DeductedTop,
         DeductedBottom,
         DeductedContact,
-        DeductedBelowGL,
         Inclined,
         Error,
     }

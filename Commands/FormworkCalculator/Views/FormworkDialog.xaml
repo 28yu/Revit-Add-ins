@@ -127,18 +127,6 @@
                 <CheckBox x:Name="ChkIncludeLinks" Margin="0,3">
                     <TextBlock x:Name="txtIncludeLinks" Text="リンクモデルも対象に含める"/>
                 </CheckBox>
-                <Grid Margin="0,3">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="60"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    <CheckBox x:Name="ChkUseGL" Grid.Column="0" VerticalAlignment="Center">
-                        <TextBlock x:Name="txtUseGL" Text="GL 高さで地中部分を控除" Margin="0,0,10,0"/>
-                    </CheckBox>
-                    <TextBox x:Name="TxtGL" Grid.Column="1" Text="0.000" Height="22"/>
-                    <TextBlock Grid.Column="2" Text=" m" VerticalAlignment="Center" Margin="5,0,0,0"/>
-                </Grid>
             </StackPanel>
         </GroupBox>
 

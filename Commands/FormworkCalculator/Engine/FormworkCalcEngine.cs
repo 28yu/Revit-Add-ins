@@ -201,10 +201,6 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                     $"(formwork accounted on wall cut-face side)");
             }
 
-            double? glFeet = null;
-            if (_settings.UseGLDeduction)
-                glFeet = UnitUtils.ConvertToInternalUnits(_settings.GLElevationMeters, UnitTypeId.Meters);
-
             // 開口処理はホスト要素のみで完結 (リンク内の開口はリンク側に閉じる)
             var hostElements = sources
                 .Where(s => !s.IsLinked)
@@ -253,7 +249,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 var elem = src.Element;
                 try
                 {
-                    var ctx = ClassifyElementFaces(src, glFeet);
+                    var ctx = ClassifyElementFaces(src);
                     if (ctx != null)
                     {
                         contexts.Add(ctx);
@@ -369,7 +365,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 }
                 catch { }
 
-                int reqCount = 0, topCount = 0, botCount = 0, conCount = 0, bglCount = 0, incCount = 0;
+                int reqCount = 0, topCount = 0, botCount = 0, conCount = 0, incCount = 0;
                 int partialFaceCount = 0;
                 int allReqFaces = 0;
                 foreach (var fi in ctx.Faces)
@@ -384,7 +380,6 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                         case FaceType.DeductedTop: topCount++; break;
                         case FaceType.DeductedBottom: botCount++; break;
                         case FaceType.DeductedContact: conCount++; break;
-                        case FaceType.DeductedBelowGL: bglCount++; break;
                         case FaceType.Inclined: incCount++; break;
                     }
                 }
@@ -421,7 +416,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 string cat = CategoryShort(er.Category);
                 FormworkDebugLog.Log(
                     $"[ElemDiag] E{er.ElementId} ({cat}) '{er.ElementName}' type='{typeName}' " +
-                    $"dim={dim}mm formwork={er.FormworkArea:F2}m² faces={reqCount}/{topCount}/{botCount}/{conCount}/{bglCount}/{incCount} " +
+                    $"dim={dim}mm formwork={er.FormworkArea:F2}m² faces={reqCount}/{topCount}/{botCount}/{conCount}/{incCount} " +
                     $"parts={partialFaceCount} dedTop={er.DeductedTopArea:F2} dedBot={er.DeductedBottomArea:F2} " +
                     $"dedCon={er.DeductedContactArea:F2}{marker}");
             }
@@ -524,10 +519,10 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         {
             if (!FormworkDebugLog.Enabled) return;
             FormworkDebugLog.Section($"Pass 1: Face Classification (elements={contexts.Count})");
-            int totalReq = 0, totalTop = 0, totalBot = 0, totalCon = 0, totalBGL = 0, totalInc = 0, totalErr = 0;
+            int totalReq = 0, totalTop = 0, totalBot = 0, totalCon = 0, totalInc = 0, totalErr = 0;
             foreach (var ctx in contexts)
             {
-                int req = 0, top = 0, bot = 0, con = 0, bgl = 0, inc = 0, err = 0;
+                int req = 0, top = 0, bot = 0, con = 0, inc = 0, err = 0;
                 foreach (var f in ctx.Faces)
                 {
                     switch (f.FaceType)
@@ -536,20 +531,19 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                         case FaceType.DeductedTop: top++; break;
                         case FaceType.DeductedBottom: bot++; break;
                         case FaceType.DeductedContact: con++; break;
-                        case FaceType.DeductedBelowGL: bgl++; break;
                         case FaceType.Inclined: inc++; break;
                         case FaceType.Error: err++; break;
                     }
                 }
                 totalReq += req; totalTop += top; totalBot += bot; totalCon += con;
-                totalBGL += bgl; totalInc += inc; totalErr += err;
+                totalInc += inc; totalErr += err;
                 FormworkDebugLog.Log(
                     $"  E{ctx.ElementId} ({ctx.Category}/{ctx.CategoryName}) " +
-                    $"total={ctx.Faces.Count} Req={req} Top={top} Bot={bot} Con={con} BGL={bgl} Inc={inc} Err={err}");
+                    $"total={ctx.Faces.Count} Req={req} Top={top} Bot={bot} Con={con} Inc={inc} Err={err}");
             }
             FormworkDebugLog.Log(
                 $"  TOTAL: Req={totalReq} Top={totalTop} Bot={totalBot} Con={totalCon} " +
-                $"BGL={totalBGL} Inc={totalInc} Err={totalErr}");
+                $"Inc={totalInc} Err={totalErr}");
             FormworkDebugLog.Flush();
         }
 
@@ -668,7 +662,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         }
 
         private ContactFaceDetector.ElementFacesContext ClassifyElementFaces(
-            ElementSource src, double? glFeet)
+            ElementSource src)
         {
             var elem = src.Element;
 
@@ -741,7 +735,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             var finalSolids = unioned != null ? new List<Solid> { unioned } : solids;
 
             var (minZ, maxZ) = FaceClassifier.GetZRange(finalSolids);
-            var faceInfos = FaceClassifier.ClassifyAll(finalSolids, glFeet, minZ, maxZ);
+            var faceInfos = FaceClassifier.ClassifyAll(finalSolids, minZ, maxZ);
 
             // 基礎以外の最下面は FormworkRequired として扱う（梁底・柱底等は形枠必要）
             // 他要素との接触は ContactDetector が個別に検出する
@@ -832,7 +826,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
 
             if (isLinkSweep && FormworkDebugLog.Enabled)
             {
-                int req = 0, top = 0, bot = 0, con = 0, bgl = 0, inc = 0, err = 0;
+                int req = 0, top = 0, bot = 0, con = 0, inc = 0, err = 0;
                 foreach (var f in faceInfos)
                 {
                     switch (f.FaceType)
@@ -841,7 +835,6 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                         case FaceType.DeductedTop: top++; break;
                         case FaceType.DeductedBottom: bot++; break;
                         case FaceType.DeductedContact: con++; break;
-                        case FaceType.DeductedBelowGL: bgl++; break;
                         case FaceType.Inclined: inc++; break;
                         case FaceType.Error: err++; break;
                     }
@@ -849,7 +842,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 FormworkDebugLog.Log(
                     $"  [LinkSweepDiag] Pass1-classified E{elem.Id.IntValue()} src='{src.SourceName}' " +
                     $"surrogateId={src.SurrogateId} totalFaces={faceInfos.Count} " +
-                    $"Req={req} Top={top} Bot={bot} Con={con} BGL={bgl} Inc={inc} Err={err}");
+                    $"Req={req} Top={top} Bot={bot} Con={con} Inc={inc} Err={err}");
             }
 
             return new ContactFaceDetector.ElementFacesContext
@@ -1099,8 +1092,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                         break;
                     case FaceType.DeductedTop: dedTop += aM2; break;
                     case FaceType.DeductedBottom: dedBottom += aM2; break;
-                    case FaceType.DeductedContact:
-                    case FaceType.DeductedBelowGL: dedContact += aM2; break;
+                    case FaceType.DeductedContact: dedContact += aM2; break;
                     case FaceType.Inclined: inclined += aM2; break;
                 }
             }
@@ -1164,9 +1156,6 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             FormworkSettings settings)
         {
             var map = new Dictionary<int, List<FaceClassifier.FaceInfo>>();
-            double? glFeet = null;
-            if (settings.UseGLDeduction)
-                glFeet = UnitUtils.ConvertToInternalUnits(settings.GLElevationMeters, UnitTypeId.Meters);
 
             var contexts = new List<ContactFaceDetector.ElementFacesContext>();
             var registry = result.SourceRegistry as ElementSourceRegistry;
@@ -1188,7 +1177,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 var unioned = SolidUnionProcessor.Union(solids);
                 var final = unioned != null ? new List<Solid> { unioned } : solids;
                 var (minZ, maxZ) = FaceClassifier.GetZRange(final);
-                var faces = FaceClassifier.ClassifyAll(final, glFeet, minZ, maxZ);
+                var faces = FaceClassifier.ClassifyAll(final, minZ, maxZ);
 
                 bool isFoundation = ElementCollector.ToCategoryGroup(elem) == CategoryGroup.Foundation;
                 bool isSlab = ElementCollector.ToCategoryGroup(elem) == CategoryGroup.Slab;

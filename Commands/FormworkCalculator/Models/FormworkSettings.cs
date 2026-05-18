@@ -34,9 +34,6 @@ namespace Tools28.Commands.FormworkCalculator.Models
         public ColorSchemeType ColorScheme { get; set; } = ColorSchemeType.ByCategory;
         public bool ShowDeductedFaces { get; set; }
 
-        public bool UseGLDeduction { get; set; }
-        public double GLElevationMeters { get; set; }
-
         /// <summary>
         /// リンクモデルも算出対象に含める。
         /// 「現在のビュー」モードの場合、ビューに表示されているリンクインスタンスの全対象要素を含める。

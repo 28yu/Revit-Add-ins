@@ -522,8 +522,6 @@ namespace Tools28.Commands.FormworkCalculator
                 CreateSheet = src.CreateSheet,
                 ColorScheme = src.ColorScheme,
                 ShowDeductedFaces = src.ShowDeductedFaces,
-                UseGLDeduction = src.UseGLDeduction,
-                GLElevationMeters = src.GLElevationMeters,
                 IncludeLinkedModels = src.IncludeLinkedModels,
                 EnableDebugLog = src.EnableDebugLog,
                 ExcludeSteelMembers = src.ExcludeSteelMembers,

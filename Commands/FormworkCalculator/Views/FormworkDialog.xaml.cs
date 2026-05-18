@@ -78,7 +78,6 @@ namespace Tools28.Commands.FormworkCalculator.Views
             grpOption.Header = Loc.S("Formwork.Option.Header");
             txtShowDeducted.Text = Loc.S("Formwork.Option.ShowDeducted");
             txtIncludeLinks.Text = Loc.S("Formwork.Option.IncludeLinks");
-            txtUseGL.Text = Loc.S("Formwork.Option.UseGL");
 
             btnOK.Content = Loc.S("Common.Execute");
             btnCancel.Content = Loc.S("Common.Cancel");
@@ -141,8 +140,6 @@ namespace Tools28.Commands.FormworkCalculator.Views
 
             ChkShowDeducted.IsChecked = s.ShowDeductedFaces;
             ChkIncludeLinks.IsChecked = s.IncludeLinkedModels;
-            ChkUseGL.IsChecked = s.UseGLDeduction;
-            TxtGL.Text = s.GLElevationMeters.ToString("F3");
         }
 
         private void BtnOk_Click(object sender, RoutedEventArgs e)
@@ -169,7 +166,6 @@ namespace Tools28.Commands.FormworkCalculator.Views
                 CreateSheet = ChkCreateSheet.IsChecked == true,
                 ShowDeductedFaces = ChkShowDeducted.IsChecked == true,
                 IncludeLinkedModels = ChkIncludeLinks.IsChecked == true,
-                UseGLDeduction = ChkUseGL.IsChecked == true,
             };
 
             if (RadioColorZone.IsChecked == true) s.ColorScheme = ColorSchemeType.ByZone;
@@ -188,17 +184,6 @@ namespace Tools28.Commands.FormworkCalculator.Views
                     Loc.S("Common.InputError"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
-            if (s.UseGLDeduction)
-            {
-                if (!double.TryParse(TxtGL.Text?.Trim(), out double gl))
-                {
-                    MessageBox.Show(Loc.S("Formwork.BadGL"),
-                        Loc.S("Common.InputError"), MessageBoxButton.OK, MessageBoxImage.Warning);
-                    return;
-                }
-                s.GLElevationMeters = gl;
-            }
-
             Settings = s;
             DialogResult = true;
         }
