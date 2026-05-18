@@ -889,22 +889,23 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     return;
                 }
 
-                // 既存ソートグループのスナップショットを取る
-                var snapshots = new List<(ElementId FieldId, bool ShowFooter, bool ShowBlankLine, ScheduleSortOrder SortOrder, bool HadHeader)>();
+                // FieldId のみ収集 (ShowFooter/ShowBlankLine/SortOrder のゲッターはバージョン依存のため読まない)
+                var fieldIds = new List<ElementId>();
+                int hadHeaderCount = 0;
                 for (int i = 0; i < sgCount; i++)
                 {
                     try
                     {
                         var sgf = def.GetSortGroupField(i);
-                        snapshots.Add((sgf.FieldId, sgf.ShowFooter, sgf.ShowBlankLine, sgf.SortOrder, sgf.ShowHeader));
+                        fieldIds.Add(sgf.FieldId);
+                        if (sgf.ShowHeader) hadHeaderCount++;
                     }
-                    catch (Exception ex) { LogEx($"FixSortGroup: snapshot[{i}]", ex); }
+                    catch (Exception ex) { LogEx($"FixSortGroup: read[{i}]", ex); }
                 }
 
-                int hadHeaderCount = snapshots.Count(s => s.HadHeader);
                 FormworkDebugLog.Log(
                     $"  [Sched] FixSortGroupHeaders: total={sgCount} withHeader={hadHeaderCount}");
-                if (hadHeaderCount == 0) return; // 全て既に false なら何もしない
+                if (hadHeaderCount == 0) return;
 
                 // 直接プロパティ変更を試す
                 for (int i = 0; i < sgCount; i++)
@@ -917,7 +918,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     catch { }
                 }
 
-                // 直接変更が効いたか確認 (GetSortGroupField で再読み込み)
+                // 直接変更が効いたか確認
                 bool stillHasHeader = false;
                 for (int i = 0; i < sgCount; i++)
                 {
@@ -944,32 +945,32 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     return;
                 }
 
-                // 逆順で削除 (インデックスがずれないように)
+                // 逆順で削除
                 for (int i = sgCount - 1; i >= 0; i--)
                 {
                     try { removeMethod.Invoke(def, new object[] { i }); }
                     catch (Exception ex) { LogReflEx($"FixSortGroup: Remove[{i}]", ex); }
                 }
 
-                // 元の順序で ShowHeader=false の状態で再追加
+                // ShowHeader=false で再追加 (SortOrder/ShowFooter/ShowBlankLine はデフォルト値を使用)
                 int readded = 0;
-                foreach (var snap in snapshots)
+                foreach (var fid in fieldIds)
                 {
                     try
                     {
-                        var newSgf = new ScheduleSortGroupField(snap.FieldId)
+                        var newSgf = new ScheduleSortGroupField(fid)
                         {
                             ShowHeader = false,
-                            ShowFooter = snap.ShowFooter,
-                            ShowBlankLine = snap.ShowBlankLine,
-                            SortOrder = snap.SortOrder,
+                            ShowFooter = false,
+                            ShowBlankLine = false,
+                            SortOrder = ScheduleSortOrder.Ascending,
                         };
                         def.AddSortGroupField(newSgf);
                         readded++;
                     }
                     catch (Exception ex) { LogEx("FixSortGroup: re-add", ex); }
                 }
-                FormworkDebugLog.Log($"  [Sched] FixSortGroupHeaders: re-added {readded}/{snapshots.Count} sort groups");
+                FormworkDebugLog.Log($"  [Sched] FixSortGroupHeaders: re-added {readded}/{fieldIds.Count} sort groups");
             }
             catch (Exception ex)
             {
