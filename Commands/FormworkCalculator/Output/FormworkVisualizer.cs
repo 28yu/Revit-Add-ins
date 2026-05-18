@@ -214,7 +214,11 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     (settings.Scope == CalculationScope.CurrentView ||
                      settings.Scope == CalculationScope.SelectedViews);
                 if (useSourceSectionBox)
-                    CopySectionBoxFromSource((View3D)sourceView, view);
+                {
+                    // ソース切断ボックスが非アクティブだった場合は EnableSectionBox にフォールバックする。
+                    bool sbCopied = CopySectionBoxFromSource((View3D)sourceView, view);
+                    if (!sbCopied) EnableSectionBox(doc, view, result);
+                }
                 else
                     EnableSectionBox(doc, view, result);
 
@@ -989,23 +993,21 @@ namespace Tools28.Commands.FormworkCalculator.Output
 
         /// <summary>
         /// CurrentView スコープでソースが 3D ビューのとき、ソースの切断ボックス位置と
-        /// 有効/無効状態をそのままコピーする。これによりユーザーがソースビューで設定した
-        /// 切断範囲が解析ビューに引き継がれる。
+        /// 有効状態をコピーする。切断ボックスが正常にコピーされた場合は true を返す。
+        /// ソースの切断ボックスが非アクティブな場合は false を返し、
+        /// 呼び出し側で EnableSectionBox にフォールバックする。
         /// </summary>
-        private static void CopySectionBoxFromSource(View3D source, View3D target)
+        private static bool CopySectionBoxFromSource(View3D source, View3D target)
         {
             try
             {
                 bool srcActive = source.IsSectionBoxActive;
                 FormworkDebugLog.Log(
                     $"  [Visual] CopySectionBoxFromSource: source='{source?.Name}' IsSectionBoxActive={srcActive}");
-                // ソースの切断ボックスがアクティブな場合のみコピーする。
-                // アクティブでない場合はコピーしない（EnableSectionBoxで自動算出する）。
                 if (!srcActive)
                 {
-                    target.IsSectionBoxActive = false;
-                    FormworkDebugLog.Log("  [Visual] CopySectionBoxFromSource: ソース非アクティブのため target も非アクティブ化");
-                    return;
+                    FormworkDebugLog.Log("  [Visual] CopySectionBoxFromSource: ソース非アクティブ → EnableSectionBox にフォールバック");
+                    return false;
                 }
                 var sb = source.GetSectionBox();
                 if (sb != null)
@@ -1025,10 +1027,12 @@ namespace Tools28.Commands.FormworkCalculator.Output
                         $"max=({sb.Max.X:F2},{sb.Max.Y:F2},{sb.Max.Z:F2})");
                 }
                 target.IsSectionBoxActive = true;
+                return true;
             }
             catch (Exception ex)
             {
                 FormworkDebugLog.Log($"  [Visual] CopySectionBoxFromSource EX: {ex.Message}");
+                return false;
             }
         }
 
@@ -1064,12 +1068,18 @@ namespace Tools28.Commands.FormworkCalculator.Output
                         catCopied++;
 
                         // V/G 上書き (色・線種・透過等)
-                        if (target.IsCategoryOverridable(catId)
-                            && source.IsCategoryOverridable(catId))
+                        // source.IsCategoryOverridable のチェックは外す:
+                        // View Template ロック時に false を返す場合があるが、
+                        // GetCategoryOverrides では実効値を取得できる。
+                        if (target.IsCategoryOverridable(catId))
                         {
-                            var ogs = source.GetCategoryOverrides(catId);
-                            if (ogs != null)
-                                target.SetCategoryOverrides(catId, ogs);
+                            try
+                            {
+                                var ogs = source.GetCategoryOverrides(catId);
+                                if (ogs != null)
+                                    target.SetCategoryOverrides(catId, ogs);
+                            }
+                            catch { }
                         }
                     }
                     catch { catErrors++; /* per-category failures are non-fatal */ }
@@ -1084,12 +1094,15 @@ namespace Tools28.Commands.FormworkCalculator.Output
                         {
                             bool srcHidden = source.GetCategoryHidden(subId);
                             target.SetCategoryHidden(subId, srcHidden);
-                            if (target.IsCategoryOverridable(subId)
-                                && source.IsCategoryOverridable(subId))
+                            if (target.IsCategoryOverridable(subId))
                             {
-                                var ogs = source.GetCategoryOverrides(subId);
-                                if (ogs != null)
-                                    target.SetCategoryOverrides(subId, ogs);
+                                try
+                                {
+                                    var ogs = source.GetCategoryOverrides(subId);
+                                    if (ogs != null)
+                                        target.SetCategoryOverrides(subId, ogs);
+                                }
+                                catch { }
                             }
                         }
                         catch { }
