@@ -1,23 +1,7 @@
-==== Formwork Debug Log Start [2026-05-18 16:35:59] ====
-[Engine] Run() 開始 Scope=CurrentView IncludeLinks=True EnableDebugLog=True
+==== Formwork Debug Log Start [2026-05-18 17:14:49] ====
+[Engine] Run() 開始 Scope=CurrentView IncludeLinks=False EnableDebugLog=True
 [Engine] 切断ボックスSolid: なし (Scope=CurrentView / SectionBox未設定またはCurrentView以外)
 [Engine] CollectAndClassify 開始
-  [LinkedCollect] linkInstances found: 17
-  [LinkInstVis] JRH_病棟_地下: ワークセット既定非表示 wsId=2065 → スキップ
-  [LinkInstVis] JRH_W_Str_Foundations: ワークセット既定非表示 wsId=2063 → スキップ
-  [LinkInstVis] JRH_D_Arc: ワークセット既定非表示 wsId=2066 → スキップ
-  [LinkInstVis] JRH_A_Str: ワークセット既定非表示 wsId=2067 → スキップ
-  [LinkInstVis] JRH_山留め(管理棟用): ワークセット既定非表示 wsId=2069 → スキップ
-  [LinkInstVis] JRH_山留め（新病棟用）: ワークセット既定非表示 wsId=2068 → スキップ
-  [LinkInstVis] JRH_A_鉄骨モデル: ワークセット既定非表示 wsId=2070 → スキップ
-  [LinkInstVis] JRH_A_Arc: ワークセット既定非表示 wsId=2071 → スキップ
-  [LinkInstVis] JRH_W_Str: ワークセット既定非表示 wsId=2072 → スキップ
-  [LinkInstVis] JRH_W_鉄骨モデル: ワークセット既定非表示 wsId=2073 → スキップ
-  [LinkInstVis] JRH_W_Arc: ワークセット既定非表示 wsId=2074 → スキップ
-  [LinkInstVis] JRH_管理棟_階段モデル: ワークセット既定非表示 wsId=2075 → スキップ
-  [LinkInstVis] JRH_外来棟_地上建築: ワークセット既定非表示 wsId=2078 → スキップ
-  [LinkInstVis] JRH_設備棟既存モデル: ワークセット既定非表示 wsId=5983 → スキップ
-  [LinkInstVis] JRH_デッキ棟_埋め戻しモデル: ワークセット既定非表示 wsId=6311 → スキップ
 
 ---- Exclusion Detection (Steel + DeckSlab + SteelStair + LgsWall) ----
   Exclusion detection: total=58 steelExcluded=0 deckSlabExcluded=0 steelStairExcluded=0 lgsExcluded=0 kept=58 linkedInstances=0
@@ -18662,7 +18646,6 @@ partial contacts added:      86
   [Clipper] pieces after subtraction: 1
     piece=[U:0.000..0.492, V:0.459..12.008]
   [Clipper] SUCCESS: created 1 solids (failed 0)
-  [Visual] copied 1/1 filters from source view (visibility preserved)
   [Visual] OST_GenericModel category set visible
   [Clipper] face area=46.7988 rect=[U:-5.594..0.000, V:0.000..8.366] partialContacts=1
   [Clipper] subtract E4925463/f5 raw=[U:-5.594..-4.806,V:0.000..3.301] clipped=[U:-5.594..-4.806, V:0.000..3.301]
@@ -19740,8 +19723,8 @@ Boolean diff fallback OK: E4924354 face area=49.6918 clipperReason=not-rectangul
   [Clipper] SUCCESS: created 1 solids (failed 0)
   [Visual] formwork DirectShapes created: 391 (elements=36)
   [Visual] doc.Regenerate() called after formwork creation
-  [Visual:Diag] sample key='壁' id=6232707 BB=[7.04,-107.05,-3.44]-[12.63,-107.00,4.92] solids=1 vol=2.339940
-  [Visual:Diag] sample key='スラブ' id=6233075 BB=[-71.19,-186.93,-17.14]-[12.63,-110.42,-17.09] solids=1 vol=26.888437
+  [Visual:Diag] sample key='壁' id=6232942 BB=[7.04,-107.05,-3.44]-[12.63,-107.00,4.92] solids=1 vol=2.339940
+  [Visual:Diag] sample key='スラブ' id=6233310 BB=[-71.19,-186.93,-17.14]-[12.63,-110.42,-17.09] solids=1 vol=26.888437
   [Visual:Diag] DirectShapes by 区分:
     'スラブ': 23
     '壁': 368
@@ -19781,6 +19764,8 @@ Boolean diff fallback OK: E4924354 face area=49.6918 clipperReason=not-rectangul
   [Filter] '型枠_その他' rule=区分=='その他' color=(180,180,180) visible=True
   [Filter] '型枠_除外' rule=区分=='除外' color=(255,145,30) visible=False
   [Filter] applied 9 filters to view '3D_型枠数量 - **型枠：工作物擁壁'
+  [Visual] filter 'コメント_工作物擁壁 _ 含まない' (fid=5212471) targets OST_GenericModel and is hidden: overriding to visible
+  [Visual] copied 1/1 filters from source view (visibility preserved)
 
 ---- Schedule Creation: 型枠数量集計 - **型枠：工作物擁壁 ----
   [Sched:after-create] IsItemized=True ShowGrandTotal=False fields=0 sortGroups=0
@@ -19825,10 +19810,18 @@ Parameter name: nCol
   [Sheet] CollectAllPerViewScheduleIds: 3件
   [Sheet] 既存シート削除: '型枠-001 - 型枠数量集計'
   [Sheet] most-used title block id=4935379 count=36
-  [Sheet] schedule 6233127 placed at L=0.08/T=1.86 → R=0.51/B=1.70
+  [Sheet] schedule 6233362 placed at L=0.08/T=1.86 → R=0.51/B=1.70
   [Sheet] schedule 6214206 placed at L=0.08/T=1.65 → R=0.62/B=0.54
-  [Sheet] schedule 6233120 placed at L=0.67/T=1.65 → R=1.23/B=1.33
-  [Sheet] schedule 6232669 placed at L=1.28/T=1.65 → R=1.84/B=0.92
+  [Sheet] schedule 6233355 placed at L=0.67/T=1.65 → R=1.23/B=1.33
+  [Sheet] schedule 6232904 placed at L=1.28/T=1.65 → R=1.84/B=0.92
+  [Sheet] viewport types found (OfClass): 4
+  [Sheet]   type id=354 name='タイトル&尺度' SHOW_LABEL=1
+  [Sheet]   type id=897434 name='非表示' SHOW_LABEL=0
+  [Sheet]   type id=2670183 name='タイトル&尺度&アンダーライン' SHOW_LABEL=1
+  [Sheet]   type id=6214232 name='Viewport_NoTitle_28Tools' SHOW_LABEL=0
+  [Sheet] FindNoTitleViewportType → id=897434 reason='SHOW_LABEL=0: '非表示''
+  [Sheet] SHOW_LABEL on existing: exists=True isReadOnly=False value=0
+  [Sheet] ChangeTypeId OK → no-title id=897434
   [Sheet] viewport types found (OfClass): 4
   [Sheet]   type id=354 name='タイトル&尺度' SHOW_LABEL=1
   [Sheet]   type id=897434 name='非表示' SHOW_LABEL=0
@@ -19838,4 +19831,4 @@ Parameter name: nCol
   [Sheet] SHOW_LABEL on existing: exists=True isReadOnly=False value=0
   [Sheet] ChangeTypeId OK → no-title id=897434
   [Sheet] created: '型枠-001 - 型枠数量集計' views=2 schedules=3
-==== End [2026-05-18 16:39:33] total lines: 19839 ====
+==== End [2026-05-18 17:19:42] total lines: 19832 ====
