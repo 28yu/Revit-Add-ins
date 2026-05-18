@@ -65,6 +65,23 @@ namespace Tools28.Commands.FormworkCalculator
                     return Result.Cancelled;
                 }
 
+                // [2] 部分更新モードを検出: CurrentView スコープ (単一ビュー再実行) で、
+                // 対象以外の型枠分析ビューが既に存在する場合、シート・サマリ集計表は
+                // 再構築せず既存のものを保持する。対象ビューとその集計表のみ更新する。
+                bool isPartialUpdate = false;
+                if (settings.Scope == CalculationScope.CurrentView && sourceViews.Count == 1)
+                {
+                    string targetAnalysisName = FormworkVisualizer.BuildAnalysisViewName(sourceViews[0].Name);
+                    bool hasOtherAnalysisViews = new FilteredElementCollector(doc)
+                        .OfClass(typeof(View3D))
+                        .Cast<View3D>()
+                        .Any(v => !v.IsTemplate
+                              && v.Name != targetAnalysisName
+                              && (v.Name == FormworkVisualizer.AnalysisViewName
+                                  || v.Name.StartsWith(FormworkVisualizer.AnalysisViewPrefix)));
+                    isPartialUpdate = hasOtherAnalysisViews;
+                }
+
                 if (settings.ExportToExcel)
                 {
                     using (var sfd = new SaveFileDialog
@@ -213,9 +230,10 @@ namespace Tools28.Commands.FormworkCalculator
                                 }
                             }
 
-                            if (settings.CreateSchedule)
+                            if (settings.CreateSchedule && !isPartialUpdate)
                             {
                                 // 動的合計サマリ集計表 (全ビュー横断の合計)
+                                // 部分更新モードでは既存の合計表をそのまま使う ([2])
                                 summaryScheduleId = ScheduleCreator.CreateSummarySchedule(doc);
                             }
 
@@ -255,7 +273,8 @@ namespace Tools28.Commands.FormworkCalculator
                         perViewAnalysisViewIds.Count > 0 ||
                         allMainScheduleIds.Count > 0 ||
                         (summaryScheduleId != null && summaryScheduleId != ElementId.InvalidElementId);
-                    if (settings.CreateSheet && haveAnyOutput)
+                    // 部分更新モードでは既存シートをそのまま保持する ([2])
+                    if (settings.CreateSheet && haveAnyOutput && !isPartialUpdate)
                     {
                         using (var tSheet = new Transaction(doc, "型枠数量算出 - シート作成"))
                         {
