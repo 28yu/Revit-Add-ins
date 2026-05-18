@@ -17,18 +17,31 @@ namespace Tools28.Commands.FormworkCalculator.Output
     /// </summary>
     internal static class FormworkVisualizer
     {
-        internal const string AnalysisViewName = "型枠分析";
-        internal const string AnalysisViewPrefix = "型枠分析 - ";
+        internal const string AnalysisViewName = "型枠数量算出";
+        internal const string AnalysisViewPrefix = "型枠数量算出 - ";
+        // 旧名 (v2.x 以前で作成されたビューを検出するためのフォールバック)
+        internal const string LegacyAnalysisViewName = "型枠分析";
+        internal const string LegacyAnalysisViewPrefix = "型枠分析 - ";
 
         /// <summary>
         /// ソースビュー名からこのビューに対応する解析ビュー名を生成する。
-        /// ソース名なし: "型枠分析" (互換性のため)
-        /// ソース名あり: "型枠分析 - {sourceViewName}"
+        /// ソース名なし: "型枠数量算出" (互換性のため)
+        /// ソース名あり: "型枠数量算出 - {sourceViewName}"
         /// </summary>
         internal static string BuildAnalysisViewName(string sourceViewName)
         {
             if (string.IsNullOrEmpty(sourceViewName)) return AnalysisViewName;
             return AnalysisViewPrefix + sourceViewName;
+        }
+
+        /// <summary>名前が型枠分析ビュー (新旧両方) のパターンに一致するか判定する。</summary>
+        internal static bool IsAnalysisViewName(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return false;
+            return name == AnalysisViewName
+                || name.StartsWith(AnalysisViewPrefix)
+                || name == LegacyAnalysisViewName
+                || name.StartsWith(LegacyAnalysisViewPrefix);
         }
         internal class VisualizerResult
         {
@@ -745,16 +758,23 @@ namespace Tools28.Commands.FormworkCalculator.Output
         /// </summary>
         internal static void HideAllFormworkShapesInOtherViews(Document doc)
         {
-            // ソースビュー名 → 分析ビュー ID マッピング
+            // ソースビュー名 → 分析ビュー ID マッピング (タグ + 名前パターンの両方で検出)
             var analysisViewByName = new Dictionary<string, ElementId>();
-            var analysisViews = new FilteredElementCollector(doc)
-                .OfClass(typeof(View3D))
-                .Cast<View3D>()
-                .Where(v => !v.IsTemplate && v.Name.StartsWith(AnalysisViewPrefix))
-                .ToList();
+            var analysisViews = Engine.FormworkOutputFinder.FindAllAnalysisViews(doc);
             foreach (var av in analysisViews)
             {
-                string srcViewName = av.Name.Substring(AnalysisViewPrefix.Length);
+                // タグから関連ソースビュー名を取得 (リネーム耐性)
+                string srcViewName = FormworkParameterManager.GetRelatedSourceView(av);
+                if (string.IsNullOrEmpty(srcViewName))
+                {
+                    // タグ未付与: 名前パターンから推定 (新旧両方)
+                    if (av.Name.StartsWith(AnalysisViewPrefix))
+                        srcViewName = av.Name.Substring(AnalysisViewPrefix.Length);
+                    else if (av.Name.StartsWith(LegacyAnalysisViewPrefix))
+                        srcViewName = av.Name.Substring(LegacyAnalysisViewPrefix.Length);
+                    else
+                        continue;
+                }
                 analysisViewByName[srcViewName] = av.Id;
             }
             FormworkDebugLog.Log($"  [Hide] analysisViews found: {analysisViewByName.Count}");

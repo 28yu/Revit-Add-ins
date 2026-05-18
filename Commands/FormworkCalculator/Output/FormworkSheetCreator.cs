@@ -23,17 +23,11 @@ namespace Tools28.Commands.FormworkCalculator.Output
         internal const string SheetName = "型枠数量集計";
 
         /// <summary>
-        /// プロジェクト内の全 型枠分析 3D ビュー (「型枠分析」「型枠分析 - xxx」) を収集する。
+        /// プロジェクト内の全 型枠分析 3D ビュー (タグ + 新旧名前パターン) を収集する。
         /// </summary>
         internal static List<ElementId> CollectAllAnalysisViewIds(Document doc)
         {
-            var list = new FilteredElementCollector(doc)
-                .OfClass(typeof(View3D))
-                .Cast<View3D>()
-                .Where(v => !v.IsTemplate &&
-                    (v.Name == FormworkVisualizer.AnalysisViewName ||
-                     v.Name.StartsWith(FormworkVisualizer.AnalysisViewPrefix)))
-                .OrderBy(v => v.Name)
+            var list = FormworkOutputFinder.FindAllAnalysisViews(doc)
                 .Select(v => v.Id)
                 .ToList();
             FormworkDebugLog.Log($"  [Sheet] CollectAllAnalysisViewIds: {list.Count}件");
