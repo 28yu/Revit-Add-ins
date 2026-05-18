@@ -1,4 +1,4 @@
-==== Formwork Debug Log Start [2026-05-18 15:50:54] ====
+==== Formwork Debug Log Start [2026-05-18 15:50:44] ====
 [Engine] Run() 開始 Scope=CurrentView IncludeLinks=True EnableDebugLog=True
 [Engine] 切断ボックスSolid: なし (Scope=CurrentView / SectionBox未設定またはCurrentView以外)
 [Engine] CollectAndClassify 開始
@@ -32,3 +32,4 @@
   Exclusion detection: total=0 steelExcluded=0 deckSlabExcluded=0 steelStairExcluded=0 lgsExcluded=0 kept=0 linkedInstances=1
 Collected elements: targets=0 excluded=0 linkedInstances=1
   [LinkMap] total linked elements mapped: 0
+==== End [2026-05-18 15:50:54] total lines: 34 ====
