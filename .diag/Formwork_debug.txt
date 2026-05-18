@@ -1,7 +1,23 @@
-==== Formwork Debug Log Start [2026-05-18 17:14:49] ====
-[Engine] Run() 開始 Scope=CurrentView IncludeLinks=False EnableDebugLog=True
+==== Formwork Debug Log Start [2026-05-18 18:04:01] ====
+[Engine] Run() 開始 Scope=CurrentView IncludeLinks=True EnableDebugLog=True
 [Engine] 切断ボックスSolid: なし (Scope=CurrentView / SectionBox未設定またはCurrentView以外)
 [Engine] CollectAndClassify 開始
+  [LinkedCollect] linkInstances found: 17
+  [LinkInstVis] JRH_病棟_地下: ワークセット既定非表示 wsId=2065 → スキップ
+  [LinkInstVis] JRH_W_Str_Foundations: ワークセット既定非表示 wsId=2063 → スキップ
+  [LinkInstVis] JRH_D_Arc: ワークセット既定非表示 wsId=2066 → スキップ
+  [LinkInstVis] JRH_A_Str: ワークセット既定非表示 wsId=2067 → スキップ
+  [LinkInstVis] JRH_山留め(管理棟用): ワークセット既定非表示 wsId=2069 → スキップ
+  [LinkInstVis] JRH_山留め（新病棟用）: ワークセット既定非表示 wsId=2068 → スキップ
+  [LinkInstVis] JRH_A_鉄骨モデル: ワークセット既定非表示 wsId=2070 → スキップ
+  [LinkInstVis] JRH_A_Arc: ワークセット既定非表示 wsId=2071 → スキップ
+  [LinkInstVis] JRH_W_Str: ワークセット既定非表示 wsId=2072 → スキップ
+  [LinkInstVis] JRH_W_鉄骨モデル: ワークセット既定非表示 wsId=2073 → スキップ
+  [LinkInstVis] JRH_W_Arc: ワークセット既定非表示 wsId=2074 → スキップ
+  [LinkInstVis] JRH_管理棟_階段モデル: ワークセット既定非表示 wsId=2075 → スキップ
+  [LinkInstVis] JRH_外来棟_地上建築: ワークセット既定非表示 wsId=2078 → スキップ
+  [LinkInstVis] JRH_設備棟既存モデル: ワークセット既定非表示 wsId=5983 → スキップ
+  [LinkInstVis] JRH_デッキ棟_埋め戻しモデル: ワークセット既定非表示 wsId=6311 → スキップ
 
 ---- Exclusion Detection (Steel + DeckSlab + SteelStair + LgsWall) ----
   Exclusion detection: total=58 steelExcluded=0 deckSlabExcluded=0 steelStairExcluded=0 lgsExcluded=0 kept=58 linkedInstances=0
@@ -18646,6 +18662,11 @@ partial contacts added:      86
   [Clipper] pieces after subtraction: 1
     piece=[U:0.000..0.492, V:0.459..12.008]
   [Clipper] SUCCESS: created 1 solids (failed 0)
+  [Visual] CreateVisualization: sourceView='**型枠：工作物擁壁' type=View3D reusedView=False target='3D_型枠数量 - **型枠：工作物擁壁'
+  [Visual] CopySectionBoxFromSource: source='**型枠：工作物擁壁' IsSectionBoxActive=False
+  [Visual] CopySectionBoxFromSource: ソース非アクティブのため target も非アクティブ化
+  [Visual] CopyCategoryVisibility 開始: source='**型枠：工作物擁壁' target='3D_型枠数量 - **型枠：工作物擁壁'
+  [Visual] CopyCategoryVisibility 完了: total=343 copied=288 hiddenCopied=35 skipped=55 errors=0
   [Visual] OST_GenericModel category set visible
   [Clipper] face area=46.7988 rect=[U:-5.594..0.000, V:0.000..8.366] partialContacts=1
   [Clipper] subtract E4925463/f5 raw=[U:-5.594..-4.806,V:0.000..3.301] clipped=[U:-5.594..-4.806, V:0.000..3.301]
@@ -19764,7 +19785,6 @@ Boolean diff fallback OK: E4924354 face area=49.6918 clipperReason=not-rectangul
   [Filter] '型枠_その他' rule=区分=='その他' color=(180,180,180) visible=True
   [Filter] '型枠_除外' rule=区分=='除外' color=(255,145,30) visible=False
   [Filter] applied 9 filters to view '3D_型枠数量 - **型枠：工作物擁壁'
-  [Visual] filter 'コメント_工作物擁壁 _ 含まない' (fid=5212471) targets OST_GenericModel and is hidden: overriding to visible
   [Visual] copied 1/1 filters from source view (visibility preserved)
 
 ---- Schedule Creation: 型枠数量集計 - **型枠：工作物擁壁 ----
@@ -19806,6 +19826,10 @@ Parameter name: nCol
   [Sched:Summary] created: '型枠数量集計_合計'
   [Hide] analysisViews found: 2
   [Hide] tagged shapes by view: **型枠：免震擁壁=1660, **型枠：工作物擁壁=413
+  [Hide] HideInOtherViews: shapes=1660 keepInViewId=6231230 success=375 fail=2 lastErr='One of the elements cannot be hidden.
+Parameter name: elementIdSet' failedView='プロジェクト ビュー'
+  [Hide] HideInOtherViews: shapes=413 keepInViewId=6232933 success=375 fail=2 lastErr='One of the elements cannot be hidden.
+Parameter name: elementIdSet' failedView='プロジェクト ビュー'
   [Sheet] CollectAllAnalysisViewIds: 2件
   [Sheet] CollectAllPerViewScheduleIds: 3件
   [Sheet] 既存シート削除: '型枠-001 - 型枠数量集計'
@@ -19822,13 +19846,6 @@ Parameter name: nCol
   [Sheet] FindNoTitleViewportType → id=897434 reason='SHOW_LABEL=0: '非表示''
   [Sheet] SHOW_LABEL on existing: exists=True isReadOnly=False value=0
   [Sheet] ChangeTypeId OK → no-title id=897434
-  [Sheet] viewport types found (OfClass): 4
-  [Sheet]   type id=354 name='タイトル&尺度' SHOW_LABEL=1
-  [Sheet]   type id=897434 name='非表示' SHOW_LABEL=0
-  [Sheet]   type id=2670183 name='タイトル&尺度&アンダーライン' SHOW_LABEL=1
-  [Sheet]   type id=6214232 name='Viewport_NoTitle_28Tools' SHOW_LABEL=0
-  [Sheet] FindNoTitleViewportType → id=897434 reason='SHOW_LABEL=0: '非表示''
-  [Sheet] SHOW_LABEL on existing: exists=True isReadOnly=False value=0
-  [Sheet] ChangeTypeId OK → no-title id=897434
+  [Sheet] Viewport.Create returned null (grid 1): viewId=6231230
   [Sheet] created: '型枠-001 - 型枠数量集計' views=2 schedules=3
-==== End [2026-05-18 17:19:42] total lines: 19832 ====
+==== End [2026-05-18 18:06:50] total lines: 19847 ====
