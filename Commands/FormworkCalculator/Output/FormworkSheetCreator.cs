@@ -72,16 +72,12 @@ namespace Tools28.Commands.FormworkCalculator.Output
         {
             if (doc == null) return null;
 
-            // 既存の型枠シートを検索し、シート名・番号を保存してから削除
+            // 既存の型枠シートを検索し、シート名・番号を保存してから削除 (タグ + 名前フォールバック)
             string existingName = null;
             string existingNumber = null;
             try
             {
-                var existing = new FilteredElementCollector(doc)
-                    .OfClass(typeof(ViewSheet))
-                    .Cast<ViewSheet>()
-                    .FirstOrDefault(s => !s.IsTemplate && !s.IsPlaceholder
-                        && (s.Name == SheetName || s.Name.StartsWith(SheetName + " ")));
+                var existing = FormworkOutputFinder.FindFormworkSheet(doc);
                 if (existing != null)
                 {
                     existingName = existing.Name;
@@ -131,6 +127,19 @@ namespace Tools28.Commands.FormworkCalculator.Output
 
             try { sheet.Name = !string.IsNullOrEmpty(preferredName) ? preferredName : UniqueSheetName(doc, SheetName); } catch { }
             try { sheet.SheetNumber = !string.IsNullOrEmpty(preferredNumber) ? preferredNumber : FindNextSheetNumber(doc); } catch { }
+
+            // 出力タグ書き込み (リネーム耐性のための識別子)
+            try
+            {
+                FormworkParameterManager.SetOutputTag(
+                    sheet,
+                    FormworkParameterManager.OutputKindSheet,
+                    string.Empty);
+            }
+            catch (Exception ex)
+            {
+                FormworkDebugLog.Log($"  [Sheet] SetOutputTag EX: {ex.Message}");
+            }
 
             var draw = GetDrawableArea(doc, sheet);
             const double margin = 0.082;
@@ -304,6 +313,19 @@ namespace Tools28.Commands.FormworkCalculator.Output
 
             try { sheet.Name = UniqueSheetName(doc, SheetName); } catch { }
             try { sheet.SheetNumber = FindNextSheetNumber(doc); } catch { }
+
+            // 出力タグ書き込み (リネーム耐性のための識別子)
+            try
+            {
+                FormworkParameterManager.SetOutputTag(
+                    sheet,
+                    FormworkParameterManager.OutputKindSheet,
+                    string.Empty);
+            }
+            catch (Exception ex)
+            {
+                FormworkDebugLog.Log($"  [Sheet] SetOutputTag EX: {ex.Message}");
+            }
 
             // 配置可能領域 (図枠の内側) を取得
             var draw = GetDrawableArea(doc, sheet);

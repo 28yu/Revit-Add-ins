@@ -384,6 +384,13 @@ namespace Tools28.Localization
             { "Formwork.LgsExcluded", "Excluded {0} LGS walls (wall with gypsum-board layer and no concrete layer)" },
             { "Formwork.LinkedIncluded", "Included {0} elements from linked models ({1} link instance(s))" },
             { "Formwork.ExcludedFilterNote", "(Excluded elements are hidden by the \"Formwork_Excluded\" filter in the analysis 3D view. Toggle the filter ON to inspect them.)" },
+            { "Formwork.UpdateConfirm.Title", "Formwork Quantity - Update Confirmation" },
+            { "Formwork.UpdateConfirm.MainInstruction", "Existing formwork outputs detected" },
+            { "Formwork.UpdateConfirm.Content", "An analysis 3D view or schedule already exists for the selected source view(s). Please choose an execution mode." },
+            { "Formwork.UpdateConfirm.UpdateLabel", "Update (preserve sheet layout)" },
+            { "Formwork.UpdateConfirm.UpdateDesc", "Refreshes only the target analysis 3D view and schedule with the current model. The sheet, summary schedule, and other views are left untouched." },
+            { "Formwork.UpdateConfirm.RecreateLabel", "Recreate (rebuild everything)" },
+            { "Formwork.UpdateConfirm.RecreateDesc", "Deletes and recreates all outputs including the sheet and summary schedule." },
 
             // === Excel Export Category Names ===
             { "Category.Walls", "Walls" },

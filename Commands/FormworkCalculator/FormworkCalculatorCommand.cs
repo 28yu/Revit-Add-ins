@@ -65,21 +65,41 @@ namespace Tools28.Commands.FormworkCalculator
                     return Result.Cancelled;
                 }
 
-                // [2] 部分更新モードを検出: CurrentView スコープ (単一ビュー再実行) で、
-                // 対象以外の型枠分析ビューが既に存在する場合、シート・サマリ集計表は
-                // 再構築せず既存のものを保持する。対象ビューとその集計表のみ更新する。
-                bool isPartialUpdate = false;
-                if (settings.Scope == CalculationScope.CurrentView && sourceViews.Count == 1)
+                // [2] 更新モード判定: 対象ソースビューに対応する既存の分析3Dビューまたは
+                // ビュー別集計表が見つかった場合、ユーザーに「更新 / 再作成 / キャンセル」を確認する。
+                // 更新モード時: 既存の分析ビュー・集計表を再利用し、シートと合計集計表は手を付けない。
+                // 再作成モード時: 従来通り全て削除・再作成する。
+                bool hasExistingOutputs = false;
+                foreach (var sv in sourceViews)
                 {
-                    string targetAnalysisName = FormworkVisualizer.BuildAnalysisViewName(sourceViews[0].Name);
-                    bool hasOtherAnalysisViews = new FilteredElementCollector(doc)
-                        .OfClass(typeof(View3D))
-                        .Cast<View3D>()
-                        .Any(v => !v.IsTemplate
-                              && v.Name != targetAnalysisName
-                              && (v.Name == FormworkVisualizer.AnalysisViewName
-                                  || v.Name.StartsWith(FormworkVisualizer.AnalysisViewPrefix)));
-                    isPartialUpdate = hasOtherAnalysisViews;
+                    if (FormworkOutputFinder.FindAnalysisView(doc, sv.Name) != null
+                        || FormworkOutputFinder.FindMainSchedule(doc, sv.Name) != null)
+                    {
+                        hasExistingOutputs = true;
+                        break;
+                    }
+                }
+
+                bool updateMode = false;
+                if (hasExistingOutputs)
+                {
+                    var td = new TaskDialog(Loc.S("Formwork.UpdateConfirm.Title"))
+                    {
+                        MainInstruction = Loc.S("Formwork.UpdateConfirm.MainInstruction"),
+                        MainContent = Loc.S("Formwork.UpdateConfirm.Content"),
+                        CommonButtons = TaskDialogCommonButtons.Cancel,
+                        DefaultButton = TaskDialogResult.CommandLink1,
+                    };
+                    td.AddCommandLink(TaskDialogCommandLinkId.CommandLink1,
+                        Loc.S("Formwork.UpdateConfirm.UpdateLabel"),
+                        Loc.S("Formwork.UpdateConfirm.UpdateDesc"));
+                    td.AddCommandLink(TaskDialogCommandLinkId.CommandLink2,
+                        Loc.S("Formwork.UpdateConfirm.RecreateLabel"),
+                        Loc.S("Formwork.UpdateConfirm.RecreateDesc"));
+                    var tdResult = td.Show();
+                    if (tdResult == TaskDialogResult.CommandLink1) updateMode = true;
+                    else if (tdResult == TaskDialogResult.CommandLink2) updateMode = false;
+                    else return Result.Cancelled;
                 }
 
                 if (settings.ExportToExcel)
@@ -194,7 +214,7 @@ namespace Tools28.Commands.FormworkCalculator
 
                                 if (settings.Create3DView)
                                 {
-                                    var v3d = FormworkVisualizer.CreateVisualization(doc, r, settings, sv);
+                                    var v3d = FormworkVisualizer.CreateVisualization(doc, r, settings, sv, updateMode);
                                     if (v3d?.AnalysisView != null)
                                     {
                                         perViewAnalysisViewIds.Add(v3d.AnalysisView.Id);
@@ -215,7 +235,8 @@ namespace Tools28.Commands.FormworkCalculator
                                     try
                                     {
                                         sid = ScheduleCreator.CreateSchedule(doc, r,
-                                            sourceFilter: null, sourceViewFilter: svName);
+                                            sourceFilter: null, sourceViewFilter: svName,
+                                            updateMode: updateMode);
                                     }
                                     catch (Exception schEx)
                                     {
@@ -230,10 +251,10 @@ namespace Tools28.Commands.FormworkCalculator
                                 }
                             }
 
-                            if (settings.CreateSchedule && !isPartialUpdate)
+                            if (settings.CreateSchedule && !updateMode)
                             {
                                 // 動的合計サマリ集計表 (全ビュー横断の合計)
-                                // 部分更新モードでは既存の合計表をそのまま使う ([2])
+                                // 更新モードでは既存の合計表をそのまま使う ([2])
                                 summaryScheduleId = ScheduleCreator.CreateSummarySchedule(doc);
                             }
 
@@ -273,8 +294,8 @@ namespace Tools28.Commands.FormworkCalculator
                         perViewAnalysisViewIds.Count > 0 ||
                         allMainScheduleIds.Count > 0 ||
                         (summaryScheduleId != null && summaryScheduleId != ElementId.InvalidElementId);
-                    // 部分更新モードでは既存シートをそのまま保持する ([2])
-                    if (settings.CreateSheet && haveAnyOutput && !isPartialUpdate)
+                    // 更新モードでは既存シートをそのまま保持する ([2])
+                    if (settings.CreateSheet && haveAnyOutput && !updateMode)
                     {
                         using (var tSheet = new Transaction(doc, "型枠数量算出 - シート作成"))
                         {

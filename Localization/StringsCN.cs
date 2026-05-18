@@ -384,6 +384,13 @@ namespace Tools28.Localization
             { "Formwork.LgsExcluded", "已排除 {0} 个 LGS 墙（含石膏板层、不含混凝土层的墙）" },
             { "Formwork.LinkedIncluded", "已从链接模型包含 {0} 个构件（链接实例：{1} 个）" },
             { "Formwork.ExcludedFilterNote", "（排除的构件在分析三维视图中由「型枠_除外」过滤器隐藏，开启过滤器即可查看）" },
+            { "Formwork.UpdateConfirm.Title", "模板数量算出 - 更新确认" },
+            { "Formwork.UpdateConfirm.MainInstruction", "检测到既有的模板输出" },
+            { "Formwork.UpdateConfirm.Content", "所选源视图对应的分析三维视图或明细表已存在。请选择执行模式。" },
+            { "Formwork.UpdateConfirm.UpdateLabel", "更新（保留图纸布局）" },
+            { "Formwork.UpdateConfirm.UpdateDesc", "仅使用最新模型刷新目标分析三维视图与明细表。图纸、合计明细表与其他视图保持不变。" },
+            { "Formwork.UpdateConfirm.RecreateLabel", "重新生成（重建所有输出）" },
+            { "Formwork.UpdateConfirm.RecreateDesc", "删除并重新创建所有输出，包括图纸与合计明细表。" },
 
             // === Excel 导出类别名称 ===
             { "Category.Walls", "墙" },

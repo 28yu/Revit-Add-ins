@@ -67,7 +67,8 @@ namespace Tools28.Commands.FormworkCalculator.Output
             Document doc,
             FormworkResult result,
             FormworkSettings settings,
-            View sourceView = null)
+            View sourceView = null,
+            bool updateMode = false)
         {
             var vr = new VisualizerResult();
 
@@ -78,8 +79,25 @@ namespace Tools28.Commands.FormworkCalculator.Output
             // [8] ホストモデルの表示名 (実際のファイル名 or タイトル)
             string hostDisplayName = GetDocumentDisplayName(doc);
 
-            // 既存の同名ビューを削除 (このソースビューのもののみ)
-            DeleteViewByName(doc, analysisName);
+            // 更新モード: 既存の分析ビューを検索して再利用する (シート上のビューポート参照を保つ)。
+            View3D view = null;
+            bool reusedView = false;
+            if (updateMode)
+            {
+                view = FormworkOutputFinder.FindAnalysisView(doc, sourceViewName);
+                if (view != null)
+                {
+                    reusedView = true;
+                    FormworkDebugLog.Log(
+                        $"  [Visual] update mode: reusing existing analysis view Id={view.Id.IntValue()} Name='{view.Name}'");
+                }
+            }
+
+            if (!reusedView)
+            {
+                // 既存の同名ビューを削除 (このソースビューのもののみ)
+                DeleteViewByName(doc, analysisName);
+            }
 
             // 既存の型枠 DirectShape を削除。
             // ソースビュー名が指定されている場合は、そのビュー由来の DirectShape のみ削除し、
@@ -87,63 +105,78 @@ namespace Tools28.Commands.FormworkCalculator.Output
             // ソースビュー名が空 (互換モード) の場合は全 DirectShape を削除する（従来動作）。
             CleanupExistingFormworkShapes(doc, sourceViewName);
 
-            var view3DType = new FilteredElementCollector(doc)
-                .OfClass(typeof(ViewFamilyType))
-                .Cast<ViewFamilyType>()
-                .FirstOrDefault(v => v.ViewFamily == ViewFamily.ThreeDimensional);
-            if (view3DType == null) return vr;
+            if (!reusedView)
+            {
+                var view3DType = new FilteredElementCollector(doc)
+                    .OfClass(typeof(ViewFamilyType))
+                    .Cast<ViewFamilyType>()
+                    .FirstOrDefault(v => v.ViewFamily == ViewFamily.ThreeDimensional);
+                if (view3DType == null) return vr;
 
-            var view = View3D.CreateIsometric(doc, view3DType.Id);
-            try { view.Name = analysisName; } catch { }
+                view = View3D.CreateIsometric(doc, view3DType.Id);
+                try { view.Name = analysisName; } catch { }
+            }
+
+            // 出力タグを書き込む (リネーム耐性のための識別子)
+            try
+            {
+                FormworkParameterManager.SetOutputTag(
+                    view,
+                    FormworkParameterManager.OutputKindAnalysisView,
+                    sourceViewName ?? string.Empty);
+            }
+            catch (Exception ex) { FormworkDebugLog.Log($"  [Visual] SetOutputTag EX: {ex.Message}"); }
+
             vr.AnalysisView = view;
             vr.MarkerValue = markerValue;
 
-            // ビューテンプレートを解除する（テンプレートが適用されていると
-            // カテゴリ/フィルタ設定の変更がブロックされる場合がある）。
-            try
+            if (!reusedView)
             {
-                if (view.ViewTemplateId != null && view.ViewTemplateId != ElementId.InvalidElementId)
+                // ビューテンプレートを解除する（テンプレートが適用されていると
+                // カテゴリ/フィルタ設定の変更がブロックされる場合がある）。
+                try
                 {
-                    view.ViewTemplateId = ElementId.InvalidElementId;
-                    FormworkDebugLog.Log("  [Visual] view template detached");
+                    if (view.ViewTemplateId != null && view.ViewTemplateId != ElementId.InvalidElementId)
+                    {
+                        view.ViewTemplateId = ElementId.InvalidElementId;
+                        FormworkDebugLog.Log("  [Visual] view template detached");
+                    }
                 }
-            }
-            catch (Exception ex)
-            {
-                FormworkDebugLog.Log($"  [Visual] detach template EX: {ex.Message}");
-            }
+                catch (Exception ex)
+                {
+                    FormworkDebugLog.Log($"  [Visual] detach template EX: {ex.Message}");
+                }
 
-            // 表示スタイルを Shading に明示設定 (Realistic では OverrideGraphicSettings の
-            // 透過・色オーバーライドが期待通りに反映されない場合があるため)。
-            try { view.DisplayStyle = DisplayStyle.Shading; }
-            catch (Exception ex)
-            {
-                FormworkDebugLog.Log($"  [Visual] DisplayStyle set EX: {ex.Message}");
+                // 表示スタイルを Shading に明示設定 (Realistic では OverrideGraphicSettings の
+                // 透過・色オーバーライドが期待通りに反映されない場合があるため)。
+                try { view.DisplayStyle = DisplayStyle.Shading; }
+                catch (Exception ex)
+                {
+                    FormworkDebugLog.Log($"  [Visual] DisplayStyle set EX: {ex.Message}");
+                }
+                try { view.DetailLevel = ViewDetailLevel.Fine; } catch { }
+
+                // 尺度を 1/200 に設定
+                try { view.Scale = 200; }
+                catch (Exception ex) { FormworkDebugLog.Log($"  [Visual] Scale set EX: {ex.Message}"); }
+
+                // 視点をビューキューブの青い角（右前上からのアイソメトリック）に設定。
+                // ソースが 3D ビューの場合はその視点を継承し、ソースと同じ見え方にする。
+                if (sourceView is View3D srcV3DForOrient)
+                    CopyOrientationIfPossible(srcV3DForOrient, view);
+                else
+                    SetIsometricOrientation(view);
             }
-            try { view.DetailLevel = ViewDetailLevel.Fine; } catch { }
-
-            // 尺度を 1/200 に設定
-            try { view.Scale = 200; }
-            catch (Exception ex) { FormworkDebugLog.Log($"  [Visual] Scale set EX: {ex.Message}"); }
-
-            // 視点をビューキューブの青い角（右前上からのアイソメトリック）に設定。
-            // ソースが 3D ビューの場合はその視点を継承し、ソースと同じ見え方にする。
-            if (sourceView is View3D srcV3DForOrient)
-                CopyOrientationIfPossible(srcV3DForOrient, view);
-            else
-                SetIsometricOrientation(view);
 
             // OST_GenericModel (DirectShape のカテゴリ) を明示的に表示状態にする。
-            // ビューテンプレートやデフォルト設定で非表示になっている場合への防御。
+            // 更新モードでも防御的に実行 (idempotent)。
             try
             {
                 var gmCatId = new ElementId(BuiltInCategory.OST_GenericModel);
                 if (view.CanCategoryBeHidden(gmCatId))
                 {
                     bool wasHidden = view.GetCategoryHidden(gmCatId);
-                    view.SetCategoryHidden(gmCatId, false);
-                    FormworkDebugLog.Log(
-                        $"  [Visual] OST_GenericModel category was hidden={wasHidden} → set visible");
+                    if (wasHidden) view.SetCategoryHidden(gmCatId, false);
                 }
             }
             catch (Exception ex)
@@ -151,35 +184,43 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 FormworkDebugLog.Log($"  [Visual] OST_GenericModel category set EX: {ex.Message}");
             }
 
-            // 視点を固定アイソメトリックに設定し、ロックする（ユーザーが誤って回転しないよう）
-            try { view.SaveOrientationAndLock(); }
-            catch (Exception ex) { FormworkDebugLog.Log($"  [Visual] SaveOrientationAndLock EX: {ex.Message}"); }
+            if (!reusedView)
+            {
+                // 視点を固定アイソメトリックに設定し、ロックする（ユーザーが誤って回転しないよう）
+                try { view.SaveOrientationAndLock(); }
+                catch (Exception ex) { FormworkDebugLog.Log($"  [Visual] SaveOrientationAndLock EX: {ex.Message}"); }
+            }
 
             // 接触検出込みで面を再計算（幾何学的検査なので rayView 不要）
             var facesByElement = FormworkCalcEngine.RecomputeFaces(doc, result, settings);
 
-            // [3] ソースが 3D ビューの場合 (CurrentView / SelectedViews モード) は、
-            // そのソースビューの切断ボックス (位置・有効/無効) をそのまま継承する。
-            // EntireProject 等は要素 BoundingBox から自動算出。
-            bool useSourceSectionBox = sourceView is View3D &&
-                (settings.Scope == CalculationScope.CurrentView ||
-                 settings.Scope == CalculationScope.SelectedViews);
-            if (useSourceSectionBox)
-                CopySectionBoxFromSource((View3D)sourceView, view);
-            else
-                EnableSectionBox(doc, view, result);
+            if (!reusedView)
+            {
+                // [3] ソースが 3D ビューの場合 (CurrentView / SelectedViews モード) は、
+                // そのソースビューの切断ボックス (位置・有効/無効) をそのまま継承する。
+                // EntireProject 等は要素 BoundingBox から自動算出。
+                // 更新モードでは既存ビューのセクションボックスを保持する。
+                bool useSourceSectionBox = sourceView is View3D &&
+                    (settings.Scope == CalculationScope.CurrentView ||
+                     settings.Scope == CalculationScope.SelectedViews);
+                if (useSourceSectionBox)
+                    CopySectionBoxFromSource((View3D)sourceView, view);
+                else
+                    EnableSectionBox(doc, view, result);
 
-            // [4] ソースが 3D ビューならその V/G 上書き (カテゴリの表示/色 + フィルタ)
-            // をターゲット 3D ビューに継承する。スコープに関わらず常に継承し、
-            // ユーザーが元の 3D ビューで設定した表示状態をベースに型枠色分けを重ねる。
-            // ソースが 3D ビューでない場合は、ノイズになる切断ボックスのアウトラインと
-            // レベル線のみ非表示化。
-            if (sourceView is View3D)
-                CopyCategoryVisibilityAndOverrides(doc, sourceView, view);
-            else
-                HideClutterCategories(view);
+                // [4] ソースが 3D ビューならその V/G 上書き (カテゴリの表示/色 + フィルタ)
+                // をターゲット 3D ビューに継承する。スコープに関わらず常に継承し、
+                // ユーザーが元の 3D ビューで設定した表示状態をベースに型枠色分けを重ねる。
+                // ソースが 3D ビューでない場合は、ノイズになる切断ボックスのアウトラインと
+                // レベル線のみ非表示化。
+                if (sourceView is View3D)
+                    CopyCategoryVisibilityAndOverrides(doc, sourceView, view);
+                else
+                    HideClutterCategories(view);
+            }
 
             // 元躯体要素を 20% 透過 + RGB(94,94,94) で表示
+            // 更新モードでも新たに追加された要素にも適用する (idempotent)。
             ApplySourceElementAppearance(doc, view, result);
 
             // 分類キーに基づく色割当

@@ -384,6 +384,13 @@ namespace Tools28.Localization
             { "Formwork.LgsExcluded", "LGS壁 {0} 個を型枠不要として除外しました（石膏ボード層を含みコンクリート層を含まない壁）" },
             { "Formwork.LinkedIncluded", "リンクモデルから {0} 件の要素を対象に含めました（リンクインスタンス: {1} 個）" },
             { "Formwork.ExcludedFilterNote", "（除外要素は解析3Dビューの「型枠_除外」フィルタで非表示。表示 ON で確認可能）" },
+            { "Formwork.UpdateConfirm.Title", "型枠数量算出 - 更新確認" },
+            { "Formwork.UpdateConfirm.MainInstruction", "既存の型枠出力が見つかりました" },
+            { "Formwork.UpdateConfirm.Content", "対象ビューに対応する分析3Dビューまたは集計表が既に存在します。実行モードを選択してください。" },
+            { "Formwork.UpdateConfirm.UpdateLabel", "更新（既存のシートレイアウトを保持）" },
+            { "Formwork.UpdateConfirm.UpdateDesc", "対象の分析3Dビューと集計表のみ最新モデルで更新します。シート・合計集計表・他のビューは変更しません。" },
+            { "Formwork.UpdateConfirm.RecreateLabel", "再作成（全ての出力を作り直す）" },
+            { "Formwork.UpdateConfirm.RecreateDesc", "シートと合計集計表を含む全ての出力を削除して再作成します。" },
 
             // === Excel エクスポート カテゴリ名（BuiltInCategory→ローカライズ）===
             { "Category.Walls", "壁" },

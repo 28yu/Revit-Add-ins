@@ -35,7 +35,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
         ///   この場合は他ビューの既存集計表は削除せず、自身の名前のみクリア。
         /// </summary>
         internal static ElementId CreateSchedule(Document doc, FormworkResult result = null,
-            string sourceFilter = null, string sourceViewFilter = null)
+            string sourceFilter = null, string sourceViewFilter = null, bool updateMode = false)
         {
             // ビュー名フィルタが指定されている場合はビュー名を集計表名に使う
             string scheduleName;
@@ -45,6 +45,27 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 scheduleName = $"{ScheduleName} - {sourceFilter}";
             else
                 scheduleName = ScheduleName;
+
+            // 更新モード: 既存集計表をタグ + 名前で検索し、見つかれば再利用 (削除せず ID を返す)。
+            // ViewSchedule は DirectShape のパラメータを動的集計するため、内容は自動更新される。
+            if (updateMode && !string.IsNullOrEmpty(sourceViewFilter))
+            {
+                var existing = FormworkOutputFinder.FindMainSchedule(doc, sourceViewFilter);
+                if (existing != null)
+                {
+                    try
+                    {
+                        FormworkParameterManager.SetOutputTag(
+                            existing,
+                            FormworkParameterManager.OutputKindMainSchedule,
+                            sourceViewFilter);
+                    }
+                    catch { }
+                    FormworkDebugLog.Log(
+                        $"  [Sched] update mode: reusing existing schedule Id={existing.Id.IntValue()} Name='{existing.Name}'");
+                    return existing.Id;
+                }
+            }
 
             // 同名の既存集計表に加え、過去実行で作成された "型枠数量集計 - xxx" 形式の
             // 集計表もまとめて削除する (初回の "ホスト" 集計表生成時のみ実行)。
@@ -77,6 +98,20 @@ namespace Tools28.Commands.FormworkCalculator.Output
             if (schedule == null) return null;
 
             try { schedule.Name = scheduleName; } catch { }
+
+            // 出力タグ書き込み (リネーム耐性のための識別子)。
+            // 合計表ではなくビュー別集計表として識別する。sourceFilter のみで sourceViewFilter
+            // が無い場合 (互換モード) はソース名で記録する。
+            try
+            {
+                string relatedSrc = !string.IsNullOrEmpty(sourceViewFilter)
+                    ? sourceViewFilter : (sourceFilter ?? string.Empty);
+                FormworkParameterManager.SetOutputTag(
+                    schedule,
+                    FormworkParameterManager.OutputKindMainSchedule,
+                    relatedSrc);
+            }
+            catch (Exception ex) { LogEx("schedule SetOutputTag", ex); }
 
             var def = schedule.Definition;
             var schedulable = def.GetSchedulableFields();
@@ -307,6 +342,16 @@ namespace Tools28.Commands.FormworkCalculator.Output
             if (schedule == null) return null;
 
             try { schedule.Name = SummaryScheduleName; } catch { }
+
+            // 出力タグ書き込み (合計集計表として識別)。
+            try
+            {
+                FormworkParameterManager.SetOutputTag(
+                    schedule,
+                    FormworkParameterManager.OutputKindSummarySchedule,
+                    string.Empty);
+            }
+            catch (Exception ex) { LogEx("summary schedule SetOutputTag", ex); }
 
             var def = schedule.Definition;
             var schedulable = def.GetSchedulableFields();

@@ -21,6 +21,15 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         public const string ParamSource = "28Tools_Formwork_ソース";    // "ホスト" or リンクファイル名
         public const string ParamSourceView = "28Tools_Formwork_ソースビュー"; // 算出元の3Dビュー名
 
+        // ビュー/集計表/シート用の出力タグ。リネームされても追跡可能にする。
+        public const string ParamRelatedSourceView = "28Tools_Formwork_関連ソースビュー"; // 紐づくソースビュー名
+        public const string ParamOutputKind = "28Tools_Formwork_出力種別";           // OutputKind* 定数の値
+
+        public const string OutputKindAnalysisView = "AnalysisView";
+        public const string OutputKindMainSchedule = "MainSchedule";
+        public const string OutputKindSummarySchedule = "SummarySchedule";
+        public const string OutputKindSheet = "FormworkSheet";
+
         public const string MarkerValue = "28Tools_Formwork";
         // 型枠不要として除外された要素 DirectShape のマーカー値。集計表は MarkerValue のみを
         // 対象とし、この値を持つ DirectShape は集計から除外される。
@@ -74,6 +83,26 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 CreateAndBindText(defGroup, bindingMap, binding, ParamPartialContact);
                 CreateAndBindText(defGroup, bindingMap, binding, ParamSource);
                 CreateAndBindText(defGroup, bindingMap, binding, ParamSourceView);
+
+                // 出力タグ (ビュー / 集計表 / シート向け)。リネーム後も追跡できるようにする。
+                CategorySet viewCatSet = app.Create.NewCategorySet();
+                foreach (var bic in new[]
+                {
+                    BuiltInCategory.OST_Views,
+                    BuiltInCategory.OST_Schedules,
+                    BuiltInCategory.OST_Sheets,
+                })
+                {
+                    try
+                    {
+                        var vc = doc.Settings.Categories.get_Item(bic);
+                        if (vc != null) viewCatSet.Insert(vc);
+                    }
+                    catch { }
+                }
+                var viewBinding = app.Create.NewInstanceBinding(viewCatSet);
+                CreateAndBindText(defGroup, bindingMap, viewBinding, ParamRelatedSourceView);
+                CreateAndBindText(defGroup, bindingMap, viewBinding, ParamOutputKind);
             }
             finally
             {
@@ -111,7 +140,8 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         {
             var map = doc.ParameterBindings;
             var it = map.ForwardIterator();
-            bool m = false, c = false, l = false, g = false, a = false, p = false, s = false, sv = false;
+            bool m = false, c = false, l = false, g = false, a = false, p = false, s = false, sv = false,
+                 rsv = false, ok = false;
             while (it.MoveNext())
             {
                 var name = it.Key.Name;
@@ -123,8 +153,48 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 else if (name == ParamPartialContact) p = true;
                 else if (name == ParamSource) s = true;
                 else if (name == ParamSourceView) sv = true;
+                else if (name == ParamRelatedSourceView) rsv = true;
+                else if (name == ParamOutputKind) ok = true;
             }
-            return m && c && l && g && a && p && s && sv;
+            return m && c && l && g && a && p && s && sv && rsv && ok;
+        }
+
+        /// <summary>
+        /// ビュー / 集計表 / シートに出力タグを書き込む。
+        /// outputKind: OutputKindAnalysisView / OutputKindMainSchedule / OutputKindSummarySchedule / OutputKindSheet
+        /// relatedSourceView: 紐づくソースビュー名 (合計表・シートでは空文字)
+        /// </summary>
+        internal static void SetOutputTag(Element e, string outputKind, string relatedSourceView = "")
+        {
+            if (e == null) return;
+            SetString(e, ParamOutputKind, outputKind ?? string.Empty);
+            SetString(e, ParamRelatedSourceView, relatedSourceView ?? string.Empty);
+        }
+
+        /// <summary>要素から出力種別タグを取得する。タグが無ければ空文字。</summary>
+        internal static string GetOutputKind(Element e)
+        {
+            if (e == null) return string.Empty;
+            try
+            {
+                var p = e.LookupParameter(ParamOutputKind);
+                return (p != null && p.StorageType == StorageType.String)
+                    ? (p.AsString() ?? string.Empty) : string.Empty;
+            }
+            catch { return string.Empty; }
+        }
+
+        /// <summary>要素から紐づくソースビュー名タグを取得する。タグが無ければ空文字。</summary>
+        internal static string GetRelatedSourceView(Element e)
+        {
+            if (e == null) return string.Empty;
+            try
+            {
+                var p = e.LookupParameter(ParamRelatedSourceView);
+                return (p != null && p.StorageType == StorageType.String)
+                    ? (p.AsString() ?? string.Empty) : string.Empty;
+            }
+            catch { return string.Empty; }
         }
 
         private static string GetSharedParamFilePath()
