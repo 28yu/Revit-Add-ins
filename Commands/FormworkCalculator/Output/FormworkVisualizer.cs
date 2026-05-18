@@ -17,16 +17,18 @@ namespace Tools28.Commands.FormworkCalculator.Output
     /// </summary>
     internal static class FormworkVisualizer
     {
-        internal const string AnalysisViewName = "型枠数量算出";
-        internal const string AnalysisViewPrefix = "型枠数量算出 - ";
-        // 旧名 (v2.x 以前で作成されたビューを検出するためのフォールバック)
+        internal const string AnalysisViewName = "3D_型枠数量";
+        internal const string AnalysisViewPrefix = "3D_型枠数量 - ";
+        // 旧名 (以前のバージョンで作成されたビューを検出するためのフォールバック)
         internal const string LegacyAnalysisViewName = "型枠分析";
         internal const string LegacyAnalysisViewPrefix = "型枠分析 - ";
+        internal const string Legacy2AnalysisViewName = "型枠数量算出";
+        internal const string Legacy2AnalysisViewPrefix = "型枠数量算出 - ";
 
         /// <summary>
         /// ソースビュー名からこのビューに対応する解析ビュー名を生成する。
-        /// ソース名なし: "型枠数量算出" (互換性のため)
-        /// ソース名あり: "型枠数量算出 - {sourceViewName}"
+        /// ソース名なし: "3D_型枠数量"
+        /// ソース名あり: "3D_型枠数量 - {sourceViewName}"
         /// </summary>
         internal static string BuildAnalysisViewName(string sourceViewName)
         {
@@ -34,14 +36,16 @@ namespace Tools28.Commands.FormworkCalculator.Output
             return AnalysisViewPrefix + sourceViewName;
         }
 
-        /// <summary>名前が型枠分析ビュー (新旧両方) のパターンに一致するか判定する。</summary>
+        /// <summary>名前が型枠分析ビュー (新旧全パターン) のパターンに一致するか判定する。</summary>
         internal static bool IsAnalysisViewName(string name)
         {
             if (string.IsNullOrEmpty(name)) return false;
             return name == AnalysisViewName
                 || name.StartsWith(AnalysisViewPrefix)
                 || name == LegacyAnalysisViewName
-                || name.StartsWith(LegacyAnalysisViewPrefix);
+                || name.StartsWith(LegacyAnalysisViewPrefix)
+                || name == Legacy2AnalysisViewName
+                || name.StartsWith(Legacy2AnalysisViewPrefix);
         }
         internal class VisualizerResult
         {

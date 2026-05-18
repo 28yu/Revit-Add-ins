@@ -58,6 +58,9 @@ namespace Tools28.Commands.FormworkCalculator
                         sourceViews.Add(v3dActive);
                 }
 
+                // [2] 分析ビューが選択/アクティブな場合、元のソースビューを解決する
+                sourceViews = ResolveAnalysisViews(doc, sourceViews);
+
                 if (sourceViews.Count == 0)
                 {
                     TaskDialog.Show(Loc.S("Common.Warning"),
@@ -457,6 +460,47 @@ namespace Tools28.Commands.FormworkCalculator
                     + "\n\n" + ex.StackTrace;
                 return Result.Failed;
             }
+        }
+
+        /// <summary>
+        /// 分析ビュー ("3D_型枠数量 - XXX" 等) が含まれている場合、
+        /// タグから元のソースビュー名を取得して実際のソースビューに置き換える。
+        /// これにより、分析ビューをアクティブにした状態でボタンを実行しても
+        /// 更新モード検出が正常に機能する。
+        /// </summary>
+        private static List<View3D> ResolveAnalysisViews(Document doc, List<View3D> views)
+        {
+            if (views == null || views.Count == 0) return views ?? new List<View3D>();
+
+            var allView3Ds = new FilteredElementCollector(doc)
+                .OfClass(typeof(View3D))
+                .Cast<View3D>()
+                .Where(v => !v.IsTemplate)
+                .ToDictionary(v => v.Name, v => v);
+
+            var resolved = new List<View3D>();
+            foreach (var v in views)
+            {
+                if (FormworkVisualizer.IsAnalysisViewName(v.Name))
+                {
+                    var sourceViewName = FormworkParameterManager.GetRelatedSourceView(v);
+                    if (!string.IsNullOrEmpty(sourceViewName)
+                        && allView3Ds.TryGetValue(sourceViewName, out var sourceView))
+                    {
+                        resolved.Add(sourceView);
+                    }
+                    else
+                    {
+                        // タグなし / ソースビュー不明の場合はそのまま追加
+                        resolved.Add(v);
+                    }
+                }
+                else
+                {
+                    resolved.Add(v);
+                }
+            }
+            return resolved;
         }
 
         /// <summary>

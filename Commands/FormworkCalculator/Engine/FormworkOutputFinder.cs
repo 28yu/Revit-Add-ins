@@ -30,12 +30,15 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 && FormworkParameterManager.GetRelatedSourceView(v) == (sourceViewName ?? string.Empty));
             if (tagged != null) return tagged;
 
-            // 2. 名前フォールバック (新旧両方)
+            // 2. 名前フォールバック (新旧全パターン)
             string analysisName = FormworkVisualizer.BuildAnalysisViewName(sourceViewName);
             string legacyName = string.IsNullOrEmpty(sourceViewName)
                 ? FormworkVisualizer.LegacyAnalysisViewName
                 : FormworkVisualizer.LegacyAnalysisViewPrefix + sourceViewName;
-            return all.FirstOrDefault(v => v.Name == analysisName || v.Name == legacyName);
+            string legacy2Name = string.IsNullOrEmpty(sourceViewName)
+                ? FormworkVisualizer.Legacy2AnalysisViewName
+                : FormworkVisualizer.Legacy2AnalysisViewPrefix + sourceViewName;
+            return all.FirstOrDefault(v => v.Name == analysisName || v.Name == legacyName || v.Name == legacy2Name);
         }
 
         /// <summary>プロジェクト内の全分析3Dビュー (タグ + 名前パターン) を返す。</summary>
