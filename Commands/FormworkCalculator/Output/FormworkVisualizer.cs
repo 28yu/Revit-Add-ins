@@ -229,6 +229,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 if (sourceView is View3D)
                 {
                     CopyCategoryVisibilityAndOverrides(doc, sourceView, view);
+                    CopyWorksetVisibility(doc, sourceView, view);
                     shouldCopySourceFilters = true;
                 }
                 else
@@ -1133,6 +1134,37 @@ namespace Tools28.Commands.FormworkCalculator.Output
 
             // 切断ボックスのアウトライン・レベル線は解析ビューで邪魔なので強制非表示
             HideClutterCategories(target);
+        }
+
+        /// <summary>
+        /// ソースビューのワークセット可視性設定をターゲットビューにコピーする。
+        /// V/G 上書き > ワークセット タブの設定に相当する。
+        /// </summary>
+        private static void CopyWorksetVisibility(Document doc, View source, View3D target)
+        {
+            if (!doc.IsWorkshared) return;
+            try
+            {
+                var worksets = new FilteredWorksetCollector(doc)
+                    .OfKind(WorksetKind.UserWorkset);
+                int copied = 0, errors = 0;
+                foreach (var ws in worksets)
+                {
+                    try
+                    {
+                        WorksetVisibility vis = source.GetWorksetVisibility(ws.Id);
+                        target.SetWorksetVisibility(ws.Id, vis);
+                        copied++;
+                    }
+                    catch { errors++; }
+                }
+                FormworkDebugLog.Log(
+                    $"  [Visual] CopyWorksetVisibility: copied={copied} errors={errors}");
+            }
+            catch (Exception ex)
+            {
+                FormworkDebugLog.Log($"  [Visual] CopyWorksetVisibility EX: {ex.Message}");
+            }
         }
 
         /// <summary>
