@@ -88,7 +88,6 @@ namespace Tools28.Commands.FormworkCalculator
                         MainInstruction = Loc.S("Formwork.UpdateConfirm.MainInstruction"),
                         MainContent = Loc.S("Formwork.UpdateConfirm.Content"),
                         CommonButtons = TaskDialogCommonButtons.Cancel,
-                        DefaultButton = TaskDialogResult.CommandLink1,
                     };
                     td.AddCommandLink(TaskDialogCommandLinkId.CommandLink1,
                         Loc.S("Formwork.UpdateConfirm.UpdateLabel"),
