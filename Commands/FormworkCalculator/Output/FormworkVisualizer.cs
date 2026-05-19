@@ -549,6 +549,12 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 $"  [Visual] total DirectShapes: {vr.CreatedShapeIds.Count} " +
                 $"(formwork={formworkShapesCount} excluded={excludedShapesCount})");
 
+            // ワークセット可視性コピー後に型枠 DirectShape のワークセットを強制表示する。
+            // ソースビューがホストのワークセットを非表示にしている場合、CopyWorksetVisibility で
+            // その設定が引き継がれ DirectShape が見えなくなるのを防ぐ。
+            if (doc.IsWorkshared)
+                EnsureFormworkWorksetsVisible(doc, view, vr.CreatedShapeIds);
+
             // View Filter による色分けを適用（個別要素オーバーライドは使わない）
             try
             {
@@ -1164,6 +1170,41 @@ namespace Tools28.Commands.FormworkCalculator.Output
             catch (Exception ex)
             {
                 FormworkDebugLog.Log($"  [Visual] CopyWorksetVisibility EX: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 型枠 DirectShape が属するワークセットをビューで強制的に表示状態にする。
+        /// CopyWorksetVisibility でソースビューのワークセット非表示設定が引き継がれた場合に
+        /// DirectShape 自身が属するワークセットだけ例外的に表示させる。
+        /// </summary>
+        private static void EnsureFormworkWorksetsVisible(
+            Document doc, View3D view, IList<ElementId> shapeIds)
+        {
+            if (shapeIds == null || shapeIds.Count == 0) return;
+            try
+            {
+                var wsIds = new HashSet<WorksetId>();
+                foreach (var id in shapeIds)
+                {
+                    try
+                    {
+                        var elem = doc.GetElement(id);
+                        if (elem != null) wsIds.Add(elem.WorksetId);
+                    }
+                    catch { }
+                }
+                foreach (var wsId in wsIds)
+                {
+                    try { view.SetWorksetVisibility(wsId, WorksetVisibility.Visible); }
+                    catch { }
+                }
+                FormworkDebugLog.Log(
+                    $"  [Visual] EnsureFormworkWorksetsVisible: worksets={string.Join(",", wsIds.Select(w => w.IntegerValue))}");
+            }
+            catch (Exception ex)
+            {
+                FormworkDebugLog.Log($"  [Visual] EnsureFormworkWorksetsVisible EX: {ex.Message}");
             }
         }
 
