@@ -354,45 +354,58 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                     new[] { typeof(ElementId) });
                 if (getOverridesMethod == null)
                 {
-                    if (FormworkDebugLog.Enabled)
-                        FormworkDebugLog.Log(
-                            $"  [VisFilter] {sourceName}: View.GetLinkOverrides(ElementId) API なし");
+                    FormworkDebugLog.Log(
+                        $"  [VisFilter] {sourceName}: View.GetLinkOverrides(ElementId) API なし");
                     return null;
                 }
 
                 object settings = getOverridesMethod.Invoke(activeView, new object[] { linkInstanceId });
                 if (settings == null)
                 {
-                    if (FormworkDebugLog.Enabled)
-                        FormworkDebugLog.Log(
-                            $"  [VisFilter] {sourceName}: GetLinkOverrides returned null (上書きなし)");
+                    FormworkDebugLog.Log(
+                        $"  [VisFilter] {sourceName}: GetLinkOverrides returned null (上書きなし)");
                     return null;
                 }
 
                 var settingsType = settings.GetType();
-                // LinkVisibilityType または LinkVisibility プロパティを探す
-                var visProp = settingsType.GetProperty("LinkVisibilityType")
-                              ?? settingsType.GetProperty("LinkVisibility");
-                var lvIdProp = settingsType.GetProperty("LinkedViewId");
 
-                if (visProp == null || lvIdProp == null)
+                // 診断: 利用可能なプロパティ一覧をログ (最初のリンクのみ)
+                if (FormworkDebugLog.Enabled)
                 {
+                    var propNames = string.Join(", ", settingsType.GetProperties().Select(p => p.Name));
+                    FormworkDebugLog.Log($"  [VisFilter] {sourceName}: RevitLinkGraphicsSettings props=[{propNames}]");
+                }
+
+                // Revit API: RevitLinkGraphicsSettings.LinkedViewId
+                // ByLinkedView モードなら有効な ElementId、それ以外は InvalidElementId。
+                // 旧バージョン互換のため複数のプロパティ名を試す。
+                ElementId lvId = null;
+                foreach (var propName in new[] { "LinkedViewId", "LinkedView", "LinkedViewElementId" })
+                {
+                    var prop = settingsType.GetProperty(propName);
+                    if (prop == null) continue;
+                    lvId = prop.GetValue(settings) as ElementId;
                     FormworkDebugLog.Log(
-                        $"  [VisFilter] {sourceName}: RevitLinkGraphicsSettings プロパティ未取得 " +
-                        $"(visProp={(visProp != null)} lvIdProp={(lvIdProp != null)})");
+                        $"  [VisFilter] {sourceName}: {propName}={lvId?.IntegerValue.ToString() ?? "null"}");
+                    break;
+                }
+
+                if (lvId == null)
+                {
+                    FormworkDebugLog.Log($"  [VisFilter] {sourceName}: LinkedViewId プロパティ未取得");
                     return null;
                 }
 
-                object visValue = visProp.GetValue(settings);
-                string visName = visValue?.ToString() ?? "null";
-                FormworkDebugLog.Log(
-                    $"  [VisFilter] {sourceName}: LinkVisibility={visName}");
-
-                // enum 値の名前で ByLinkedView を判定 (Revit バージョン依存を回避)
-                if (!string.Equals(visName, "ByLinkedView", StringComparison.OrdinalIgnoreCase))
+                // InvalidElementId (-1) または負値 → ByLinkedView 未設定
+                if (lvId.IntegerValue < 0)
+                {
+                    FormworkDebugLog.Log(
+                        $"  [VisFilter] {sourceName}: LinkedViewId 無効値 ({lvId.IntegerValue}) → ByLinkedView未設定");
                     return null;
+                }
 
-                var lvId = lvIdProp.GetValue(settings) as ElementId;
+                FormworkDebugLog.Log(
+                    $"  [VisFilter] {sourceName}: ByLinkedView 確認 LinkedViewId={lvId.IntegerValue}");
                 return lvId;
             }
             catch (Exception ex)

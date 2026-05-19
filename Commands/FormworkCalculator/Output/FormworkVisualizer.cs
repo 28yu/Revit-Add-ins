@@ -315,33 +315,21 @@ namespace Tools28.Commands.FormworkCalculator.Output
             int skippedInvisible = 0;
             foreach (var er in result.ElementResults)
             {
-                // ソースビューで非表示の要素はDirectShapeを作らない。
-                // ホスト要素: ElementId.IntegerValue が visibleInSourceIds に含まれるか確認。
-                // リンク要素: リンクインスタンスID が visibleInSourceIds に含まれるか確認。
+                // ソースビューで非表示のホスト要素はDirectShapeを作らない。
+                // リンク要素の可視判定はElementCollector側(TryGetByLinkedViewId等)で実施済み。
+                // FilteredElementCollector(doc, viewId)はリンク内の個別要素を返さないため
+                // Visualizerレベルではリンク要素の可視判定はできない。
                 if (visibleInSourceIds != null)
                 {
                     var srcInfo = registryForVisibility?.Get(er.ElementId);
-                    bool isVisible = true;
-                    if (srcInfo != null)
+                    if (srcInfo != null && !srcInfo.IsLinked)
                     {
-                        if (srcInfo.IsLinked)
+                        // ホスト要素のみ: ElementId でチェック
+                        if (!visibleInSourceIds.Contains(er.ElementId))
                         {
-                            // リンクインスタンス自体がソースビューで表示されているかチェック
-                            var linkInstId = srcInfo.LinkInstanceId;
-                            isVisible = linkInstId != null &&
-                                linkInstId != ElementId.InvalidElementId &&
-                                visibleInSourceIds.Contains(linkInstId.IntegerValue);
+                            skippedInvisible++;
+                            continue;
                         }
-                        else
-                        {
-                            // ホスト要素: ElementId でチェック
-                            isVisible = visibleInSourceIds.Contains(er.ElementId);
-                        }
-                    }
-                    if (!isVisible)
-                    {
-                        skippedInvisible++;
-                        continue;
                     }
                 }
 
