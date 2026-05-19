@@ -286,8 +286,65 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 }
             }
 
+            // ソースビューに実際に表示されている要素IDを収集し、非表示要素のDirectShape作成を省く。
+            // FilteredElementCollector(doc, viewId) はカテゴリ・ワークセット・フィルタ・要素個別非表示を
+            // 全て反映した「視点上で見えている要素」のみを返す。
+            // EntireProject スコープは全要素対象なのでフィルタしない。
+            HashSet<int> visibleInSourceIds = null;
+            if (sourceView != null && settings.Scope != CalculationScope.EntireProject)
+            {
+                try
+                {
+                    visibleInSourceIds = new FilteredElementCollector(doc, sourceView.Id)
+                        .WhereElementIsNotElementType()
+                        .ToElementIds()
+                        .Select(eid => eid.IntegerValue)
+                        .ToHashSet();
+                    FormworkDebugLog.Log(
+                        $"  [Visual] visibleInSourceIds: {visibleInSourceIds.Count} (scope={settings.Scope})");
+                }
+                catch (Exception ex)
+                {
+                    FormworkDebugLog.Log($"  [Visual] visibleInSourceIds EX: {ex.Message}");
+                    visibleInSourceIds = null;
+                }
+            }
+
+            var registryForVisibility = result.SourceRegistry as Engine.ElementSourceRegistry;
+
+            int skippedInvisible = 0;
             foreach (var er in result.ElementResults)
             {
+                // ソースビューで非表示の要素はDirectShapeを作らない。
+                // ホスト要素: ElementId.IntegerValue が visibleInSourceIds に含まれるか確認。
+                // リンク要素: リンクインスタンスID が visibleInSourceIds に含まれるか確認。
+                if (visibleInSourceIds != null)
+                {
+                    var srcInfo = registryForVisibility?.Get(er.ElementId);
+                    bool isVisible = true;
+                    if (srcInfo != null)
+                    {
+                        if (srcInfo.IsLinked)
+                        {
+                            // リンクインスタンス自体がソースビューで表示されているかチェック
+                            var linkInstId = srcInfo.LinkInstanceId;
+                            isVisible = linkInstId != null &&
+                                linkInstId != ElementId.InvalidElementId &&
+                                visibleInSourceIds.Contains(linkInstId.IntegerValue);
+                        }
+                        else
+                        {
+                            // ホスト要素: ElementId でチェック
+                            isVisible = visibleInSourceIds.Contains(er.ElementId);
+                        }
+                    }
+                    if (!isVisible)
+                    {
+                        skippedInvisible++;
+                        continue;
+                    }
+                }
+
                 if (!facesByElement.TryGetValue(er.ElementId, out var faces))
                 {
                     // [LinkSweepDiag] facesByElement に該当 ID が無いと DirectShape が作られない
@@ -526,7 +583,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
             int formworkShapesCount = vr.CreatedShapeIds.Count;
             FormworkDebugLog.Log(
                 $"  [Visual] formwork DirectShapes created: {formworkShapesCount} " +
-                $"(elements={result.ElementResults.Count})");
+                $"(elements={result.ElementResults.Count} skippedInvisible={skippedInvisible})");
 
             // 新しく作成した DirectShape のジオメトリを Revit に認識させるため Regenerate
             try
