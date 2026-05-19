@@ -286,6 +286,30 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 }
             }
 
+            // ワークシェアリング環境では DirectShape 作成前にアクティブワークセットを
+            // 専用ワークセット「28Tools_型枠」に切り替える。
+            // ELEM_PARTITION_PARAM は DirectShape では読み取り専用になるため、
+            // 事前にアクティブワークセットを変更する方式が唯一の確実な方法。
+            WorksetId savedActiveWorksetId = null;
+            WorksetId formworkWorksetId = null;
+            if (doc.IsWorkshared)
+            {
+                try
+                {
+                    formworkWorksetId = GetOrCreateFormworkWorkset(doc);
+                    savedActiveWorksetId = doc.GetWorksetTable().GetActiveWorksetId();
+                    doc.GetWorksetTable().SetActiveWorksetId(formworkWorksetId);
+                    FormworkDebugLog.Log(
+                        $"  [Visual] アクティブワークセット切替: saved={savedActiveWorksetId.IntegerValue} → formwork={formworkWorksetId.IntegerValue}");
+                }
+                catch (Exception ex)
+                {
+                    FormworkDebugLog.Log($"  [Visual] アクティブワークセット切替 EX: {ex.Message}");
+                    savedActiveWorksetId = null;
+                    formworkWorksetId = null;
+                }
+            }
+
             foreach (var er in result.ElementResults)
             {
                 if (!facesByElement.TryGetValue(er.ElementId, out var faces))
@@ -548,6 +572,21 @@ namespace Tools28.Commands.FormworkCalculator.Output
             FormworkDebugLog.Log(
                 $"  [Visual] total DirectShapes: {vr.CreatedShapeIds.Count} " +
                 $"(formwork={formworkShapesCount} excluded={excludedShapesCount})");
+
+            // DirectShape 作成完了後にアクティブワークセットを元に戻す
+            if (savedActiveWorksetId != null)
+            {
+                try
+                {
+                    doc.GetWorksetTable().SetActiveWorksetId(savedActiveWorksetId);
+                    FormworkDebugLog.Log(
+                        $"  [Visual] アクティブワークセット復元: {savedActiveWorksetId.IntegerValue}");
+                }
+                catch (Exception ex)
+                {
+                    FormworkDebugLog.Log($"  [Visual] アクティブワークセット復元 EX: {ex.Message}");
+                }
+            }
 
             // ワークセット可視性コピー後に型枠 DirectShape のワークセットを強制表示する。
             // ソースビューがホストのワークセットを非表示にしている場合、CopyWorksetVisibility で
@@ -1176,57 +1215,40 @@ namespace Tools28.Commands.FormworkCalculator.Output
         /// <summary>
         /// 型枠 DirectShape が属するワークセットをビューで強制的に表示状態にする。
         /// CopyWorksetVisibility でソースビューのワークセット非表示設定が引き継がれた場合に
-        /// DirectShape を専用ワークセット「28Tools_型枠」に移動し、そこだけ表示させる。
-        /// これにより他のホスト要素が意図せず表示されることを防ぐ。
+        /// 専用ワークセット「28Tools_型枠」を解析ビューで強制表示する。
+        /// DirectShape はアクティブワークセットを事前変更して作成済みのため、
+        /// ここではワークセットの可視性設定のみ行う（移動処理は不要）。
         /// </summary>
         private static void EnsureFormworkWorksetsVisible(
             Document doc, View3D view, IList<ElementId> shapeIds)
         {
             if (shapeIds == null || shapeIds.Count == 0) return;
-            const string wsName = "28Tools_型枠";
             try
             {
-                // 専用ワークセットを検索または作成
-                WorksetId formworkWsId = null;
-                var allWs = new FilteredWorksetCollector(doc).OfKind(WorksetKind.UserWorkset);
-                var existing = allWs.FirstOrDefault(ws => ws.Name == wsName);
-                if (existing != null)
-                {
-                    formworkWsId = existing.Id;
-                }
-                else
-                {
-                    var newWs = Workset.Create(doc, wsName);
-                    formworkWsId = newWs.Id;
-                }
-
-                // 全 DirectShape を専用ワークセットに移動
-                int moved = 0;
-                foreach (var id in shapeIds)
-                {
-                    try
-                    {
-                        var elem = doc.GetElement(id);
-                        if (elem == null) continue;
-                        var wsParam = elem.get_Parameter(BuiltInParameter.ELEM_PARTITION_PARAM);
-                        if (wsParam != null && !wsParam.IsReadOnly)
-                        {
-                            wsParam.Set(formworkWsId.IntegerValue);
-                            moved++;
-                        }
-                    }
-                    catch { }
-                }
-
-                // 専用ワークセットだけを解析ビューで強制表示
-                view.SetWorksetVisibility(formworkWsId, WorksetVisibility.Visible);
+                var wsId = GetOrCreateFormworkWorkset(doc);
+                if (wsId == null) return;
+                view.SetWorksetVisibility(wsId, WorksetVisibility.Visible);
                 FormworkDebugLog.Log(
-                    $"  [Visual] EnsureFormworkWorksetsVisible: wsId={formworkWsId.IntegerValue} wsName={wsName} moved={moved}/{shapeIds.Count}");
+                    $"  [Visual] EnsureFormworkWorksetsVisible: wsId={wsId.IntegerValue} shapeCount={shapeIds.Count}");
             }
             catch (Exception ex)
             {
                 FormworkDebugLog.Log($"  [Visual] EnsureFormworkWorksetsVisible EX: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// 専用ワークセット「28Tools_型枠」を検索または作成してIDを返す。
+        /// </summary>
+        private static WorksetId GetOrCreateFormworkWorkset(Document doc)
+        {
+            const string wsName = "28Tools_型枠";
+            var allWs = new FilteredWorksetCollector(doc).OfKind(WorksetKind.UserWorkset);
+            var existing = allWs.FirstOrDefault(ws => ws.Name == wsName);
+            if (existing != null) return existing.Id;
+            var newWs = Workset.Create(doc, wsName);
+            FormworkDebugLog.Log($"  [Visual] 専用ワークセット作成: '{wsName}' id={newWs.Id.IntegerValue}");
+            return newWs.Id;
         }
 
         /// <summary>
