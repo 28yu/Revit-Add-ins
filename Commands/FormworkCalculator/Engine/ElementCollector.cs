@@ -205,6 +205,54 @@ namespace Tools28.Commands.FormworkCalculator.Engine
 
                 if (activeView != null && settings.Scope == CalculationScope.CurrentView)
                 {
+                    // (Z) リンクの表示モードが「リンクされたビューで設定」(ByLinkedView) の場合、
+                    // 割当られたリンクビューで実際に可視な要素のみに絞り込む。
+                    // ホストビューの V/G → Revit リンク → 「表示設定」が「リンクされたビューで設定」
+                    // になっている場合、その割当ビューの設定 (セクションボックス・ワークセット・
+                    // フィルタ・要素個別非表示) に従って表示される。エンジンは従来これを考慮しておらず、
+                    // 全リンク要素を対象としていたが、ソースビューが特定エリアを切り出しているケースに
+                    // 対応するため、リンクビューでの可視要素のみを残す。
+                    try
+                    {
+                        var linkOv = activeView.GetLinkOverrides(rli.Id);
+                        if (linkOv != null &&
+                            linkOv.LinkVisibilityType == LinkVisibility.ByLinkedView)
+                        {
+                            var lvId = linkOv.LinkedViewId;
+                            if (lvId != null && lvId != ElementId.InvalidElementId)
+                            {
+                                var lvVisible = new HashSet<int>(
+                                    new FilteredElementCollector(linkDoc, lvId)
+                                        .WhereElementIsNotElementType()
+                                        .ToElementIds()
+                                        .Select(eid => eid.IntegerValue));
+                                int beforeLV = linkedElems.Count;
+                                linkedElems = linkedElems
+                                    .Where(e => lvVisible.Contains(e.Id.IntegerValue))
+                                    .ToList();
+                                int hiddenLV = beforeLV - linkedElems.Count;
+                                FormworkDebugLog.Log(
+                                    $"  [VisFilter] {sourceName}: リンクビュー({lvId.IntValue()})フィルタ除外 " +
+                                    $"{hiddenLV}/{beforeLV} (ByLinkedView mode)");
+                            }
+                            else
+                            {
+                                FormworkDebugLog.Log(
+                                    $"  [VisFilter] {sourceName}: ByLinkedView だが LinkedViewId 未設定");
+                            }
+                        }
+                        else if (linkOv != null && FormworkDebugLog.Enabled)
+                        {
+                            FormworkDebugLog.Log(
+                                $"  [VisFilter] {sourceName}: LinkVisibilityType={linkOv.LinkVisibilityType} (ByLinkedView 以外、絞り込みなし)");
+                        }
+                    }
+                    catch (Exception exLv)
+                    {
+                        FormworkDebugLog.Log(
+                            $"  [VisFilter] {sourceName}: GetLinkOverrides EX: {exLv.Message}");
+                    }
+
                     // (A) グローバルカテゴリ非表示: V/G → モデルカテゴリ タブ
                     int beforeCat = linkedElems.Count;
                     linkedElems = linkedElems.Where(e =>
