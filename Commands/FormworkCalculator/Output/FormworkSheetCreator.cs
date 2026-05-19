@@ -55,37 +55,73 @@ namespace Tools28.Commands.FormworkCalculator.Output
         }
 
         /// <summary>
-        /// 既存の型枠数量集計シートがあれば削除して、現在のビュー・集計表で再構築する。
-        /// 既存シート名 / 番号は保持して同一の位置に再作成する。
+        /// 既存の型枠数量集計シートを削除し、名前・番号を out パラメータで返す。
+        /// 削除はトランザクション内で呼び出すこと。
+        /// Viewport.Create が null を返す問題を回避するため、削除とシート作成は
+        /// 別トランザクションに分けること (FormworkCalculatorCommand 側で管理する)。
         /// </summary>
-        internal static ElementId CreateOrUpdateSheet(
-            Document doc,
-            IList<ElementId> analysisViewIds,
-            IList<ElementId> mainScheduleIds,
-            ElementId summaryScheduleId)
+        internal static void DeleteExistingFormworkSheet(
+            Document doc, out string savedName, out string savedNumber)
         {
-            if (doc == null) return null;
-
-            // 既存の型枠シートを検索し、シート名・番号を保存してから削除 (タグ + 名前フォールバック)
-            string existingName = null;
-            string existingNumber = null;
+            savedName = null;
+            savedNumber = null;
             try
             {
                 var existing = FormworkOutputFinder.FindFormworkSheet(doc);
                 if (existing != null)
                 {
-                    existingName = existing.Name;
-                    existingNumber = existing.SheetNumber;
+                    savedName = existing.Name;
+                    savedNumber = existing.SheetNumber;
                     doc.Delete(existing.Id);
-                    FormworkDebugLog.Log($"  [Sheet] 既存シート削除: '{existingNumber} - {existingName}'");
-                    // 削除後に Regenerate してビューの「使用中」フラグを解放する。
-                    // これをしないと Viewport.Create が null を返すことがある。
-                    doc.Regenerate();
+                    FormworkDebugLog.Log(
+                        $"  [Sheet] 既存シート削除: '{savedNumber} - {savedName}'");
                 }
             }
             catch (Exception ex)
             {
                 FormworkDebugLog.Log($"  [Sheet] 既存シート削除 EX: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 既存の型枠数量集計シートがあれば削除して、現在のビュー・集計表で再構築する。
+        /// 既存シート名 / 番号は保持して同一の位置に再作成する。
+        /// ※ Viewport.Create null 問題の回避には、DeleteExistingFormworkSheet を別トランザクションで
+        /// 先に呼び出し、その後このメソッドではなく CreateSheetMulti を直接呼び出すことを推奨。
+        /// </summary>
+        internal static ElementId CreateOrUpdateSheet(
+            Document doc,
+            IList<ElementId> analysisViewIds,
+            IList<ElementId> mainScheduleIds,
+            ElementId summaryScheduleId,
+            string preferredName = null,
+            string preferredNumber = null)
+        {
+            if (doc == null) return null;
+
+            // 呼び出し元で別トランザクションとして削除済みの場合は preferred* が渡される。
+            // 未削除の場合のフォールバックとして自前削除も残す。
+            string existingName = preferredName;
+            string existingNumber = preferredNumber;
+            if (existingName == null && existingNumber == null)
+            {
+                try
+                {
+                    var existing = FormworkOutputFinder.FindFormworkSheet(doc);
+                    if (existing != null)
+                    {
+                        existingName = existing.Name;
+                        existingNumber = existing.SheetNumber;
+                        doc.Delete(existing.Id);
+                        FormworkDebugLog.Log(
+                            $"  [Sheet] 既存シート削除(フォールバック): '{existingNumber} - {existingName}'");
+                        doc.Regenerate();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    FormworkDebugLog.Log($"  [Sheet] 既存シート削除 EX: {ex.Message}");
+                }
             }
 
             return CreateSheetMulti(doc, analysisViewIds, mainScheduleIds, summaryScheduleId,

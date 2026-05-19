@@ -299,6 +299,26 @@ namespace Tools28.Commands.FormworkCalculator
                     // 更新モードでは既存シートをそのまま保持する ([2])
                     if (settings.CreateSheet && haveAnyOutput && !updateMode)
                     {
+                        // 既存シートの削除は別トランザクションで先に行う。
+                        // 同一トランザクション内でシート削除→Viewport.Create をすると
+                        // Viewport.Create が null を返す既知の Revit API 問題を回避するため。
+                        string savedSheetName = null, savedSheetNumber = null;
+                        using (var tDeleteSheet = new Transaction(doc, "型枠数量算出 - 既存シート削除"))
+                        {
+                            tDeleteSheet.Start();
+                            try
+                            {
+                                FormworkSheetCreator.DeleteExistingFormworkSheet(
+                                    doc, out savedSheetName, out savedSheetNumber);
+                                tDeleteSheet.Commit();
+                            }
+                            catch (Exception ex)
+                            {
+                                tDeleteSheet.RollBack();
+                                FormworkDebugLog.Log($"  [Sheet] PreDelete EX: {ex.Message}");
+                            }
+                        }
+
                         using (var tSheet = new Transaction(doc, "型枠数量算出 - シート作成"))
                         {
                             tSheet.Start();
@@ -308,7 +328,8 @@ namespace Tools28.Commands.FormworkCalculator
                                 var allAnalysisViewIds = FormworkSheetCreator.CollectAllAnalysisViewIds(doc);
                                 var allScheduleIds = FormworkSheetCreator.CollectAllPerViewScheduleIds(doc);
                                 sheetId = FormworkSheetCreator.CreateOrUpdateSheet(
-                                    doc, allAnalysisViewIds, allScheduleIds, summaryScheduleId);
+                                    doc, allAnalysisViewIds, allScheduleIds, summaryScheduleId,
+                                    preferredName: savedSheetName, preferredNumber: savedSheetNumber);
                                 tSheet.Commit();
                             }
                             catch (Exception ex)
