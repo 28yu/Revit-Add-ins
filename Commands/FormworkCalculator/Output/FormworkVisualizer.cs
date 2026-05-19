@@ -286,32 +286,6 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 }
             }
 
-            // ワークシェアリング環境では DirectShape 作成前にアクティブワークセットを
-            // 専用ワークセット「28Tools_型枠」に切り替える。
-            // ELEM_PARTITION_PARAM は DirectShape では読み取り専用になるため、
-            // 事前にアクティブワークセットを変更する方式が唯一の確実な方法。
-            WorksetId savedActiveWorksetId = null;
-            WorksetId formworkWorksetId = null;
-            if (doc.IsWorkshared)
-            {
-                try
-                {
-                    formworkWorksetId = GetOrCreateFormworkWorkset(doc);
-                    savedActiveWorksetId = doc.GetWorksetTable().GetActiveWorksetId();
-                    doc.GetWorksetTable().SetActiveWorksetId(formworkWorksetId);
-                    // SetActiveWorksetId 直後に読み返して実際に変わったか確認する
-                    var actualActiveAfter = doc.GetWorksetTable().GetActiveWorksetId();
-                    FormworkDebugLog.Log(
-                        $"  [Visual] アクティブワークセット切替: saved={savedActiveWorksetId.IntegerValue} → formwork={formworkWorksetId.IntegerValue} actual={actualActiveAfter.IntegerValue}");
-                }
-                catch (Exception ex)
-                {
-                    FormworkDebugLog.Log($"  [Visual] アクティブワークセット切替 EX: {ex.Message}");
-                    savedActiveWorksetId = null;
-                    formworkWorksetId = null;
-                }
-            }
-
             foreach (var er in result.ElementResults)
             {
                 if (!facesByElement.TryGetValue(er.ElementId, out var faces))
@@ -574,21 +548,6 @@ namespace Tools28.Commands.FormworkCalculator.Output
             FormworkDebugLog.Log(
                 $"  [Visual] total DirectShapes: {vr.CreatedShapeIds.Count} " +
                 $"(formwork={formworkShapesCount} excluded={excludedShapesCount})");
-
-            // DirectShape 作成完了後にアクティブワークセットを元に戻す
-            if (savedActiveWorksetId != null)
-            {
-                try
-                {
-                    doc.GetWorksetTable().SetActiveWorksetId(savedActiveWorksetId);
-                    FormworkDebugLog.Log(
-                        $"  [Visual] アクティブワークセット復元: {savedActiveWorksetId.IntegerValue}");
-                }
-                catch (Exception ex)
-                {
-                    FormworkDebugLog.Log($"  [Visual] アクティブワークセット復元 EX: {ex.Message}");
-                }
-            }
 
             // ワークセット可視性コピー後に型枠 DirectShape のワークセットを強制表示する。
             // ソースビューがホストのワークセットを非表示にしている場合、CopyWorksetVisibility で

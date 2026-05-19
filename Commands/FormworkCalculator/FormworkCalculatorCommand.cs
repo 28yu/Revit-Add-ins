@@ -201,6 +201,52 @@ namespace Tools28.Commands.FormworkCalculator
                         }
                     }
 
+                    // DirectShape を専用ワークセット「28Tools_型枠」に割り当てるための事前設定。
+                    // 手順：① 別トランザクションでワークセットを作成してコミット（確定）
+                    //       ② トランザクション外で SetActiveWorksetId を呼び出す
+                    //       ③ その後のトランザクション内で DirectShape を作成 → 確定済みWSに割当
+                    // SetActiveWorksetId をトランザクション内で呼ぶと、同 TX 内で作成した
+                    // 「未確定」ワークセットは DirectShape の割当に反映されないことがある。
+                    WorksetId savedActiveWsId = null;
+                    if (doc.IsWorkshared && settings.Create3DView)
+                    {
+                        WorksetId formworkWsId = null;
+                        using (var tWs = new Transaction(doc, "型枠数量算出 - ワークセット作成"))
+                        {
+                            tWs.Start();
+                            try
+                            {
+                                formworkWsId = FormworkVisualizer.GetOrCreateFormworkWorkset(doc);
+                                tWs.Commit();
+                                FormworkDebugLog.Log(
+                                    $"  [CMD] 専用ワークセット確定: id={formworkWsId?.IntegerValue}");
+                            }
+                            catch (Exception ex)
+                            {
+                                tWs.RollBack();
+                                FormworkDebugLog.Log($"  [CMD] ワークセット作成TX EX: {ex.Message}");
+                            }
+                        }
+
+                        if (formworkWsId != null)
+                        {
+                            try
+                            {
+                                savedActiveWsId = doc.GetWorksetTable().GetActiveWorksetId();
+                                doc.GetWorksetTable().SetActiveWorksetId(formworkWsId);
+                                var actual = doc.GetWorksetTable().GetActiveWorksetId();
+                                FormworkDebugLog.Log(
+                                    $"  [CMD] アクティブWS切替(TX外): saved={savedActiveWsId.IntegerValue}" +
+                                    $" → formwork={formworkWsId.IntegerValue} actual={actual.IntegerValue}");
+                            }
+                            catch (Exception ex)
+                            {
+                                FormworkDebugLog.Log($"  [CMD] アクティブWS切替 EX: {ex.Message}");
+                                savedActiveWsId = null;
+                            }
+                        }
+                    }
+
                     using (var t = new Transaction(doc, "型枠数量算出 - ビュー作成"))
                     {
                         t.Start();
@@ -267,6 +313,21 @@ namespace Tools28.Commands.FormworkCalculator
                             t.RollBack();
                             TaskDialog.Show(Loc.S("Common.Error"),
                                 string.Format(Loc.S("Formwork.ViewFailed"), ex.Message));
+                        }
+                    }
+
+                    // DirectShape 作成後にアクティブワークセットを復元する
+                    if (savedActiveWsId != null)
+                    {
+                        try
+                        {
+                            doc.GetWorksetTable().SetActiveWorksetId(savedActiveWsId);
+                            FormworkDebugLog.Log(
+                                $"  [CMD] アクティブWS復元: {savedActiveWsId.IntegerValue}");
+                        }
+                        catch (Exception ex)
+                        {
+                            FormworkDebugLog.Log($"  [CMD] アクティブWS復元 EX: {ex.Message}");
                         }
                     }
 
