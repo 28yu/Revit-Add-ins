@@ -1225,7 +1225,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
         /// <summary>
         /// 専用ワークセット「28Tools_型枠」を検索または作成してIDを返す。
         /// </summary>
-        private static WorksetId GetOrCreateFormworkWorkset(Document doc)
+        internal static WorksetId GetOrCreateFormworkWorkset(Document doc)
         {
             const string wsName = "28Tools_型枠";
             var allWs = new FilteredWorksetCollector(doc).OfKind(WorksetKind.UserWorkset);
