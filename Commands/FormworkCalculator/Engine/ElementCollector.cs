@@ -224,10 +224,10 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                                 new FilteredElementCollector(linkDoc, linkedViewId)
                                     .WhereElementIsNotElementType()
                                     .ToElementIds()
-                                    .Select(eid => eid.IntegerValue));
+                                    .Select(eid => eid.IntValue()));
                             int beforeLV = linkedElems.Count;
                             linkedElems = linkedElems
-                                .Where(e => lvVisible.Contains(e.Id.IntegerValue))
+                                .Where(e => lvVisible.Contains(e.Id.IntValue()))
                                 .ToList();
                             int hiddenLV = beforeLV - linkedElems.Count;
                             FormworkDebugLog.Log(
@@ -386,7 +386,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                     if (prop == null) continue;
                     lvId = prop.GetValue(settings) as ElementId;
                     FormworkDebugLog.Log(
-                        $"  [VisFilter] {sourceName}: {propName}={lvId?.IntegerValue.ToString() ?? "null"}");
+                        $"  [VisFilter] {sourceName}: {propName}={lvId?.IntValue().ToString() ?? "null"}");
                     break;
                 }
 
@@ -397,15 +397,15 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 }
 
                 // InvalidElementId (-1) または負値 → ByLinkedView 未設定
-                if (lvId.IntegerValue < 0)
+                if (lvId.IntValue() < 0)
                 {
                     FormworkDebugLog.Log(
-                        $"  [VisFilter] {sourceName}: LinkedViewId 無効値 ({lvId.IntegerValue}) → ByLinkedView未設定");
+                        $"  [VisFilter] {sourceName}: LinkedViewId 無効値 ({lvId.IntValue()}) → ByLinkedView未設定");
                     return null;
                 }
 
                 FormworkDebugLog.Log(
-                    $"  [VisFilter] {sourceName}: ByLinkedView 確認 LinkedViewId={lvId.IntegerValue}");
+                    $"  [VisFilter] {sourceName}: ByLinkedView 確認 LinkedViewId={lvId.IntValue()}");
                 return lvId;
             }
             catch (Exception ex)

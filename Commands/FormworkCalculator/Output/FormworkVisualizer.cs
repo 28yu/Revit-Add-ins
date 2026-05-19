@@ -298,7 +298,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     visibleInSourceIds = new FilteredElementCollector(doc, sourceView.Id)
                         .WhereElementIsNotElementType()
                         .ToElementIds()
-                        .Select(eid => eid.IntegerValue)
+                        .Select(eid => eid.IntValue())
                         .ToHashSet();
                     FormworkDebugLog.Log(
                         $"  [Visual] visibleInSourceIds: {visibleInSourceIds.Count} (scope={settings.Scope})");
