@@ -215,9 +215,9 @@ namespace Tools28.Commands.FormworkCalculator.Output
                      settings.Scope == CalculationScope.SelectedViews);
                 if (useSourceSectionBox)
                 {
-                    // ソース切断ボックスが非アクティブだった場合は EnableSectionBox にフォールバックする。
-                    bool sbCopied = CopySectionBoxFromSource((View3D)sourceView, view);
-                    if (!sbCopied) EnableSectionBox(doc, view, result);
+                    // ソースの切断ボックス状態をそのまま踏襲する。
+                    // アクティブならコピー、非アクティブならビューも切断ボックスなしにする。
+                    CopySectionBoxFromSource((View3D)sourceView, view);
                 }
                 else
                     EnableSectionBox(doc, view, result);
@@ -1002,7 +1002,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
         /// CurrentView スコープでソースが 3D ビューのとき、ソースの切断ボックス位置と
         /// 有効状態をコピーする。切断ボックスが正常にコピーされた場合は true を返す。
         /// ソースの切断ボックスが非アクティブな場合は false を返し、
-        /// 呼び出し側で EnableSectionBox にフォールバックする。
+        /// false を返した場合、切断ボックスなし状態のままにする（ソース非アクティブを尊重）。
         /// </summary>
         private static bool CopySectionBoxFromSource(View3D source, View3D target)
         {
@@ -1013,7 +1013,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     $"  [Visual] CopySectionBoxFromSource: source='{source?.Name}' IsSectionBoxActive={srcActive}");
                 if (!srcActive)
                 {
-                    FormworkDebugLog.Log("  [Visual] CopySectionBoxFromSource: ソース非アクティブ → EnableSectionBox にフォールバック");
+                    FormworkDebugLog.Log("  [Visual] CopySectionBoxFromSource: ソース非アクティブ → 解析ビューも切断ボックスなし");
                     return false;
                 }
                 var sb = source.GetSectionBox();
@@ -1176,31 +1176,52 @@ namespace Tools28.Commands.FormworkCalculator.Output
         /// <summary>
         /// 型枠 DirectShape が属するワークセットをビューで強制的に表示状態にする。
         /// CopyWorksetVisibility でソースビューのワークセット非表示設定が引き継がれた場合に
-        /// DirectShape 自身が属するワークセットだけ例外的に表示させる。
+        /// DirectShape を専用ワークセット「28Tools_型枠」に移動し、そこだけ表示させる。
+        /// これにより他のホスト要素が意図せず表示されることを防ぐ。
         /// </summary>
         private static void EnsureFormworkWorksetsVisible(
             Document doc, View3D view, IList<ElementId> shapeIds)
         {
             if (shapeIds == null || shapeIds.Count == 0) return;
+            const string wsName = "28Tools_型枠";
             try
             {
-                var wsIds = new HashSet<WorksetId>();
+                // 専用ワークセットを検索または作成
+                WorksetId formworkWsId = null;
+                var allWs = new FilteredWorksetCollector(doc).OfKind(WorksetKind.UserWorkset);
+                var existing = allWs.FirstOrDefault(ws => ws.Name == wsName);
+                if (existing != null)
+                {
+                    formworkWsId = existing.Id;
+                }
+                else
+                {
+                    var newWs = Workset.Create(doc, wsName);
+                    formworkWsId = newWs.Id;
+                }
+
+                // 全 DirectShape を専用ワークセットに移動
+                int moved = 0;
                 foreach (var id in shapeIds)
                 {
                     try
                     {
                         var elem = doc.GetElement(id);
-                        if (elem != null) wsIds.Add(elem.WorksetId);
+                        if (elem == null) continue;
+                        var wsParam = elem.get_Parameter(BuiltInParameter.ELEM_PARTITION_PARAM);
+                        if (wsParam != null && !wsParam.IsReadOnly)
+                        {
+                            wsParam.Set(formworkWsId.IntegerValue);
+                            moved++;
+                        }
                     }
                     catch { }
                 }
-                foreach (var wsId in wsIds)
-                {
-                    try { view.SetWorksetVisibility(wsId, WorksetVisibility.Visible); }
-                    catch { }
-                }
+
+                // 専用ワークセットだけを解析ビューで強制表示
+                view.SetWorksetVisibility(formworkWsId, WorksetVisibility.Visible);
                 FormworkDebugLog.Log(
-                    $"  [Visual] EnsureFormworkWorksetsVisible: worksets={string.Join(",", wsIds.Select(w => w.IntegerValue))}");
+                    $"  [Visual] EnsureFormworkWorksetsVisible: wsId={formworkWsId.IntegerValue} wsName={wsName} moved={moved}/{shapeIds.Count}");
             }
             catch (Exception ex)
             {
