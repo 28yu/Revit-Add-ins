@@ -1,4 +1,4 @@
-==== Formwork Debug Log Start [2026-05-19 15:14:33] ====
+==== Formwork Debug Log Start [2026-05-19 16:09:09] ====
 [Engine] Run() 開始 Scope=CurrentView IncludeLinks=True EnableDebugLog=True
 [Engine] 切断ボックスSolid: なし (Scope=CurrentView / SectionBox未設定またはCurrentView以外)
 [Engine] CollectAndClassify 開始
@@ -19792,7 +19792,7 @@ Boolean diff fallback OK: E4924354 face area=49.6918 clipperReason=not-rectangul
   [Filter] '型枠_その他' rule=区分=='その他' color=(180,180,180) visible=True
   [Filter] '型枠_除外' rule=区分=='除外' color=(255,145,30) visible=False
   [Filter] applied 9 filters to view '3D_型枠数量 - **型枠：工作物擁壁'
-  [Visual] copied 1/1 filters from source view (visibility preserved)
+  [Visual] copied 1/1 filters from source view (forcedVisible=1 for GenericModel-matching filters)
 
 ---- Schedule Creation: 型枠数量集計 - **型枠：工作物擁壁 ----
   [Sched:after-create] IsItemized=True ShowGrandTotal=False fields=0 sortGroups=0
@@ -19854,6 +19854,13 @@ Parameter name: elementIdSet' failedView='プロジェクト ビュー'
   [Sheet] FindNoTitleViewportType → id=897434 reason='SHOW_LABEL=0: '非表示''
   [Sheet] SHOW_LABEL on existing: exists=True isReadOnly=False value=0
   [Sheet] ChangeTypeId OK → no-title id=897434
-  [Sheet] Viewport.Create returned null (grid 1): viewId=6246900
+  [Sheet] viewport types found (OfClass): 4
+  [Sheet]   type id=354 name='タイトル&尺度' SHOW_LABEL=1
+  [Sheet]   type id=897434 name='非表示' SHOW_LABEL=0
+  [Sheet]   type id=2670183 name='タイトル&尺度&アンダーライン' SHOW_LABEL=1
+  [Sheet]   type id=6214232 name='Viewport_NoTitle_28Tools' SHOW_LABEL=0
+  [Sheet] FindNoTitleViewportType → id=897434 reason='SHOW_LABEL=0: '非表示''
+  [Sheet] SHOW_LABEL on existing: exists=True isReadOnly=False value=0
+  [Sheet] ChangeTypeId OK → no-title id=897434
   [Sheet] created: '型枠-001 - 型枠数量集計' views=2 schedules=3
-==== End [2026-05-19 15:17:16] total lines: 19855 ====
+==== End [2026-05-19 16:13:32] total lines: 19862 ====
