@@ -299,8 +299,10 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     formworkWorksetId = GetOrCreateFormworkWorkset(doc);
                     savedActiveWorksetId = doc.GetWorksetTable().GetActiveWorksetId();
                     doc.GetWorksetTable().SetActiveWorksetId(formworkWorksetId);
+                    // SetActiveWorksetId 直後に読み返して実際に変わったか確認する
+                    var actualActiveAfter = doc.GetWorksetTable().GetActiveWorksetId();
                     FormworkDebugLog.Log(
-                        $"  [Visual] アクティブワークセット切替: saved={savedActiveWorksetId.IntegerValue} → formwork={formworkWorksetId.IntegerValue}");
+                        $"  [Visual] アクティブワークセット切替: saved={savedActiveWorksetId.IntegerValue} → formwork={formworkWorksetId.IntegerValue} actual={actualActiveAfter.IntegerValue}");
                 }
                 catch (Exception ex)
                 {
@@ -633,6 +635,28 @@ namespace Tools28.Commands.FormworkCalculator.Output
         {
             try
             {
+                // 最初の3個のDirectShapeのワークセットIDを確認（SetActiveWorksetId有効性診断）
+                int wsCheckCount = 0;
+                foreach (var id in shapeIds)
+                {
+                    if (wsCheckCount >= 3) break;
+                    var elem = doc.GetElement(id);
+                    if (elem == null) continue;
+                    try
+                    {
+                        var wsParam = elem.get_Parameter(BuiltInParameter.ELEM_PARTITION_PARAM);
+                        int wsId = wsParam != null ? wsParam.AsInteger() : -1;
+                        bool isRO = wsParam?.IsReadOnly ?? true;
+                        FormworkDebugLog.Log(
+                            $"  [Visual:WsDiag] DS id={id.IntValue()} wsId={wsId} paramIsReadOnly={isRO}");
+                    }
+                    catch (Exception ex)
+                    {
+                        FormworkDebugLog.Log($"  [Visual:WsDiag] DS id={id.IntValue()} EX={ex.Message}");
+                    }
+                    wsCheckCount++;
+                }
+
                 var byKey = new Dictionary<string, int>();
                 var sampledKeys = new HashSet<string>();
                 foreach (var id in shapeIds)
@@ -1228,8 +1252,10 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 var wsId = GetOrCreateFormworkWorkset(doc);
                 if (wsId == null) return;
                 view.SetWorksetVisibility(wsId, WorksetVisibility.Visible);
+                // 設定が実際に反映されたか確認
+                var actualVis = view.GetWorksetVisibility(wsId);
                 FormworkDebugLog.Log(
-                    $"  [Visual] EnsureFormworkWorksetsVisible: wsId={wsId.IntegerValue} shapeCount={shapeIds.Count}");
+                    $"  [Visual] EnsureFormworkWorksetsVisible: wsId={wsId.IntegerValue} shapeCount={shapeIds.Count} setVis=Visible actualVis={actualVis}");
             }
             catch (Exception ex)
             {
