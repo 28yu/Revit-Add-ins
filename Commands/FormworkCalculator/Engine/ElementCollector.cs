@@ -212,45 +212,33 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                     // フィルタ・要素個別非表示) に従って表示される。エンジンは従来これを考慮しておらず、
                     // 全リンク要素を対象としていたが、ソースビューが特定エリアを切り出しているケースに
                     // 対応するため、リンクビューでの可視要素のみを残す。
+                    //
+                    // Revit バージョンによって API 名・プロパティ名が異なる可能性があるため
+                    // リフレクションで安全に呼び出す。失敗時は従来動作 (絞り込みなし) にフォールバック。
                     try
                     {
-                        var linkOv = activeView.GetLinkOverrides(rli.Id);
-                        if (linkOv != null &&
-                            linkOv.LinkVisibilityType == LinkVisibility.ByLinkedView)
+                        ElementId linkedViewId = TryGetByLinkedViewId(activeView, rli.Id, sourceName);
+                        if (linkedViewId != null && linkedViewId != ElementId.InvalidElementId)
                         {
-                            var lvId = linkOv.LinkedViewId;
-                            if (lvId != null && lvId != ElementId.InvalidElementId)
-                            {
-                                var lvVisible = new HashSet<int>(
-                                    new FilteredElementCollector(linkDoc, lvId)
-                                        .WhereElementIsNotElementType()
-                                        .ToElementIds()
-                                        .Select(eid => eid.IntegerValue));
-                                int beforeLV = linkedElems.Count;
-                                linkedElems = linkedElems
-                                    .Where(e => lvVisible.Contains(e.Id.IntegerValue))
-                                    .ToList();
-                                int hiddenLV = beforeLV - linkedElems.Count;
-                                FormworkDebugLog.Log(
-                                    $"  [VisFilter] {sourceName}: リンクビュー({lvId.IntValue()})フィルタ除外 " +
-                                    $"{hiddenLV}/{beforeLV} (ByLinkedView mode)");
-                            }
-                            else
-                            {
-                                FormworkDebugLog.Log(
-                                    $"  [VisFilter] {sourceName}: ByLinkedView だが LinkedViewId 未設定");
-                            }
-                        }
-                        else if (linkOv != null && FormworkDebugLog.Enabled)
-                        {
+                            var lvVisible = new HashSet<int>(
+                                new FilteredElementCollector(linkDoc, linkedViewId)
+                                    .WhereElementIsNotElementType()
+                                    .ToElementIds()
+                                    .Select(eid => eid.IntegerValue));
+                            int beforeLV = linkedElems.Count;
+                            linkedElems = linkedElems
+                                .Where(e => lvVisible.Contains(e.Id.IntegerValue))
+                                .ToList();
+                            int hiddenLV = beforeLV - linkedElems.Count;
                             FormworkDebugLog.Log(
-                                $"  [VisFilter] {sourceName}: LinkVisibilityType={linkOv.LinkVisibilityType} (ByLinkedView 以外、絞り込みなし)");
+                                $"  [VisFilter] {sourceName}: リンクビュー({linkedViewId.IntValue()})フィルタ除外 " +
+                                $"{hiddenLV}/{beforeLV} (ByLinkedView mode)");
                         }
                     }
                     catch (Exception exLv)
                     {
                         FormworkDebugLog.Log(
-                            $"  [VisFilter] {sourceName}: GetLinkOverrides EX: {exLv.Message}");
+                            $"  [VisFilter] {sourceName}: ByLinkedView 判定 EX: {exLv.Message}");
                     }
 
                     // (A) グローバルカテゴリ非表示: V/G → モデルカテゴリ タブ
@@ -343,6 +331,78 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         ///     ホスト側を非表示にするとリンク要素まで除外される誤動作が発生する。
         /// このためリンクモデルの可視性はリンク文書自身の既定値のみで判断する。
         /// </summary>
+        /// <summary>
+        /// ホストビュー (activeView) のリンクインスタンス (linkInstanceId) について、
+        /// 表示モードが「リンクされたビューで設定」の場合に割当られたリンクビューの
+        /// ElementId を返す。それ以外のモード、API 非対応、エラー時は null を返す。
+        ///
+        /// Revit バージョン間で API 名・プロパティ名が異なる可能性があるため
+        /// リフレクションで動的に呼び出す。
+        ///
+        /// 想定 API:
+        ///   View.GetLinkOverrides(ElementId) → RevitLinkGraphicsSettings
+        ///   RevitLinkGraphicsSettings.LinkVisibilityType (or LinkVisibility) → enum (ByLinkedView=1 想定)
+        ///   RevitLinkGraphicsSettings.LinkedViewId → ElementId
+        /// </summary>
+        private static ElementId TryGetByLinkedViewId(View activeView, ElementId linkInstanceId, string sourceName)
+        {
+            try
+            {
+                var viewType = activeView.GetType();
+                var getOverridesMethod = viewType.GetMethod(
+                    "GetLinkOverrides",
+                    new[] { typeof(ElementId) });
+                if (getOverridesMethod == null)
+                {
+                    if (FormworkDebugLog.Enabled)
+                        FormworkDebugLog.Log(
+                            $"  [VisFilter] {sourceName}: View.GetLinkOverrides(ElementId) API なし");
+                    return null;
+                }
+
+                object settings = getOverridesMethod.Invoke(activeView, new object[] { linkInstanceId });
+                if (settings == null)
+                {
+                    if (FormworkDebugLog.Enabled)
+                        FormworkDebugLog.Log(
+                            $"  [VisFilter] {sourceName}: GetLinkOverrides returned null (上書きなし)");
+                    return null;
+                }
+
+                var settingsType = settings.GetType();
+                // LinkVisibilityType または LinkVisibility プロパティを探す
+                var visProp = settingsType.GetProperty("LinkVisibilityType")
+                              ?? settingsType.GetProperty("LinkVisibility");
+                var lvIdProp = settingsType.GetProperty("LinkedViewId");
+
+                if (visProp == null || lvIdProp == null)
+                {
+                    FormworkDebugLog.Log(
+                        $"  [VisFilter] {sourceName}: RevitLinkGraphicsSettings プロパティ未取得 " +
+                        $"(visProp={(visProp != null)} lvIdProp={(lvIdProp != null)})");
+                    return null;
+                }
+
+                object visValue = visProp.GetValue(settings);
+                string visName = visValue?.ToString() ?? "null";
+                FormworkDebugLog.Log(
+                    $"  [VisFilter] {sourceName}: LinkVisibility={visName}");
+
+                // enum 値の名前で ByLinkedView を判定 (Revit バージョン依存を回避)
+                if (!string.Equals(visName, "ByLinkedView", StringComparison.OrdinalIgnoreCase))
+                    return null;
+
+                var lvId = lvIdProp.GetValue(settings) as ElementId;
+                return lvId;
+            }
+            catch (Exception ex)
+            {
+                FormworkDebugLog.Log(
+                    $"  [VisFilter] {sourceName}: TryGetByLinkedViewId EX: {ex.Message}");
+                return null;
+            }
+        }
+
         private static HashSet<int> BuildHiddenWorksetIds(Document linkDoc, View hostView, string sourceName)
         {
             var hidden = new HashSet<int>();
