@@ -420,17 +420,57 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             try
             {
                 var viewType = activeView.GetType();
-                var getOverridesMethod = viewType.GetMethod(
-                    "GetLinkOverrides",
-                    new[] { typeof(ElementId) });
+
+                // 動的探索: View / View3D に存在する "Link" 関連メソッドを全て列挙
+                // バージョン間で API 名が異なるため、最初のリンクで一度だけ全列挙してログに残す
+                if (FormworkDebugLog.Enabled)
+                {
+                    try
+                    {
+                        var linkMethods = viewType.GetMethods(System.Reflection.BindingFlags.Public |
+                                                              System.Reflection.BindingFlags.NonPublic |
+                                                              System.Reflection.BindingFlags.Instance |
+                                                              System.Reflection.BindingFlags.FlattenHierarchy)
+                            .Where(m => m.Name.IndexOf("Link", StringComparison.OrdinalIgnoreCase) >= 0)
+                            .Select(m => $"{m.Name}({string.Join(",", m.GetParameters().Select(p => p.ParameterType.Name))})")
+                            .Distinct()
+                            .Take(30);
+                        FormworkDebugLog.Log($"  [VisFilter] {sourceName}: View link methods=[{string.Join(" | ", linkMethods)}]");
+                    }
+                    catch { }
+                }
+
+                // GetLinkOverrides を引数型に依存せず動的に取得
+                var getOverridesMethod = viewType.GetMethods()
+                    .FirstOrDefault(m => m.Name == "GetLinkOverrides" && m.GetParameters().Length == 1);
                 if (getOverridesMethod == null)
                 {
                     FormworkDebugLog.Log(
-                        $"  [VisFilter] {sourceName}: View.GetLinkOverrides(ElementId) API なし");
+                        $"  [VisFilter] {sourceName}: View.GetLinkOverrides(*) API なし");
                     return null;
                 }
+                FormworkDebugLog.Log(
+                    $"  [VisFilter] {sourceName}: GetLinkOverrides paramType={getOverridesMethod.GetParameters()[0].ParameterType.FullName}");
 
-                object settings = getOverridesMethod.Invoke(activeView, new object[] { linkInstanceId });
+                // 引数型に応じて変換 (LinkElementId vs ElementId)
+                var paramType = getOverridesMethod.GetParameters()[0].ParameterType;
+                object arg;
+                if (paramType == typeof(ElementId))
+                {
+                    arg = linkInstanceId;
+                }
+                else
+                {
+                    try { arg = Activator.CreateInstance(paramType, linkInstanceId); }
+                    catch (Exception exCtor)
+                    {
+                        FormworkDebugLog.Log(
+                            $"  [VisFilter] {sourceName}: {paramType.Name} ctor 失敗: {exCtor.Message}");
+                        return null;
+                    }
+                }
+
+                object settings = getOverridesMethod.Invoke(activeView, new object[] { arg });
                 if (settings == null)
                 {
                     FormworkDebugLog.Log(
