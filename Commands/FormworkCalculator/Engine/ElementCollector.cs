@@ -62,11 +62,55 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             // 2) リンクモデルの要素を収集して登録
             if (settings != null && settings.IncludeLinkedModels)
             {
-                CollectFromLinkedModels(doc, settings, activeView, cr);
+                // ホスト要素の集合 BoundingBox を計算して渡す。
+                // Revit 2021 では ByLinkedView 取得が不可で切断ボックスもない場合に、
+                // このホスト BB をリンク要素の空間フィルタとして使う (Fallback)。
+                Outline hostBbOutline = BuildHostBbOutline(hostRaw);
+                CollectFromLinkedModels(doc, settings, activeView, cr, hostBbOutline);
             }
 
             ClassifyAndFilter(doc, cr, settings);
             return cr;
+        }
+
+        /// <summary>
+        /// ホスト要素リストの集合 BoundingBox を Outline で返す。
+        /// 有効な BB を持つ要素が 1 つもなければ null を返す。
+        /// </summary>
+        private static Outline BuildHostBbOutline(IEnumerable<Element> hostElems)
+        {
+            double minX = double.MaxValue, minY = double.MaxValue, minZ = double.MaxValue;
+            double maxX = double.MinValue, maxY = double.MinValue, maxZ = double.MinValue;
+            bool any = false;
+            foreach (var e in hostElems)
+            {
+                try
+                {
+                    var bb = e.get_BoundingBox(null);
+                    if (bb == null) continue;
+                    var min = bb.Transform != null && !bb.Transform.IsIdentity
+                        ? bb.Transform.OfPoint(bb.Min)
+                        : bb.Min;
+                    var max = bb.Transform != null && !bb.Transform.IsIdentity
+                        ? bb.Transform.OfPoint(bb.Max)
+                        : bb.Max;
+                    // 変換後 min/max を軸並列 BB に再計算
+                    double x0 = Math.Min(min.X, max.X), x1 = Math.Max(min.X, max.X);
+                    double y0 = Math.Min(min.Y, max.Y), y1 = Math.Max(min.Y, max.Y);
+                    double z0 = Math.Min(min.Z, max.Z), z1 = Math.Max(min.Z, max.Z);
+                    if (x0 < minX) minX = x0; if (x1 > maxX) maxX = x1;
+                    if (y0 < minY) minY = y0; if (y1 > maxY) maxY = y1;
+                    if (z0 < minZ) minZ = z0; if (z1 > maxZ) maxZ = z1;
+                    any = true;
+                }
+                catch { }
+            }
+            if (!any) return null;
+            // 余裕: 水平 3ft (≈0.9m)、垂直 10ft (≈3m) を付加
+            const double hBuf = 3.0, vBuf = 10.0;
+            return new Outline(
+                new XYZ(minX - hBuf, minY - hBuf, minZ - vBuf),
+                new XYZ(maxX + hBuf, maxY + hBuf, maxZ + vBuf));
         }
 
         /// <summary>
@@ -81,7 +125,8 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         ///   リンクモデル座標系に逆変換した BoundingBoxIntersectsFilter で要素数を絞り込む。
         /// </summary>
         private static void CollectFromLinkedModels(
-            Document hostDoc, FormworkSettings settings, View activeView, CollectionResult cr)
+            Document hostDoc, FormworkSettings settings, View activeView, CollectionResult cr,
+            Outline hostBbOutline = null)
         {
             var linkInstances = new FilteredElementCollector(hostDoc)
                 .OfClass(typeof(RevitLinkInstance))
@@ -365,6 +410,64 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                             FormworkDebugLog.Log(
                                 $"  [VisFilter] {sourceName}: リンクビューフィルタ除外 " +
                                 $"{hiddenLV}/{beforeLV} (ByLinkedView mode)");
+                        }
+                        else if (hostBbOutline != null)
+                        {
+                            // (Z-Fallback) ByLinkedView が使えず切断ボックスもない場合
+                            // (Revit 2021 等)、ホスト要素の集合BoundingBoxを空間フィルタとして使う。
+                            // リンク要素のBBをホスト座標系で評価し、ホストBB外の要素を除外する。
+                            // これによりカメラに映っていない遠方のスラブ等を除去できる。
+                            int beforeBB = linkedElems.Count;
+                            var invTransform = transform.IsIdentity
+                                ? transform
+                                : transform.Inverse;
+                            linkedElems = linkedElems.Where(e =>
+                            {
+                                try
+                                {
+                                    var bb = e.get_BoundingBox(null);
+                                    if (bb == null) return true;
+                                    // リンクBBの8頂点をホスト座標系に変換し、いずれかがホストBB内なら残す
+                                    var lMin = bb.Min; var lMax = bb.Max;
+                                    XYZ[] corners = new[]
+                                    {
+                                        new XYZ(lMin.X, lMin.Y, lMin.Z),
+                                        new XYZ(lMax.X, lMin.Y, lMin.Z),
+                                        new XYZ(lMin.X, lMax.Y, lMin.Z),
+                                        new XYZ(lMax.X, lMax.Y, lMin.Z),
+                                        new XYZ(lMin.X, lMin.Y, lMax.Z),
+                                        new XYZ(lMax.X, lMin.Y, lMax.Z),
+                                        new XYZ(lMin.X, lMax.Y, lMax.Z),
+                                        new XYZ(lMax.X, lMax.Y, lMax.Z),
+                                    };
+                                    // 変換後のBBを計算してホストBBと重複判定
+                                    double x0 = double.MaxValue, y0 = double.MaxValue, z0 = double.MaxValue;
+                                    double x1 = double.MinValue, y1 = double.MinValue, z1 = double.MinValue;
+                                    foreach (var c in corners)
+                                    {
+                                        var hc = transform.OfPoint(c);
+                                        if (hc.X < x0) x0 = hc.X; if (hc.X > x1) x1 = hc.X;
+                                        if (hc.Y < y0) y0 = hc.Y; if (hc.Y > y1) y1 = hc.Y;
+                                        if (hc.Z < z0) z0 = hc.Z; if (hc.Z > z1) z1 = hc.Z;
+                                    }
+                                    var hMin = hostBbOutline.MinimumPoint;
+                                    var hMax = hostBbOutline.MaximumPoint;
+                                    // 軸並列 BB 重複判定 (Separating Axis Theorem 1D × 3)
+                                    return !(x1 < hMin.X || x0 > hMax.X
+                                          || y1 < hMin.Y || y0 > hMax.Y
+                                          || z1 < hMin.Z || z0 > hMax.Z);
+                                }
+                                catch { return true; }
+                            }).ToList();
+                            int hiddenBB = beforeBB - linkedElems.Count;
+                            FormworkDebugLog.Log(
+                                $"  [VisFilter] {sourceName}: HostBB空間フィルタ(Z-Fallback) 除外 " +
+                                $"{hiddenBB}/{beforeBB} (ByLinkedView不可時のフォールバック)");
+                        }
+                        else
+                        {
+                            FormworkDebugLog.Log(
+                                $"  [VisFilter] {sourceName}: Z-Fallback スキップ (hostBbOutline=null)");
                         }
                     }
                     catch (Exception exLv)
@@ -1056,6 +1159,60 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 if (hidden > 0 && FormworkDebugLog.Enabled)
                     FormworkDebugLog.Log(
                         $"  [HostCollect] 個別非表示要素を除外: {hidden} 要素 (view='{activeView.Name}')");
+
+                // ビューフィルタルールの明示チェック。
+                // Revit 2021 では FilteredElementCollector(doc, viewId) がビューフィルタルール
+                // (ParameterFilterElement) を必ずしも適用しないため、ここで補完する。
+                // リンク要素の C2 ブロックと同等ロジック。
+                try
+                {
+                    var hostFilterIds = activeView.GetFilters();
+                    if (hostFilterIds != null && hostFilterIds.Count > 0)
+                    {
+                        int totalHiddenByFilter = 0;
+                        foreach (var fid in hostFilterIds)
+                        {
+                            bool filterVisible = true;
+                            try { filterVisible = activeView.GetFilterVisibility(fid); } catch { }
+                            if (filterVisible) continue;
+
+                            var pfe = doc.GetElement(fid) as ParameterFilterElement;
+                            if (pfe == null) continue;
+
+                            ICollection<ElementId> filterCats = null;
+                            ElementFilter elementFilter = null;
+                            try
+                            {
+                                filterCats = pfe.GetCategories();
+                                elementFilter = pfe.GetElementFilter();
+                            }
+                            catch { continue; }
+                            if (elementFilter == null || filterCats == null) continue;
+
+                            var filterCatSet = new HashSet<int>(filterCats.Select(c => c.IntValue()));
+                            int beforeFilter = result.Count;
+                            result = result.Where(e =>
+                            {
+                                if (e?.Category == null) return true;
+                                if (!filterCatSet.Contains(e.Category.Id.IntValue())) return true;
+                                try { return !elementFilter.PassesFilter(doc, e.Id); }
+                                catch { return true; }
+                            }).ToList();
+                            int hiddenByFilter = beforeFilter - result.Count;
+                            totalHiddenByFilter += hiddenByFilter;
+                            if (hiddenByFilter > 0 && FormworkDebugLog.Enabled)
+                                FormworkDebugLog.Log(
+                                    $"  [HostCollect] ビューフィルタ'{pfe.Name}' 除外: {hiddenByFilter}/{beforeFilter}");
+                        }
+                        if (totalHiddenByFilter > 0)
+                            FormworkDebugLog.Log(
+                                $"  [HostCollect] ビューフィルタ合計除外: {totalHiddenByFilter} 要素");
+                    }
+                }
+                catch (Exception exFil)
+                {
+                    FormworkDebugLog.Log($"  [HostCollect] ビューフィルタチェックEX: {exFil.Message}");
+                }
             }
             return result;
         }
