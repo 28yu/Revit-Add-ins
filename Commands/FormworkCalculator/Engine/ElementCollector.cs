@@ -53,138 +53,23 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             var cr = new CollectionResult();
 
             // 1) ホストドキュメントの要素を収集して登録
+            // ソースビューでの可視性 (カテゴリ・ワークセット・ビューフィルタ・個別非表示) に従う。
             var hostRaw = CollectFromDoc(doc, settings, activeView, isLinked: false);
-
-            // 1b) 壁BB空間ヒューリスティック:
-            //   切断ボックス無しで「カメラ枠外の遠方要素」を除外するためのフォールバック。
-            //   ソースビューに可視な壁要素の集合BoundingBoxを計算し、壁ではない要素
-            //   (スラブ・床・梁・柱・基礎・階段・屋根) のうち、このBBと交差しないものを除外する。
-            //   - 壁が存在しないビュー、または EntireProject スコープでは無効化される。
-            //   - リンク要素にも同じBBを渡して下流で適用する。
-            Outline wallBbOutline = null;
-            bool useWallBb = settings != null
-                && (settings.Scope == CalculationScope.CurrentView
-                    || settings.Scope == CalculationScope.SelectedViews);
-            if (useWallBb)
-            {
-                wallBbOutline = BuildWallBbOutline(hostRaw);
-                if (wallBbOutline != null)
-                {
-                    int beforeHost = hostRaw.Count;
-                    hostRaw = FilterByWallBb(hostRaw, wallBbOutline, isLinked: false);
-                    int afterHost = hostRaw.Count;
-                    if (beforeHost != afterHost)
-                        FormworkDebugLog.Log(
-                            $"  [WallBB] ホスト非壁要素を空間フィルタで除外: {beforeHost - afterHost}/{beforeHost} " +
-                            $"(min=({wallBbOutline.MinimumPoint.X:F1},{wallBbOutline.MinimumPoint.Y:F1},{wallBbOutline.MinimumPoint.Z:F1}) " +
-                            $"max=({wallBbOutline.MaximumPoint.X:F1},{wallBbOutline.MaximumPoint.Y:F1},{wallBbOutline.MaximumPoint.Z:F1}))");
-                    else
-                        FormworkDebugLog.Log($"  [WallBB] ホスト非壁要素を空間フィルタで除外: 0/{beforeHost}");
-                }
-                else
-                {
-                    FormworkDebugLog.Log("  [WallBB] ソースビューに壁要素なし → 空間フィルタ無効");
-                }
-            }
-
             foreach (var elem in hostRaw)
             {
                 cr.Registry.RegisterHost(elem, doc);
             }
 
             // 2) リンクモデルの要素を収集して登録
+            // 各リンクインスタンスのワークセット可視性、リンク要素のカテゴリ/ワークセット/
+            // ビューフィルタ/IsHidden 可視性をホストビューと同じ基準で判定する。
             if (settings != null && settings.IncludeLinkedModels)
             {
-                // 壁BBをリンク要素の空間フィルタにも適用する。
-                CollectFromLinkedModels(doc, settings, activeView, cr, wallBbOutline);
+                CollectFromLinkedModels(doc, settings, activeView, cr);
             }
 
             ClassifyAndFilter(doc, cr, settings);
             return cr;
-        }
-
-        /// <summary>
-        /// 要素リストのうち「壁系」要素の集合 BoundingBox を計算する。
-        /// 壁系: OST_Walls カテゴリ または WallSweep。
-        /// 有効な壁が 1 つもなければ null を返す。
-        /// </summary>
-        private static Outline BuildWallBbOutline(IEnumerable<Element> elems)
-        {
-            double minX = double.MaxValue, minY = double.MaxValue, minZ = double.MaxValue;
-            double maxX = double.MinValue, maxY = double.MinValue, maxZ = double.MinValue;
-            bool any = false;
-            int wallCount = 0;
-            foreach (var e in elems)
-            {
-                if (!IsWallLike(e)) continue;
-                wallCount++;
-                try
-                {
-                    var bb = e.get_BoundingBox(null);
-                    if (bb == null) continue;
-                    var min = bb.Transform != null && !bb.Transform.IsIdentity
-                        ? bb.Transform.OfPoint(bb.Min) : bb.Min;
-                    var max = bb.Transform != null && !bb.Transform.IsIdentity
-                        ? bb.Transform.OfPoint(bb.Max) : bb.Max;
-                    double x0 = Math.Min(min.X, max.X), x1 = Math.Max(min.X, max.X);
-                    double y0 = Math.Min(min.Y, max.Y), y1 = Math.Max(min.Y, max.Y);
-                    double z0 = Math.Min(min.Z, max.Z), z1 = Math.Max(min.Z, max.Z);
-                    if (x0 < minX) minX = x0; if (x1 > maxX) maxX = x1;
-                    if (y0 < minY) minY = y0; if (y1 > maxY) maxY = y1;
-                    if (z0 < minZ) minZ = z0; if (z1 > maxZ) maxZ = z1;
-                    any = true;
-                }
-                catch { }
-            }
-            FormworkDebugLog.Log($"  [WallBB] BuildWallBbOutline: 壁系要素数={wallCount} 有効BB={any}");
-            if (!any) return null;
-            // 余裕: 水平 ±10ft (≈3m)、垂直 ±20ft (≈6m)
-            // 壁周辺のスラブ・梁・柱を含めるために十分大きく取る。
-            const double hBuf = 10.0, vBuf = 20.0;
-            return new Outline(
-                new XYZ(minX - hBuf, minY - hBuf, minZ - vBuf),
-                new XYZ(maxX + hBuf, maxY + hBuf, maxZ + vBuf));
-        }
-
-        /// <summary>
-        /// 壁BBで非壁要素を絞り込む。壁系要素は常に保持する。
-        /// </summary>
-        private static List<Element> FilterByWallBb(List<Element> elems, Outline wallBb, bool isLinked)
-        {
-            var hMin = wallBb.MinimumPoint;
-            var hMax = wallBb.MaximumPoint;
-            var result = new List<Element>(elems.Count);
-            foreach (var e in elems)
-            {
-                if (IsWallLike(e)) { result.Add(e); continue; }
-                try
-                {
-                    var bb = e.get_BoundingBox(null);
-                    if (bb == null) { result.Add(e); continue; }
-                    var min = bb.Transform != null && !bb.Transform.IsIdentity
-                        ? bb.Transform.OfPoint(bb.Min) : bb.Min;
-                    var max = bb.Transform != null && !bb.Transform.IsIdentity
-                        ? bb.Transform.OfPoint(bb.Max) : bb.Max;
-                    double x0 = Math.Min(min.X, max.X), x1 = Math.Max(min.X, max.X);
-                    double y0 = Math.Min(min.Y, max.Y), y1 = Math.Max(min.Y, max.Y);
-                    double z0 = Math.Min(min.Z, max.Z), z1 = Math.Max(min.Z, max.Z);
-                    bool intersects = !(x1 < hMin.X || x0 > hMax.X
-                                     || y1 < hMin.Y || y0 > hMax.Y
-                                     || z1 < hMin.Z || z0 > hMax.Z);
-                    if (intersects) result.Add(e);
-                }
-                catch { result.Add(e); }
-            }
-            return result;
-        }
-
-        private static bool IsWallLike(Element e)
-        {
-            if (e == null) return false;
-            if (e is WallSweep) return true;
-            if (e is Wall) return true;
-            if (e.Category != null && e.Category.Id.IntValue() == (int)BuiltInCategory.OST_Walls) return true;
-            return false;
         }
 
         /// <summary>
@@ -199,8 +84,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         ///   リンクモデル座標系に逆変換した BoundingBoxIntersectsFilter で要素数を絞り込む。
         /// </summary>
         private static void CollectFromLinkedModels(
-            Document hostDoc, FormworkSettings settings, View activeView, CollectionResult cr,
-            Outline wallBbOutline = null)
+            Document hostDoc, FormworkSettings settings, View activeView, CollectionResult cr)
         {
             var linkInstances = new FilteredElementCollector(hostDoc)
                 .OfClass(typeof(RevitLinkInstance))
@@ -485,59 +369,9 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                                 $"  [VisFilter] {sourceName}: リンクビューフィルタ除外 " +
                                 $"{hiddenLV}/{beforeLV} (ByLinkedView mode)");
                         }
-                        else if (wallBbOutline != null)
-                        {
-                            // (Z-Fallback) ByLinkedView が使えず切断ボックスもない場合、
-                            // 壁BB空間フィルタを非壁リンク要素に適用する。
-                            // 壁系要素 (Wall/WallSweep/OST_Walls) は常に保持し、それ以外のみBB外を除外。
-                            // リンクBBはリンクローカル座標 → ホスト座標に変換して比較する。
-                            int beforeBB = linkedElems.Count;
-                            linkedElems = linkedElems.Where(e =>
-                            {
-                                if (IsWallLike(e)) return true;
-                                try
-                                {
-                                    var bb = e.get_BoundingBox(null);
-                                    if (bb == null) return true;
-                                    var lMin = bb.Min; var lMax = bb.Max;
-                                    XYZ[] corners = new[]
-                                    {
-                                        new XYZ(lMin.X, lMin.Y, lMin.Z),
-                                        new XYZ(lMax.X, lMin.Y, lMin.Z),
-                                        new XYZ(lMin.X, lMax.Y, lMin.Z),
-                                        new XYZ(lMax.X, lMax.Y, lMin.Z),
-                                        new XYZ(lMin.X, lMin.Y, lMax.Z),
-                                        new XYZ(lMax.X, lMin.Y, lMax.Z),
-                                        new XYZ(lMin.X, lMax.Y, lMax.Z),
-                                        new XYZ(lMax.X, lMax.Y, lMax.Z),
-                                    };
-                                    double x0 = double.MaxValue, y0 = double.MaxValue, z0 = double.MaxValue;
-                                    double x1 = double.MinValue, y1 = double.MinValue, z1 = double.MinValue;
-                                    foreach (var c in corners)
-                                    {
-                                        var hc = transform.OfPoint(c);
-                                        if (hc.X < x0) x0 = hc.X; if (hc.X > x1) x1 = hc.X;
-                                        if (hc.Y < y0) y0 = hc.Y; if (hc.Y > y1) y1 = hc.Y;
-                                        if (hc.Z < z0) z0 = hc.Z; if (hc.Z > z1) z1 = hc.Z;
-                                    }
-                                    var hMin = wallBbOutline.MinimumPoint;
-                                    var hMax = wallBbOutline.MaximumPoint;
-                                    return !(x1 < hMin.X || x0 > hMax.X
-                                          || y1 < hMin.Y || y0 > hMax.Y
-                                          || z1 < hMin.Z || z0 > hMax.Z);
-                                }
-                                catch { return true; }
-                            }).ToList();
-                            int hiddenBB = beforeBB - linkedElems.Count;
-                            FormworkDebugLog.Log(
-                                $"  [VisFilter] {sourceName}: 壁BB空間フィルタ 除外 " +
-                                $"{hiddenBB}/{beforeBB} (非壁リンク要素のみ対象)");
-                        }
-                        else
-                        {
-                            FormworkDebugLog.Log(
-                                $"  [VisFilter] {sourceName}: 壁BB空間フィルタ スキップ (wallBbOutline=null)");
-                        }
+                        // ByLinkedView が使えない場合 (Revit 2021 等) はそのまま処理を進める。
+                        // ユーザーがソースビューのワークセット/ビューフィルタ/カテゴリ可視性で
+                        // 不要な要素を除外する責任を持つ設計。
                     }
                     catch (Exception exLv)
                     {
