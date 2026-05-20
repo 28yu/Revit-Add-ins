@@ -290,15 +290,18 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                     // GetFilterVisibility=false のフィルタについて、カテゴリ一致+ルール一致の
                     // リンク要素を除外する。ParameterFilterElement.GetElementFilter() の
                     // ElementFilter.PassesFilter(linkDoc, elemId) でクロスドキュメント評価できる。
+                    FormworkDebugLog.Log($"  [VisFilter] {sourceName}: C2 開始 (ホストビューフィルタ評価)");
                     try
                     {
                         var hostFilterIds = activeView.GetFilters();
+                        FormworkDebugLog.Log($"  [VisFilter] {sourceName}: C2 hostFilters={hostFilterIds?.Count ?? -1}");
                         int totalFilterHidden = 0;
                         int filtersChecked = 0;
-                        foreach (var fid in hostFilterIds)
+                        if (hostFilterIds != null) foreach (var fid in hostFilterIds)
                         {
                             bool filterVisible = true;
                             try { filterVisible = activeView.GetFilterVisibility(fid); } catch { }
+                            FormworkDebugLog.Log($"  [VisFilter] {sourceName}: C2 filter fid={fid.IntValue()} visible={filterVisible}");
                             if (filterVisible) continue;
 
                             var pfe = hostDoc.GetElement(fid) as ParameterFilterElement;
@@ -311,9 +314,14 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                                 filterCats = pfe.GetCategories();
                                 elementFilter = pfe.GetElementFilter();
                             }
-                            catch { continue; }
+                            catch (Exception exPfe)
+                            {
+                                FormworkDebugLog.Log($"  [VisFilter] {sourceName}: C2 pfe.Get EX: {exPfe.Message}");
+                                continue;
+                            }
                             if (elementFilter == null || filterCats == null) continue;
 
+                            // BuiltInCategory の整数値でカテゴリを比較 (クロスドキュメントでも同じ値)
                             var filterCatSet = new HashSet<int>(filterCats.Select(c => c.IntValue()));
                             int beforeFilter = linkedElems.Count;
                             linkedElems = linkedElems.Where(e =>
@@ -331,15 +339,20 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                                 FormworkDebugLog.Log(
                                     $"  [VisFilter] {sourceName}: フィルタ非表示'{pfe.Name}' 除外 {thisHidden}/{beforeFilter}");
                             }
+                            else
+                            {
+                                FormworkDebugLog.Log(
+                                    $"  [VisFilter] {sourceName}: フィルタ非表示'{pfe.Name}' 除外0 cats=[{string.Join(",", filterCats.Select(c => c.IntValue()))}]");
+                            }
                         }
                         FormworkDebugLog.Log(
                             $"  [VisFilter] {sourceName}: ホストフィルタチェック完了 " +
-                            $"hostFilters={hostFilterIds.Count} hidden評価={filtersChecked} 累計除外={totalFilterHidden}");
+                            $"hostFilters={hostFilterIds?.Count ?? -1} hidden評価={filtersChecked} 累計除外={totalFilterHidden}");
                     }
                     catch (Exception exFil)
                     {
                         FormworkDebugLog.Log(
-                            $"  [VisFilter] {sourceName}: ホストフィルタチェックEX: {exFil.Message}");
+                            $"  [VisFilter] {sourceName}: ホストフィルタチェックEX: {exFil.Message}\n{exFil.StackTrace}");
                     }
 
                     // (D) 診断ログ: 残った要素のサンプル (先頭5件) のワークセット情報
