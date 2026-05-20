@@ -124,13 +124,43 @@ namespace Tools28.Commands.FormworkCalculator.Output
 
             if (!reusedView)
             {
-                var view3DType = new FilteredElementCollector(doc)
-                    .OfClass(typeof(ViewFamilyType))
-                    .Cast<ViewFamilyType>()
-                    .FirstOrDefault(v => v.ViewFamily == ViewFamily.ThreeDimensional);
-                if (view3DType == null) return vr;
+                // ソースが 3D ビューの場合は View.Duplicate でソースビューの全設定を複製する。
+                // これにより以下が自動的に継承される:
+                //   - V/G → Revitリンク タブの「表示設定」(ByHostView / ByLinkedView)
+                //   - 各リンクに割り当てられた "Linked View Id"
+                //   - カテゴリ非表示、フィルタ、ワークセット可視性、セクションボックス等
+                // Revit 2022/2023 では GetLinkOverrides/SetLinkOverrides API が無いため、
+                // Duplicate が ByLinkedView 設定を継承する唯一の確実な方法。
+                view = null;
+                if (sourceView is View3D srcV3DDup)
+                {
+                    try
+                    {
+                        var dupId = srcV3DDup.Duplicate(ViewDuplicateOption.Duplicate);
+                        if (dupId != null && dupId != ElementId.InvalidElementId)
+                        {
+                            view = doc.GetElement(dupId) as View3D;
+                            FormworkDebugLog.Log(
+                                $"  [Visual] view duplicated from source='{srcV3DDup.Name}' newId={dupId.IntValue()}");
+                        }
+                    }
+                    catch (Exception exDup)
+                    {
+                        FormworkDebugLog.Log($"  [Visual] Duplicate EX: {exDup.Message} → CreateIsometric fallback");
+                    }
+                }
 
-                view = View3D.CreateIsometric(doc, view3DType.Id);
+                if (view == null)
+                {
+                    var view3DType = new FilteredElementCollector(doc)
+                        .OfClass(typeof(ViewFamilyType))
+                        .Cast<ViewFamilyType>()
+                        .FirstOrDefault(v => v.ViewFamily == ViewFamily.ThreeDimensional);
+                    if (view3DType == null) return vr;
+
+                    view = View3D.CreateIsometric(doc, view3DType.Id);
+                }
+
                 try { view.Name = analysisName; } catch { }
             }
 
