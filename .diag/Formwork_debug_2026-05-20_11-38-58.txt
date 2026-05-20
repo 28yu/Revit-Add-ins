@@ -1,4 +1,4 @@
-==== Formwork Debug Log Start [2026-05-20 11:38:58] ====
+==== Formwork Debug Log Start [2026-05-20 11:08:54] ====
 [Engine] Run() 開始 Scope=CurrentView IncludeLinks=True EnableDebugLog=True
 [Engine] 切断ボックスSolid: なし (Scope=CurrentView / SectionBox未設定またはCurrentView以外)
 [Engine] CollectAndClassify 開始
@@ -464,7 +464,6 @@ partial contacts added:      4
   [CMD] 専用ワークセット確定: id=11824
   [CMD] アクティブWS切替(TX外): saved=0 → formwork=11824 actual=11824
   [Visual] CleanupExistingFormworkShapes filter='**型枠：免震擁壁' total=519 match=0 untagged=519 otherView=0 deleted=519
-  [Visual] view duplicated from source='**型枠：免震擁壁' newId=6267117
   [SlabVoidExclude] E4551694 start: topFace=found BBox X=[3850,48345]mm Y=[-33800,-32630]mm margin=50mm offset=10mm
   [SlabVoidExclude]   exclude face n=(-1,0,0) center=(39453,-33215)mm check=(39443,-33215)mm bbox=True proj=False
   [SlabVoidExclude]   exclude face n=(1,0,0) center=(8397,-33215)mm check=(8407,-33215)mm bbox=True proj=False
@@ -892,4 +891,4 @@ Parameter name: elementIdSet' failedView='プロジェクト ビュー'
   [Sheet] SHOW_LABEL on existing: exists=True isReadOnly=False value=0
   [Sheet] ChangeTypeId OK → no-title id=897434
   [Sheet] created: '型枠-001 - 型枠数量集計' views=1 schedules=2
-==== End [2026-05-20 11:45:48] total lines: 892 ====
+==== End [2026-05-20 11:13:52] total lines: 891 ====
