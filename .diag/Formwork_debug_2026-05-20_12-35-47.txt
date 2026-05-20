@@ -1,0 +1,895 @@
+==== Formwork Debug Log Start [2026-05-20 11:38:58] ====
+[Engine] Run() 開始 Scope=CurrentView IncludeLinks=True EnableDebugLog=True
+[Engine] 切断ボックスSolid: なし (Scope=CurrentView / SectionBox未設定またはCurrentView以外)
+[Engine] CollectAndClassify 開始
+  [LinkedCollect] linkInstances found: 17
+  [LinkInstVis] JRH_病棟_地下: ワークセット既定非表示 wsId=2065 → スキップ
+  [LinkInstVis] JRH_W_Str_Foundations: wsId=2063 wsVis=Visible → visible
+  [LinkedCollect] ⚠️ JRH_W_Str_Foundations: IsWorkshared=true (BIM360 or Revit Server). セクションボックスフィルタで要素数を絞り込みます。
+  [LinkedCollect] JRH_W_Str_Foundations: CollectFromDoc 開始 cats=7 outline=無(全要素対象)
+  [LinkSweepDiag] CollectFromDoc(linkDoc='JRH_W_Str_Foundations') WallSweep found=35 added=35
+  [VisFilter] JRH_W_Str_Foundations: カテゴリ非表示除外 0/439
+  [WsCheck] JRH_W_Str_Foundations ws='ワークセット1' id=0 → visible
+  [WsCheck] JRH_W_Str_Foundations ws='共有済みのビュー、レベル、通芯' id=163 → visible
+  [WsCheck] JRH_W_Str_Foundations: ワークセット総計=2 既定非表示=0 → 除外対象=0
+  [VisFilter] JRH_W_Str_Foundations: C2 開始 (ホストビューフィルタ評価)
+  [VisFilter] JRH_W_Str_Foundations: C2 hostFilters=2
+  [VisFilter] JRH_W_Str_Foundations: C2 filter fid=6176923 visible=False
+  [VisFilter] JRH_W_Str_Foundations: フィルタ非表示'コメント_新病棟_後施工（含まない）' 除外 370/439
+  [VisFilter] JRH_W_Str_Foundations: C2 filter fid=6226612 visible=False
+  [VisFilter] JRH_W_Str_Foundations: フィルタ非表示'床_スラブハンチ' 除外0 cats=[-2000032]
+  [VisFilter] JRH_W_Str_Foundations: ホストフィルタチェック完了 hostFilters=2 hidden評価=2 累計除外=370
+  [VisFilter] JRH_W_Str_Foundations: View link methods=[IsMonitoringLinkElement() | GetMonitoredLinkElementIds()]
+  [VisFilter] JRH_W_Str_Foundations: View.GetLinkOverrides(*) API なし
+  [VisFilter] JRH_W_Str_Foundations: linkDoc内3Dビュー total=12 sectionBoxActive=7
+  [VisFilter] JRH_W_Str_Foundations: 候補ビュー'{3D}' id=242606 visible=1440 overlap=69 extra=1371 score=-1233
+  [VisFilter] JRH_W_Str_Foundations: 候補ビュー'{3D - kimura.junko.z}' id=3350816 visible=108 overlap=2 extra=106 score=-102
+  [VisFilter] JRH_W_Str_Foundations: 候補ビュー'{3D - chin.gigi.z}' id=4625611 visible=1440 overlap=69 extra=1371 score=-1233
+  [VisFilter] JRH_W_Str_Foundations: 候補ビュー'{3D - fks.tsuha} コピー 1' id=4843320 visible=1279 overlap=48 extra=1231 score=-1135
+  [VisFilter] JRH_W_Str_Foundations: 候補ビュー'{3D - fks.tsuha}' id=4868731 visible=23 overlap=3 extra=20 score=-14
+  [VisFilter] JRH_W_Str_Foundations: 候補ビュー'3Dビュー：Link_後施工' id=4876500 visible=271 overlap=21 extra=250 score=-208
+  [VisFilter] JRH_W_Str_Foundations: 候補ビュー'3Dビュー：Link_後施工_型枠用' id=4935770 visible=271 overlap=21 extra=250 score=-208
+  [VisFilter] JRH_W_Str_Foundations: 最良ByLinkedView候補='{3D - fks.tsuha}' id=4868731 score=-14
+  [VisFilter] JRH_W_Str_Foundations: リンクビューフィルタ除外 66/69 (ByLinkedView mode)
+  [VisFilter:sample] JRH_W_Str_Foundations E4629936 cat='壁' workset=[0'ワークセット1']
+  [VisFilter:sample] JRH_W_Str_Foundations E4551694 cat='床' workset=[0'ワークセット1']
+  [VisFilter:sample] JRH_W_Str_Foundations E4915071 cat='床' workset=[0'ワークセット1']
+  [LinkedCollect] JRH_W_Str_Foundations elements=3 isWorkshared=True transform=Translation(0.00,0.00,0.00)
+  [LinkInstVis] JRH_D_Arc: ワークセット既定非表示 wsId=2066 → スキップ
+  [LinkInstVis] JRH_A_Str: ワークセット既定非表示 wsId=2067 → スキップ
+  [LinkInstVis] JRH_山留め(管理棟用): ワークセット既定非表示 wsId=2069 → スキップ
+  [LinkInstVis] JRH_山留め（新病棟用）: ワークセット既定非表示 wsId=2068 → スキップ
+  [LinkInstVis] JRH_A_鉄骨モデル: ワークセット既定非表示 wsId=2070 → スキップ
+  [LinkInstVis] JRH_A_Arc: ワークセット既定非表示 wsId=2071 → スキップ
+  [LinkInstVis] JRH_W_Str: ワークセット既定非表示 wsId=2072 → スキップ
+  [LinkInstVis] JRH_W_鉄骨モデル: ワークセット既定非表示 wsId=2073 → スキップ
+  [LinkInstVis] JRH_W_Arc: ワークセット既定非表示 wsId=2074 → スキップ
+  [LinkInstVis] JRH_管理棟_階段モデル: ワークセット既定非表示 wsId=2075 → スキップ
+  [LinkInstVis] JRH_外来棟_地上建築: ワークセット既定非表示 wsId=2078 → スキップ
+  [LinkInstVis] JRH_設備棟既存モデル: ワークセット既定非表示 wsId=5983 → スキップ
+  [LinkInstVis] JRH_デッキ棟_埋め戻しモデル: ワークセット既定非表示 wsId=6311 → スキップ
+
+---- Exclusion Detection (Steel + DeckSlab + SteelStair + LgsWall) ----
+  Exclusion detection: total=3 steelExcluded=0 deckSlabExcluded=0 steelStairExcluded=0 lgsExcluded=0 kept=3 linkedInstances=1
+Collected elements: targets=3 excluded=0 linkedInstances=1
+  [LinkMap] src='JRH_W_Str_Foundations' count=3 srgRange=[-3..-1]
+  [LinkMap] total linked elements mapped: 3
+[Pass1] 開始: total=3 linked=3 host=0
+[Pass1] リンク [1/3] E4629936 cat='壁' src='JRH_W_Str_Foundations' → GetSolids開始
+[Pass1] リンク [2/3] E4551694 cat='床' src='JRH_W_Str_Foundations' → GetSolids開始
+  [SlabVoidExclude] E4551694 start: topFace=found BBox X=[3850,48345]mm Y=[-33800,-32630]mm margin=50mm offset=10mm
+  [SlabVoidExclude]   exclude face n=(-1,0,0) center=(39453,-33215)mm check=(39443,-33215)mm bbox=True proj=False
+  [SlabVoidExclude]   exclude face n=(1,0,0) center=(8397,-33215)mm check=(8407,-33215)mm bbox=True proj=False
+  [SlabVoidExclude]   exclude face n=(1,0,0) center=(26447,-33215)mm check=(26457,-33215)mm bbox=True proj=False
+  [SlabVoidExclude]   exclude face n=(-1,0,0) center=(15307,-33215)mm check=(15297,-33215)mm bbox=True proj=False
+  [SlabVoidExclude]   exclude face n=(1,0,0) center=(35693,-33215)mm check=(35703,-33215)mm bbox=True proj=False
+  [SlabVoidExclude]   exclude face n=(-1,0,0) center=(29707,-33215)mm check=(29697,-33215)mm bbox=True proj=False
+  [SlabVoidExclude] E4551694 done: excluded=6
+[Pass1] リンク [3/3] E4915071 cat='床' src='JRH_W_Str_Foundations' → GetSolids開始
+  [SlabVoidExclude] E4915071 start: topFace=found BBox X=[8397,39453]mm Y=[-33493,-32630]mm margin=50mm offset=10mm
+  [SlabVoidExclude]   exclude face n=(1,0,0) center=(15307,-33215)mm check=(15317,-33215)mm bbox=True proj=False
+  [SlabVoidExclude]   exclude face n=(1,0,0) center=(29707,-33215)mm check=(29717,-33215)mm bbox=True proj=False
+  [SlabVoidExclude]   exclude face n=(-1,0,0) center=(26447,-33215)mm check=(26437,-33215)mm bbox=True proj=False
+  [SlabVoidExclude]   exclude face n=(-1,0,0) center=(35693,-33215)mm check=(35683,-33215)mm bbox=True proj=False
+  [SlabVoidExclude] E4915071 done: excluded=4
+
+---- Pass 1: Face Classification (elements=3) ----
+  E-1 (Wall/壁) total=7 Req=5 Top=2 Bot=0 Con=0 Inc=0 Err=0
+  E-2 (Slab/床) total=31 Req=17 Top=14 Bot=0 Con=0 Inc=0 Err=0
+  E-3 (Slab/床) total=14 Req=9 Top=5 Bot=0 Con=0 Inc=0 Err=0
+  TOTAL: Req=31 Top=21 Bot=0 Con=0 Inc=0 Err=0
+
+---- Pass 2: Contact Face Detection (elements=3) ----
+SpatialGrid cell size: 200.000 ft
+    s2-via-plane planeDist=0.787402 uv=(-30.130,-0.361)
+[Pair E-1(Wall) x E-2(Slab)]
+  f0->f2 dot=-1.000 aArea=191.1365 bArea=10.7676 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=0.787402 uv=(93.806,-0.361)
+  f0->f7 dot=-1.000 aArea=191.1365 bArea=21.0568 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=0.787402 uv=(18.274,-0.361)
+  f0->f13 dot=-1.000 aArea=191.1365 bArea=26.3802 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=0.787402 uv=(57.064,-0.361)
+  f0->f17 dot=-1.000 aArea=191.1365 bArea=14.1752 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(-93.806,-0.254)
+  f1->f4 dot=-1.000 aArea=201.4487 bArea=26.1769 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(30.130,-0.254)
+  f1->f9 dot=-1.000 aArea=201.4487 bArea=11.7385 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(-18.274,-0.254)
+  f1->f11 dot=-1.000 aArea=201.4487 bArea=34.1743 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(-57.064,-0.254)
+  f1->f15 dot=-1.000 aArea=201.4487 bArea=18.3633 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=74.137139 uv=(-1.132,-0.302)
+  f2->f1 dot=-1.000 aArea=4.2160 bArea=3.0724 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=42.670604 uv=(-1.132,-0.220)
+  f2->f6 dot=-1.000 aArea=4.2160 bArea=3.6375 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=36.548556 uv=(-1.132,-0.220)
+  f2->f12 dot=-1.000 aArea=4.2160 bArea=3.6375 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=10.695538 uv=(-1.132,-0.220)
+  f2->f16 dot=-1.000 aArea=4.2160 bArea=3.6375 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=108.392388 uv=(-1.132,5.840)
+  f3->f3 dot=-1.000 aArea=4.2160 bArea=2.8966 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=22.670604 uv=(-1.132,5.732)
+  f3->f8 dot=-1.000 aArea=4.2160 bArea=3.6375 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=36.548556 uv=(-1.132,5.732)
+  f3->f10 dot=-1.000 aArea=4.2160 bArea=3.6375 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=66.883202 uv=(-1.132,5.732)
+  f3->f14 dot=-1.000 aArea=4.2160 bArea=3.6375 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=0.077213 uv=(-0.028,-48.404)
+  f4->f5 dot=-0.981 aArea=30.5702 bArea=10.7285 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=0.701484 uv=(1.787,-49.847)
+  f4->f18 dot=-0.934 aArea=30.5702 bArea=36.7176 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=0.547057 uv=(1.843,70.367)
+  f4->f19 dot=-0.934 aArea=30.5702 bArea=57.5146 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=1.142449 uv=(3.120,84.539)
+  f4->f20 dot=-0.933 aArea=30.5702 bArea=15.7638 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=0.647435 uv=(1.807,84.954)
+  f4->f21 dot=-0.934 aArea=30.5702 bArea=15.7635 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=0.101863 uv=(-0.037,84.951)
+  f4->f22 dot=-1.000 aArea=30.5702 bArea=4.3202 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=0.101922 uv=(-0.037,84.954)
+  f4->f23 dot=-0.966 aArea=30.5702 bArea=4.0803 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=0.624271 uv=(1.815,-42.388)
+  f4->f24 dot=-0.932 aArea=30.5702 bArea=8.8256 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=0.071589 uv=(0.362,-42.283)
+  f4->f25 dot=-0.999 aArea=30.5702 bArea=1.2092 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=0.547057 uv=(1.843,0.000)
+  f4->f26 dot=-0.934 aArea=30.5702 bArea=111.5447 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+  f4->f27 dot=-1.000 aArea=30.5702 bArea=30.5702 d=0.0000 uv=(0.000,0.000) overlap=1.000 FULL_CONTACT
+    s2-via-plane planeDist=0.787402 uv=(-11.335,-0.303)
+[Pair E-1(Wall) x E-3(Slab)]
+  f0->f5 dot=-1.000 aArea=191.1365 bArea=18.9665 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=0.787402 uv=(41.896,-0.303)
+  f0->f9 dot=-1.000 aArea=191.1365 bArea=8.9480 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=0.787402 uv=(73.051,-0.303)
+  f0->f13 dot=-1.000 aArea=191.1365 bArea=10.3204 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(11.335,-0.303)
+  f1->f3 dot=-1.000 aArea=201.4487 bArea=18.9665 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(-41.896,-0.303)
+  f1->f7 dot=-1.000 aArea=201.4487 bArea=8.9480 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(-73.051,-0.303)
+  f1->f11 dot=-1.000 aArea=201.4487 bArea=10.3204 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=59.219160 uv=(-1.132,-0.303)
+  f2->f4 dot=-1.000 aArea=4.2160 bArea=3.2114 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=0.000000 uv=(-1.132,-0.303)
+    s2-uvOnA method=via-plane bounds=[U:-3.051..0.787,V:-0.722..0.115]
+    s2-uvOnA clamped to faceA bounds=[U:-3.051..0.787,V:-0.722..0.115] → [0.000..0.787,0.000..0.115]
+  f2->f8 dot=-1.000 aArea=4.2160 bArea=3.2114 d=- uv=- overlap=- PARTIAL_CONTACT area=0.0878
+    s2-via-plane planeDist=30.334646 uv=(-1.132,-0.303)
+  f2->f12 dot=-1.000 aArea=4.2160 bArea=3.2114 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=0.000000 uv=(-1.132,5.815)
+    s2-uvOnA method=via-plane bounds=[U:-3.051..0.787,V:5.397..6.234]
+    s2-uvOnA clamped to faceA bounds=[U:-3.051..0.787,V:5.397..6.234] → [0.000..0.787,5.397..5.512]
+  f3->f2 dot=-1.000 aArea=4.2160 bArea=3.2114 d=- uv=- overlap=- PARTIAL_CONTACT area=0.0878
+    s2-via-plane planeDist=47.244094 uv=(-1.132,5.815)
+  f3->f6 dot=-1.000 aArea=4.2160 bArea=3.2114 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=79.219160 uv=(-1.132,5.815)
+  f3->f10 dot=-1.000 aArea=4.2160 bArea=3.2114 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+[Pair E-2(Slab) x E-1(Wall)]
+  f0->f5 dot=-0.997 aArea=384.9287 bArea=14.4391 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+  f0->f6 dot=-0.997 aArea=384.9287 bArea=14.4391 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=74.137139 uv=(3.478,3.445)
+  f1->f2 dot=-1.000 aArea=3.0724 bArea=4.2160 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=0.787402 uv=(3.619,55.863)
+  f2->f0 dot=-1.000 aArea=10.7676 bArea=191.1365 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=108.392388 uv=(3.478,0.394)
+  f3->f3 dot=-1.000 aArea=2.8966 bArea=4.2160 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(3.478,90.118)
+  f4->f1 dot=-1.000 aArea=26.1769 bArea=201.4487 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=0.081114 uv=(0.012,49.126)
+  f5->f4 dot=-0.981 aArea=10.7285 bArea=30.5702 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=0.787402 uv=(3.619,-60.945)
+  f7->f0 dot=-1.000 aArea=21.0568 bArea=191.1365 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(3.478,-40.945)
+  f9->f1 dot=-1.000 aArea=11.7385 bArea=201.4487 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(3.478,18.274)
+  f11->f1 dot=-1.000 aArea=34.1743 bArea=201.4487 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=0.787402 uv=(3.619,18.274)
+  f13->f0 dot=-1.000 aArea=26.3802 bArea=191.1365 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(3.478,48.609)
+  f15->f1 dot=-1.000 aArea=18.3633 bArea=201.4487 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=0.787402 uv=(3.619,-28.970)
+  f17->f0 dot=-1.000 aArea=14.1752 bArea=191.1365 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=1.574495 uv=(-83.215,0.703)
+  f22->f4 dot=-1.000 aArea=4.3202 bArea=30.5702 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=2.186928 uv=(-40.433,10.798)
+  f25->f4 dot=-0.999 aArea=1.2092 bArea=30.5702 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+  f27->f4 dot=-1.000 aArea=30.5702 bArea=30.5702 d=0.0000 uv=(0.000,0.000) overlap=1.000 FULL_CONTACT
+    s2-via-plane planeDist=0.000000 uv=(0.000,-38.789)
+    s2-uvOnA method=via-plane bounds=[U:-0.418..0.418,V:-57.064..-20.515]
+    s2-uvOnA clamp-eliminated (no overlap with faceA UV range)
+  f28->f4 dot=-1.000 aArea=16.4267 bArea=30.5702 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-uv-out-of-bounds)
+    s2-via-plane planeDist=0.000000 uv=(0.000,-70.367)
+    s2-uvOnA method=via-plane bounds=[U:-0.418..0.418,V:-88.642..-52.093]
+    s2-uvOnA clamp-eliminated (no overlap with faceA UV range)
+  f30->f4 dot=-1.000 aArea=15.7626 bArea=30.5702 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-uv-out-of-bounds)
+[Pair E-2(Slab) x E-3(Slab)]
+  f0->f1 dot=-1.000 aArea=384.9287 bArea=175.4313 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+  f1->f2 dot=-1.000 aArea=3.0724 bArea=3.2114 d=37.5886 uv=(0.420,1.919) overlap=- REJECTED(s1=cond3-distance,s2=not-evaluated)
+  f1->f6 dot=-1.000 aArea=3.0724 bArea=3.2114 d=84.8327 uv=(0.420,1.919) overlap=- REJECTED(s1=cond3-distance,s2=not-evaluated)
+  f1->f10 dot=-1.000 aArea=3.0724 bArea=3.2114 d=116.8077 uv=(0.420,1.919) overlap=- REJECTED(s1=cond3-distance,s2=not-evaluated)
+    s2-via-plane planeDist=3.838583 uv=(0.418,26.253)
+  f2->f3 dot=-1.000 aArea=10.7676 bArea=18.9665 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.418,79.485)
+  f2->f7 dot=-1.000 aArea=10.7676 bArea=8.9480 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.418,110.640)
+  f2->f11 dot=-1.000 aArea=10.7676 bArea=10.3204 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+  f3->f4 dot=-1.000 aArea=2.8966 bArea=3.2114 d=131.0630 uv=(0.394,1.919) overlap=- REJECTED(s1=cond3-distance,s2=not-evaluated)
+  f3->f8 dot=-1.000 aArea=2.8966 bArea=3.2114 d=71.8438 uv=(0.394,1.919) overlap=- REJECTED(s1=cond3-distance,s2=not-evaluated)
+  f3->f12 dot=-1.000 aArea=2.8966 bArea=3.2114 d=41.5092 uv=(0.394,1.919) overlap=- REJECTED(s1=cond3-distance,s2=not-evaluated)
+    s2-via-plane planeDist=3.838583 uv=(0.418,119.728)
+  f4->f5 dot=-1.000 aArea=26.1769 bArea=18.9665 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.418,66.496)
+  f4->f9 dot=-1.000 aArea=26.1769 bArea=8.9480 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.418,35.341)
+  f4->f13 dot=-1.000 aArea=26.1769 bArea=10.3204 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=0.998508 uv=(1.393,59.126)
+  f5->f0 dot=-0.989 aArea=10.7285 bArea=175.4313 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.418,-90.554)
+  f7->f3 dot=-1.000 aArea=21.0568 bArea=18.9665 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.418,-37.323)
+  f7->f7 dot=-1.000 aArea=21.0568 bArea=8.9480 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.418,-6.168)
+  f7->f11 dot=-1.000 aArea=21.0568 bArea=10.3204 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.418,-11.335)
+  f9->f5 dot=-1.000 aArea=11.7385 bArea=18.9665 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.418,-64.567)
+  f9->f9 dot=-1.000 aArea=11.7385 bArea=8.9480 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.418,-95.722)
+  f9->f13 dot=-1.000 aArea=11.7385 bArea=10.3204 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.418,47.884)
+  f11->f5 dot=-1.000 aArea=34.1743 bArea=18.9665 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.418,-5.348)
+  f11->f9 dot=-1.000 aArea=34.1743 bArea=8.9480 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.418,-36.503)
+  f11->f13 dot=-1.000 aArea=34.1743 bArea=10.3204 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.418,-11.335)
+  f13->f3 dot=-1.000 aArea=26.3802 bArea=18.9665 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.418,41.896)
+  f13->f7 dot=-1.000 aArea=26.3802 bArea=8.9480 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.418,73.051)
+  f13->f11 dot=-1.000 aArea=26.3802 bArea=10.3204 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.418,78.219)
+  f15->f5 dot=-1.000 aArea=18.3633 bArea=18.9665 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.418,24.987)
+  f15->f9 dot=-1.000 aArea=18.3633 bArea=8.9480 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.418,-6.168)
+  f15->f13 dot=-1.000 aArea=18.3633 bArea=10.3204 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.418,-58.579)
+  f17->f3 dot=-1.000 aArea=14.1752 bArea=18.9665 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.418,-5.348)
+  f17->f7 dot=-1.000 aArea=14.1752 bArea=8.9480 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.418,25.807)
+  f17->f11 dot=-1.000 aArea=14.1752 bArea=10.3204 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=2.703820 uv=(-73.199,-0.512)
+  f22->f0 dot=-0.941 aArea=4.3202 bArea=175.4313 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=4.046062 uv=(-49.706,14.489)
+  f25->f0 dot=-0.940 aArea=1.2092 bArea=175.4313 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=1.326913 uv=(1.145,-28.789)
+  f28->f0 dot=-0.941 aArea=16.4267 bArea=175.4313 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=1.326913 uv=(1.145,-60.367)
+  f30->f0 dot=-0.941 aArea=15.7626 bArea=175.4313 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=6.217192 uv=(0.591,-18.274)
+[Pair E-3(Slab) x E-1(Wall)]
+  f0->f5 dot=-0.997 aArea=175.4313 bArea=14.4391 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=6.217192 uv=(0.197,-18.274)
+  f0->f6 dot=-0.997 aArea=175.4313 bArea=14.4391 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(3.478,-18.274)
+  f3->f1 dot=-1.000 aArea=18.9665 bArea=201.4487 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=59.219160 uv=(3.478,3.445)
+  f4->f2 dot=-1.000 aArea=3.2114 bArea=4.2160 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=0.787402 uv=(3.619,40.945)
+  f5->f0 dot=-1.000 aArea=18.9665 bArea=191.1365 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(3.478,28.970)
+  f7->f1 dot=-1.000 aArea=8.9480 bArea=201.4487 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=0.787402 uv=(3.619,-18.274)
+  f9->f0 dot=-1.000 aArea=8.9480 bArea=191.1365 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=79.219160 uv=(3.478,0.394)
+  f10->f3 dot=-1.000 aArea=3.2114 bArea=4.2160 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(3.478,60.945)
+  f11->f1 dot=-1.000 aArea=10.3204 bArea=201.4487 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=0.787402 uv=(3.619,-48.609)
+  f13->f0 dot=-1.000 aArea=10.3204 bArea=191.1365 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=0.780840 uv=(0.394,30.130)
+[Pair E-3(Slab) x E-2(Slab)]
+  f0->f5 dot=-0.989 aArea=175.4313 bArea=10.7285 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=0.805446 uv=(2.313,31.573)
+  f0->f18 dot=-1.000 aArea=175.4313 bArea=36.7176 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=0.969488 uv=(2.313,-88.642)
+  f0->f19 dot=-1.000 aArea=175.4313 bArea=57.5146 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=0.839752 uv=(3.716,-102.813)
+  f0->f20 dot=-1.000 aArea=175.4313 bArea=15.7638 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=0.862861 uv=(2.313,-103.228)
+  f0->f21 dot=-1.000 aArea=175.4313 bArea=15.7635 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=0.754655 uv=(0.394,-103.225)
+  f0->f22 dot=-0.941 aArea=175.4313 bArea=4.3202 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=0.754593 uv=(0.394,-103.228)
+  f0->f23 dot=-0.997 aArea=175.4313 bArea=4.0803 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=0.887467 uv=(2.313,24.114)
+  f0->f24 dot=-0.998 aArea=175.4313 bArea=8.8256 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=0.917615 uv=(0.759,24.009)
+  f0->f25 dot=-0.940 aArea=175.4313 bArea=1.2092 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=0.969488 uv=(2.313,-18.274)
+  f0->f26 dot=-1.000 aArea=175.4313 bArea=111.5447 d=0.9781 uv=(10.000,0.372) overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=0.862861 uv=(0.394,-18.274)
+  f0->f27 dot=-0.941 aArea=175.4313 bArea=30.5702 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=0.862861 uv=(0.394,-57.064)
+  f0->f28 dot=-0.941 aArea=175.4313 bArea=16.4267 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=0.969488 uv=(2.313,-57.064)
+  f0->f29 dot=-1.000 aArea=175.4313 bArea=59.9377 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=0.862861 uv=(0.394,-88.642)
+  f0->f30 dot=-0.941 aArea=175.4313 bArea=15.7626 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.361,30.130)
+  f3->f2 dot=-1.000 aArea=18.9665 bArea=10.7676 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.361,-93.806)
+  f3->f7 dot=-1.000 aArea=18.9665 bArea=21.0568 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.361,-18.274)
+  f3->f13 dot=-1.000 aArea=18.9665 bArea=26.3802 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.361,-57.064)
+  f3->f17 dot=-1.000 aArea=18.9665 bArea=14.1752 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+  f4->f3 dot=-1.000 aArea=3.2114 bArea=2.8966 d=131.0630 uv=(0.418,1.919) overlap=- REJECTED(s1=cond3-distance,s2=not-evaluated)
+    s2-uvOnA method=via-plane bounds=[U:0.000..1.004,V:0.000..3.839]
+    s2-uvOnA clamped to faceA bounds=[U:0.000..1.004,V:0.000..3.839] → [0.000..0.837,0.000..3.839]
+  f4->f8 dot=-1.000 aArea=3.2114 bArea=3.6375 d=0.0000 uv=(0.418,1.919) overlap=0.750(ok=3/off=1) PARTIAL_CONTACT area=3.2114
+  f4->f10 dot=-1.000 aArea=3.2114 bArea=3.6375 d=59.2192 uv=(0.418,1.919) overlap=- REJECTED(s1=cond3-distance,s2=not-evaluated)
+  f4->f14 dot=-1.000 aArea=3.2114 bArea=3.6375 d=89.5538 uv=(0.418,1.919) overlap=- REJECTED(s1=cond3-distance,s2=not-evaluated)
+    s2-via-plane planeDist=3.838583 uv=(0.468,116.476)
+  f5->f4 dot=-1.000 aArea=18.9665 bArea=26.1769 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.468,-7.459)
+  f5->f9 dot=-1.000 aArea=18.9665 bArea=11.7385 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.468,40.945)
+  f5->f11 dot=-1.000 aArea=18.9665 bArea=34.1743 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.468,79.734)
+  f5->f15 dot=-1.000 aArea=18.9665 bArea=18.3633 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.361,77.374)
+  f7->f2 dot=-1.000 aArea=8.9480 bArea=10.7676 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.361,-46.562)
+  f7->f7 dot=-1.000 aArea=8.9480 bArea=21.0568 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.361,28.970)
+  f7->f13 dot=-1.000 aArea=8.9480 bArea=26.3802 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.361,-9.820)
+  f7->f17 dot=-1.000 aArea=8.9480 bArea=14.1752 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.468,57.257)
+  f9->f4 dot=-1.000 aArea=8.9480 bArea=26.1769 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.468,-66.678)
+  f9->f9 dot=-1.000 aArea=8.9480 bArea=11.7385 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.468,-18.274)
+  f9->f11 dot=-1.000 aArea=8.9480 bArea=34.1743 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.468,20.515)
+  f9->f15 dot=-1.000 aArea=8.9480 bArea=18.3633 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+  f10->f1 dot=-1.000 aArea=3.2114 bArea=3.0724 d=116.8077 uv=(0.418,1.919) overlap=- REJECTED(s1=cond3-distance,s2=not-evaluated)
+    s2-uvOnA method=via-plane bounds=[U:0.000..1.004,V:0.000..3.839]
+    s2-uvOnA clamped to faceA bounds=[U:0.000..1.004,V:0.000..3.839] → [0.000..0.837,0.000..3.839]
+  f10->f6 dot=-1.000 aArea=3.2114 bArea=3.6375 d=0.0000 uv=(0.418,1.919) overlap=0.750(ok=3/off=1) PARTIAL_CONTACT area=3.2114
+  f10->f12 dot=-1.000 aArea=3.2114 bArea=3.6375 d=79.2192 uv=(0.418,1.919) overlap=- REJECTED(s1=cond3-distance,s2=not-evaluated)
+  f10->f16 dot=-1.000 aArea=3.2114 bArea=3.6375 d=31.9751 uv=(0.418,1.919) overlap=- REJECTED(s1=cond3-distance,s2=not-evaluated)
+    s2-via-plane planeDist=3.838583 uv=(0.361,109.349)
+  f11->f2 dot=-1.000 aArea=10.3204 bArea=10.7676 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.361,-14.587)
+  f11->f7 dot=-1.000 aArea=10.3204 bArea=21.0568 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.361,60.945)
+  f11->f13 dot=-1.000 aArea=10.3204 bArea=26.3802 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.361,22.156)
+  f11->f17 dot=-1.000 aArea=10.3204 bArea=14.1752 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.468,26.923)
+  f13->f4 dot=-1.000 aArea=10.3204 bArea=26.1769 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.468,-97.013)
+  f13->f9 dot=-1.000 aArea=10.3204 bArea=11.7385 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.468,-48.609)
+  f13->f11 dot=-1.000 aArea=10.3204 bArea=34.1743 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.468,-9.820)
+  f13->f15 dot=-1.000 aArea=10.3204 bArea=18.3633 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+
+---- Pass 2 Summary ----
+pairs checked (grid):        6
+pairs with BB overlap:       6
+full contact changes:        2
+partial contacts added:      4
+
+---- Post Pass 2 Totals ----
+  FormworkRequired: 29
+  DeductedContact:  2
+
+---- Per-Face Detail (elements with ≥6 faces) ----
+  fmt: [FaceDetail] E<id> face[i] type=<T> area=<ft²> n=(x,y,z) center=(x,y,z)
+[FaceDetail] E-1 face[0] type=FormworkRequired area=191.1365 n=(0.000,-1.000,0.000) center=(68.494,-107.841,2.306) partials=0
+[FaceDetail] E-1 face[1] type=FormworkRequired area=201.4487 n=(0.000,1.000,0.000) center=(68.494,-107.054,2.165) partials=0
+[FaceDetail] E-1 face[2] type=FormworkRequired area=4.2160 n=(1.000,0.000,0.000) center=(86.768,-107.448,2.165) partials=1
+[FaceDetail] E-1 face[3] type=FormworkRequired area=4.2160 n=(-1.000,0.000,0.000) center=(50.220,-107.448,2.165) partials=1
+[FaceDetail] E-1 face[4] type=DeductedContact area=30.5702 n=(0.000,-0.337,-0.941) center=(68.494,-107.448,-0.449) partials=0
+[FaceDetail] E-1 face[5] type=DeductedTop area=14.4391 n=(0.000,0.083,0.997) center=(68.494,-107.644,4.905) partials=0
+[FaceDetail] E-1 face[6] type=DeductedTop area=14.4391 n=(0.000,-0.083,0.997) center=(68.494,-107.251,4.905) partials=0
+[FaceDetail] E-2 face[0] type=FormworkRequired area=384.9287 n=(0.000,0.000,-1.000) center=(85.622,-108.973,-1.312) partials=0
+[FaceDetail] E-2 face[1] type=FormworkRequired area=3.0724 n=(-1.000,0.000,0.000) center=(12.631,-108.973,-0.892) partials=0
+[FaceDetail] E-2 face[2] type=FormworkRequired area=10.7676 n=(0.000,1.000,0.000) center=(20.090,-107.054,-0.951) partials=0
+[FaceDetail] E-2 face[3] type=FormworkRequired area=2.8966 n=(1.000,0.000,0.000) center=(158.612,-108.973,-0.919) partials=0
+[FaceDetail] E-2 face[4] type=FormworkRequired area=26.1769 n=(0.000,-1.000,0.000) center=(144.026,-110.892,-0.845) partials=0
+[FaceDetail] E-2 face[5] type=FormworkRequired area=10.7285 n=(0.000,0.148,0.989) center=(20.090,-107.448,-0.531) partials=0
+[FaceDetail] E-2 face[6] type=DeductedTop area=3.6375 n=(-1.000,0.000,0.000) center=(129.439,-108.973,-0.810) partials=0
+[FaceDetail] E-2 face[7] type=FormworkRequired area=21.0568 n=(0.000,1.000,0.000) center=(144.026,-107.054,-0.951) partials=0
+[FaceDetail] E-2 face[8] type=DeductedTop area=3.6375 n=(1.000,0.000,0.000) center=(27.549,-108.973,-0.810) partials=0
+[FaceDetail] E-2 face[9] type=FormworkRequired area=11.7385 n=(0.000,-1.000,0.000) center=(20.090,-110.892,-0.845) partials=0
+[FaceDetail] E-2 face[10] type=DeductedTop area=3.6375 n=(1.000,0.000,0.000) center=(86.768,-108.973,-0.810) partials=0
+[FaceDetail] E-2 face[11] type=FormworkRequired area=34.1743 n=(0.000,-1.000,0.000) center=(68.494,-110.892,-0.845) partials=0
+[FaceDetail] E-2 face[12] type=DeductedTop area=3.6375 n=(-1.000,0.000,0.000) center=(50.220,-108.973,-0.810) partials=0
+[FaceDetail] E-2 face[13] type=FormworkRequired area=26.3802 n=(0.000,1.000,0.000) center=(68.494,-107.054,-0.951) partials=0
+[FaceDetail] E-2 face[14] type=DeductedTop area=3.6375 n=(1.000,0.000,0.000) center=(117.103,-108.973,-0.810) partials=0
+[FaceDetail] E-2 face[15] type=FormworkRequired area=18.3633 n=(0.000,-1.000,0.000) center=(107.283,-110.892,-0.845) partials=0
+[FaceDetail] E-2 face[16] type=DeductedTop area=3.6375 n=(-1.000,0.000,0.000) center=(97.464,-108.973,-0.810) partials=0
+[FaceDetail] E-2 face[17] type=FormworkRequired area=14.1752 n=(0.000,1.000,0.000) center=(107.283,-107.054,-0.951) partials=0
+[FaceDetail] E-2 face[18] type=DeductedTop area=36.7176 n=(0.000,-0.023,1.000) center=(18.647,-109.367,-0.507) partials=0
+[FaceDetail] E-2 face[19] type=DeductedTop area=57.5146 n=(0.000,-0.023,1.000) center=(138.862,-109.367,-0.343) partials=0
+[FaceDetail] E-2 face[20] type=DeductedTop area=15.7638 n=(0.021,-0.023,1.000) center=(153.033,-110.770,-0.473) partials=0
+[FaceDetail] E-2 face[21] type=DeductedTop area=15.7635 n=(0.021,-0.021,1.000) center=(153.448,-109.367,-0.449) partials=0
+[FaceDetail] E-2 face[22] type=FormworkRequired area=4.3202 n=(0.020,0.337,0.941) center=(153.445,-107.448,-0.558) partials=0
+[FaceDetail] E-2 face[23] type=DeductedTop area=4.0803 n=(0.000,0.083,0.997) center=(153.448,-107.448,-0.558) partials=0
+[FaceDetail] E-2 face[24] type=DeductedTop area=8.8256 n=(-0.057,-0.023,0.998) center=(26.106,-109.367,-0.425) partials=0
+[FaceDetail] E-2 face[25] type=FormworkRequired area=1.2092 n=(-0.053,0.337,0.940) center=(26.211,-107.813,-0.395) partials=0
+[FaceDetail] E-2 face[26] type=DeductedTop area=111.5447 n=(0.000,-0.023,1.000) center=(68.494,-109.367,-0.343) partials=0
+[FaceDetail] E-2 face[27] type=DeductedContact area=30.5702 n=(0.000,0.337,0.941) center=(68.494,-107.448,-0.449) partials=0
+[FaceDetail] E-2 face[28] type=FormworkRequired area=16.4267 n=(0.000,0.337,0.941) center=(107.283,-107.448,-0.449) partials=0
+[FaceDetail] E-2 face[29] type=DeductedTop area=59.9377 n=(0.000,-0.023,1.000) center=(107.283,-109.367,-0.343) partials=0
+[FaceDetail] E-2 face[30] type=FormworkRequired area=15.7626 n=(0.000,0.337,0.941) center=(138.862,-107.448,-0.449) partials=0
+[FaceDetail] E-3 face[0] type=FormworkRequired area=175.4313 n=(0.000,0.000,-1.000) center=(78.494,-108.973,-1.312) partials=0
+[FaceDetail] E-3 face[1] type=DeductedTop area=175.4313 n=(0.000,0.000,1.000) center=(78.494,-108.973,-0.476) partials=0
+[FaceDetail] E-3 face[2] type=DeductedTop area=3.2114 n=(1.000,0.000,0.000) center=(50.220,-108.973,-0.894) partials=0
+[FaceDetail] E-3 face[3] type=FormworkRequired area=18.9665 n=(0.000,-1.000,0.000) center=(38.885,-110.892,-0.894) partials=0
+[FaceDetail] E-3 face[4] type=FormworkRequired area=3.2114 n=(-1.000,0.000,0.000) center=(27.549,-108.973,-0.894) partials=1
+[FaceDetail] E-3 face[5] type=FormworkRequired area=18.9665 n=(0.000,1.000,0.000) center=(38.885,-107.054,-0.894) partials=0
+[FaceDetail] E-3 face[6] type=DeductedTop area=3.2114 n=(1.000,0.000,0.000) center=(97.464,-108.973,-0.894) partials=0
+[FaceDetail] E-3 face[7] type=FormworkRequired area=8.9480 n=(0.000,-1.000,0.000) center=(92.116,-110.892,-0.894) partials=0
+[FaceDetail] E-3 face[8] type=DeductedTop area=3.2114 n=(-1.000,0.000,0.000) center=(86.768,-108.973,-0.894) partials=0
+[FaceDetail] E-3 face[9] type=FormworkRequired area=8.9480 n=(0.000,1.000,0.000) center=(92.116,-107.054,-0.894) partials=0
+[FaceDetail] E-3 face[10] type=FormworkRequired area=3.2114 n=(1.000,0.000,0.000) center=(129.439,-108.973,-0.894) partials=1
+[FaceDetail] E-3 face[11] type=FormworkRequired area=10.3204 n=(0.000,-1.000,0.000) center=(123.271,-110.892,-0.894) partials=0
+[FaceDetail] E-3 face[12] type=DeductedTop area=3.2114 n=(-1.000,0.000,0.000) center=(117.103,-108.973,-0.894) partials=0
+[FaceDetail] E-3 face[13] type=FormworkRequired area=10.3204 n=(0.000,1.000,0.000) center=(123.271,-107.054,-0.894) partials=0
+  [FaceDiag] E-1 face[2] area=4.2160 partials=1 [ E-3:a=0.0878 ] single-partial(partial=0.0878,clipper-FAIL=not-rectangular:interior-points(2)) eff=4.1282
+  [FaceDiag] E-1 face[3] area=4.2160 partials=1 [ E-3:a=0.0878 ] single-partial(partial=0.0878,clipper-FAIL=not-rectangular:interior-points(2)) eff=4.1282
+  [Clipper] face area=3.2114 rect=[U:0.000..0.837, V:0.000..3.839] partialContacts=1
+  [Clipper] subtract E-2/f8 raw=[U:0.000..0.837,V:0.000..3.839] clipped=[U:0.000..0.837, V:0.000..3.839]
+  [Clipper] pieces after subtraction: 0
+  [FaceDiag] E-3 face[4] area=3.2114 partials=1 [ E-2:a=3.2114 ] single-partial(partial=3.2114,clipper-FAIL=fully-clipped) demoted-to-contact(partialSum=3.2114/face=3.2114) eff=0.0000
+  [Clipper] face area=3.2114 rect=[U:0.000..0.837, V:0.000..3.839] partialContacts=1
+  [Clipper] subtract E-2/f6 raw=[U:0.000..0.837,V:0.000..3.839] clipped=[U:0.000..0.837, V:0.000..3.839]
+  [Clipper] pieces after subtraction: 0
+  [FaceDiag] E-3 face[10] area=3.2114 partials=1 [ E-2:a=3.2114 ] single-partial(partial=3.2114,clipper-FAIL=fully-clipped) demoted-to-contact(partialSum=3.2114/face=3.2114) eff=0.0000
+
+---- Element Diagnostics (3 elements) ----
+  fmt: [ElemDiag] E<id> (cat) 'name' type='type' formwork=Xm² faces=R/T/B/C/B(GL)/I parts=N
+       ⚠️ markers: ZERO=formwork≈0, MOSTLY_DED=控除>>formwork, ALL_PARTIAL=全FormworkRequired面が部分接触
+[ElemDiag] E-1 (壁) 'R240/R-0 _天端勾配M型' type='R240/R-0 _天端勾配M型' dim=11140x240x1680mm formwork=37.24m² faces=4/2/0/1/0 parts=2 dedTop=2.68 dedBot=0.00 dedCon=2.86
+[ElemDiag] E-2 (スラブ) 'S20+20下フカシ 変数' type='S20+20下フカシ 変数' dim=44495x1170x306mm formwork=55.94m² faces=16/14/0/1/0 parts=0 dedTop=30.84 dedBot=0.00 dedCon=2.84
+[ElemDiag] E-3 (スラブ) 'S20+35+20下フカシ' type='S20+35+20下フカシ' dim=31056x863x255mm formwork=23.40m² faces=7/5/0/2/0 parts=0 dedTop=17.49 dedBot=0.00 dedCon=0.60
+  [Visual] 専用ワークセット作成: '28Tools_型枠' id=11824
+  [CMD] 専用ワークセット確定: id=11824
+  [CMD] アクティブWS切替(TX外): saved=0 → formwork=11824 actual=11824
+  [Visual] CleanupExistingFormworkShapes filter='**型枠：免震擁壁' total=519 match=0 untagged=519 otherView=0 deleted=519
+  [Visual] view duplicated from source='**型枠：免震擁壁' newId=6267117
+  [SlabVoidExclude] E4551694 start: topFace=found BBox X=[3850,48345]mm Y=[-33800,-32630]mm margin=50mm offset=10mm
+  [SlabVoidExclude]   exclude face n=(-1,0,0) center=(39453,-33215)mm check=(39443,-33215)mm bbox=True proj=False
+  [SlabVoidExclude]   exclude face n=(1,0,0) center=(8397,-33215)mm check=(8407,-33215)mm bbox=True proj=False
+  [SlabVoidExclude]   exclude face n=(1,0,0) center=(26447,-33215)mm check=(26457,-33215)mm bbox=True proj=False
+  [SlabVoidExclude]   exclude face n=(-1,0,0) center=(15307,-33215)mm check=(15297,-33215)mm bbox=True proj=False
+  [SlabVoidExclude]   exclude face n=(1,0,0) center=(35693,-33215)mm check=(35703,-33215)mm bbox=True proj=False
+  [SlabVoidExclude]   exclude face n=(-1,0,0) center=(29707,-33215)mm check=(29697,-33215)mm bbox=True proj=False
+  [SlabVoidExclude] E4551694 done: excluded=6
+  [SlabVoidExclude] E4915071 start: topFace=found BBox X=[8397,39453]mm Y=[-33493,-32630]mm margin=50mm offset=10mm
+  [SlabVoidExclude]   exclude face n=(1,0,0) center=(15307,-33215)mm check=(15317,-33215)mm bbox=True proj=False
+  [SlabVoidExclude]   exclude face n=(1,0,0) center=(29707,-33215)mm check=(29717,-33215)mm bbox=True proj=False
+  [SlabVoidExclude]   exclude face n=(-1,0,0) center=(26447,-33215)mm check=(26437,-33215)mm bbox=True proj=False
+  [SlabVoidExclude]   exclude face n=(-1,0,0) center=(35693,-33215)mm check=(35683,-33215)mm bbox=True proj=False
+  [SlabVoidExclude] E4915071 done: excluded=4
+
+---- Pass 2: Contact Face Detection (elements=3) ----
+SpatialGrid cell size: 200.000 ft
+    s2-via-plane planeDist=0.787402 uv=(-30.130,-0.361)
+[Pair E-1(Wall) x E-2(Slab)]
+  f0->f2 dot=-1.000 aArea=191.1365 bArea=10.7676 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=0.787402 uv=(93.806,-0.361)
+  f0->f7 dot=-1.000 aArea=191.1365 bArea=21.0568 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=0.787402 uv=(18.274,-0.361)
+  f0->f13 dot=-1.000 aArea=191.1365 bArea=26.3802 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=0.787402 uv=(57.064,-0.361)
+  f0->f17 dot=-1.000 aArea=191.1365 bArea=14.1752 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(-93.806,-0.254)
+  f1->f4 dot=-1.000 aArea=201.4487 bArea=26.1769 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(30.130,-0.254)
+  f1->f9 dot=-1.000 aArea=201.4487 bArea=11.7385 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(-18.274,-0.254)
+  f1->f11 dot=-1.000 aArea=201.4487 bArea=34.1743 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(-57.064,-0.254)
+  f1->f15 dot=-1.000 aArea=201.4487 bArea=18.3633 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=74.137139 uv=(-1.132,-0.302)
+  f2->f1 dot=-1.000 aArea=4.2160 bArea=3.0724 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=42.670604 uv=(-1.132,-0.220)
+  f2->f6 dot=-1.000 aArea=4.2160 bArea=3.6375 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=36.548556 uv=(-1.132,-0.220)
+  f2->f12 dot=-1.000 aArea=4.2160 bArea=3.6375 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=10.695538 uv=(-1.132,-0.220)
+  f2->f16 dot=-1.000 aArea=4.2160 bArea=3.6375 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=108.392388 uv=(-1.132,5.840)
+  f3->f3 dot=-1.000 aArea=4.2160 bArea=2.8966 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=22.670604 uv=(-1.132,5.732)
+  f3->f8 dot=-1.000 aArea=4.2160 bArea=3.6375 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=36.548556 uv=(-1.132,5.732)
+  f3->f10 dot=-1.000 aArea=4.2160 bArea=3.6375 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=66.883202 uv=(-1.132,5.732)
+  f3->f14 dot=-1.000 aArea=4.2160 bArea=3.6375 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=0.077213 uv=(-0.028,-48.404)
+  f4->f5 dot=-0.981 aArea=30.5702 bArea=10.7285 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=0.701484 uv=(1.787,-49.847)
+  f4->f18 dot=-0.934 aArea=30.5702 bArea=36.7176 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=0.547057 uv=(1.843,70.367)
+  f4->f19 dot=-0.934 aArea=30.5702 bArea=57.5146 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=1.142449 uv=(3.120,84.539)
+  f4->f20 dot=-0.933 aArea=30.5702 bArea=15.7638 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=0.647435 uv=(1.807,84.954)
+  f4->f21 dot=-0.934 aArea=30.5702 bArea=15.7635 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=0.101863 uv=(-0.037,84.951)
+  f4->f22 dot=-1.000 aArea=30.5702 bArea=4.3202 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=0.101922 uv=(-0.037,84.954)
+  f4->f23 dot=-0.966 aArea=30.5702 bArea=4.0803 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=0.624271 uv=(1.815,-42.388)
+  f4->f24 dot=-0.932 aArea=30.5702 bArea=8.8256 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=0.071589 uv=(0.362,-42.283)
+  f4->f25 dot=-0.999 aArea=30.5702 bArea=1.2092 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=0.547057 uv=(1.843,0.000)
+  f4->f26 dot=-0.934 aArea=30.5702 bArea=111.5447 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+  f4->f27 dot=-1.000 aArea=30.5702 bArea=30.5702 d=0.0000 uv=(0.000,0.000) overlap=1.000 FULL_CONTACT
+    s2-via-plane planeDist=0.787402 uv=(-11.335,-0.303)
+[Pair E-1(Wall) x E-3(Slab)]
+  f0->f5 dot=-1.000 aArea=191.1365 bArea=18.9665 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=0.787402 uv=(41.896,-0.303)
+  f0->f9 dot=-1.000 aArea=191.1365 bArea=8.9480 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=0.787402 uv=(73.051,-0.303)
+  f0->f13 dot=-1.000 aArea=191.1365 bArea=10.3204 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(11.335,-0.303)
+  f1->f3 dot=-1.000 aArea=201.4487 bArea=18.9665 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(-41.896,-0.303)
+  f1->f7 dot=-1.000 aArea=201.4487 bArea=8.9480 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(-73.051,-0.303)
+  f1->f11 dot=-1.000 aArea=201.4487 bArea=10.3204 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=59.219160 uv=(-1.132,-0.303)
+  f2->f4 dot=-1.000 aArea=4.2160 bArea=3.2114 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=0.000000 uv=(-1.132,-0.303)
+    s2-uvOnA method=via-plane bounds=[U:-3.051..0.787,V:-0.722..0.115]
+    s2-uvOnA clamped to faceA bounds=[U:-3.051..0.787,V:-0.722..0.115] → [0.000..0.787,0.000..0.115]
+  f2->f8 dot=-1.000 aArea=4.2160 bArea=3.2114 d=- uv=- overlap=- PARTIAL_CONTACT area=0.0878
+    s2-via-plane planeDist=30.334646 uv=(-1.132,-0.303)
+  f2->f12 dot=-1.000 aArea=4.2160 bArea=3.2114 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=0.000000 uv=(-1.132,5.815)
+    s2-uvOnA method=via-plane bounds=[U:-3.051..0.787,V:5.397..6.234]
+    s2-uvOnA clamped to faceA bounds=[U:-3.051..0.787,V:5.397..6.234] → [0.000..0.787,5.397..5.512]
+  f3->f2 dot=-1.000 aArea=4.2160 bArea=3.2114 d=- uv=- overlap=- PARTIAL_CONTACT area=0.0878
+    s2-via-plane planeDist=47.244094 uv=(-1.132,5.815)
+  f3->f6 dot=-1.000 aArea=4.2160 bArea=3.2114 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=79.219160 uv=(-1.132,5.815)
+  f3->f10 dot=-1.000 aArea=4.2160 bArea=3.2114 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+[Pair E-2(Slab) x E-1(Wall)]
+  f0->f5 dot=-0.997 aArea=384.9287 bArea=14.4391 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+  f0->f6 dot=-0.997 aArea=384.9287 bArea=14.4391 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=74.137139 uv=(3.478,3.445)
+  f1->f2 dot=-1.000 aArea=3.0724 bArea=4.2160 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=0.787402 uv=(3.619,55.863)
+  f2->f0 dot=-1.000 aArea=10.7676 bArea=191.1365 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=108.392388 uv=(3.478,0.394)
+  f3->f3 dot=-1.000 aArea=2.8966 bArea=4.2160 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(3.478,90.118)
+  f4->f1 dot=-1.000 aArea=26.1769 bArea=201.4487 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=0.081114 uv=(0.012,49.126)
+  f5->f4 dot=-0.981 aArea=10.7285 bArea=30.5702 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=0.787402 uv=(3.619,-60.945)
+  f7->f0 dot=-1.000 aArea=21.0568 bArea=191.1365 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(3.478,-40.945)
+  f9->f1 dot=-1.000 aArea=11.7385 bArea=201.4487 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(3.478,18.274)
+  f11->f1 dot=-1.000 aArea=34.1743 bArea=201.4487 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=0.787402 uv=(3.619,18.274)
+  f13->f0 dot=-1.000 aArea=26.3802 bArea=191.1365 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(3.478,48.609)
+  f15->f1 dot=-1.000 aArea=18.3633 bArea=201.4487 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=0.787402 uv=(3.619,-28.970)
+  f17->f0 dot=-1.000 aArea=14.1752 bArea=191.1365 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=1.574495 uv=(-83.215,0.703)
+  f22->f4 dot=-1.000 aArea=4.3202 bArea=30.5702 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=2.186928 uv=(-40.433,10.798)
+  f25->f4 dot=-0.999 aArea=1.2092 bArea=30.5702 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+  f27->f4 dot=-1.000 aArea=30.5702 bArea=30.5702 d=0.0000 uv=(0.000,0.000) overlap=1.000 FULL_CONTACT
+    s2-via-plane planeDist=0.000000 uv=(0.000,-38.789)
+    s2-uvOnA method=via-plane bounds=[U:-0.418..0.418,V:-57.064..-20.515]
+    s2-uvOnA clamp-eliminated (no overlap with faceA UV range)
+  f28->f4 dot=-1.000 aArea=16.4267 bArea=30.5702 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-uv-out-of-bounds)
+    s2-via-plane planeDist=0.000000 uv=(0.000,-70.367)
+    s2-uvOnA method=via-plane bounds=[U:-0.418..0.418,V:-88.642..-52.093]
+    s2-uvOnA clamp-eliminated (no overlap with faceA UV range)
+  f30->f4 dot=-1.000 aArea=15.7626 bArea=30.5702 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-uv-out-of-bounds)
+[Pair E-2(Slab) x E-3(Slab)]
+  f0->f1 dot=-1.000 aArea=384.9287 bArea=175.4313 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+  f1->f2 dot=-1.000 aArea=3.0724 bArea=3.2114 d=37.5886 uv=(0.420,1.919) overlap=- REJECTED(s1=cond3-distance,s2=not-evaluated)
+  f1->f6 dot=-1.000 aArea=3.0724 bArea=3.2114 d=84.8327 uv=(0.420,1.919) overlap=- REJECTED(s1=cond3-distance,s2=not-evaluated)
+  f1->f10 dot=-1.000 aArea=3.0724 bArea=3.2114 d=116.8077 uv=(0.420,1.919) overlap=- REJECTED(s1=cond3-distance,s2=not-evaluated)
+    s2-via-plane planeDist=3.838583 uv=(0.418,26.253)
+  f2->f3 dot=-1.000 aArea=10.7676 bArea=18.9665 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.418,79.485)
+  f2->f7 dot=-1.000 aArea=10.7676 bArea=8.9480 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.418,110.640)
+  f2->f11 dot=-1.000 aArea=10.7676 bArea=10.3204 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+  f3->f4 dot=-1.000 aArea=2.8966 bArea=3.2114 d=131.0630 uv=(0.394,1.919) overlap=- REJECTED(s1=cond3-distance,s2=not-evaluated)
+  f3->f8 dot=-1.000 aArea=2.8966 bArea=3.2114 d=71.8438 uv=(0.394,1.919) overlap=- REJECTED(s1=cond3-distance,s2=not-evaluated)
+  f3->f12 dot=-1.000 aArea=2.8966 bArea=3.2114 d=41.5092 uv=(0.394,1.919) overlap=- REJECTED(s1=cond3-distance,s2=not-evaluated)
+    s2-via-plane planeDist=3.838583 uv=(0.418,119.728)
+  f4->f5 dot=-1.000 aArea=26.1769 bArea=18.9665 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.418,66.496)
+  f4->f9 dot=-1.000 aArea=26.1769 bArea=8.9480 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.418,35.341)
+  f4->f13 dot=-1.000 aArea=26.1769 bArea=10.3204 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=0.998508 uv=(1.393,59.126)
+  f5->f0 dot=-0.989 aArea=10.7285 bArea=175.4313 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.418,-90.554)
+  f7->f3 dot=-1.000 aArea=21.0568 bArea=18.9665 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.418,-37.323)
+  f7->f7 dot=-1.000 aArea=21.0568 bArea=8.9480 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.418,-6.168)
+  f7->f11 dot=-1.000 aArea=21.0568 bArea=10.3204 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.418,-11.335)
+  f9->f5 dot=-1.000 aArea=11.7385 bArea=18.9665 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.418,-64.567)
+  f9->f9 dot=-1.000 aArea=11.7385 bArea=8.9480 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.418,-95.722)
+  f9->f13 dot=-1.000 aArea=11.7385 bArea=10.3204 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.418,47.884)
+  f11->f5 dot=-1.000 aArea=34.1743 bArea=18.9665 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.418,-5.348)
+  f11->f9 dot=-1.000 aArea=34.1743 bArea=8.9480 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.418,-36.503)
+  f11->f13 dot=-1.000 aArea=34.1743 bArea=10.3204 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.418,-11.335)
+  f13->f3 dot=-1.000 aArea=26.3802 bArea=18.9665 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.418,41.896)
+  f13->f7 dot=-1.000 aArea=26.3802 bArea=8.9480 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.418,73.051)
+  f13->f11 dot=-1.000 aArea=26.3802 bArea=10.3204 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.418,78.219)
+  f15->f5 dot=-1.000 aArea=18.3633 bArea=18.9665 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.418,24.987)
+  f15->f9 dot=-1.000 aArea=18.3633 bArea=8.9480 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.418,-6.168)
+  f15->f13 dot=-1.000 aArea=18.3633 bArea=10.3204 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.418,-58.579)
+  f17->f3 dot=-1.000 aArea=14.1752 bArea=18.9665 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.418,-5.348)
+  f17->f7 dot=-1.000 aArea=14.1752 bArea=8.9480 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.418,25.807)
+  f17->f11 dot=-1.000 aArea=14.1752 bArea=10.3204 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=2.703820 uv=(-73.199,-0.512)
+  f22->f0 dot=-0.941 aArea=4.3202 bArea=175.4313 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=4.046062 uv=(-49.706,14.489)
+  f25->f0 dot=-0.940 aArea=1.2092 bArea=175.4313 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=1.326913 uv=(1.145,-28.789)
+  f28->f0 dot=-0.941 aArea=16.4267 bArea=175.4313 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=1.326913 uv=(1.145,-60.367)
+  f30->f0 dot=-0.941 aArea=15.7626 bArea=175.4313 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=6.217192 uv=(0.591,-18.274)
+[Pair E-3(Slab) x E-1(Wall)]
+  f0->f5 dot=-0.997 aArea=175.4313 bArea=14.4391 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=6.217192 uv=(0.197,-18.274)
+  f0->f6 dot=-0.997 aArea=175.4313 bArea=14.4391 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(3.478,-18.274)
+  f3->f1 dot=-1.000 aArea=18.9665 bArea=201.4487 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=59.219160 uv=(3.478,3.445)
+  f4->f2 dot=-1.000 aArea=3.2114 bArea=4.2160 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=0.787402 uv=(3.619,40.945)
+  f5->f0 dot=-1.000 aArea=18.9665 bArea=191.1365 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(3.478,28.970)
+  f7->f1 dot=-1.000 aArea=8.9480 bArea=201.4487 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=0.787402 uv=(3.619,-18.274)
+  f9->f0 dot=-1.000 aArea=8.9480 bArea=191.1365 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=79.219160 uv=(3.478,0.394)
+  f10->f3 dot=-1.000 aArea=3.2114 bArea=4.2160 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(3.478,60.945)
+  f11->f1 dot=-1.000 aArea=10.3204 bArea=201.4487 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=0.787402 uv=(3.619,-48.609)
+  f13->f0 dot=-1.000 aArea=10.3204 bArea=191.1365 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=0.780840 uv=(0.394,30.130)
+[Pair E-3(Slab) x E-2(Slab)]
+  f0->f5 dot=-0.989 aArea=175.4313 bArea=10.7285 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=0.805446 uv=(2.313,31.573)
+  f0->f18 dot=-1.000 aArea=175.4313 bArea=36.7176 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=0.969488 uv=(2.313,-88.642)
+  f0->f19 dot=-1.000 aArea=175.4313 bArea=57.5146 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=0.839752 uv=(3.716,-102.813)
+  f0->f20 dot=-1.000 aArea=175.4313 bArea=15.7638 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=0.862861 uv=(2.313,-103.228)
+  f0->f21 dot=-1.000 aArea=175.4313 bArea=15.7635 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=0.754655 uv=(0.394,-103.225)
+  f0->f22 dot=-0.941 aArea=175.4313 bArea=4.3202 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=0.754593 uv=(0.394,-103.228)
+  f0->f23 dot=-0.997 aArea=175.4313 bArea=4.0803 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=0.887467 uv=(2.313,24.114)
+  f0->f24 dot=-0.998 aArea=175.4313 bArea=8.8256 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=0.917615 uv=(0.759,24.009)
+  f0->f25 dot=-0.940 aArea=175.4313 bArea=1.2092 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=0.969488 uv=(2.313,-18.274)
+  f0->f26 dot=-1.000 aArea=175.4313 bArea=111.5447 d=0.9781 uv=(10.000,0.372) overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=0.862861 uv=(0.394,-18.274)
+  f0->f27 dot=-0.941 aArea=175.4313 bArea=30.5702 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=0.862861 uv=(0.394,-57.064)
+  f0->f28 dot=-0.941 aArea=175.4313 bArea=16.4267 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=0.969488 uv=(2.313,-57.064)
+  f0->f29 dot=-1.000 aArea=175.4313 bArea=59.9377 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=0.862861 uv=(0.394,-88.642)
+  f0->f30 dot=-0.941 aArea=175.4313 bArea=15.7626 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.361,30.130)
+  f3->f2 dot=-1.000 aArea=18.9665 bArea=10.7676 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.361,-93.806)
+  f3->f7 dot=-1.000 aArea=18.9665 bArea=21.0568 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.361,-18.274)
+  f3->f13 dot=-1.000 aArea=18.9665 bArea=26.3802 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.361,-57.064)
+  f3->f17 dot=-1.000 aArea=18.9665 bArea=14.1752 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+  f4->f3 dot=-1.000 aArea=3.2114 bArea=2.8966 d=131.0630 uv=(0.418,1.919) overlap=- REJECTED(s1=cond3-distance,s2=not-evaluated)
+    s2-uvOnA method=via-plane bounds=[U:0.000..1.004,V:0.000..3.839]
+    s2-uvOnA clamped to faceA bounds=[U:0.000..1.004,V:0.000..3.839] → [0.000..0.837,0.000..3.839]
+  f4->f8 dot=-1.000 aArea=3.2114 bArea=3.6375 d=0.0000 uv=(0.418,1.919) overlap=0.750(ok=3/off=1) PARTIAL_CONTACT area=3.2114
+  f4->f10 dot=-1.000 aArea=3.2114 bArea=3.6375 d=59.2192 uv=(0.418,1.919) overlap=- REJECTED(s1=cond3-distance,s2=not-evaluated)
+  f4->f14 dot=-1.000 aArea=3.2114 bArea=3.6375 d=89.5538 uv=(0.418,1.919) overlap=- REJECTED(s1=cond3-distance,s2=not-evaluated)
+    s2-via-plane planeDist=3.838583 uv=(0.468,116.476)
+  f5->f4 dot=-1.000 aArea=18.9665 bArea=26.1769 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.468,-7.459)
+  f5->f9 dot=-1.000 aArea=18.9665 bArea=11.7385 d=- uv=- overlap=- REJECTED(s1=cond2-area-ratio,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.468,40.945)
+  f5->f11 dot=-1.000 aArea=18.9665 bArea=34.1743 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.468,79.734)
+  f5->f15 dot=-1.000 aArea=18.9665 bArea=18.3633 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.361,77.374)
+  f7->f2 dot=-1.000 aArea=8.9480 bArea=10.7676 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.361,-46.562)
+  f7->f7 dot=-1.000 aArea=8.9480 bArea=21.0568 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.361,28.970)
+  f7->f13 dot=-1.000 aArea=8.9480 bArea=26.3802 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.361,-9.820)
+  f7->f17 dot=-1.000 aArea=8.9480 bArea=14.1752 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.468,57.257)
+  f9->f4 dot=-1.000 aArea=8.9480 bArea=26.1769 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.468,-66.678)
+  f9->f9 dot=-1.000 aArea=8.9480 bArea=11.7385 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.468,-18.274)
+  f9->f11 dot=-1.000 aArea=8.9480 bArea=34.1743 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.468,20.515)
+  f9->f15 dot=-1.000 aArea=8.9480 bArea=18.3633 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+  f10->f1 dot=-1.000 aArea=3.2114 bArea=3.0724 d=116.8077 uv=(0.418,1.919) overlap=- REJECTED(s1=cond3-distance,s2=not-evaluated)
+    s2-uvOnA method=via-plane bounds=[U:0.000..1.004,V:0.000..3.839]
+    s2-uvOnA clamped to faceA bounds=[U:0.000..1.004,V:0.000..3.839] → [0.000..0.837,0.000..3.839]
+  f10->f6 dot=-1.000 aArea=3.2114 bArea=3.6375 d=0.0000 uv=(0.418,1.919) overlap=0.750(ok=3/off=1) PARTIAL_CONTACT area=3.2114
+  f10->f12 dot=-1.000 aArea=3.2114 bArea=3.6375 d=79.2192 uv=(0.418,1.919) overlap=- REJECTED(s1=cond3-distance,s2=not-evaluated)
+  f10->f16 dot=-1.000 aArea=3.2114 bArea=3.6375 d=31.9751 uv=(0.418,1.919) overlap=- REJECTED(s1=cond3-distance,s2=not-evaluated)
+    s2-via-plane planeDist=3.838583 uv=(0.361,109.349)
+  f11->f2 dot=-1.000 aArea=10.3204 bArea=10.7676 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.361,-14.587)
+  f11->f7 dot=-1.000 aArea=10.3204 bArea=21.0568 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.361,60.945)
+  f11->f13 dot=-1.000 aArea=10.3204 bArea=26.3802 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.361,22.156)
+  f11->f17 dot=-1.000 aArea=10.3204 bArea=14.1752 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.468,26.923)
+  f13->f4 dot=-1.000 aArea=10.3204 bArea=26.1769 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.468,-97.013)
+  f13->f9 dot=-1.000 aArea=10.3204 bArea=11.7385 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.468,-48.609)
+  f13->f11 dot=-1.000 aArea=10.3204 bArea=34.1743 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+    s2-via-plane planeDist=3.838583 uv=(0.468,-9.820)
+  f13->f15 dot=-1.000 aArea=10.3204 bArea=18.3633 d=- uv=- overlap=- REJECTED(s1=cond3-project-null,s2=s2-distance)
+
+---- Pass 2 Summary ----
+pairs checked (grid):        6
+pairs with BB overlap:       6
+full contact changes:        2
+partial contacts added:      4
+  [Clipper] face area=3.2114 rect=[U:0.000..0.837, V:0.000..3.839] partialContacts=1
+  [Clipper] subtract E-2/f8 raw=[U:0.000..0.837,V:0.000..3.839] clipped=[U:0.000..0.837, V:0.000..3.839]
+  [Clipper] pieces after subtraction: 0
+  [Clipper] face area=3.2114 rect=[U:0.000..0.837, V:0.000..3.839] partialContacts=1
+  [Clipper] subtract E-2/f6 raw=[U:0.000..0.837,V:0.000..3.839] clipped=[U:0.000..0.837, V:0.000..3.839]
+  [Clipper] pieces after subtraction: 0
+  [Visual] CreateVisualization: sourceView='**型枠：免震擁壁' type=View3D reusedView=False target='3D_型枠数量 - **型枠：免震擁壁'
+  [Visual] CopySectionBoxFromSource: source='**型枠：免震擁壁' IsSectionBoxActive=False
+  [Visual] CopySectionBoxFromSource: ソース非アクティブ → 解析ビューも切断ボックスなし
+  [Visual] CopyCategoryVisibility 開始: source='**型枠：免震擁壁' target='3D_型枠数量 - **型枠：免震擁壁'
+  [Visual] CopyCategoryVisibility 完了: total=345 copied=290 hiddenCopied=34 skipped=55 errors=0
+  [Visual] CopyWorksetVisibility: copied=22 errors=0
+  [Visual] OST_GenericModel category set visible
+  [Visual] visibleInSourceIds: 49 (scope=CurrentView)
+  [BoolDiff] pc E-3/f8 UvBoundsOnA=[U:0.000..0.787,V:0.000..0.115] hasContactFaceB=True
+    [PolyCutter] vol=0.642283 faceBNormal=(-1.00,0.00,0.00) dir=(1.00,0.00,0.00) needsReverse=True loops=1
+    [BoolDiff] polygon-cutter=OK
+    [BoolDiff] subtract volBefore=0.210800 volAfter=0.209880 delta=0.000920
+Boolean diff fallback OK: E-1 face area=4.2160 clipperReason=not-rectangular:interior-points(2)
+  [BoolDiff] pc E-3/f2 UvBoundsOnA=[U:0.000..0.787,V:5.397..5.512] hasContactFaceB=True
+    [PolyCutter] vol=0.642283 faceBNormal=(1.00,0.00,0.00) dir=(-1.00,0.00,0.00) needsReverse=True loops=1
+    [BoolDiff] polygon-cutter=OK
+    [BoolDiff] subtract volBefore=0.210800 volAfter=0.209880 delta=0.000920
+Boolean diff fallback OK: E-1 face area=4.2160 clipperReason=not-rectangular:interior-points(2)
+  [Visual] formwork DirectShapes created: 27 (elements=3 skippedInvisible=0)
+  [Visual] doc.Regenerate() called after formwork creation
+  [Visual:WsDiag] DS id=6267126 wsId=11824 paramIsReadOnly=False
+  [Visual:WsDiag] DS id=6267127 wsId=11824 paramIsReadOnly=False
+  [Visual:WsDiag] DS id=6267128 wsId=11824 paramIsReadOnly=False
+  [Visual:Diag] sample key='壁' id=6267126 BB=[50.22,-107.89,-0.31]-[86.77,-107.84,4.92] solids=1 vol=9.556824
+  [Visual:Diag] sample key='スラブ' id=6267130 BB=[12.63,-110.89,-1.36]-[158.61,-107.05,-1.31] solids=1 vol=19.246437
+  [Visual:Diag] DirectShapes by 区分:
+    'スラブ': 23
+    '壁': 4
+  [Visual] total DirectShapes: 27 (formwork=27 excluded=0)
+  [Visual] EnsureFormworkWorksetsVisible: wsId=11824 shapeCount=27 setVis=Visible actualVis=Visible
+  [Filter] solidFillPatternId=4
+  [Filter] paramElemId=6202741 (28Tools_Formwork_区分)
+  [Filter] '型枠_柱' rule=区分=='柱' color=(60,120,240) visible=True
+  [Filter] '型枠_梁' rule=区分=='梁' color=(60,200,100) visible=True
+  [Filter] '型枠_壁' rule=区分=='壁' color=(255,160,60) visible=True
+  [Filter] '型枠_スラブ' rule=区分=='スラブ' color=(250,220,60) visible=True
+  [Filter] '型枠_基礎' rule=区分=='基礎' color=(160,100,220) visible=True
+  [Filter] '型枠_階段' rule=区分=='階段' color=(60,200,220) visible=True
+  [Filter] '型枠_屋根' rule=区分=='屋根' color=(220,100,140) visible=True
+  [Filter] '型枠_その他' rule=区分=='その他' color=(180,180,180) visible=True
+  [Filter] applied 8 filters to view '3D_型枠数量 - **型枠：免震擁壁'
+  [Visual] copied 2/2 filters from source view (forcedVisible=1 for GenericModel-matching filters)
+
+---- Schedule Creation: 型枠数量集計 - **型枠：免震擁壁 ----
+  [Sched:after-create] IsItemized=True ShowGrandTotal=False fields=0 sortGroups=0
+  [Sched:after-set-itemized-before-fields] IsItemized=False ShowGrandTotal=True fields=0 sortGroups=0
+  [Sched:after-add-fields] IsItemized=False ShowGrandTotal=True fields=6 sortGroups=0
+  [Sched:areaField after-add] heading='28Tools_Formwork_面積' fieldType=Instance DisplayType=Standard IsCalculated=False IsHidden=False
+  [Sched:areaField after-set-displaytype-1] heading='型枠面積' fieldType=Instance DisplayType=Totals IsCalculated=False IsHidden=False
+  [Sched:after-group-fields] IsItemized=False ShowGrandTotal=True fields=8 sortGroups=3
+  [Sched:areaField after-group] heading='型枠面積' fieldType=Instance DisplayType=Totals IsCalculated=False IsHidden=False
+  [Sched:after-sort-group] IsItemized=False ShowGrandTotal=True fields=8 sortGroups=4
+  [Sched] ShowGrandTotalTitle = True
+  [Sched] GrandTotalTitle set: '型枠面積(合計)'
+  [Sched] ShowGrandTotalTitle = False
+  [Sched] ShowGrandTotalCount = False
+  [Sched] BlankLineBeforeData: no matching property found (manual setting required)
+  [Sched:freshAreaField after-set-displaytype-2] heading='型枠面積' fieldType=Instance DisplayType=Totals IsCalculated=False IsHidden=False
+  [Sched:FINAL] IsItemized=False ShowGrandTotal=True fields=8 sortGroups=4
+  [Sched] AutoWidth: body rows=5 cols=6
+  [Sched] col 0 header=4.0 maxValue=2.0 → width=0.075 ft (~23mm)
+  [Sched] col 1 header=6.0 maxValue=0.0 → width=0.091 ft (~28mm)
+  [Sched] col 2 header=6.0 maxValue=0.0 → width=0.091 ft (~28mm)
+  [Sched] col 3 header=4.0 maxValue=0.0 → width=0.075 ft (~23mm)
+  [Sched] col 4 header=4.0 maxValue=0.0 → width=0.085 ft (~26mm)
+  [Sched] col 5 header=8.0 maxValue=10.0 → width=0.125 ft (~38mm)
+
+---- Summary Schedule Creation ----
+  [Sched] ShowGrandTotalTitle = True
+  [Sched] GrandTotalTitle set: '全体合計'
+  [Sched] ShowGrandTotalTitle = True
+  [Sched] ShowGrandTotalCount = True
+  [Sched:Summary] body rows=4 cols=3
+  [Sched:Summary] col 0 header=10.0 maxValue=12.0 → width=0.142 ft (~43mm)
+  [Sched:Summary] col 1 header=6.0 maxValue=0.0 → width=0.098 ft (~30mm)
+  [Sched:Summary] col 2 header=14.0 maxValue=10.0 → width=0.159 ft (~48mm)
+  [Sched:Summary] data row pink EX (expected on Revit 2022): Only allow to override cell style for header section or column header in body section.
+Parameter name: nCol
+  [Sched:Summary] column headers styled (bold/red, area col pink)
+  [Sched:Summary] created: '型枠数量集計_合計'
+  [CMD] アクティブWS復元: 0
+  [Hide] analysisViews found: 1
+  [Hide] tagged shapes by view: **型枠：免震擁壁=27
+  [Hide] HideInOtherViews: shapes=27 keepInViewId=6267117 success=375 fail=2 lastErr='One of the elements cannot be hidden.
+Parameter name: elementIdSet' failedView='プロジェクト ビュー'
+  [Sheet] 既存シート削除: '型枠-001 - 型枠数量集計'
+  [Sheet] CollectAllAnalysisViewIds: 1件
+  [Sheet] CollectAllPerViewScheduleIds: 2件
+  [Sheet] most-used title block id=4935379 count=36
+  [Sheet] schedule 6267160 placed at L=0.08/T=1.86 → R=0.49/B=1.72
+  [Sheet] schedule 6214206 placed at L=0.08/T=1.67 → R=0.62/B=1.47
+  [Sheet] schedule 6267153 placed at L=0.67/T=1.67 → R=1.22/B=1.47
+  [Sheet] viewport types found (OfClass): 4
+  [Sheet]   type id=354 name='タイトル&尺度' SHOW_LABEL=1
+  [Sheet]   type id=897434 name='非表示' SHOW_LABEL=0
+  [Sheet]   type id=2670183 name='タイトル&尺度&アンダーライン' SHOW_LABEL=1
+  [Sheet]   type id=6214232 name='Viewport_NoTitle_28Tools' SHOW_LABEL=0
+  [Sheet] FindNoTitleViewportType → id=897434 reason='SHOW_LABEL=0: '非表示''
+  [Sheet] SHOW_LABEL on existing: exists=True isReadOnly=False value=0
+  [Sheet] ChangeTypeId OK → no-title id=897434
+  [Sheet] created: '型枠-001 - 型枠数量集計' views=1 schedules=2
+==== End [2026-05-20 11:45:48] total lines: 892 ====
