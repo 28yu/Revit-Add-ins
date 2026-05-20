@@ -1,4 +1,4 @@
-==== Formwork Debug Log Start [2026-05-20 10:36:44] ====
+==== Formwork Debug Log Start [2026-05-20 10:11:06] ====
 [Engine] Run() 開始 Scope=CurrentView IncludeLinks=True EnableDebugLog=True
 [Engine] 切断ボックスSolid: なし (Scope=CurrentView / SectionBox未設定またはCurrentView以外)
 [Engine] CollectAndClassify 開始
@@ -8,8 +8,7 @@
   [LinkedCollect] ⚠️ JRH_W_Str_Foundations: IsWorkshared=true (BIM360 or Revit Server). セクションボックスフィルタで要素数を絞り込みます。
   [LinkedCollect] JRH_W_Str_Foundations: CollectFromDoc 開始 cats=7 outline=無(全要素対象)
   [LinkSweepDiag] CollectFromDoc(linkDoc='JRH_W_Str_Foundations') WallSweep found=35 added=35
-  [VisFilter] JRH_W_Str_Foundations: View link methods=[IsMonitoringLinkElement() | GetMonitoredLinkElementIds()]
-  [VisFilter] JRH_W_Str_Foundations: View.GetLinkOverrides(*) API なし
+  [VisFilter] JRH_W_Str_Foundations: View.GetLinkOverrides(ElementId) API なし
   [VisFilter] JRH_W_Str_Foundations: カテゴリ非表示除外 0/439
   [WsCheck] JRH_W_Str_Foundations ws='ワークセット1' id=0 → visible
   [WsCheck] JRH_W_Str_Foundations ws='共有済みのビュー、レベル、通芯' id=163 → visible
@@ -5104,4 +5103,4 @@ Parameter name: elementIdSet' failedView='プロジェクト ビュー'
   [Sheet] SHOW_LABEL on existing: exists=True isReadOnly=False value=0
   [Sheet] ChangeTypeId OK → no-title id=897434
   [Sheet] created: '型枠-001 - 型枠数量集計' views=1 schedules=2
-==== End [2026-05-20 10:43:15] total lines: 5104 ====
+==== End [2026-05-20 10:16:18] total lines: 5103 ====
