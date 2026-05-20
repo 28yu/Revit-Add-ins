@@ -898,35 +898,41 @@ namespace Tools28.Commands.FormworkCalculator.Output
         }
 
         /// <summary>
-        /// プロジェクト内の全型枠 DirectShape について、ParamSourceView で対応する分析ビュー以外で
-        /// 非表示にする。複数3Dビュー対応のポストパス: 新規作成された分析ビューが
-        /// 過去実行の他ビュー DirectShape を巻き込んでしまうのを防ぐ。
+        /// 全型枠 DirectShape を「対応する分析ビューでだけ表示」状態に揃える。
+        ///   - 非分析ビュー (平面・断面・他 3D ビュー等): 全型枠 DirectShape を非表示
+        ///   - 各分析ビュー: 自分のソースビューに紐づくシェイプのみ表示。それ以外
+        ///     (他ソースの分析ビュー由来 + タグなし) は全て非表示
+        /// これにより、過去実行の残りや別ソースの DirectShape が紛れ込むのを防ぐ。
         /// </summary>
         internal static void HideAllFormworkShapesInOtherViews(Document doc)
         {
-            // ソースビュー名 → 分析ビュー ID マッピング (タグ + 名前パターンの両方で検出)
-            var analysisViewByName = new Dictionary<string, ElementId>();
+            // 分析ビュー ID → ソースビュー名 マッピング
+            var sourceByAnalysisId = new Dictionary<int, string>();
+            var analysisViewIds = new HashSet<int>();
             var analysisViews = Engine.FormworkOutputFinder.FindAllAnalysisViews(doc);
             foreach (var av in analysisViews)
             {
-                // タグから関連ソースビュー名を取得 (リネーム耐性)
+                analysisViewIds.Add(av.Id.IntValue());
                 string srcViewName = FormworkParameterManager.GetRelatedSourceView(av);
                 if (string.IsNullOrEmpty(srcViewName))
                 {
-                    // タグ未付与: 名前パターンから推定 (新旧両方)
                     if (av.Name.StartsWith(AnalysisViewPrefix))
                         srcViewName = av.Name.Substring(AnalysisViewPrefix.Length);
                     else if (av.Name.StartsWith(LegacyAnalysisViewPrefix))
                         srcViewName = av.Name.Substring(LegacyAnalysisViewPrefix.Length);
+                    else if (av.Name == AnalysisViewName || av.Name == LegacyAnalysisViewName)
+                        srcViewName = string.Empty;
                     else
-                        continue;
+                        srcViewName = string.Empty;
                 }
-                analysisViewByName[srcViewName] = av.Id;
+                sourceByAnalysisId[av.Id.IntValue()] = srcViewName ?? string.Empty;
             }
-            FormworkDebugLog.Log($"  [Hide] analysisViews found: {analysisViewByName.Count}");
+            FormworkDebugLog.Log($"  [Hide] analysisViews found: {analysisViewIds.Count}");
 
-            // ソースビュー名 → DirectShape Id 群
+            // 全型枠 DirectShape を収集 (タグありは sourceView 別、タグなしは別バケット)
+            var allShapeIds = new List<ElementId>();
             var shapesByView = new Dictionary<string, List<ElementId>>();
+            var untaggedShapes = new List<ElementId>();
             var collector = new FilteredElementCollector(doc)
                 .OfClass(typeof(DirectShape))
                 .OfCategory(BuiltInCategory.OST_GenericModel);
@@ -940,28 +946,90 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     if (string.IsNullOrEmpty(mv) ||
                         !mv.StartsWith(FormworkParameterManager.MarkerValue)) continue;
 
+                    allShapeIds.Add(e.Id);
+
                     var pv = e.LookupParameter(FormworkParameterManager.ParamSourceView);
                     string sv = pv?.AsString() ?? string.Empty;
-                    if (string.IsNullOrEmpty(sv)) continue; // タグなしはスキップ
-
-                    if (!shapesByView.TryGetValue(sv, out var list))
+                    if (string.IsNullOrEmpty(sv))
                     {
-                        list = new List<ElementId>();
-                        shapesByView[sv] = list;
+                        untaggedShapes.Add(e.Id);
                     }
-                    list.Add(e.Id);
+                    else
+                    {
+                        if (!shapesByView.TryGetValue(sv, out var list))
+                        {
+                            list = new List<ElementId>();
+                            shapesByView[sv] = list;
+                        }
+                        list.Add(e.Id);
+                    }
                 }
                 catch { }
             }
-            FormworkDebugLog.Log($"  [Hide] tagged shapes by view: " +
-                string.Join(", ", shapesByView.Select(kv => $"{kv.Key}={kv.Value.Count}")));
+            FormworkDebugLog.Log(
+                $"  [Hide] total formwork shapes={allShapeIds.Count} " +
+                $"untagged={untaggedShapes.Count} taggedGroups={shapesByView.Count}");
 
-            // 各ソースビュー群を、対応する分析ビュー以外で非表示にする
-            foreach (var kv in shapesByView)
+            if (allShapeIds.Count == 0) return;
+
+            // プロジェクト内の全ビューを走査し、各ビューで非表示にすべきシェイプを決定して一括非表示
+            var allViews = new FilteredElementCollector(doc)
+                .OfClass(typeof(View))
+                .Cast<View>()
+                .Where(v => !v.IsTemplate && !(v is ViewSchedule) && v.ViewType != ViewType.Legend)
+                .ToList();
+
+            int totalHidden = 0;
+            foreach (var v in allViews)
             {
-                if (!analysisViewByName.TryGetValue(kv.Key, out var avId)) continue;
-                HideInOtherViews(doc, kv.Value, avId);
+                List<ElementId> toHide;
+                bool isAnalysis = analysisViewIds.Contains(v.Id.IntValue());
+
+                if (isAnalysis)
+                {
+                    // 自分のソースビュー名に紐づくシェイプは「表示」、それ以外は全部「非表示」
+                    sourceByAnalysisId.TryGetValue(v.Id.IntValue(), out string ownSrc);
+                    toHide = new List<ElementId>();
+                    foreach (var kv in shapesByView)
+                    {
+                        if (kv.Key != ownSrc) toHide.AddRange(kv.Value);
+                    }
+                    toHide.AddRange(untaggedShapes);
+                }
+                else
+                {
+                    // 非分析ビュー: 全型枠シェイプを非表示
+                    toHide = allShapeIds;
+                }
+
+                if (toHide.Count == 0) continue;
+
+                try
+                {
+                    v.HideElements(toHide);
+                    totalHidden += toHide.Count;
+                }
+                catch (Exception ex)
+                {
+                    // HideElements は既に非表示の要素 / 隠せない要素があるとバッチごと失敗する。
+                    // 1 件ずつ再試行する。
+                    int perItemOk = 0;
+                    foreach (var id in toHide)
+                    {
+                        try
+                        {
+                            v.HideElements(new List<ElementId> { id });
+                            perItemOk++;
+                        }
+                        catch { }
+                    }
+                    totalHidden += perItemOk;
+                    FormworkDebugLog.Log(
+                        $"  [Hide] view='{v.Name}' batch EX='{ex.Message}' perItemOk={perItemOk}/{toHide.Count}");
+                }
             }
+            FormworkDebugLog.Log(
+                $"  [Hide] HideAllFormworkShapesInOtherViews done: views={allViews.Count} totalHidden={totalHidden}");
         }
 
         private static DirectShapeType GetOrCreateDirectShapeType(Document doc, string typeName)
