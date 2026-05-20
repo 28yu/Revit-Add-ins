@@ -1,5 +1,6 @@
-## 最終セッション: 2026-05-15 04:28
-変更ファイル: .claude/update-status.sh,__test.tmp
+## 最終セッション: 2026-05-20 02:16
+変更ファイル: Docs/HANDOFF-PDFtoExcel-Tool.md
+
 
 # 開発ステータス
 
