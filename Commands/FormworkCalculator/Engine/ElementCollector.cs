@@ -284,6 +284,64 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                         FormworkDebugLog.Log(
                             $"  [VisFilter] {sourceName}: IsHidden 除外 {hiddenIH}/{beforeIH}");
 
+                    // (C2) ホストビューのフィルタ可視性をリンク要素に適用 (ByHostView mode 対応)
+                    // 「リンクの表示設定」がデフォルトの「ホストビューで設定」の場合、
+                    // ホストビューのフィルタはリンク要素にも適用される。
+                    // GetFilterVisibility=false のフィルタについて、カテゴリ一致+ルール一致の
+                    // リンク要素を除外する。ParameterFilterElement.GetElementFilter() の
+                    // ElementFilter.PassesFilter(linkDoc, elemId) でクロスドキュメント評価できる。
+                    try
+                    {
+                        var hostFilterIds = activeView.GetFilters();
+                        int totalFilterHidden = 0;
+                        int filtersChecked = 0;
+                        foreach (var fid in hostFilterIds)
+                        {
+                            bool filterVisible = true;
+                            try { filterVisible = activeView.GetFilterVisibility(fid); } catch { }
+                            if (filterVisible) continue;
+
+                            var pfe = hostDoc.GetElement(fid) as ParameterFilterElement;
+                            if (pfe == null) continue;
+
+                            ICollection<ElementId> filterCats = null;
+                            ElementFilter elementFilter = null;
+                            try
+                            {
+                                filterCats = pfe.GetCategories();
+                                elementFilter = pfe.GetElementFilter();
+                            }
+                            catch { continue; }
+                            if (elementFilter == null || filterCats == null) continue;
+
+                            var filterCatSet = new HashSet<int>(filterCats.Select(c => c.IntValue()));
+                            int beforeFilter = linkedElems.Count;
+                            linkedElems = linkedElems.Where(e =>
+                            {
+                                if (e?.Category == null) return true;
+                                if (!filterCatSet.Contains(e.Category.Id.IntValue())) return true;
+                                try { return !elementFilter.PassesFilter(linkDoc, e.Id); }
+                                catch { return true; }
+                            }).ToList();
+                            int thisHidden = beforeFilter - linkedElems.Count;
+                            filtersChecked++;
+                            if (thisHidden > 0)
+                            {
+                                totalFilterHidden += thisHidden;
+                                FormworkDebugLog.Log(
+                                    $"  [VisFilter] {sourceName}: フィルタ非表示'{pfe.Name}' 除外 {thisHidden}/{beforeFilter}");
+                            }
+                        }
+                        FormworkDebugLog.Log(
+                            $"  [VisFilter] {sourceName}: ホストフィルタチェック完了 " +
+                            $"hostFilters={hostFilterIds.Count} hidden評価={filtersChecked} 累計除外={totalFilterHidden}");
+                    }
+                    catch (Exception exFil)
+                    {
+                        FormworkDebugLog.Log(
+                            $"  [VisFilter] {sourceName}: ホストフィルタチェックEX: {exFil.Message}");
+                    }
+
                     // (D) 診断ログ: 残った要素のサンプル (先頭5件) のワークセット情報
                     if (linkedElems.Count > 0 && isWorkshared)
                     {
