@@ -1,4 +1,4 @@
-==== Formwork Debug Log Start [2026-05-20 10:11:06] ====
+==== Formwork Debug Log Start [2026-05-20 09:30:31] ====
 [Engine] Run() 開始 Scope=CurrentView IncludeLinks=True EnableDebugLog=True
 [Engine] 切断ボックスSolid: なし (Scope=CurrentView / SectionBox未設定またはCurrentView以外)
 [Engine] CollectAndClassify 開始
@@ -13,12 +13,7 @@
   [WsCheck] JRH_W_Str_Foundations ws='ワークセット1' id=0 → visible
   [WsCheck] JRH_W_Str_Foundations ws='共有済みのビュー、レベル、通芯' id=163 → visible
   [WsCheck] JRH_W_Str_Foundations: ワークセット総計=2 既定非表示=0 → 除外対象=0
-  [VisFilter] JRH_W_Str_Foundations: C2 開始 (ホストビューフィルタ評価)
-  [VisFilter] JRH_W_Str_Foundations: C2 hostFilters=2
-  [VisFilter] JRH_W_Str_Foundations: C2 filter fid=6176923 visible=False
   [VisFilter] JRH_W_Str_Foundations: フィルタ非表示'コメント_新病棟_後施工（含まない）' 除外 370/439
-  [VisFilter] JRH_W_Str_Foundations: C2 filter fid=6226612 visible=False
-  [VisFilter] JRH_W_Str_Foundations: フィルタ非表示'床_スラブハンチ' 除外0 cats=[-2000032]
   [VisFilter] JRH_W_Str_Foundations: ホストフィルタチェック完了 hostFilters=2 hidden評価=2 累計除外=370
   [VisFilter:sample] JRH_W_Str_Foundations E4551240 cat='壁' workset=[0'ワークセット1']
   [VisFilter:sample] JRH_W_Str_Foundations E4551895 cat='壁' workset=[0'ワークセット1']
@@ -5103,4 +5098,4 @@ Parameter name: elementIdSet' failedView='プロジェクト ビュー'
   [Sheet] SHOW_LABEL on existing: exists=True isReadOnly=False value=0
   [Sheet] ChangeTypeId OK → no-title id=897434
   [Sheet] created: '型枠-001 - 型枠数量集計' views=1 schedules=2
-==== End [2026-05-20 10:16:18] total lines: 5103 ====
+==== End [2026-05-20 09:35:37] total lines: 5098 ====
