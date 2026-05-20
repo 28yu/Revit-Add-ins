@@ -60,13 +60,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 cr.Registry.RegisterHost(elem, doc);
             }
 
-            // 2) リンクモデルの要素を収集して登録
-            // 各リンクインスタンスのワークセット可視性、リンク要素のカテゴリ/ワークセット/
-            // ビューフィルタ/IsHidden 可視性をホストビューと同じ基準で判定する。
-            if (settings != null && settings.IncludeLinkedModels)
-            {
-                CollectFromLinkedModels(doc, settings, activeView, cr);
-            }
+            // リンクモデルは現時点では対象外 (将来改良予定)
 
             ClassifyAndFilter(doc, cr, settings);
             return cr;

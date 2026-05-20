@@ -165,7 +165,7 @@ namespace Tools28.Commands.FormworkCalculator.Views
                 Create3DView = ChkCreate3DView.IsChecked == true,
                 CreateSheet = ChkCreateSheet.IsChecked == true,
                 ShowDeductedFaces = ChkShowDeducted.IsChecked == true,
-                IncludeLinkedModels = ChkIncludeLinks.IsChecked == true,
+                IncludeLinkedModels = false,
             };
 
             if (RadioColorZone.IsChecked == true) s.ColorScheme = ColorSchemeType.ByZone;

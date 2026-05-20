@@ -124,7 +124,7 @@
                 <CheckBox x:Name="ChkShowDeducted" Margin="0,3">
                     <TextBlock x:Name="txtShowDeducted" Text="控除面も表示する"/>
                 </CheckBox>
-                <CheckBox x:Name="ChkIncludeLinks" Margin="0,3">
+                <CheckBox x:Name="ChkIncludeLinks" Margin="0,3" Visibility="Collapsed">
                     <TextBlock x:Name="txtIncludeLinks" Text="リンクモデルも対象に含める"/>
                 </CheckBox>
             </StackPanel>
