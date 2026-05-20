@@ -634,20 +634,48 @@ namespace Tools28.Commands.FormworkCalculator.Output
             if (doc.IsWorkshared)
                 EnsureFormworkWorksetsVisible(doc, view, vr.CreatedShapeIds);
 
+            // ソースビューから Duplicate で継承されたフィルタを一旦全て削除する。
+            // Duplicate で引き継いだソースフィルタはフィルタリスト先頭（最高優先度）に位置するが、
+            // 型枠フィルタが最高優先度でないとソースフィルタの visible=false 設定が
+            // 型枠 DirectShape（OST_GenericModel）にも適用されて非表示になってしまう。
+            // 削除したフィルタは後段 CopyFilterSettings で再追加し、型枠フィルタより低優先度にする。
+            if (shouldCopySourceFilters)
+            {
+                try
+                {
+                    var inheritedFilters = view.GetFilters();
+                    if (inheritedFilters != null && inheritedFilters.Count > 0)
+                    {
+                        foreach (var ifid in inheritedFilters)
+                        {
+                            try { view.RemoveFilter(ifid); } catch { }
+                        }
+                        FormworkDebugLog.Log(
+                            $"  [Visual] cleared {inheritedFilters.Count} inherited filters " +
+                            $"(will re-add after formwork filters for correct priority)");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    FormworkDebugLog.Log($"  [Visual] clearInheritedFilters EX: {ex.Message}");
+                }
+            }
+
             // View Filter による色分けを適用（個別要素オーバーライドは使わない）
+            // ★ この後に追加されるフィルタ（ソースフィルタ）より高優先度になる。
             try
             {
                 FormworkFilterManager.ApplyColorFilters(doc, view, keyAssignment);
             }
             catch { }
 
-            // ソースビューのフィルタ設定を型枠フィルタの後に追加する。
-            // 型枠フィルタ（OST_GenericModel + 区分パラメータ）を先に追加しておくことで
-            // 優先度が高くなり、ソースフィルタが GenericModel を非表示にしても
-            // 型枠 DirectShape は型枠フィルタで表示・色分けされる。
+            // ソースビューのフィルタ設定を型枠フィルタの後に追加する（低優先度）。
+            // 型枠フィルタが先頭に追加済みのため、ソースフィルタが OST_GenericModel を
+            // 非表示にしても型枠 DirectShape は型枠フィルタで表示・色分けされる。
+            // 型枠 DirectShape のサンプル ID を渡し、PassesFilter による安全チェックも実施する。
             if (shouldCopySourceFilters && sourceView != null)
             {
-                try { CopyFilterSettings(doc, sourceView, view); }
+                try { CopyFilterSettings(doc, sourceView, view, vr.CreatedShapeIds); }
                 catch { }
             }
 
@@ -1396,19 +1424,33 @@ namespace Tools28.Commands.FormworkCalculator.Output
         /// <summary>
         /// ソースビューに適用されているフィルタを一覧でターゲットビューにコピーする。
         /// 各フィルタの上書き設定 (OverrideGraphicSettings) と表示/非表示状態を
-        /// そのまま継承する (visible=false のフィルタも同じ状態でコピー)。
-        /// 型枠色分け用のフィルタ「型枠_*」は後段の FormworkFilterManager で
-        /// 追加適用されるため、ここでは触れない。
+        /// そのまま継承する。ただし visible=false のフィルタが型枠 DirectShape を
+        /// 非表示にしてしまう場合は、そのフィルタの可視性を true に強制する。
+        /// 呼び出し前に型枠フィルタが既に target に追加されていることが前提（優先度確保）。
         /// </summary>
-        private static void CopyFilterSettings(Document doc, View source, View3D target)
+        private static void CopyFilterSettings(Document doc, View source, View3D target,
+            ICollection<ElementId> formworkShapeIds = null)
         {
             try
             {
                 var srcFilterIds = source.GetFilters();
                 if (srcFilterIds == null || srcFilterIds.Count == 0) return;
 
-                var gmCatId = new ElementId(BuiltInCategory.OST_GenericModel);
-                int copied = 0;
+                // 安全チェック用: 型枠 DirectShape の代表サンプル
+                ElementId sampleFormworkId = null;
+                if (formworkShapeIds != null)
+                {
+                    foreach (var sid in formworkShapeIds)
+                    {
+                        if (sid != null && sid != ElementId.InvalidElementId)
+                        {
+                            sampleFormworkId = sid;
+                            break;
+                        }
+                    }
+                }
+
+                int copied = 0, forcedVisible = 0;
                 foreach (var fid in srcFilterIds)
                 {
                     if (fid == null || fid == ElementId.InvalidElementId) continue;
@@ -1426,13 +1468,43 @@ namespace Tools28.Commands.FormworkCalculator.Output
                             target.SetFilterOverrides(fid, ogs);
 
                         // 可視性をソースのまま継承する。
-                        // 型枠 DirectShape は固有パラメータ (28Tools_Formwork_*) を持ち、
-                        // ソース側ユーザー定義フィルタのルールに一致する可能性は非常に低い。
-                        // 万一 OST_GenericModel カテゴリ + ルール無しのフィルタがあった場合は
-                        // 型枠が非表示になるが、その場合はユーザー側でフィルタ調整を依頼する。
+                        // ただし visible=false のフィルタが型枠 DirectShape にも適用される場合は
+                        // 可視性を true に強制して型枠が隠れないようにする（安全策）。
+                        // ※ 型枠フィルタが高優先度に配置されていれば、Revit のフィルタ優先度で
+                        //    通常はこの安全策不要だが、フィルタルールが完全に一致しないエッジケースに備える。
                         bool srcVis = source.GetFilterVisibility(fid);
-                        target.SetFilterVisibility(fid, srcVis);
+                        bool targetVis = srcVis;
 
+                        if (!srcVis && sampleFormworkId != null)
+                        {
+                            // このフィルタが型枠 DirectShape に一致するか PassesFilter で確認
+                            bool hitsFormwork = false;
+                            try
+                            {
+                                var pfe = doc.GetElement(fid) as ParameterFilterElement;
+                                if (pfe != null)
+                                {
+                                    var ef = pfe.GetElementFilter();
+                                    if (ef == null)
+                                        hitsFormwork = true; // ルール無し = カテゴリのみ → 全 GenericModel に適用される
+                                    else
+                                        hitsFormwork = ef.PassesFilter(doc, sampleFormworkId);
+                                }
+                                else
+                                    hitsFormwork = true; // SelectionFilter 等 → 安全のため表示
+                            }
+                            catch { hitsFormwork = true; }
+
+                            if (hitsFormwork)
+                            {
+                                targetVis = true;
+                                forcedVisible++;
+                                FormworkDebugLog.Log(
+                                    $"  [Visual] filter fid={fid.IntValue()} visible=false → forced true (hits formwork DS)");
+                            }
+                        }
+
+                        target.SetFilterVisibility(fid, targetVis);
                         copied++;
                     }
                     catch (Exception exFilter)
@@ -1442,7 +1514,8 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     }
                 }
                 FormworkDebugLog.Log(
-                    $"  [Visual] copied {copied}/{srcFilterIds.Count} filters from source view");
+                    $"  [Visual] copied {copied}/{srcFilterIds.Count} filters from source view " +
+                    $"(forcedVisible={forcedVisible})");
             }
             catch (Exception ex)
             {
