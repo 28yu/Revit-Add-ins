@@ -43,7 +43,9 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         /// </summary>
         private static Solid BuildSectionBoxSolid(View view, FormworkSettings settings)
         {
-            if (settings == null || settings.Scope != CalculationScope.CurrentView) return null;
+            if (settings == null) return null;
+            if (settings.Scope != CalculationScope.CurrentView
+                && settings.Scope != CalculationScope.SelectedViews) return null;
             if (!(view is View3D v3d)) return null;
             BoundingBoxXYZ sb = null;
             try { if (v3d.IsSectionBoxActive) sb = v3d.GetSectionBox(); }

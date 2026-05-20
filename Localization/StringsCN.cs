@@ -389,11 +389,6 @@ namespace Tools28.Localization
             { "Formwork.UpdateConfirm.UpdateDesc", "仅使用最新模型刷新目标分析三维视图与明细表。图纸、合计明细表与其他视图保持不变。" },
             { "Formwork.UpdateConfirm.RecreateLabel", "重新生成（重建所有输出）" },
             { "Formwork.UpdateConfirm.RecreateDesc", "删除并重新创建所有输出，包括图纸与合计明细表。" },
-            { "Formwork.SectionBoxWarning.Title", "模板数量算出 - 切断框未设置" },
-            { "Formwork.SectionBoxWarning.Instruction", "一个或多个视图未设置切断框" },
-            { "Formwork.SectionBoxWarning.Content", "以下源视图未启用切断框（截面框）：\n{0}\n\n未设置切断框时，较大的楼板等构件可能在可视范围之外生成悬空的模板。\n\n建议在源视图中启用切断框后重新执行。" },
-            { "Formwork.SectionBoxWarning.Continue", "继续执行" },
-            { "Formwork.SectionBoxWarning.ContinueDesc", "不使用切断框生成模板（可能在范围外产生悬空模板）。" },
 
             // === Excel 导出类别名称 ===
             { "Category.Walls", "墙" },

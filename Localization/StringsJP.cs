@@ -389,11 +389,6 @@ namespace Tools28.Localization
             { "Formwork.UpdateConfirm.UpdateDesc", "対象の分析3Dビューと集計表のみ最新モデルで更新します。シート・合計集計表・他のビューは変更しません。" },
             { "Formwork.UpdateConfirm.RecreateLabel", "再作成（全ての出力を作り直す）" },
             { "Formwork.UpdateConfirm.RecreateDesc", "シートと合計集計表を含む全ての出力を削除して再作成します。" },
-            { "Formwork.SectionBoxWarning.Title", "型枠数量算出 - 切断ボックス未設定" },
-            { "Formwork.SectionBoxWarning.Instruction", "切断ボックスが未設定のビューがあります" },
-            { "Formwork.SectionBoxWarning.Content", "以下のソースビューに切断ボックス（セクションボックス）が設定されていません。\n{0}\n\n切断ボックスが未設定の場合、スラブなど大きな要素が範囲外まで広がっているとき、型枠が表示範囲外にも「浮いた状態」で作成されることがあります。\n\nソースビューで「切断ボックス」を有効にしてから再実行することを推奨します。" },
-            { "Formwork.SectionBoxWarning.Continue", "このまま続行する" },
-            { "Formwork.SectionBoxWarning.ContinueDesc", "切断ボックスなしで型枠を生成します（範囲外に型枠が出る可能性があります）。" },
 
             // === Excel エクスポート カテゴリ名（BuiltInCategory→ローカライズ）===
             { "Category.Walls", "壁" },

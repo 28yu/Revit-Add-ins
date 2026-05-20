@@ -98,8 +98,11 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 try { linkDoc = rli.GetLinkDocument(); } catch { }
                 if (linkDoc == null) continue;
 
-                // 「現在のビュー」モードではリンクインスタンスがアクティブビューに表示されているか確認
-                if (settings.Scope == CalculationScope.CurrentView && activeView != null)
+                // 「現在のビュー」または「選択のビュー」モードではリンクインスタンスが
+                // 該当ビューに表示されているか確認
+                if ((settings.Scope == CalculationScope.CurrentView
+                     || settings.Scope == CalculationScope.SelectedViews)
+                    && activeView != null)
                 {
                     string rliName = MakeLinkSourceName(rli, linkDoc);
 
@@ -177,10 +180,11 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                         $"セクションボックスフィルタで要素数を絞り込みます。");
                 }
 
-                // CurrentView + 3D セクションボックスがあればリンクローカル座標系に変換した
+                // CurrentView/SelectedViews + 3D セクションボックスがあればリンクローカル座標系に変換した
                 // BoundingBoxIntersectsFilter を生成し、大規模モデルの要素数を絞り込む。
                 Outline linkLocalOutline = null;
-                if (settings.Scope == CalculationScope.CurrentView)
+                if (settings.Scope == CalculationScope.CurrentView
+                    || settings.Scope == CalculationScope.SelectedViews)
                 {
                     linkLocalOutline = GetLinkLocalSectionBoxOutline(activeView, transform);
                     if (linkLocalOutline != null)
@@ -203,7 +207,9 @@ namespace Tools28.Commands.FormworkCalculator.Engine
 
                 var linkedElems = CollectFromDoc(linkDoc, settings, null, isLinked: true, linkLocalOutline: linkLocalOutline);
 
-                if (activeView != null && settings.Scope == CalculationScope.CurrentView)
+                if (activeView != null
+                    && (settings.Scope == CalculationScope.CurrentView
+                        || settings.Scope == CalculationScope.SelectedViews))
                 {
                     // (A) グローバルカテゴリ非表示: V/G → モデルカテゴリ タブ
                     int beforeCat = linkedElems.Count;
@@ -946,8 +952,12 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         {
             var result = new List<Element>();
             var seenIds = new HashSet<int>();
+            // SelectedViews も CurrentView と同等にビュー可視性フィルタを適用する。
+            // 各ソースビューに対して個別収集するため、activeView は per-iteration の
+            // ソース 3D ビュー。これにより「見せたくない要素は型枠化されない」が保証される。
             bool useViewFilter = !isLinked
-                && settings.Scope == CalculationScope.CurrentView
+                && (settings.Scope == CalculationScope.CurrentView
+                    || settings.Scope == CalculationScope.SelectedViews)
                 && activeView != null;
 
             foreach (var key in settings.IncludedCategories)

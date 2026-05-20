@@ -389,11 +389,6 @@ namespace Tools28.Localization
             { "Formwork.UpdateConfirm.UpdateDesc", "Refreshes only the target analysis 3D view and schedule with the current model. The sheet, summary schedule, and other views are left untouched." },
             { "Formwork.UpdateConfirm.RecreateLabel", "Recreate (rebuild everything)" },
             { "Formwork.UpdateConfirm.RecreateDesc", "Deletes and recreates all outputs including the sheet and summary schedule." },
-            { "Formwork.SectionBoxWarning.Title", "Formwork Quantity - Section Box Not Set" },
-            { "Formwork.SectionBoxWarning.Instruction", "Section box not active in one or more views" },
-            { "Formwork.SectionBoxWarning.Content", "The following source view(s) do not have an active section box:\n{0}\n\nWithout a section box, formwork may be generated across the full extent of large elements (e.g., slabs), resulting in floating formwork outside the visible area.\n\nIt is recommended to enable the section box on the source view(s) and re-run." },
-            { "Formwork.SectionBoxWarning.Continue", "Continue anyway" },
-            { "Formwork.SectionBoxWarning.ContinueDesc", "Generate formwork without a section box (floating formwork may appear outside the visible range)." },
 
             // === Excel Export Category Names ===
             { "Category.Walls", "Walls" },
