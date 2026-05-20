@@ -1409,7 +1409,6 @@ namespace Tools28.Commands.FormworkCalculator.Output
 
                 var gmCatId = new ElementId(BuiltInCategory.OST_GenericModel);
                 int copied = 0;
-                int forcedVisible = 0;
                 foreach (var fid in srcFilterIds)
                 {
                     if (fid == null || fid == ElementId.InvalidElementId) continue;
@@ -1426,42 +1425,13 @@ namespace Tools28.Commands.FormworkCalculator.Output
                         if (ogs != null)
                             target.SetFilterOverrides(fid, ogs);
 
-                        // 可視性の決定:
-                        // Revit の仕様上、複数フィルタが同一要素にマッチする場合、
-                        // 1 つでも visible=false なら要素は非表示になる (AND 論理)。
-                        // 型枠 DirectShape (OST_GenericModel) を対象にしているフィルタを
-                        // visible=false でコピーすると、型枠 DirectShape が消える。
-                        // よって対象カテゴリに OST_GenericModel を含むフィルタは
-                        // 強制的に visible=true でコピーする (色オーバーライドは維持)。
+                        // 可視性をソースのまま継承する。
+                        // 型枠 DirectShape は固有パラメータ (28Tools_Formwork_*) を持ち、
+                        // ソース側ユーザー定義フィルタのルールに一致する可能性は非常に低い。
+                        // 万一 OST_GenericModel カテゴリ + ルール無しのフィルタがあった場合は
+                        // 型枠が非表示になるが、その場合はユーザー側でフィルタ調整を依頼する。
                         bool srcVis = source.GetFilterVisibility(fid);
-                        bool targetVis = srcVis;
-                        if (!srcVis)
-                        {
-                            bool matchesGenericModel = false;
-                            try
-                            {
-                                var fElem = doc.GetElement(fid) as ParameterFilterElement;
-                                if (fElem != null)
-                                {
-                                    var fCats = fElem.GetCategories();
-                                    if (fCats != null && fCats.Any(c => c == gmCatId))
-                                        matchesGenericModel = true;
-                                }
-                                else
-                                {
-                                    // SelectionFilterElement 等は全カテゴリ対象とみなす
-                                    matchesGenericModel = true;
-                                }
-                            }
-                            catch { matchesGenericModel = true; }
-
-                            if (matchesGenericModel)
-                            {
-                                targetVis = true;
-                                forcedVisible++;
-                            }
-                        }
-                        target.SetFilterVisibility(fid, targetVis);
+                        target.SetFilterVisibility(fid, srcVis);
 
                         copied++;
                     }
@@ -1472,8 +1442,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     }
                 }
                 FormworkDebugLog.Log(
-                    $"  [Visual] copied {copied}/{srcFilterIds.Count} filters from source view " +
-                    $"(forcedVisible={forcedVisible} for GenericModel-matching filters)");
+                    $"  [Visual] copied {copied}/{srcFilterIds.Count} filters from source view");
             }
             catch (Exception ex)
             {
