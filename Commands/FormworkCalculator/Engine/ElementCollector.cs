@@ -613,6 +613,16 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                     FormworkDebugLog.Log(
                         $"  [VisFilter] {sourceName}: 最良ByLinkedView候補='{bestView.Name}' id={bestView.Id.IntValue()} " +
                         $"score={bestScore}");
+
+                    // score <= 0 はヒューリスティックの信頼度が低い（除外 > 保持）
+                    // 誤った絞り込みで WallSweep 等が欠落するのを防ぐためフィルタをスキップ
+                    if (bestScore <= 0)
+                    {
+                        FormworkDebugLog.Log(
+                            $"  [VisFilter] {sourceName}: score={bestScore} ≤ 0 → ByLinkedViewフィルタスキップ(確信度低)");
+                        return null;
+                    }
+
                     return bestSet;
                 }
             }
