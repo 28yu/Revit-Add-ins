@@ -238,6 +238,8 @@ namespace Tools28.Commands.FormworkCalculator.Output
             {
                 // [3] ソースが 3D ビューの場合 (CurrentView / SelectedViews モード) は、
                 // そのソースビューの切断ボックス (位置・有効/無効) をそのまま継承する。
+                // ソースに切断ボックスが無い場合は型枠要素の BoundingBox から自動算出することで
+                // 分析ビューが全体表示にならないようにする。
                 // EntireProject 等は要素 BoundingBox から自動算出。
                 // 更新モードでは既存ビューのセクションボックスを保持する。
                 bool useSourceSectionBox = sourceView is View3D &&
@@ -246,8 +248,10 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 if (useSourceSectionBox)
                 {
                     // ソースの切断ボックス状態をそのまま踏襲する。
-                    // アクティブならコピー、非アクティブならビューも切断ボックスなしにする。
-                    CopySectionBoxFromSource((View3D)sourceView, view);
+                    // アクティブならコピー、非アクティブなら要素BBoxから自動算出する。
+                    bool copied = CopySectionBoxFromSource((View3D)sourceView, view);
+                    if (!copied)
+                        EnableSectionBox(doc, view, result);
                 }
                 else
                     EnableSectionBox(doc, view, result);
@@ -973,10 +977,20 @@ namespace Tools28.Commands.FormworkCalculator.Output
             if (allShapeIds.Count == 0) return;
 
             // プロジェクト内の全ビューを走査し、各ビューで非表示にすべきシェイプを決定して一括非表示
+            // ViewType.Internal / ProjectBrowser / SystemBrowser は HideElements 非対応のため除外
+            var excludedViewTypes = new HashSet<ViewType>
+            {
+                ViewType.Legend,
+                ViewType.Schedule,
+                ViewType.Internal,
+                ViewType.ProjectBrowser,
+                ViewType.SystemBrowser,
+            };
             var allViews = new FilteredElementCollector(doc)
                 .OfClass(typeof(View))
                 .Cast<View>()
-                .Where(v => !v.IsTemplate && !(v is ViewSchedule) && v.ViewType != ViewType.Legend)
+                .Where(v => !v.IsTemplate && !(v is ViewSchedule)
+                    && !excludedViewTypes.Contains(v.ViewType))
                 .ToList();
 
             int totalHidden = 0;
