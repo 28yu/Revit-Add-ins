@@ -68,7 +68,35 @@ namespace Tools28.Commands.FormworkCalculator
                     return Result.Cancelled;
                 }
 
-                // [2] 更新モード判定: 対象ソースビューに対応する既存の分析3Dビューまたは
+                // [2b] 切断ボックス未設定チェック:
+                // 切断ボックスがないと大きなスラブ等の全範囲に型枠が生成され、
+                // 表示範囲外に「浮いた型枠」が作成される場合があることをユーザーに警告する。
+                {
+                    var noBoxViews = sourceViews
+                        .Where(sv => { try { return !sv.IsSectionBoxActive; } catch { return false; } })
+                        .Select(sv => $"  ・{sv.Name}")
+                        .ToList();
+                    if (noBoxViews.Count > 0)
+                    {
+                        var tdSb = new TaskDialog(Loc.S("Formwork.SectionBoxWarning.Title"))
+                        {
+                            MainInstruction = Loc.S("Formwork.SectionBoxWarning.Instruction"),
+                            MainContent = string.Format(
+                                Loc.S("Formwork.SectionBoxWarning.Content"),
+                                string.Join("\n", noBoxViews)),
+                            CommonButtons = TaskDialogCommonButtons.Cancel,
+                        };
+                        tdSb.AddCommandLink(
+                            TaskDialogCommandLinkId.CommandLink1,
+                            Loc.S("Formwork.SectionBoxWarning.Continue"),
+                            Loc.S("Formwork.SectionBoxWarning.ContinueDesc"));
+                        var sbResult = tdSb.Show();
+                        if (sbResult != TaskDialogResult.CommandLink1)
+                            return Result.Cancelled;
+                    }
+                }
+
+                // [3] 更新モード判定: 対象ソースビューに対応する既存の分析3Dビューまたは
                 // ビュー別集計表が見つかった場合、ユーザーに「更新 / 再作成 / キャンセル」を確認する。
                 // 更新モード時: 既存の分析ビュー・集計表を再利用し、シートと合計集計表は手を付けない。
                 // 再作成モード時: 従来通り全て削除・再作成する。
