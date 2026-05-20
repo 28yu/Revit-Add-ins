@@ -205,42 +205,6 @@ namespace Tools28.Commands.FormworkCalculator.Engine
 
                 if (activeView != null && settings.Scope == CalculationScope.CurrentView)
                 {
-                    // (Z) リンクの表示モードが「リンクされたビューで設定」(ByLinkedView) の場合、
-                    // 割当られたリンクビューで実際に可視な要素のみに絞り込む。
-                    // ホストビューの V/G → Revit リンク → 「表示設定」が「リンクされたビューで設定」
-                    // になっている場合、その割当ビューの設定 (セクションボックス・ワークセット・
-                    // フィルタ・要素個別非表示) に従って表示される。エンジンは従来これを考慮しておらず、
-                    // 全リンク要素を対象としていたが、ソースビューが特定エリアを切り出しているケースに
-                    // 対応するため、リンクビューでの可視要素のみを残す。
-                    //
-                    // Revit バージョンによって API 名・プロパティ名が異なる可能性があるため
-                    // リフレクションで安全に呼び出す。失敗時は従来動作 (絞り込みなし) にフォールバック。
-                    try
-                    {
-                        ElementId linkedViewId = TryGetByLinkedViewId(activeView, rli.Id, sourceName);
-                        if (linkedViewId != null && linkedViewId != ElementId.InvalidElementId)
-                        {
-                            var lvVisible = new HashSet<int>(
-                                new FilteredElementCollector(linkDoc, linkedViewId)
-                                    .WhereElementIsNotElementType()
-                                    .ToElementIds()
-                                    .Select(eid => eid.IntValue()));
-                            int beforeLV = linkedElems.Count;
-                            linkedElems = linkedElems
-                                .Where(e => lvVisible.Contains(e.Id.IntValue()))
-                                .ToList();
-                            int hiddenLV = beforeLV - linkedElems.Count;
-                            FormworkDebugLog.Log(
-                                $"  [VisFilter] {sourceName}: リンクビュー({linkedViewId.IntValue()})フィルタ除外 " +
-                                $"{hiddenLV}/{beforeLV} (ByLinkedView mode)");
-                        }
-                    }
-                    catch (Exception exLv)
-                    {
-                        FormworkDebugLog.Log(
-                            $"  [VisFilter] {sourceName}: ByLinkedView 判定 EX: {exLv.Message}");
-                    }
-
                     // (A) グローバルカテゴリ非表示: V/G → モデルカテゴリ タブ
                     int beforeCat = linkedElems.Count;
                     linkedElems = linkedElems.Where(e =>
@@ -353,6 +317,54 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                     {
                         FormworkDebugLog.Log(
                             $"  [VisFilter] {sourceName}: ホストフィルタチェックEX: {exFil.Message}\n{exFil.StackTrace}");
+                    }
+
+                    // (Z) リンクの表示モードが「リンクされたビューで設定」(ByLinkedView) の場合、
+                    // 割当られたリンクビューで実際に可視な要素のみに絞り込む。
+                    // C2 (ホストフィルタ) の後に実行することで fallback のスコア計算精度が上がる。
+                    // Revit 2024+: GetLinkOverrides API が利用可能 → LinkedViewId を直接取得
+                    // Revit 2022/2023: API なし → linkDoc 内のセクションボックス付き View3D を探索
+                    try
+                    {
+                        ElementId linkedViewId = TryGetByLinkedViewId(activeView, rli.Id, sourceName);
+                        HashSet<int> lvVisible = null;
+
+                        if (linkedViewId != null && linkedViewId != ElementId.InvalidElementId
+                            && linkedViewId.IntValue() >= 0)
+                        {
+                            // Revit 2024+: GetLinkOverrides で LinkedViewId が判明
+                            lvVisible = new HashSet<int>(
+                                new FilteredElementCollector(linkDoc, linkedViewId)
+                                    .WhereElementIsNotElementType()
+                                    .ToElementIds()
+                                    .Select(eid => eid.IntValue()));
+                            FormworkDebugLog.Log(
+                                $"  [VisFilter] {sourceName}: ByLinkedView(API) linkedViewId={linkedViewId.IntValue()} " +
+                                $"visible={lvVisible.Count}");
+                        }
+                        else
+                        {
+                            // Revit 2022/2023 fallback: linkDoc 内の section-box 付き View3D を探索
+                            // (C2 フィルタ後の linkedElems を渡してスコア計算の精度を上げる)
+                            lvVisible = TryGetLinkedViewVisibleIds(linkDoc, linkedElems, sourceName);
+                        }
+
+                        if (lvVisible != null)
+                        {
+                            int beforeLV = linkedElems.Count;
+                            linkedElems = linkedElems
+                                .Where(e => lvVisible.Contains(e.Id.IntValue()))
+                                .ToList();
+                            int hiddenLV = beforeLV - linkedElems.Count;
+                            FormworkDebugLog.Log(
+                                $"  [VisFilter] {sourceName}: リンクビューフィルタ除外 " +
+                                $"{hiddenLV}/{beforeLV} (ByLinkedView mode)");
+                        }
+                    }
+                    catch (Exception exLv)
+                    {
+                        FormworkDebugLog.Log(
+                            $"  [VisFilter] {sourceName}: ByLinkedView 判定 EX: {exLv.Message}");
                     }
 
                     // (D) 診断ログ: 残った要素のサンプル (先頭5件) のワークセット情報
@@ -525,6 +537,90 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                     $"  [VisFilter] {sourceName}: TryGetByLinkedViewId EX: {ex.Message}");
                 return null;
             }
+        }
+
+        /// <summary>
+        /// GetLinkOverrides が使えない Revit バージョン向け fallback。
+        /// linkDoc 内の View3D でセクションボックスが有効なものを全列挙し、
+        /// visibleElems の大多数が含まれるものを "ByLinkedView で割り当てられたビュー" と推定して
+        /// そのビューで可視な要素の ID セットを返す。
+        /// セクションボックス付きビューが 1 件のみなら確定、複数なら最良を採用。
+        /// </summary>
+        private static HashSet<int> TryGetLinkedViewVisibleIds(
+            Document linkDoc,
+            List<Element> visibleElems,
+            string sourceName)
+        {
+            if (linkDoc == null || visibleElems == null || visibleElems.Count == 0)
+                return null;
+            try
+            {
+                var views3d = new FilteredElementCollector(linkDoc)
+                    .OfClass(typeof(View3D))
+                    .Cast<View3D>()
+                    .Where(v => !v.IsTemplate)
+                    .ToList();
+
+                // セクションボックスが有効なビューだけを候補に
+                var boxViews = views3d.Where(v =>
+                {
+                    try { return v.IsSectionBoxActive; } catch { return false; }
+                }).ToList();
+
+                FormworkDebugLog.Log(
+                    $"  [VisFilter] {sourceName}: linkDoc内3Dビュー total={views3d.Count} sectionBoxActive={boxViews.Count}");
+
+                if (boxViews.Count == 0) return null;
+
+                var visIds = new HashSet<int>(visibleElems.Select(e => e.Id.IntValue()));
+
+                // 各ビューでの可視要素セットを取得し、visibleElems との重なりを計算
+                View3D bestView = null;
+                HashSet<int> bestSet = null;
+                int bestScore = int.MinValue;
+
+                foreach (var v in boxViews)
+                {
+                    try
+                    {
+                        var ids = new HashSet<int>(
+                            new FilteredElementCollector(linkDoc, v.Id)
+                                .WhereElementIsNotElementType()
+                                .ToElementIds()
+                                .Select(eid => eid.IntValue()));
+
+                        // スコア = (元リストからの残存数 * 2) - 追加要素数
+                        // 元リストをできるだけ保持しつつ、追加を最小化するビューを選ぶ
+                        int overlap = visIds.Count(id => ids.Contains(id));
+                        int extra = ids.Count(id => !visIds.Contains(id));
+                        int score = overlap * 2 - extra;
+                        FormworkDebugLog.Log(
+                            $"  [VisFilter] {sourceName}: 候補ビュー'{v.Name}' id={v.Id.IntValue()} " +
+                            $"visible={ids.Count} overlap={overlap} extra={extra} score={score}");
+
+                        if (score > bestScore)
+                        {
+                            bestScore = score;
+                            bestView = v;
+                            bestSet = ids;
+                        }
+                    }
+                    catch { }
+                }
+
+                if (bestView != null && bestSet != null)
+                {
+                    FormworkDebugLog.Log(
+                        $"  [VisFilter] {sourceName}: 最良ByLinkedView候補='{bestView.Name}' id={bestView.Id.IntValue()} " +
+                        $"score={bestScore}");
+                    return bestSet;
+                }
+            }
+            catch (Exception ex)
+            {
+                FormworkDebugLog.Log($"  [VisFilter] {sourceName}: TryGetLinkedViewVisibleIds EX: {ex.Message}");
+            }
+            return null;
         }
 
         private static HashSet<int> BuildHiddenWorksetIds(Document linkDoc, View hostView, string sourceName)
