@@ -1618,6 +1618,13 @@ namespace Tools28.Commands.FormworkCalculator.Output
             int catTotal = 0, catCopied = 0, catSkipped = 0, catErrors = 0;
             int hiddenCopied = 0;
             FormworkDebugLog.Log($"  [Visual] CopyCategoryVisibility 開始: source='{source?.Name}' target='{target?.Name}'");
+            // 型枠 DirectShape カテゴリ。
+            // ソースが OST_GenericModel に透過 100% / SurfaceForegroundPatternVisible=false /
+            // ProjectionLineWeight=0 等を設定していると、コピー後の解析ビューで
+            // 型枠 DS が「存在するが見えない」状態になる。
+            // カテゴリ可視性・V/G ともコピー対象から除外する（後段で明示クリーン化する）。
+            var gmCatIdInt = (int)BuiltInCategory.OST_GenericModel;
+
             try
             {
                 var allCategories = doc.Settings.Categories;
@@ -1627,6 +1634,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     catTotal++;
                     var catId = cat.Id;
                     if (!target.CanCategoryBeHidden(catId)) { catSkipped++; continue; }
+                    bool isFormworkCategory = catId.IntValue() == gmCatIdInt;
                     try
                     {
                         // 表示/非表示
@@ -1639,7 +1647,8 @@ namespace Tools28.Commands.FormworkCalculator.Output
                         // source.IsCategoryOverridable のチェックは外す:
                         // View Template ロック時に false を返す場合があるが、
                         // GetCategoryOverrides では実効値を取得できる。
-                        if (target.IsCategoryOverridable(catId))
+                        // OST_GenericModel はコピーせず、後段で空 OGS を当てる。
+                        if (!isFormworkCategory && target.IsCategoryOverridable(catId))
                         {
                             try
                             {
@@ -1652,7 +1661,8 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     }
                     catch { catErrors++; /* per-category failures are non-fatal */ }
 
-                    // サブカテゴリも同様にコピー
+                    // サブカテゴリも同様にコピー (OST_GenericModel のサブは型枠 DS に
+                    // 影響しないため通常コピーで OK)
                     foreach (Category sub in cat.SubCategories)
                     {
                         if (sub == null) continue;
@@ -1690,12 +1700,19 @@ namespace Tools28.Commands.FormworkCalculator.Output
             //   高くなり、ソースフィルタが OST_GenericModel を非表示にしていても
             //   型枠 DirectShape が確実に表示・色分けされる。
 
-            // DirectShape (OST_GenericModel) は型枠表示の主役なので強制的に表示状態に上書き
+            // DirectShape (OST_GenericModel) は型枠表示の主役なので強制的に表示状態に上書き。
+            // V/G オーバーライドも空にリセットする (ソース側に透過 100% やパターン不可視等が
+            // 設定されていると、Color フィルタを適用しても型枠 DS が見えなくなるため)。
             try
             {
                 var gmId = new ElementId(BuiltInCategory.OST_GenericModel);
                 if (target.CanCategoryBeHidden(gmId))
                     target.SetCategoryHidden(gmId, false);
+                if (target.IsCategoryOverridable(gmId))
+                {
+                    target.SetCategoryOverrides(gmId, new OverrideGraphicSettings());
+                    FormworkDebugLog.Log("  [Visual] OST_GenericModel V/G overrides reset");
+                }
             }
             catch { }
 
