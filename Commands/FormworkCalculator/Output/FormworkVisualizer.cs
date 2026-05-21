@@ -1166,23 +1166,63 @@ namespace Tools28.Commands.FormworkCalculator.Output
 
         /// <summary>
         /// 指定フィルタをビューのフィルタリスト先頭（最高優先度）に配置する。
-        /// AddFilter → SetFilters で先頭挿入。先頭に既にある場合はスキップ。
+        /// Revit の filter visibility は「最初にマッチしたフィルタ」が勝つ仕様のため、
+        /// 既存の高優先度フィルタに型枠 DS がマッチして visible=true を返してしまうと
+        /// 末尾の非表示フィルタが負ける。これを防ぐため先頭に移動する。
+        ///
+        /// View.SetOrderOnFilters は Revit 2022+ にしかないため、全バージョン対応のため
+        /// 既存「他」フィルタを一旦 Remove してから再 Add する方式で並び替える。
+        /// 「他」フィルタの上書設定 (overrides / visibility) は保存してから復元する。
         /// </summary>
         private static void SetFilterAtHighestPriority(View v, ElementId filterId)
         {
-            var list = v.GetFilters().ToList();
-            if (list.Count > 0 && list[0] == filterId) return; // already at top
+            var current = v.GetFilters().ToList();
+            // 既に先頭にある場合は何もしない
+            if (current.Count > 0 && current[0] == filterId) return;
 
-            if (!list.Contains(filterId))
+            // 非表示フィルタが未追加なら追加
+            if (!current.Contains(filterId))
             {
                 v.AddFilter(filterId);
-                list = v.GetFilters().ToList();
+                current = v.GetFilters().ToList();
             }
 
-            // 先頭に移動
-            list.Remove(filterId);
-            list.Insert(0, filterId);
-            v.SetFilters(list);
+            // 「他」フィルタを順序保ったまま取得
+            var others = current.Where(f => f != filterId).ToList();
+
+            // 他フィルタの設定を保存
+            var savedOverrides = new Dictionary<ElementId, OverrideGraphicSettings>();
+            var savedVisibility = new Dictionary<ElementId, bool>();
+            foreach (var f in others)
+            {
+                try { savedOverrides[f] = v.GetFilterOverrides(f); } catch { }
+                try { savedVisibility[f] = v.GetFilterVisibility(f); }
+                catch { savedVisibility[f] = true; }
+            }
+
+            // 他フィルタを一旦すべて削除（filterId だけが残る → 先頭）
+            foreach (var f in others)
+            {
+                try { v.RemoveFilter(f); } catch { }
+            }
+
+            // 他フィルタを元の順序で再追加（filterId の後ろに来る）
+            foreach (var f in others)
+            {
+                try
+                {
+                    v.AddFilter(f);
+                    if (savedOverrides.TryGetValue(f, out var og) && og != null)
+                    {
+                        try { v.SetFilterOverrides(f, og); } catch { }
+                    }
+                    if (savedVisibility.TryGetValue(f, out var vis))
+                    {
+                        try { v.SetFilterVisibility(f, vis); } catch { }
+                    }
+                }
+                catch { }
+            }
         }
 
         /// <summary>
