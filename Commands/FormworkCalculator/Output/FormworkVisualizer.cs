@@ -267,11 +267,12 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     }
                     else
                     {
-                        // ソースに切断ボックスなし → 解析ビューも切断ボックスなし（全体表示）。
-                        // EnableSectionBox を呼ぶと空のBBoxが有効化されて型枠DSが
-                        // クリップアウトされる問題があるため、ここでは何もしない。
+                        // ソースに切断ボックスなし → 型枠要素の BoundingBox から切断ボックスを算出して設定。
+                        // これにより解析ビューがモデル全体表示にならず、型枠エリアにフォーカスされる。
+                        // EnableSectionBox は要素BBoxが取得できない場合は切断ボックスを有効化しないため安全。
                         FormworkDebugLog.Log(
-                            "  [Visual] source IsSectionBoxActive=False → analysis view also no section box");
+                            "  [Visual] source IsSectionBoxActive=False → compute section box from element BBoxes");
+                        EnableSectionBox(doc, view, result);
                     }
                 }
                 else
