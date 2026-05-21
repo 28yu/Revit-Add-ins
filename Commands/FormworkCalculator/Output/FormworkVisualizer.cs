@@ -1035,10 +1035,25 @@ namespace Tools28.Commands.FormworkCalculator.Output
 
             if (allShapeIds.Count == 0) return;
 
-            // ─── Step 3: ビューフィルタ「全非表示」を作成/取得 ──────────────────
+            // ─── ワークセット方式（ワークシェアプロジェクト推奨） ───────────────
+            // 型枠 DS は全て "28Tools_型枠" ワークセットに属する。
+            // WorksetDefaultVisibilitySettings.SetWorksetVisibility(wsId, false) で
+            // グローバルデフォルトを Hidden に設定すれば、UseGlobalSetting のビューは
+            // 全て自動的に型枠ワークセットを非表示にする（新規作成ビューも自動対応）。
+            // 各ビュー個別に明示的 Hidden/Visible を設定して、テンプレートやレガシー
+            // ビューの可視性設定を確実に上書きする。
+            if (doc.IsWorkshared)
+            {
+                if (HideFormworkViaWorkset(doc, analysisViewIds, sourceByAnalysisId,
+                    shapesByView, untaggedShapes))
+                {
+                    return; // 完了
+                }
+                // 失敗時はフィルタ方式へフォールバック
+            }
+
+            // ─── Step 3: ビューフィルタ「全非表示」を作成/取得（非ワークシェア用） ──
             // 非分析ビューに適用する ParameterFilterElement を作成しておく。
-            // これにより要素レベル Hide より確実に、ビューテンプレートが設定された
-            // 平面ビュー・断面ビュー等でも型枠 DS を非表示にできる。
             ElementId hideFilterId = null;
             if (formworkMarkerParamId != null)
             {
@@ -1240,6 +1255,143 @@ namespace Tools28.Commands.FormworkCalculator.Output
             FormworkDebugLog.Log(
                 $"  [Hide] hideFilter '{filterName}' created id={newFilter.Id.IntValue()}");
             return newFilter.Id;
+        }
+
+        /// <summary>
+        /// 型枠ワークセット "28Tools_型枠" のグローバルデフォルト可視性を Hidden に設定し、
+        /// 全ビューおよびビューテンプレートのワークセット可視性を明示的に設定する。
+        ///   - 非分析ビュー / 非分析テンプレート → Hidden
+        ///   - 分析ビュー / 分析ビュー用テンプレート → Visible
+        /// 分析ビュー内では、HideElements で「他ソース由来 + タグなし」シェイプを非表示。
+        /// 成功時 true。ワークセット未取得や例外時は false（呼出し側でフォールバック）。
+        /// </summary>
+        private static bool HideFormworkViaWorkset(
+            Document doc,
+            HashSet<int> analysisViewIds,
+            Dictionary<int, string> sourceByAnalysisId,
+            Dictionary<string, List<ElementId>> shapesByView,
+            List<ElementId> untaggedShapes)
+        {
+            try
+            {
+                var wsId = GetOrCreateFormworkWorkset(doc);
+                if (wsId == null)
+                {
+                    FormworkDebugLog.Log("  [Hide][WS] formwork workset not available");
+                    return false;
+                }
+
+                // (1) グローバルデフォルト可視性を Hidden に
+                try
+                {
+                    var defaults = WorksetDefaultVisibilitySettings
+                        .GetWorksetDefaultVisibilitySettings(doc);
+                    if (defaults.IsWorksetVisible(wsId))
+                    {
+                        defaults.SetWorksetVisibility(wsId, false);
+                        FormworkDebugLog.Log($"  [Hide][WS] global default → Hidden (wsId={wsId.IntegerValue})");
+                    }
+                    else
+                    {
+                        FormworkDebugLog.Log($"  [Hide][WS] global default already Hidden (wsId={wsId.IntegerValue})");
+                    }
+                }
+                catch (Exception exDef)
+                {
+                    FormworkDebugLog.Log($"  [Hide][WS] SetGlobalVisibility EX: {exDef.Message}");
+                }
+
+                // (2) 分析ビューが使うテンプレート ID を収集
+                //     （それらテンプレートには Visible を設定して分析ビューの可視性を維持）
+                var analysisTemplateIds = new HashSet<int>();
+                foreach (var avId in analysisViewIds)
+                {
+                    try
+                    {
+                        var av = doc.GetElement(new ElementId(avId)) as View;
+                        if (av?.ViewTemplateId != null &&
+                            av.ViewTemplateId != ElementId.InvalidElementId)
+                        {
+                            analysisTemplateIds.Add(av.ViewTemplateId.IntValue());
+                        }
+                    }
+                    catch { }
+                }
+
+                // (3) 全ビュー（テンプレート含む）のワークセット可視性を明示設定
+                var excludedViewTypes = new HashSet<ViewType>
+                {
+                    ViewType.Legend,
+                    ViewType.Schedule,
+                    ViewType.Internal,
+                    ViewType.ProjectBrowser,
+                    ViewType.SystemBrowser,
+                };
+                var allViewsAndTemplates = new FilteredElementCollector(doc)
+                    .OfClass(typeof(View))
+                    .Cast<View>()
+                    .Where(v => !(v is ViewSchedule)
+                        && !excludedViewTypes.Contains(v.ViewType))
+                    .ToList();
+
+                int hiddenCount = 0, visibleCount = 0, skipped = 0;
+                foreach (var v in allViewsAndTemplates)
+                {
+                    bool isAnalysisView = analysisViewIds.Contains(v.Id.IntValue());
+                    bool isAnalysisTemplate = v.IsTemplate
+                        && analysisTemplateIds.Contains(v.Id.IntValue());
+
+                    WorksetVisibility target = (isAnalysisView || isAnalysisTemplate)
+                        ? WorksetVisibility.Visible
+                        : WorksetVisibility.Hidden;
+
+                    try
+                    {
+                        var cur = v.GetWorksetVisibility(wsId);
+                        if (cur != target)
+                        {
+                            v.SetWorksetVisibility(wsId, target);
+                        }
+                        if (target == WorksetVisibility.Hidden) hiddenCount++;
+                        else visibleCount++;
+                    }
+                    catch
+                    {
+                        skipped++;
+                    }
+                }
+
+                // (4) 分析ビュー内で「他ソース由来 + タグなし」シェイプを HideElements
+                foreach (var avIdInt in analysisViewIds)
+                {
+                    try
+                    {
+                        var av = doc.GetElement(new ElementId(avIdInt)) as View;
+                        if (av == null) continue;
+                        sourceByAnalysisId.TryGetValue(avIdInt, out string ownSrc);
+                        var toHide = new List<ElementId>();
+                        foreach (var kv in shapesByView)
+                        {
+                            if (kv.Key != ownSrc) toHide.AddRange(kv.Value);
+                        }
+                        toHide.AddRange(untaggedShapes);
+                        if (toHide.Count == 0) continue;
+                        int dummy = 0;
+                        HideElementsSafe(av, toHide, ref dummy);
+                    }
+                    catch { }
+                }
+
+                FormworkDebugLog.Log(
+                    $"  [Hide][WS] done: hiddenViews={hiddenCount} visibleViews={visibleCount} " +
+                    $"skipped={skipped} analysisTemplates={analysisTemplateIds.Count}");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                FormworkDebugLog.Log($"  [Hide][WS] EX (fallback to filter): {ex.Message}");
+                return false;
+            }
         }
 
         /// <summary>
