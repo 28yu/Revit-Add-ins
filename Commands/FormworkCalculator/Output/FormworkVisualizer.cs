@@ -38,7 +38,11 @@ namespace Tools28.Commands.FormworkCalculator.Output
             return AnalysisViewPrefix + sourceViewName;
         }
 
-        /// <summary>名前が型枠分析ビュー (新旧全パターン) のパターンに一致するか判定する。</summary>
+        /// <summary>名前が型枠分析ビュー (新旧全パターン) のパターンに一致するか判定する。
+        /// 注: Legacy3 ("**型枠：") は当アドインの管理対象ではない別系統の旧ビューのため
+        /// ここには含めない（含めると型枠数量集計シートに余計なビューが貼り付けられる）。
+        /// 非表示フィルタの除外目的では HideAllFormworkShapesInOtherViews 内で別途扱う。
+        /// </summary>
         internal static bool IsAnalysisViewName(string name)
         {
             if (string.IsNullOrEmpty(name)) return false;
@@ -47,8 +51,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 || name == LegacyAnalysisViewName
                 || name.StartsWith(LegacyAnalysisViewPrefix)
                 || name == Legacy2AnalysisViewName
-                || name.StartsWith(Legacy2AnalysisViewPrefix)
-                || name.StartsWith(Legacy3AnalysisViewPrefix);
+                || name.StartsWith(Legacy2AnalysisViewPrefix);
         }
         internal class VisualizerResult
         {
@@ -971,6 +974,20 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 sourceByAnalysisId[av.Id.IntValue()] = srcViewName ?? string.Empty;
             }
             FormworkDebugLog.Log($"  [Hide] analysisViews found: {analysisViewIds.Count}");
+
+            // Legacy3 ("**型枠：") 系の古い分析ビューは IsAnalysisViewName から外しているが
+            // (シート貼付対象から除外するため)、それらに対する非表示フィルタ適用は避けたい
+            // (古いビューでも型枠表示を保護する)。ここでスキップ対象集合に追加する。
+            int legacy3Count = 0;
+            var allViews3D = new FilteredElementCollector(doc)
+                .OfClass(typeof(View3D))
+                .Cast<View3D>()
+                .Where(v => !v.IsTemplate && v.Name.StartsWith(Legacy3AnalysisViewPrefix));
+            foreach (var lv in allViews3D)
+            {
+                if (analysisViewIds.Add(lv.Id.IntValue())) legacy3Count++;
+            }
+            FormworkDebugLog.Log($"  [Hide] legacy3 analysisViews added to skip: {legacy3Count}");
 
             // ─── Step 2: 全型枠 DirectShape を収集 ───────────────────────────────
             var allShapeIds = new List<ElementId>();
