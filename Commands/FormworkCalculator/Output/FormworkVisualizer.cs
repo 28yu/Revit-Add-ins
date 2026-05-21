@@ -931,14 +931,17 @@ namespace Tools28.Commands.FormworkCalculator.Output
 
         /// <summary>
         /// 全型枠 DirectShape を「対応する分析ビューでだけ表示」状態に揃える。
-        ///   - 非分析ビュー (平面・断面・他 3D ビュー等): 全型枠 DirectShape を非表示
+        ///   - 非分析ビュー (平面・断面・他 3D ビュー等):
+        ///       ① ビューフィルタ "28T_型枠_全非表示" を追加して visible=false に設定（主手段）
+        ///          ビューにテンプレートが適用されている場合はテンプレートにも同フィルタを適用
+        ///       ② フィルタ適用が失敗したビューは HideElements() で要素レベル非表示（フォールバック）
         ///   - 各分析ビュー: 自分のソースビューに紐づくシェイプのみ表示。それ以外
-        ///     (他ソースの分析ビュー由来 + タグなし) は全て非表示
+        ///     (他ソースの分析ビュー由来 + タグなし) は HideElements() で非表示
         /// これにより、過去実行の残りや別ソースの DirectShape が紛れ込むのを防ぐ。
         /// </summary>
         internal static void HideAllFormworkShapesInOtherViews(Document doc)
         {
-            // 分析ビュー ID → ソースビュー名 マッピング
+            // ─── Step 1: 分析ビュー一覧 ──────────────────────────────────────────
             var sourceByAnalysisId = new Dictionary<int, string>();
             var analysisViewIds = new HashSet<int>();
             var analysisViews = Engine.FormworkOutputFinder.FindAllAnalysisViews(doc);
@@ -961,10 +964,12 @@ namespace Tools28.Commands.FormworkCalculator.Output
             }
             FormworkDebugLog.Log($"  [Hide] analysisViews found: {analysisViewIds.Count}");
 
-            // 全型枠 DirectShape を収集 (タグありは sourceView 別、タグなしは別バケット)
+            // ─── Step 2: 全型枠 DirectShape を収集 ───────────────────────────────
             var allShapeIds = new List<ElementId>();
             var shapesByView = new Dictionary<string, List<ElementId>>();
             var untaggedShapes = new List<ElementId>();
+            ElementId formworkMarkerParamId = null;
+
             var collector = new FilteredElementCollector(doc)
                 .OfClass(typeof(DirectShape))
                 .OfCategory(BuiltInCategory.OST_GenericModel);
@@ -979,6 +984,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
                         !mv.StartsWith(FormworkParameterManager.MarkerValue)) continue;
 
                     allShapeIds.Add(e.Id);
+                    if (formworkMarkerParamId == null) formworkMarkerParamId = pm.Id;
 
                     var pv = e.LookupParameter(FormworkParameterManager.ParamSourceView);
                     string sv = pv?.AsString() ?? string.Empty;
@@ -1000,12 +1006,30 @@ namespace Tools28.Commands.FormworkCalculator.Output
             }
             FormworkDebugLog.Log(
                 $"  [Hide] total formwork shapes={allShapeIds.Count} " +
-                $"untagged={untaggedShapes.Count} taggedGroups={shapesByView.Count}");
+                $"untagged={untaggedShapes.Count} taggedGroups={shapesByView.Count} " +
+                $"markerParamId={formworkMarkerParamId?.IntValue()}");
 
             if (allShapeIds.Count == 0) return;
 
-            // プロジェクト内の全ビューを走査し、各ビューで非表示にすべきシェイプを決定して一括非表示
-            // ViewType.Internal / ProjectBrowser / SystemBrowser は HideElements 非対応のため除外
+            // ─── Step 3: ビューフィルタ「全非表示」を作成/取得 ──────────────────
+            // 非分析ビューに適用する ParameterFilterElement を作成しておく。
+            // これにより要素レベル Hide より確実に、ビューテンプレートが設定された
+            // 平面ビュー・断面ビュー等でも型枠 DS を非表示にできる。
+            ElementId hideFilterId = null;
+            if (formworkMarkerParamId != null)
+            {
+                try
+                {
+                    hideFilterId = GetOrCreateHideAllFormworkFilter(doc, formworkMarkerParamId);
+                }
+                catch (Exception ex)
+                {
+                    FormworkDebugLog.Log($"  [Hide] hideFilter create EX: {ex.Message}");
+                }
+            }
+            FormworkDebugLog.Log($"  [Hide] hideFilterId={hideFilterId?.IntValue()}");
+
+            // ─── Step 4: 全ビューを走査 ──────────────────────────────────────────
             var excludedViewTypes = new HashSet<ViewType>
             {
                 ViewType.Legend,
@@ -1021,57 +1045,191 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     && !excludedViewTypes.Contains(v.ViewType))
                 .ToList();
 
-            int totalHidden = 0;
+            // テンプレートへの適用済みIDを追跡（同じテンプレートに2回適用しないため）
+            var appliedTemplateIds = new HashSet<int>();
+            int filterHideCount = 0, elemHideCount = 0;
+
             foreach (var v in allViews)
             {
-                List<ElementId> toHide;
                 bool isAnalysis = analysisViewIds.Contains(v.Id.IntValue());
 
                 if (isAnalysis)
                 {
-                    // 自分のソースビュー名に紐づくシェイプは「表示」、それ以外は全部「非表示」
+                    // 分析ビュー: 自ソース以外のシェイプを要素レベルで非表示
                     sourceByAnalysisId.TryGetValue(v.Id.IntValue(), out string ownSrc);
-                    toHide = new List<ElementId>();
+                    var toHide = new List<ElementId>();
                     foreach (var kv in shapesByView)
                     {
                         if (kv.Key != ownSrc) toHide.AddRange(kv.Value);
                     }
                     toHide.AddRange(untaggedShapes);
+
+                    if (toHide.Count > 0)
+                    {
+                        HideElementsSafe(v, toHide, ref elemHideCount);
+                    }
+                    continue;
+                }
+
+                // 非分析ビュー ────────────────────────────────────────────────────
+                // ① フィルタで非表示（主手段）
+                bool filterApplied = false;
+                if (hideFilterId != null)
+                {
+                    filterApplied = ApplyHideFilterToView(doc, v, hideFilterId,
+                        appliedTemplateIds, ref filterHideCount);
+                }
+
+                // ② フィルタ不可のビューは要素レベル非表示（フォールバック）
+                if (!filterApplied)
+                {
+                    HideElementsSafe(v, allShapeIds, ref elemHideCount);
+                }
+            }
+
+            FormworkDebugLog.Log(
+                $"  [Hide] HideAllFormworkShapesInOtherViews done: " +
+                $"views={allViews.Count} filterHide={filterHideCount} elemHide={elemHideCount}");
+        }
+
+        /// <summary>
+        /// ビュー (またはそのテンプレート) に非表示フィルタを適用する。
+        /// 成功した場合 true を返す。
+        /// </summary>
+        private static bool ApplyHideFilterToView(
+            Document doc, View v, ElementId hideFilterId,
+            HashSet<int> appliedTemplateIds, ref int counter)
+        {
+            // --- ビュー直接に適用を試みる ---
+            try
+            {
+                var existingFilters = v.GetFilters();
+                if (!existingFilters.Contains(hideFilterId))
+                    v.AddFilter(hideFilterId);
+                v.SetFilterVisibility(hideFilterId, false);
+                counter++;
+                FormworkDebugLog.Log(
+                    $"  [Hide] view='{v.Name}'({v.ViewType}) filterOK");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                FormworkDebugLog.Log(
+                    $"  [Hide] view='{v.Name}'({v.ViewType}) " +
+                    $"hasTemplate={v.ViewTemplateId != ElementId.InvalidElementId} " +
+                    $"filterEX: {ex.Message}");
+            }
+
+            // --- ビューテンプレートに適用を試みる ---
+            if (v.ViewTemplateId != null && v.ViewTemplateId != ElementId.InvalidElementId)
+            {
+                int tmplIdInt = v.ViewTemplateId.IntValue();
+                if (!appliedTemplateIds.Contains(tmplIdInt))
+                {
+                    try
+                    {
+                        var tmpl = doc.GetElement(v.ViewTemplateId) as View;
+                        if (tmpl != null)
+                        {
+                            var tmplFilters = tmpl.GetFilters();
+                            if (!tmplFilters.Contains(hideFilterId))
+                                tmpl.AddFilter(hideFilterId);
+                            tmpl.SetFilterVisibility(hideFilterId, false);
+                            appliedTemplateIds.Add(tmplIdInt);
+                            counter++;
+                            FormworkDebugLog.Log(
+                                $"  [Hide] view='{v.Name}' → template='{tmpl.Name}' filterOK");
+                            return true;
+                        }
+                    }
+                    catch (Exception exTmpl)
+                    {
+                        FormworkDebugLog.Log(
+                            $"  [Hide] view='{v.Name}' templateFilter EX: {exTmpl.Message}");
+                    }
                 }
                 else
                 {
-                    // 非分析ビュー: 全型枠シェイプを非表示
-                    toHide = allShapeIds;
-                }
-
-                if (toHide.Count == 0) continue;
-
-                try
-                {
-                    v.HideElements(toHide);
-                    totalHidden += toHide.Count;
-                }
-                catch (Exception ex)
-                {
-                    // HideElements は既に非表示の要素 / 隠せない要素があるとバッチごと失敗する。
-                    // 1 件ずつ再試行する。
-                    int perItemOk = 0;
-                    foreach (var id in toHide)
-                    {
-                        try
-                        {
-                            v.HideElements(new List<ElementId> { id });
-                            perItemOk++;
-                        }
-                        catch { }
-                    }
-                    totalHidden += perItemOk;
+                    // 同テンプレートへの適用済み → そのビューにも効いているはず
                     FormworkDebugLog.Log(
-                        $"  [Hide] view='{v.Name}' batch EX='{ex.Message}' perItemOk={perItemOk}/{toHide.Count}");
+                        $"  [Hide] view='{v.Name}' template already applied (shared template)");
+                    return true;
                 }
             }
+
+            return false;
+        }
+
+        /// <summary>
+        /// 型枠 DirectShape を全て非表示にするビューフィルタを作成または取得する。
+        /// ルール: 28Tools_FormworkMarker パラメータが "28Tools_Formwork" で始まる要素
+        /// カテゴリ: OST_GenericModel のみ
+        /// </summary>
+        private static ElementId GetOrCreateHideAllFormworkFilter(
+            Document doc, ElementId markerParamId)
+        {
+            const string filterName = "28T_型枠_全非表示";
+
+            var existing = new FilteredElementCollector(doc)
+                .OfClass(typeof(ParameterFilterElement))
+                .Cast<ParameterFilterElement>()
+                .FirstOrDefault(f => f.Name == filterName);
+            if (existing != null)
+            {
+                FormworkDebugLog.Log(
+                    $"  [Hide] hideFilter '{filterName}' reused id={existing.Id.IntValue()}");
+                return existing.Id;
+            }
+
+            var cats = new List<ElementId>
+            {
+                new ElementId(BuiltInCategory.OST_GenericModel)
+            };
+#if REVIT2026
+            FilterRule rule = ParameterFilterRuleFactory.CreateBeginsWithRule(
+                markerParamId, FormworkParameterManager.MarkerValue);
+#else
+            FilterRule rule = ParameterFilterRuleFactory.CreateBeginsWithRule(
+                markerParamId, FormworkParameterManager.MarkerValue, false);
+#endif
+            var ef = new ElementParameterFilter(rule);
+            var newFilter = ParameterFilterElement.Create(doc, filterName, cats, ef);
             FormworkDebugLog.Log(
-                $"  [Hide] HideAllFormworkShapesInOtherViews done: views={allViews.Count} totalHidden={totalHidden}");
+                $"  [Hide] hideFilter '{filterName}' created id={newFilter.Id.IntValue()}");
+            return newFilter.Id;
+        }
+
+        /// <summary>
+        /// HideElements をバッチで実行し、失敗時に1件ずつ再試行する。
+        /// </summary>
+        private static void HideElementsSafe(
+            View v, List<ElementId> toHide, ref int counter)
+        {
+            if (toHide == null || toHide.Count == 0) return;
+            try
+            {
+                v.HideElements(toHide);
+                counter += toHide.Count;
+                FormworkDebugLog.Log(
+                    $"  [Hide] view='{v.Name}'({v.ViewType}) elemHide OK count={toHide.Count}");
+            }
+            catch (Exception ex)
+            {
+                int ok = 0;
+                foreach (var id in toHide)
+                {
+                    try
+                    {
+                        v.HideElements(new List<ElementId> { id });
+                        ok++;
+                    }
+                    catch { }
+                }
+                counter += ok;
+                FormworkDebugLog.Log(
+                    $"  [Hide] view='{v.Name}'({v.ViewType}) " +
+                    $"batchEX='{ex.Message}' perItem={ok}/{toHide.Count}");
+            }
         }
 
         private static DirectShapeType GetOrCreateDirectShapeType(Document doc, string typeName)
