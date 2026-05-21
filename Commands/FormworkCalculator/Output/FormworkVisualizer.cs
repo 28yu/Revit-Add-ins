@@ -253,11 +253,26 @@ namespace Tools28.Commands.FormworkCalculator.Output
                      settings.Scope == CalculationScope.SelectedViews);
                 if (useSourceSectionBox)
                 {
-                    // ソースの切断ボックス状態をそのまま踏襲する。
-                    // アクティブならコピー、非アクティブなら要素BBoxから自動算出する。
-                    bool copied = CopySectionBoxFromSource((View3D)sourceView, view);
-                    if (!copied)
-                        EnableSectionBox(doc, view, result);
+                    var srcV3D = (View3D)sourceView;
+                    if (srcV3D.IsSectionBoxActive)
+                    {
+                        // ソースに切断ボックスあり → コピーを試みる。
+                        // コピー失敗時は要素BBoxからフォールバック。
+                        bool copied = CopySectionBoxFromSource(srcV3D, view);
+                        if (!copied)
+                        {
+                            FormworkDebugLog.Log("  [Visual] SectionBox copy failed → fallback to EnableSectionBox");
+                            EnableSectionBox(doc, view, result);
+                        }
+                    }
+                    else
+                    {
+                        // ソースに切断ボックスなし → 解析ビューも切断ボックスなし（全体表示）。
+                        // EnableSectionBox を呼ぶと空のBBoxが有効化されて型枠DSが
+                        // クリップアウトされる問題があるため、ここでは何もしない。
+                        FormworkDebugLog.Log(
+                            "  [Visual] source IsSectionBoxActive=False → analysis view also no section box");
+                    }
                 }
                 else
                     EnableSectionBox(doc, view, result);
@@ -2078,10 +2093,24 @@ namespace Tools28.Commands.FormworkCalculator.Output
                         Max = new XYZ(maxP.X + margin, maxP.Y + margin, maxP.Z + margin),
                     };
                     view.SetSectionBox(sb);
+                    view.IsSectionBoxActive = true;
+                    FormworkDebugLog.Log(
+                        $"  [Visual] EnableSectionBox: set BB " +
+                        $"min=({minP.X:F2},{minP.Y:F2},{minP.Z:F2}) " +
+                        $"max=({maxP.X:F2},{maxP.Y:F2},{maxP.Z:F2})");
                 }
-                view.IsSectionBoxActive = true;
+                else
+                {
+                    // 要素のBBoxが取得できなかった場合は切断ボックスを有効化しない。
+                    // 空のBBoxを有効化すると型枠DSがクリップアウトされる。
+                    FormworkDebugLog.Log(
+                        "  [Visual] EnableSectionBox: no elements with BBox found → section box NOT activated");
+                }
             }
-            catch { }
+            catch (Exception exSb)
+            {
+                FormworkDebugLog.Log($"  [Visual] EnableSectionBox EX: {exSb.Message}");
+            }
         }
 
         /// <summary>
