@@ -203,8 +203,29 @@ namespace Tools28
             {
                 string assemblyName = new AssemblyName(args.Name).Name;
 
+                // ClosedXML 等の NuGet パッケージが要求する .NET ライブラリは、
+                // Revit の bin に含まれない場合があるため add-in フォルダから解決する。
+                // 例: System.Runtime.CompilerServices.Unsafe (ClosedXML→DocumentFormat.OpenXml 経由)
+                bool isNuGetDependency =
+                    assemblyName.Equals("System.Runtime.CompilerServices.Unsafe",
+                        StringComparison.OrdinalIgnoreCase) ||
+                    assemblyName.Equals("System.Memory",
+                        StringComparison.OrdinalIgnoreCase) ||
+                    assemblyName.Equals("System.Buffers",
+                        StringComparison.OrdinalIgnoreCase) ||
+                    assemblyName.Equals("System.Numerics.Vectors",
+                        StringComparison.OrdinalIgnoreCase) ||
+                    assemblyName.Equals("System.IO.Packaging",
+                        StringComparison.OrdinalIgnoreCase) ||
+                    assemblyName.Equals("System.Threading.Tasks.Extensions",
+                        StringComparison.OrdinalIgnoreCase) ||
+                    assemblyName.Equals("System.ValueTuple",
+                        StringComparison.OrdinalIgnoreCase);
+
                 // System/Framework アセンブリは解決しない（.NET 8 の resolver と競合してデッドロックの可能性）
-                if (assemblyName.StartsWith("System.", StringComparison.OrdinalIgnoreCase) ||
+                // ただし上記の NuGet 依存ライブラリは例外的に add-in フォルダから解決する
+                if (!isNuGetDependency &&
+                    (assemblyName.StartsWith("System.", StringComparison.OrdinalIgnoreCase) ||
                     assemblyName.StartsWith("Microsoft.", StringComparison.OrdinalIgnoreCase) ||
                     assemblyName.StartsWith("Autodesk.", StringComparison.OrdinalIgnoreCase) ||
                     assemblyName.StartsWith("PresentationCore", StringComparison.OrdinalIgnoreCase) ||
@@ -212,7 +233,7 @@ namespace Tools28
                     assemblyName.StartsWith("WindowsBase", StringComparison.OrdinalIgnoreCase) ||
                     assemblyName.StartsWith("mscorlib", StringComparison.OrdinalIgnoreCase) ||
                     assemblyName.StartsWith("netstandard", StringComparison.OrdinalIgnoreCase) ||
-                    assemblyName.EndsWith(".resources", StringComparison.OrdinalIgnoreCase))
+                    assemblyName.EndsWith(".resources", StringComparison.OrdinalIgnoreCase)))
                 {
                     return null;
                 }

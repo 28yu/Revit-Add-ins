@@ -120,8 +120,11 @@ namespace Tools28.Commands.FormworkCalculator
                 }
 
                 // 各ソースビューの計算結果と出力IDを保持
+                // perViewResults / perViewSourceNames / perViewSources は同じインデックスで対応する。
+                // (r == null でスキップした場合に sourceViews との index が崩れるバグを防ぐ)
                 var perViewResults = new List<FormworkResult>();
                 var perViewSourceNames = new List<string>();
+                var perViewSources = new List<View3D>();
                 var perViewAnalysisViewIds = new List<ElementId>();
                 var perViewScheduleIds = new List<ElementId>();
                 // 分析ビュー Id → そのビューで作成された DirectShape Id 群
@@ -155,6 +158,7 @@ namespace Tools28.Commands.FormworkCalculator
                     if (r == null) continue;
                     perViewResults.Add(r);
                     perViewSourceNames.Add(sv.Name);
+                    perViewSources.Add(sv);
                     if (firstResult == null) firstResult = r;
                 }
 
@@ -260,7 +264,9 @@ namespace Tools28.Commands.FormworkCalculator
                             for (int i = 0; i < perViewResults.Count; i++)
                             {
                                 var r = perViewResults[i];
-                                var sv = sourceViews[i];
+                                // perViewSources を使うことで sourceViews との index ずれを防ぐ
+                                // (foreach 内で r==null によりスキップされた場合の不整合対策)
+                                var sv = perViewSources[i];
                                 var svName = perViewSourceNames[i];
 
                                 if (settings.Create3DView)
