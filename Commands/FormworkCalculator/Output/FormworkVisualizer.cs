@@ -1282,24 +1282,9 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 }
 
                 // (1) グローバルデフォルト可視性を Hidden に
-                try
-                {
-                    var defaults = WorksetDefaultVisibilitySettings
-                        .GetWorksetDefaultVisibilitySettings(doc);
-                    if (defaults.IsWorksetVisible(wsId))
-                    {
-                        defaults.SetWorksetVisibility(wsId, false);
-                        FormworkDebugLog.Log($"  [Hide][WS] global default → Hidden (wsId={wsId.IntegerValue})");
-                    }
-                    else
-                    {
-                        FormworkDebugLog.Log($"  [Hide][WS] global default already Hidden (wsId={wsId.IntegerValue})");
-                    }
-                }
-                catch (Exception exDef)
-                {
-                    FormworkDebugLog.Log($"  [Hide][WS] SetGlobalVisibility EX: {exDef.Message}");
-                }
+                // GetOrCreateFormworkWorkset でも設定しているが、ここでも確実に適用する。
+                // (初回作成直後の TX コミット前でも機能するよう二重保険)
+                TrySetWorksetGlobalVisibility(doc, wsId, "28Tools_型枠(HidePhase)", isNew: false);
 
                 // (2) 分析ビューが使うテンプレート ID を収集
                 //     （それらテンプレートには Visible を設定して分析ビューの可視性を維持）
@@ -1768,10 +1753,37 @@ namespace Tools28.Commands.FormworkCalculator.Output
             const string wsName = "28Tools_型枠";
             var allWs = new FilteredWorksetCollector(doc).OfKind(WorksetKind.UserWorkset);
             var existing = allWs.FirstOrDefault(ws => ws.Name == wsName);
-            if (existing != null) return existing.Id;
+            if (existing != null)
+            {
+                // 既存ワークセットでも「全ビューに表示」を確実にオフにする
+                TrySetWorksetGlobalVisibility(doc, existing.Id, wsName, isNew: false);
+                return existing.Id;
+            }
+
             var newWs = Workset.Create(doc, wsName);
             FormworkDebugLog.Log($"  [Visual] 専用ワークセット作成: '{wsName}' id={newWs.Id.IntegerValue}");
+            // 新規ワークセットはデフォルトで「全ビューに表示」=true になるため即座にオフに設定
+            TrySetWorksetGlobalVisibility(doc, newWs.Id, wsName, isNew: true);
             return newWs.Id;
+        }
+
+        private static void TrySetWorksetGlobalVisibility(
+            Document doc, WorksetId wsId, string wsName, bool isNew)
+        {
+            try
+            {
+                var defaults = WorksetDefaultVisibilitySettings
+                    .GetWorksetDefaultVisibilitySettings(doc);
+                defaults.SetWorksetVisibility(wsId, false);
+                FormworkDebugLog.Log(
+                    $"  [Visual] WS '{wsName}' 全ビュー非表示に設定 " +
+                    $"(isNew={isNew}, wsId={wsId.IntegerValue})");
+            }
+            catch (Exception ex)
+            {
+                FormworkDebugLog.Log(
+                    $"  [Visual] WS '{wsName}' 全ビュー非表示 設定失敗 EX: {ex.Message}");
+            }
         }
 
         /// <summary>
