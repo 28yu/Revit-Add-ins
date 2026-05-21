@@ -24,6 +24,8 @@ namespace Tools28.Commands.FormworkCalculator.Output
         internal const string LegacyAnalysisViewPrefix = "型枠分析 - ";
         internal const string Legacy2AnalysisViewName = "型枠数量算出";
         internal const string Legacy2AnalysisViewPrefix = "型枠数量算出 - ";
+        // さらに古いバージョン ("**型枠：SourceViewName" 形式)
+        internal const string Legacy3AnalysisViewPrefix = "**型枠：";
 
         /// <summary>
         /// ソースビュー名からこのビューに対応する解析ビュー名を生成する。
@@ -45,7 +47,8 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 || name == LegacyAnalysisViewName
                 || name.StartsWith(LegacyAnalysisViewPrefix)
                 || name == Legacy2AnalysisViewName
-                || name.StartsWith(Legacy2AnalysisViewPrefix);
+                || name.StartsWith(Legacy2AnalysisViewPrefix)
+                || name.StartsWith(Legacy3AnalysisViewPrefix);
         }
         internal class VisualizerResult
         {
@@ -955,7 +958,12 @@ namespace Tools28.Commands.FormworkCalculator.Output
                         srcViewName = av.Name.Substring(AnalysisViewPrefix.Length);
                     else if (av.Name.StartsWith(LegacyAnalysisViewPrefix))
                         srcViewName = av.Name.Substring(LegacyAnalysisViewPrefix.Length);
-                    else if (av.Name == AnalysisViewName || av.Name == LegacyAnalysisViewName)
+                    else if (av.Name.StartsWith(Legacy2AnalysisViewPrefix))
+                        srcViewName = av.Name.Substring(Legacy2AnalysisViewPrefix.Length);
+                    else if (av.Name.StartsWith(Legacy3AnalysisViewPrefix))
+                        srcViewName = av.Name.Substring(Legacy3AnalysisViewPrefix.Length);
+                    else if (av.Name == AnalysisViewName || av.Name == LegacyAnalysisViewName
+                        || av.Name == Legacy2AnalysisViewName)
                         srcViewName = string.Empty;
                     else
                         srcViewName = string.Empty;
@@ -1103,9 +1111,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
             // --- ビュー直接に適用を試みる ---
             try
             {
-                var existingFilters = v.GetFilters();
-                if (!existingFilters.Contains(hideFilterId))
-                    v.AddFilter(hideFilterId);
+                SetFilterAtHighestPriority(v, hideFilterId);
                 v.SetFilterVisibility(hideFilterId, false);
                 counter++;
                 FormworkDebugLog.Log(
@@ -1131,9 +1137,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
                         var tmpl = doc.GetElement(v.ViewTemplateId) as View;
                         if (tmpl != null)
                         {
-                            var tmplFilters = tmpl.GetFilters();
-                            if (!tmplFilters.Contains(hideFilterId))
-                                tmpl.AddFilter(hideFilterId);
+                            SetFilterAtHighestPriority(tmpl, hideFilterId);
                             tmpl.SetFilterVisibility(hideFilterId, false);
                             appliedTemplateIds.Add(tmplIdInt);
                             counter++;
@@ -1158,6 +1162,27 @@ namespace Tools28.Commands.FormworkCalculator.Output
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// 指定フィルタをビューのフィルタリスト先頭（最高優先度）に配置する。
+        /// AddFilter → SetFilters で先頭挿入。先頭に既にある場合はスキップ。
+        /// </summary>
+        private static void SetFilterAtHighestPriority(View v, ElementId filterId)
+        {
+            var list = v.GetFilters().ToList();
+            if (list.Count > 0 && list[0] == filterId) return; // already at top
+
+            if (!list.Contains(filterId))
+            {
+                v.AddFilter(filterId);
+                list = v.GetFilters().ToList();
+            }
+
+            // 先頭に移動
+            list.Remove(filterId);
+            list.Insert(0, filterId);
+            v.SetFilters(list);
         }
 
         /// <summary>
