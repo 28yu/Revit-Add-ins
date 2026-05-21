@@ -376,6 +376,79 @@ git pull origin main
 
 ## FormworkCalculator 開発知見
 
+### ワークセット可視性の落とし穴（2026-05-21）
+
+#### `IsWorksetVisible` は新規WSで常に `false` を返す（Revit API バグ）
+- `WorksetDefaultVisibilitySettings.IsWorksetVisible(wsId)` が新規作成直後のWSで `false` を返す
+- にもかかわらず Revit UI では「全ビューに表示」チェックが入っている
+- **対策**: ガード (`if (!IsWorksetVisible) SetWorksetVisibility(false)`) は不要。常に `SetWorksetVisibility(false)` を呼ぶ
+- 既存WS・新規WS の両方で毎回 `SetWorksetVisibility(false)` を呼ぶことでUI表示が一致する
+
+#### per-view ワークセット可視性の優先順位
+- Global default (`WorksetDefaultVisibilitySettings`) よりも per-view 設定 (`view.SetWorksetVisibility()`) が優先
+- グローバルを Hidden にしても、per-view で Visible に設定していれば表示される
+- `EnsureFormworkWorksetsVisible` を Global set の**後に**呼ぶことで解析ビューのみ Visible を保証
+
+### ClosedXML AssemblyResolve ハンドラの注意点（2026-05-21）
+
+`System.*` アセンブリを一律スキップすると ClosedXML の NuGet 推移的依存が壊れる。
+ホワイトリスト方式に変更が必要:
+
+```csharp
+bool isNuGetDependency =
+    assemblyName.Equals("System.Runtime.CompilerServices.Unsafe", StringComparison.OrdinalIgnoreCase) ||
+    assemblyName.Equals("System.Memory", StringComparison.OrdinalIgnoreCase) ||
+    assemblyName.Equals("System.Buffers", StringComparison.OrdinalIgnoreCase) ||
+    assemblyName.Equals("System.Numerics.Vectors", StringComparison.OrdinalIgnoreCase) ||
+    assemblyName.Equals("System.IO.Packaging", StringComparison.OrdinalIgnoreCase) ||
+    assemblyName.Equals("System.Threading.Tasks.Extensions", StringComparison.OrdinalIgnoreCase) ||
+    assemblyName.Equals("System.ValueTuple", StringComparison.OrdinalIgnoreCase);
+if (!isNuGetDependency && assemblyName.StartsWith("System.", ...))
+    return null; // スキップ
+```
+
+### 切断ボックス（SectionBox）操作の注意点（2026-05-21）
+
+#### `IsSectionBoxActive = true` を `SetSectionBox` なしで呼ぶと空のBBoxが有効化される
+- 空のセクションボックスが有効化されると全 DirectShape がクリップアウトされて何も見えなくなる
+- **正しい順序**: 必ず `view.SetSectionBox(validBB)` → `view.IsSectionBoxActive = true` の順で呼ぶ
+- BBoxが計算できない場合は `IsSectionBoxActive = true` を呼ばない（何もしない）
+
+#### ソースビューに切断ボックスがない場合の正しい挙動
+- NG: 解析ビューにも切断ボックスを設定しない → 全体表示になり型枠DSがシート上で極小
+- OK: `EnableSectionBox` で型枠対象要素の BoundingBox から切断ボックスを算出して設定
+- `elem.get_BoundingBox(null)` は `doc.Regenerate()` 前でも元の構造要素なら取得可能
+
+#### `EnableSectionBox` の安全な実装パターン
+```csharp
+// result.ElementResults の BBox を合算して切断ボックスを設定
+// 要素が一つもない場合は IsSectionBoxActive を呼ばない（空BBox有効化を防止）
+if (minP != null && maxP != null)
+{
+    view.SetSectionBox(new BoundingBoxXYZ { Min = minP - margin, Max = maxP + margin });
+    view.IsSectionBoxActive = true;
+}
+// else: 何もしない（安全）
+```
+
+#### ⚠️ 未解決: 3Dビューの切断ボックス座標系（2026-05-21 時点）
+- `EnableSectionBox` はワールド座標 (`elem.get_BoundingBox(null)`) で BBox を計算
+- Revit の切断ボックスはビューローカル座標系（`BoundingBoxXYZ.Transform`）で定義される
+- 回転・傾斜のある 3D ビューではワールド座標でセットした切断ボックスがズレる可能性
+- 特に `**型枠：` 系の Legacy3 ビューで発生リスクあり（カメラ向き不明）
+- **次セッションで調査が必要**: `view.GetSectionBox().Transform` を確認し座標変換が必要か検証
+
+### Legacy3 ビュー（`**型枠：` プレフィックス）の扱い（2026-05-21）
+
+旧アドインバージョンが作成した `**型枠：{sourceViewName}` 形式の 3D ビュー:
+- `IsAnalysisViewName()` には含めない（シートに余計なビューが貼り付けられるため）
+- `HideAllFormworkShapesInOtherViews` の hide ループには含める（DS を非表示にするため）
+- `CollectAllAnalysisViewIds` では除外し、現バージョンの解析ビュー (`3D_型枠数量 -`) のみ返す
+
+---
+
+## FormworkCalculator 開発知見（旧）
+
 ### 処理パイプライン（3 Pass）
 ```
 Pass 1: 要素毎に Solid 取得 → FaceClassifier で分類

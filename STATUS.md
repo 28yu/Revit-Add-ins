@@ -1,5 +1,5 @@
-## 最終セッション: 2026-05-20 02:16
-変更ファイル: Docs/HANDOFF-PDFtoExcel-Tool.md
+## 最終セッション: 2026-05-21 17:30
+変更ファイル: Commands/FormworkCalculator/Output/FormworkVisualizer.cs, Application.cs
 
 
 # 開発ステータス
@@ -7,38 +7,54 @@
 > このファイルはセッション終了時に更新すること
 
 ## 現在作業中
-FormworkCalculator の複数3Dビュー対応 & 不具合修正
-ブランチ: `claude/improve-formwork-calculation-OoBuI` (= `build/test2`)
-最新コミット: `1292a36` ([1]-1 ParamSourceView バインド漏れ修正 / [6] 選択のビュー追加)
+FormworkCalculator の 3D ビュー不具合修正（継続中）
+ブランチ: `claude/fix-3d-view-issues-vqjlN`
+最新コミット: `08c185f` (型枠ビューが空になる問題を修正：切断ボックスなしソースビューにBBoxを算出して設定)
 
 ### 完了 (本セッション)
-- [3] ダイアログ文言変更 (シートを作成 / 集計表を作成) - 3言語対応
-- [4]-2 ビューポートタイトル非表示: `VIEWPORT_ATTR_SHOW_LABEL=0` のタイプを最優先、なければ複製作成
-- [5] リンクモデルを切断ボックスでクリップ (`_sectionBoxSolid` × `BooleanOperationsType.Intersect`)
-- [6] ダイアログ計算範囲に「選択のビュー」追加 (3D ビュー選択時に自動選択)
-- ワークセット非表示リンクの除外 (`activeView.GetWorksetVisibility(rli.WorksetId)`)
+- [x] ワークセット '28Tools_型枠' の「全ビューに表示」チェックが入る問題を修正
+  - `IsWorksetVisible(wsId)` は新規WSでも `false` を返す（UI上はチェック入り）→ガード削除、常に `SetWorksetVisibility(false)` を呼ぶ
+  - 既存WS・新規WS両方で毎回設定するよう変更
+- [x] Excel エクスポート時 `System.Runtime.CompilerServices.Unsafe` エラーを修正
+  - `OnAssemblyResolve` が全 `System.*` をスキップしていた → ClosedXML NuGet 依存DLLをホワイトリスト化
+- [x] 複数ビュー選択時のインデックス不一致修正（防御的実装）
+  - `sourceViews[i]` → `perViewSources[i]` に統一
+- [x] EnableSectionBox の空BBox問題修正（第1次）
+  - `IsSectionBoxActive=True` を BBox なしで呼ばないよう変更
+- [x] IsSectionBoxActive=False ソースビューに要素BBoxから切断ボックスを算出・設定（第2次）
+  - 修正前: ソースに切断ボックスなし→解析ビューも切断ボックスなし→全体表示でDSが極小
+  - 修正後: EnableSectionBox を呼んで型枠要素のBBoxから切断ボックスを算出
 
-### 未確認 (次セッションでユーザー確認待ち)
-- [1] 複数3Dビュー選択 → 1シート集約 (基盤実装済み、[1]-1 修正後の動作確認待ち)
-- [2] 特定ビュー再実行で他ビューはそのまま (per-view クリーンアップ実装済み、[1] 修正後に確認予定)
-
-### 重要な実装メモ
-- **DirectShape のソースビュー識別**: 共有パラメータ `ParamSourceView` (`28Tools_Formwork_ソースビュー`) で各 DirectShape にソースビュー名を保存
-- **重要な落とし穴**: `FormworkParameterManager.IsAllBound()` に新パラメータの存在確認を必ず追加すること (旧バージョン文書で新パラメータがバインドされず全フィルタ無効化される)
-- **シート再構築**: `FormworkSheetCreator.CreateOrUpdateSheet` が既存シートを削除→再作成 (シート名・番号は引継ぎ)。シート上の配置は `CollectAllAnalysisViewIds` + `CollectAllPerViewScheduleIds` でプロジェクト内全分析ビュー・集計表を拾う
-- **HideAllFormworkShapesInOtherViews**: 全ループ後に呼ぶポストパス。`ParamSourceView` でグルーピングし、各群を対応分析ビュー以外で `HideElements`。新規分析ビューに過去ビューの DirectShape が紛れ込むのを防止
-- **エンジン Scope 正規化**: `SelectedViews` モードはループ内で各ビューを `CurrentView` 扱いするため `CloneWithScope(settings, CurrentView)` でエンジンに渡す
+### ⚠️ 未解決（次セッションで継続）
+**問題**: 複数ビュー選択実行時、1つの3Dビューに型枠が表示されない
+- 対象: `**型枠：工作物擁壁`（IsSectionBoxActive=False のソースビュー）
+- 試みた修正: 3回（上記参照） → ユーザー確認でまだ改善されず
+- 最新ログ（第2回提出）から判明した事実:
+  - DS は正常に413個作成されている
+  - ワークセット可視性: Visible ✓
+  - 要素非表示カウント: 2553件（= 2034+519、正確）✓
+  - OST_GenericModel: 可視 ✓
+  - フィルタ: 9件適用（壁・スラブ可視）✓
+  - 切断ボックスなし → 全体表示 → DSが極小に見える（第2次修正で対処済みのはず）
+- **残課題**: 第2次修正後もユーザーが改善なしと報告 → 別の原因が存在する可能性
+  - 仮説A: 3Dビューの切断ボックスはビューローカル座標系だが、EnableSectionBox はワールド座標で計算している → 回転ビューでズレる可能性
+  - 仮説B: EnableSectionBox が正しく動作していても、ビューポートのカメラ向きが型枠と合っていない
+  - 次セッションでログ（3回目提出）を送ってもらい確認する
 
 ### デバッグログの送り方
 ローカル PC で `.\Send-FormworkLog.ps1` 実行 → `.diag/Formwork_debug*.txt` が push される。Claude は `/home/user/Revit-Add-ins/.diag/Formwork_debug.txt` を Read。
 
+または: `C:\temp\Formwork_debug.txt` と `C:\temp\Tools28_debug.txt` を直接ドラッグ&ドロップ。
+
 ## 直近の意思決定
+- 2026-05-21: 第2次修正でEnableSectionBoxを再有効化（IsSectionBoxActive=False でも要素BBoxから算出）
 - 2026-05-15: CLAUDE.md をスリム化し STATUS.md / TASKS.md / Docs/DEVLOG.md に分離
-- 2026-05-15: FormworkCalculator は1シートにプロジェクト全体の分析ビュー+集計表を集約 (1プロジェクト1シート方式)
+- 2026-05-15: FormworkCalculator は1シートにプロジェクト全体の分析ビュー+集計表を集約
 
 ## 既知のブロッカー・注意事項
 - `build/test` ブランチへの push は 403 になるため `build/test2` を使う
 - ローカルPCで `git pull` 後は `git log --oneline -3` で反映確認すること
+- ClosedXML の AssemblyResolve ハンドラ: System.* の一律スキップは禁止（ホワイトリスト方式）
 
 ## 実装済み機能の状態
 
@@ -49,12 +65,12 @@ FormworkCalculator の複数3Dビュー対応 & 不具合修正
 | ViewCopy / SectionBoxCopy / ViewportPosition / CropBoxCopy | ✅ 完了 | |
 | BeamUnderLevel（梁下端色分け） | ✅ 完了・動作確認済み | |
 | BeamTopLevel（梁天端色分け） | ✅ 完了・動作確認済み | |
-| RoomTagCreator（部屋タグ自動配置） | ✅ 完了 | リボン登録要確認 |
+| RoomTagCreator（部屋タグ自動配置） | ✅ 完了 | |
 | FilledRegionSplitMerge（塗潰し領域分割統合） | ✅ 完了 | |
 | ExcelExportImport（Excel連携） | ✅ 完了・全バージョン確認済み | |
 | FireProtection（耐火被覆色分け） | ✅ 完了・動作確認済み | |
-| FormworkCalculator（型枠数量算出） | ✅ 完了 | 一部特殊形状で接触面検出漏れあり |
-| LanguageSwitch（多言語切替） | ✅ 完了 | Revit環境でのテストが必要 |
+| FormworkCalculator（型枠数量算出） | 🔧 不具合修正中 | 複数ビュー時1ビュー空白問題 |
+| LanguageSwitch（多言語切替） | ✅ 完了 | |
 | ExpiryManager（バージョン有効期限） | ✅ 実装済み(v2.1〜) | |
 
 ## 現在のバージョン

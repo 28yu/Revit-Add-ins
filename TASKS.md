@@ -3,7 +3,15 @@
 ## TODO
 
 ### 優先度: 高
-（完了済み項目なし）
+- [ ] **FormworkCalculator: 複数ビュー選択時に1ビューが空白になる問題** (`claude/fix-3d-view-issues-vqjlN`)
+  - 対象: IsSectionBoxActive=False のソースビュー（例: `**型枠：工作物擁壁`）
+  - 3回修正済みもまだ未解決（2026-05-21時点）
+  - 調査ポイント1: `EnableSectionBox` の切断ボックス座標系（ワールド座標 vs. ビューローカル座標）
+    - `view.GetSectionBox().Transform` を確認 → Identity でなければ座標変換が必要
+    - 修正案: `BoundingBoxXYZ.Transform.Inverse.OfPoint(worldPoint)` でビューローカル座標に変換してからセット
+  - 調査ポイント2: EnableSectionBox が実際に呼ばれているかログ確認（3回目ログ提出待ち）
+    - ログに `EnableSectionBox: set BB` or `no elements with BBox found` が出るか確認
+  - 調査ポイント3: ビューポートがシート上で正しい位置に配置されているか
 
 ### 優先度: 中
 - [ ] FormworkCalculator: 特殊形状の接触面検出漏れ改善
