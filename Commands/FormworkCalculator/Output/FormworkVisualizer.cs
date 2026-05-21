@@ -1496,18 +1496,39 @@ namespace Tools28.Commands.FormworkCalculator.Output
 
                             if (hitsFormwork)
                             {
-                                // ★ 型枠 DS を除外した修正フィルタを生成して使用する（visible=false 維持）
+                                // ★ 型枠 DS を除外した修正フィルタ群を生成して使用する（visible=false 維持）
                                 if (formworkMarkerParamId != null)
                                 {
-                                    var modFid = CreateAnalysisFilterExcludingFormwork(
+                                    var modFids = CreateAnalysisFiltersExcludingFormwork(
                                         doc, fid, formworkMarkerParamId);
-                                    if (modFid != null)
+                                    if (modFids != null && modFids.Count > 0)
                                     {
-                                        filterToAdd = modFid;
+                                        // 元フィルタは追加せず、生成した修正フィルタ群を追加する
+                                        var srcOgs = source.GetFilterOverrides(fid);
+                                        foreach (var mfid in modFids)
+                                        {
+                                            try
+                                            {
+                                                var existingForMod = target.GetFilters();
+                                                if (!existingForMod.Contains(mfid))
+                                                    target.AddFilter(mfid);
+                                                if (srcOgs != null)
+                                                    target.SetFilterOverrides(mfid, srcOgs);
+                                                target.SetFilterVisibility(mfid, srcVis); // false 維持
+                                            }
+                                            catch (Exception exAdd)
+                                            {
+                                                FormworkDebugLog.Log(
+                                                    $"  [Visual] modified filter add EX: {exAdd.Message}");
+                                            }
+                                        }
                                         modifiedCopy++;
+                                        copied++;
                                         FormworkDebugLog.Log(
                                             $"  [Visual] filter fid={fid.IntValue()} → " +
-                                            $"modified copy {modFid.IntValue()} (excludes formwork DS, visible=false 維持)");
+                                            $"replaced with {modFids.Count} modified filter(s) " +
+                                            $"(excludes formwork DS, visible=false 維持)");
+                                        continue; // 元フィルタは追加しない
                                     }
                                     else
                                     {
@@ -1561,44 +1582,51 @@ namespace Tools28.Commands.FormworkCalculator.Output
         }
 
         /// <summary>
-        /// 型枠 DirectShape を除外した分析ビュー専用フィルタを作成する。
+        /// 型枠 DirectShape を除外した分析ビュー専用フィルタ群を作成する。
         ///
-        /// 元フィルタのルールに「28Tools_FormworkMarker が "28Tools_Formwork" で始まらない」
-        /// という AND 条件を追加することで、型枠 DS はこのフィルタにマッチしなくなる。
-        /// フィルタ名は "28T_FW_{originalFid.IntValue()}" で識別し、既存の同名フィルタは
-        /// 削除してから再作成する。
+        /// 【問題】
+        /// 28Tools_FormworkMarker パラメータは OST_GenericModel にしか割当てられていないため、
+        /// 元フィルタが OST_GenericModel 以外のカテゴリ（壁・柱等）を含むと、
+        /// AND ルールに FormworkMarker を追加すると ParameterFilterElement.Create が
+        /// "rule refers to a parameter that does not apply to filter's categories" で失敗する。
         ///
-        /// 戻り値: 作成したフィルタ要素の ElementId。失敗した場合は null。
+        /// 【対策】
+        /// カテゴリを分割して 1〜2 個のフィルタを作成する：
+        ///   フィルタA（"28T_FW_{fid}_GM"）: OST_GenericModel のみ
+        ///        ルール = (元フィルタのルール) AND (FormworkMarker が "28Tools_Formwork" で始まらない)
+        ///        → 型枠 DS は除外され、非形式の GenericModel 要素は元同様に非表示
+        ///   フィルタB（"28T_FW_{fid}_Other"）: 元カテゴリ - OST_GenericModel
+        ///        ルール = 元フィルタのルール（変更なし）
+        ///        → 非 GenericModel 要素を元同様に非表示
+        ///
+        /// 戻り値: 作成したフィルタ要素 ID のリスト。空 = 全て失敗（呼出し側でフォールバック）。
         /// </summary>
-        private static ElementId CreateAnalysisFilterExcludingFormwork(
+        private static List<ElementId> CreateAnalysisFiltersExcludingFormwork(
             Document doc, ElementId originalFid, ElementId formworkMarkerParamId)
         {
+            var result = new List<ElementId>();
             try
             {
                 var pfe = doc.GetElement(originalFid) as ParameterFilterElement;
-                if (pfe == null) return null;
-
-                string newName = $"28T_FW_{originalFid.IntValue()}";
-                if (newName.Length > 100) newName = newName.Substring(0, 100);
-
-                // 既存の同名フィルタを削除（前回実行の残り）
-                var existingPfe = new FilteredElementCollector(doc)
-                    .OfClass(typeof(ParameterFilterElement))
-                    .Cast<ParameterFilterElement>()
-                    .FirstOrDefault(f => f.Name == newName);
-                if (existingPfe != null)
-                {
-                    try { doc.Delete(existingPfe.Id); } catch { }
-                }
+                if (pfe == null) return result;
 
                 var cats = pfe.GetCategories();
                 var originalEf = pfe.GetElementFilter();
+                if (cats == null || cats.Count == 0) return result;
 
-                // ルール: FormworkMarker が "28Tools_Formwork" で始まる
-                // → inverted=true にすることで「始まらない（＝型枠 DS ではない）」要素にマッチする
-                // ※ FormworkMarker パラメータを持たない要素（躯体等）はルール FAIL → inverted → PASS
-                //   → 型枠 DS 以外の全要素がこの条件をパスする（期待通り）
-                // Revit 2026 では ParameterFilterRuleFactory の caseSensitive 引数が廃止された
+                var gmCatIdInt = (int)BuiltInCategory.OST_GenericModel;
+                var gmCatId = new ElementId(BuiltInCategory.OST_GenericModel);
+
+                var gmCats = new List<ElementId>();
+                var otherCats = new List<ElementId>();
+                foreach (var cid in cats)
+                {
+                    if (cid.IntValue() == gmCatIdInt) gmCats.Add(cid);
+                    else otherCats.Add(cid);
+                }
+
+                // 「始まる」ルール（inverted=true で「始まらない」フィルタにする）
+                // Revit 2026 では ParameterFilterRuleFactory の caseSensitive 引数が廃止
 #if REVIT2026
                 FilterRule beginsWithRule = ParameterFilterRuleFactory.CreateBeginsWithRule(
                     formworkMarkerParamId, FormworkParameterManager.MarkerValue);
@@ -1606,28 +1634,84 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 FilterRule beginsWithRule = ParameterFilterRuleFactory.CreateBeginsWithRule(
                     formworkMarkerParamId, FormworkParameterManager.MarkerValue, false);
 #endif
-                // inverted=true: FormworkMarker が "28Tools_Formwork" で「始まらない」要素にマッチ
                 var notFormworkFilter = new ElementParameterFilter(beginsWithRule, true);
 
-                // 元フィルタのルールと AND で結合
-                ElementFilter combined;
-                if (originalEf != null)
-                    combined = new LogicalAndFilter(
-                        new System.Collections.Generic.List<ElementFilter>
-                        { originalEf, notFormworkFilter });
-                else
-                    combined = notFormworkFilter; // 元ルール無し（カテゴリのみ）→ 型枠除外ルールのみ
+                // フィルタA: OST_GenericModel のみ（型枠 DS 除外ルール付き）
+                if (gmCats.Count > 0)
+                {
+                    string nameA = $"28T_FW_{originalFid.IntValue()}_GM";
+                    if (nameA.Length > 100) nameA = nameA.Substring(0, 100);
+                    DeleteExistingParamFilterByName(doc, nameA);
 
-                var newPfe = ParameterFilterElement.Create(doc, newName, cats, combined);
-                return newPfe?.Id;
+                    try
+                    {
+                        ElementFilter combined;
+                        if (originalEf != null)
+                            combined = new LogicalAndFilter(
+                                new List<ElementFilter> { originalEf, notFormworkFilter });
+                        else
+                            combined = notFormworkFilter;
+
+                        var newA = ParameterFilterElement.Create(doc, nameA, gmCats, combined);
+                        if (newA != null) result.Add(newA.Id);
+                    }
+                    catch (Exception ex)
+                    {
+                        FormworkDebugLog.Log(
+                            $"  [Visual] FilterA (GenericModel only) create EX " +
+                            $"fid={originalFid.IntValue()}: {ex.Message}");
+                    }
+                }
+
+                // フィルタB: OST_GenericModel 以外（元ルールそのまま、型枠 DS とは無関係）
+                if (otherCats.Count > 0)
+                {
+                    string nameB = $"28T_FW_{originalFid.IntValue()}_Other";
+                    if (nameB.Length > 100) nameB = nameB.Substring(0, 100);
+                    DeleteExistingParamFilterByName(doc, nameB);
+
+                    try
+                    {
+                        ParameterFilterElement newB;
+                        if (originalEf != null)
+                            newB = ParameterFilterElement.Create(doc, nameB, otherCats, originalEf);
+                        else
+                            newB = ParameterFilterElement.Create(doc, nameB, otherCats);
+                        if (newB != null) result.Add(newB.Id);
+                    }
+                    catch (Exception ex)
+                    {
+                        FormworkDebugLog.Log(
+                            $"  [Visual] FilterB (Other categories) create EX " +
+                            $"fid={originalFid.IntValue()}: {ex.Message}");
+                    }
+                }
+
+                return result;
             }
             catch (Exception ex)
             {
                 FormworkDebugLog.Log(
-                    $"  [Visual] CreateAnalysisFilterExcludingFormwork " +
+                    $"  [Visual] CreateAnalysisFiltersExcludingFormwork " +
                     $"fid={originalFid.IntValue()} EX: {ex.Message}");
-                return null;
+                return result;
             }
+        }
+
+        private static void DeleteExistingParamFilterByName(Document doc, string name)
+        {
+            try
+            {
+                var existing = new FilteredElementCollector(doc)
+                    .OfClass(typeof(ParameterFilterElement))
+                    .Cast<ParameterFilterElement>()
+                    .FirstOrDefault(f => f.Name == name);
+                if (existing != null)
+                {
+                    try { doc.Delete(existing.Id); } catch { }
+                }
+            }
+            catch { }
         }
 
         /// <summary>
