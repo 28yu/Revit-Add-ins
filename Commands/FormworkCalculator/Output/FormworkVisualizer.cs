@@ -676,12 +676,11 @@ namespace Tools28.Commands.FormworkCalculator.Output
             catch { }
 
             // ソースビューのフィルタ設定を型枠フィルタの後に追加する（低優先度）。
-            // 型枠フィルタが先頭に追加済みのため、ソースフィルタが OST_GenericModel を
-            // 非表示にしても型枠 DirectShape は型枠フィルタで表示・色分けされる。
-            // 型枠 DirectShape のサンプル ID を渡し、PassesFilter による安全チェックも実施する。
+            // 型枠カラーフィルタが先頭（最高優先度）にいるため、ここで追加するソースフィルタが
+            // OST_GenericModel を visible=false にしても型枠 DS は型枠フィルタで表示される。
             if (shouldCopySourceFilters && sourceView != null)
             {
-                try { CopyFilterSettings(doc, sourceView, view, vr.CreatedShapeIds); }
+                try { CopyFilterSettings(doc, sourceView, view); }
                 catch { }
             }
 
@@ -1055,6 +1054,11 @@ namespace Tools28.Commands.FormworkCalculator.Output
             FormworkDebugLog.Log($"  [Hide] hideFilterId={hideFilterId?.IntValue()}");
 
             // ─── Step 4: 全ビューを走査 ──────────────────────────────────────────
+            // 【非表示化の方針】
+            //   テンプレートありビュー → ビューテンプレートのみにフィルタを適用
+            //                            (個別ビューには適用しない → V/G ダイアログが汚れない)
+            //   テンプレートなしビュー → HideElements（フィルタ不使用 → V/G に影響なし）
+            //   分析ビュー           → 他ソースのシェイプのみ HideElements
             var excludedViewTypes = new HashSet<ViewType>
             {
                 ViewType.Legend,
@@ -1070,7 +1074,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     && !excludedViewTypes.Contains(v.ViewType))
                 .ToList();
 
-            // テンプレートへの適用済みIDを追跡（同じテンプレートに2回適用しないため）
+            // テンプレートへの適用済みIDを追跡（同一テンプレートに重複適用しない）
             var appliedTemplateIds = new HashSet<int>();
             int filterHideCount = 0, elemHideCount = 0;
 
@@ -1088,97 +1092,54 @@ namespace Tools28.Commands.FormworkCalculator.Output
                         if (kv.Key != ownSrc) toHide.AddRange(kv.Value);
                     }
                     toHide.AddRange(untaggedShapes);
-
                     if (toHide.Count > 0)
-                    {
                         HideElementsSafe(v, toHide, ref elemHideCount);
-                    }
                     continue;
                 }
 
                 // 非分析ビュー ────────────────────────────────────────────────────
-                // ① フィルタで非表示（主手段）
-                bool filterApplied = false;
-                if (hideFilterId != null)
-                {
-                    filterApplied = ApplyHideFilterToView(doc, v, hideFilterId,
-                        appliedTemplateIds, ref filterHideCount);
-                }
+                bool hasTemplate = v.ViewTemplateId != null
+                    && v.ViewTemplateId != ElementId.InvalidElementId;
 
-                // ② フィルタ不可のビューは要素レベル非表示（フォールバック）
-                if (!filterApplied)
+                if (hasTemplate && hideFilterId != null)
                 {
+                    // テンプレートありビュー: フィルタをテンプレートのみに適用
+                    int tmplId = v.ViewTemplateId.IntValue();
+                    if (!appliedTemplateIds.Contains(tmplId))
+                    {
+                        try
+                        {
+                            var tmpl = doc.GetElement(v.ViewTemplateId) as View;
+                            if (tmpl != null)
+                            {
+                                SetFilterAtHighestPriority(tmpl, hideFilterId);
+                                tmpl.SetFilterVisibility(hideFilterId, false);
+                                appliedTemplateIds.Add(tmplId);
+                                filterHideCount++;
+                                FormworkDebugLog.Log(
+                                    $"  [Hide] template='{tmpl.Name}' filterOK");
+                            }
+                        }
+                        catch (Exception exTmpl)
+                        {
+                            FormworkDebugLog.Log(
+                                $"  [Hide] view='{v.Name}' templateFilter EX: {exTmpl.Message}");
+                            // テンプレートへの適用失敗 → ビュー直接に HideElements
+                            HideElementsSafe(v, allShapeIds, ref elemHideCount);
+                        }
+                    }
+                    // 同テンプレートの2件目以降はスキップ（テンプレートで一括適用済み）
+                }
+                else
+                {
+                    // テンプレートなしビュー: HideElements（V/G に影響なし）
                     HideElementsSafe(v, allShapeIds, ref elemHideCount);
                 }
             }
 
             FormworkDebugLog.Log(
-                $"  [Hide] HideAllFormworkShapesInOtherViews done: " +
-                $"views={allViews.Count} filterHide={filterHideCount} elemHide={elemHideCount}");
-        }
-
-        /// <summary>
-        /// ビュー (またはそのテンプレート) に非表示フィルタを適用する。
-        /// 成功した場合 true を返す。
-        /// </summary>
-        private static bool ApplyHideFilterToView(
-            Document doc, View v, ElementId hideFilterId,
-            HashSet<int> appliedTemplateIds, ref int counter)
-        {
-            // --- ビュー直接に適用を試みる ---
-            try
-            {
-                SetFilterAtHighestPriority(v, hideFilterId);
-                v.SetFilterVisibility(hideFilterId, false);
-                counter++;
-                FormworkDebugLog.Log(
-                    $"  [Hide] view='{v.Name}'({v.ViewType}) filterOK");
-                return true;
-            }
-            catch (Exception ex)
-            {
-                FormworkDebugLog.Log(
-                    $"  [Hide] view='{v.Name}'({v.ViewType}) " +
-                    $"hasTemplate={v.ViewTemplateId != ElementId.InvalidElementId} " +
-                    $"filterEX: {ex.Message}");
-            }
-
-            // --- ビューテンプレートに適用を試みる ---
-            if (v.ViewTemplateId != null && v.ViewTemplateId != ElementId.InvalidElementId)
-            {
-                int tmplIdInt = v.ViewTemplateId.IntValue();
-                if (!appliedTemplateIds.Contains(tmplIdInt))
-                {
-                    try
-                    {
-                        var tmpl = doc.GetElement(v.ViewTemplateId) as View;
-                        if (tmpl != null)
-                        {
-                            SetFilterAtHighestPriority(tmpl, hideFilterId);
-                            tmpl.SetFilterVisibility(hideFilterId, false);
-                            appliedTemplateIds.Add(tmplIdInt);
-                            counter++;
-                            FormworkDebugLog.Log(
-                                $"  [Hide] view='{v.Name}' → template='{tmpl.Name}' filterOK");
-                            return true;
-                        }
-                    }
-                    catch (Exception exTmpl)
-                    {
-                        FormworkDebugLog.Log(
-                            $"  [Hide] view='{v.Name}' templateFilter EX: {exTmpl.Message}");
-                    }
-                }
-                else
-                {
-                    // 同テンプレートへの適用済み → そのビューにも効いているはず
-                    FormworkDebugLog.Log(
-                        $"  [Hide] view='{v.Name}' template already applied (shared template)");
-                    return true;
-                }
-            }
-
-            return false;
+                $"  [Hide] done: views={allViews.Count} templateFilter={filterHideCount} " +
+                $"elemHide={elemHideCount} appliedTemplates={appliedTemplateIds.Count}");
         }
 
         /// <summary>
@@ -1662,20 +1623,14 @@ namespace Tools28.Commands.FormworkCalculator.Output
         }
 
         /// <summary>
-        /// ソースビューに適用されているフィルタを分析ビューにコピーする。
+        /// ソースビューのフィルタ設定を分析ビューにコピーする（元フィルタ名・設定を維持）。
         ///
-        /// 【Revit フィルタ可視性の挙動】
-        /// フィルタ優先度（上位優先）はグラフィックオーバーライド（色・線種）にのみ適用される。
-        /// 可視性（表示/非表示）は「マッチする全フィルタのうち 1 つでも visible=false → 非表示」
-        /// という動作をするため、高優先度の型枠フィルタが visible=true でも、
-        /// 低優先度フィルタが visible=false でマッチすれば型枠 DS は非表示になる。
-        ///
-        /// 【対処】
-        /// visible=false のソースフィルタが型枠 DirectShape にマッチする場合、
-        /// そのフィルタの分析ビュー用コピー（"28T_FW_{filterId}" 名）を生成する。
-        /// コピーフィルタには「28Tools_FormworkMarker で始まらない」という AND 条件を追加し、
-        /// 型枠 DS はフィルタにマッチしなくなるようにする（visible=false の影響を受けなくなる）。
-        /// 元フィルタが非表示にしていた非型枠要素は引き続き非表示となる。
+        /// 【フィルタ優先度について】
+        /// このメソッドが呼ばれる前に ApplyColorFilters で型枠カラーフィルタがリスト先頭
+        /// （最高優先度）に配置される。Revit は「先頭にマッチしたフィルタが可視性を決定」
+        /// する仕様のため、ここで追加するソースフィルタ（低優先度）が visible=false で
+        /// 型枠 DS にマッチしていても、先頭の型枠カラーフィルタ（visible=true）が勝って
+        /// 型枠 DS は正しく表示される。そのため、フィルタ名変更や分割は不要。
         /// </summary>
         private static void CopyFilterSettings(Document doc, View source, View3D target,
             ICollection<ElementId> formworkShapeIds = null)
@@ -1685,124 +1640,22 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 var srcFilterIds = source.GetFilters();
                 if (srcFilterIds == null || srcFilterIds.Count == 0) return;
 
-                // 型枠 DS のサンプル ID とマーカーパラメータ ID を取得
-                ElementId sampleFormworkId = null;
-                ElementId formworkMarkerParamId = null;
-                if (formworkShapeIds != null)
-                {
-                    foreach (var sid in formworkShapeIds)
-                    {
-                        if (sid == null || sid == ElementId.InvalidElementId) continue;
-                        sampleFormworkId = sid;
-                        try
-                        {
-                            var elem = doc.GetElement(sid);
-                            var p = elem?.LookupParameter(FormworkParameterManager.ParamMarker);
-                            if (p != null) formworkMarkerParamId = p.Id;
-                        }
-                        catch { }
-                        break;
-                    }
-                }
-
-                int copied = 0, modifiedCopy = 0, forcedVisible = 0;
+                int copied = 0;
+                var existingTargetFilters = target.GetFilters();
                 foreach (var fid in srcFilterIds)
                 {
                     if (fid == null || fid == ElementId.InvalidElementId) continue;
-
                     try
                     {
-                        bool srcVis = source.GetFilterVisibility(fid);
-                        ElementId filterToAdd = fid;
-                        bool targetVis = srcVis;
-
-                        if (!srcVis && sampleFormworkId != null)
+                        if (!existingTargetFilters.Contains(fid))
                         {
-                            // このフィルタが型枠 DirectShape にマッチするか確認
-                            bool hitsFormwork = false;
-                            try
-                            {
-                                var pfe = doc.GetElement(fid) as ParameterFilterElement;
-                                if (pfe != null)
-                                {
-                                    var ef = pfe.GetElementFilter();
-                                    // ef == null はルール無し（カテゴリのみ）→ 全 GenericModel に一致
-                                    hitsFormwork = (ef == null) || ef.PassesFilter(doc, sampleFormworkId);
-                                }
-                                else
-                                    hitsFormwork = true; // SelectionFilter 等は型枠 DS に一致すると仮定
-                            }
-                            catch { hitsFormwork = true; }
-
-                            if (hitsFormwork)
-                            {
-                                // ★ 型枠 DS を除外した修正フィルタ群を生成して使用する（visible=false 維持）
-                                if (formworkMarkerParamId != null)
-                                {
-                                    var modFids = CreateAnalysisFiltersExcludingFormwork(
-                                        doc, fid, formworkMarkerParamId);
-                                    if (modFids != null && modFids.Count > 0)
-                                    {
-                                        // 元フィルタは追加せず、生成した修正フィルタ群を追加する
-                                        var srcOgs = source.GetFilterOverrides(fid);
-                                        foreach (var mfid in modFids)
-                                        {
-                                            try
-                                            {
-                                                var existingForMod = target.GetFilters();
-                                                if (!existingForMod.Contains(mfid))
-                                                    target.AddFilter(mfid);
-                                                if (srcOgs != null)
-                                                    target.SetFilterOverrides(mfid, srcOgs);
-                                                target.SetFilterVisibility(mfid, srcVis); // false 維持
-                                            }
-                                            catch (Exception exAdd)
-                                            {
-                                                FormworkDebugLog.Log(
-                                                    $"  [Visual] modified filter add EX: {exAdd.Message}");
-                                            }
-                                        }
-                                        modifiedCopy++;
-                                        copied++;
-                                        FormworkDebugLog.Log(
-                                            $"  [Visual] filter fid={fid.IntValue()} → " +
-                                            $"replaced with {modFids.Count} modified filter(s) " +
-                                            $"(excludes formwork DS, visible=false 維持)");
-                                        continue; // 元フィルタは追加しない
-                                    }
-                                    else
-                                    {
-                                        // 修正フィルタ生成失敗 → 強制表示にフォールバック
-                                        targetVis = true;
-                                        forcedVisible++;
-                                        FormworkDebugLog.Log(
-                                            $"  [Visual] filter fid={fid.IntValue()} → forced true " +
-                                            $"(modified filter creation failed, fallback)");
-                                    }
-                                }
-                                else
-                                {
-                                    // マーカーパラメータ ID 未取得 → 強制表示にフォールバック
-                                    targetVis = true;
-                                    forcedVisible++;
-                                    FormworkDebugLog.Log(
-                                        $"  [Visual] filter fid={fid.IntValue()} → forced true " +
-                                        $"(no marker paramId, fallback)");
-                                }
-                            }
+                            target.AddFilter(fid);
+                            existingTargetFilters = target.GetFilters(); // refresh
                         }
-
-                        // ターゲットにフィルタを追加 (既に存在する場合はスキップ)
-                        var existing = target.GetFilters();
-                        if (!existing.Contains(filterToAdd))
-                            target.AddFilter(filterToAdd);
-
-                        // グラフィックオーバーライドをコピー（元フィルタの設定を使用）
                         var ogs = source.GetFilterOverrides(fid);
                         if (ogs != null)
-                            target.SetFilterOverrides(filterToAdd, ogs);
-
-                        target.SetFilterVisibility(filterToAdd, targetVis);
+                            target.SetFilterOverrides(fid, ogs);
+                        target.SetFilterVisibility(fid, source.GetFilterVisibility(fid));
                         copied++;
                     }
                     catch (Exception exFilter)
@@ -1812,8 +1665,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     }
                 }
                 FormworkDebugLog.Log(
-                    $"  [Visual] copied {copied}/{srcFilterIds.Count} filters from source view " +
-                    $"(modifiedCopy={modifiedCopy} forcedVisible={forcedVisible})");
+                    $"  [Visual] CopyFilterSettings: copied={copied}/{srcFilterIds.Count}");
             }
             catch (Exception ex)
             {
@@ -1952,6 +1804,35 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 }
             }
             catch { }
+        }
+
+        /// <summary>
+        /// 旧実装で生成された一時分割フィルタ ("28T_FW_*_GM" / "28T_FW_*_Other") を削除する。
+        /// これらは現行の CopyFilterSettings では不要になったためクリーンアップする。
+        /// トランザクション内で呼び出すこと。
+        /// </summary>
+        internal static void CleanupLegacySplitFilters(Document doc)
+        {
+            try
+            {
+                var toDelete = new FilteredElementCollector(doc)
+                    .OfClass(typeof(ParameterFilterElement))
+                    .Cast<ParameterFilterElement>()
+                    .Where(f => f.Name.StartsWith("28T_FW_") &&
+                        (f.Name.EndsWith("_GM") || f.Name.EndsWith("_Other")))
+                    .Select(f => f.Id)
+                    .ToList();
+                if (toDelete.Count == 0) return;
+                foreach (var id in toDelete)
+                {
+                    try { doc.Delete(id); } catch { }
+                }
+                FormworkDebugLog.Log($"  [Visual] CleanupLegacySplitFilters: deleted={toDelete.Count}");
+            }
+            catch (Exception ex)
+            {
+                FormworkDebugLog.Log($"  [Visual] CleanupLegacySplitFilters EX: {ex.Message}");
+            }
         }
 
         /// <summary>

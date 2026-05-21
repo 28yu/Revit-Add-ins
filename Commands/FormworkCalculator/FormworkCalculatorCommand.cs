@@ -252,6 +252,9 @@ namespace Tools28.Commands.FormworkCalculator
                         t.Start();
                         try
                         {
+                            // 旧実装の一時分割フィルタ ("28T_FW_*_GM" / "28T_FW_*_Other") を削除
+                            FormworkVisualizer.CleanupLegacySplitFilters(doc);
+
                             // 選択された各 3D ビューについて個別に処理する。
                             // ParamSourceView でタグ付けされるため、各ビューの DirectShape は分離管理可能。
                             for (int i = 0; i < perViewResults.Count; i++)
