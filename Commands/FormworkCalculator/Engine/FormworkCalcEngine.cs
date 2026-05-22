@@ -771,14 +771,11 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 }
             }
 
-            // 床(スラブ)の場合、ボイドや開口で抜かれた内部の縦面・下向き面を除外する。
-            // 床の外周以外にある縦面は「ボイド/開口の内側」と判定し型枠不要とする。
-            // (外周の縦面は床の本来のエッジで型枠必要、ボイド内側はコンクリート打設時に
-            //  打設されない空間なので型枠不要)
-            if (isSlab)
-            {
-                ExcludeSlabInteriorVoidFaces(elem, faceInfos, finalSolids);
-            }
+            // 床(スラブ)のボイド/開口の内部縦面は、以前は「打設されない空間」として
+            // 型枠不要扱いにしていたが、これは誤り。ボイドや貫通開口を区切るためには
+            // コンクリート打設時に型枠が必要 (壁がボイドを貫通している場合の控除は
+            // ContactFaceDetector が DeductedContact として処理する)。
+            // 旧 ExcludeSlabInteriorVoidFaces の呼び出しは廃止。
 
             // 壁の斜めの天端: 斜面の水平射影の短辺 (壁厚方向の幅) が
             // しきい値 (既定 30mm) 以上なら型枠不要 (天端扱い) として控除する。
@@ -1229,11 +1226,8 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                     }
                 }
 
-                // スラブのボイド/開口内部の縦面を除外 (ClassifyElementFaces と同じロジック)
-                if (isSlab)
-                {
-                    ExcludeSlabInteriorVoidFaces(elem, faces, final);
-                }
+                // スラブのボイド/開口内部の縦面除外は廃止 (ClassifyElementFaces と同じ理由)。
+                // ボイドの内側面はコンクリート打設時の型枠が必要なため FormworkRequired のまま残す。
 
                 BoundingBoxXYZ bb = ComputeWorldBoundingBox(final);
 
