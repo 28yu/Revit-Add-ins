@@ -85,7 +85,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     ? $"選択ビュー ({results.Count}件)"
                     : "現在のビュー");
             ws.Cell(4, 1).Value = "対象要素数";
-            ws.Cell(4, 2).Value = results.Sum(r => r.ProcessedElementCount);
+            ws.Cell(4, 2).Value = results.Sum(x => x.ProcessedElementCount);
             ws.Cell(5, 1).Value = "実行日時";
             ws.Cell(5, 2).Value = DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss");
 
