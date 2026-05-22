@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using ClosedXML.Excel;
 using Tools28.Commands.FormworkCalculator.Models;
 
@@ -9,27 +11,50 @@ namespace Tools28.Commands.FormworkCalculator.Output
     {
         private const string HeaderColor = "9BBB59";
 
+        /// <summary>
+        /// 単一ソースビュー結果を Excel に出力する (後方互換)。
+        /// </summary>
         internal static void Export(string path, FormworkSettings settings, FormworkResult result)
         {
+            ExportMulti(path, settings,
+                new List<FormworkResult> { result },
+                new List<string> { string.Empty });
+        }
+
+        /// <summary>
+        /// 複数ソースビューの結果を 1 つの Excel に集約出力する。
+        /// 集計表（合計シート）と同じ「全ビュー作成済み DirectShape 合算」値を表示する。
+        /// </summary>
+        internal static void ExportMulti(
+            string path, FormworkSettings settings,
+            IList<FormworkResult> results, IList<string> sourceViewNames)
+        {
+            if (results == null || results.Count == 0) return;
+            if (sourceViewNames == null || sourceViewNames.Count != results.Count)
+            {
+                sourceViewNames = Enumerable.Range(0, results.Count)
+                    .Select(_ => string.Empty).ToList();
+            }
+
             var dir = Path.GetDirectoryName(path);
             if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
                 Directory.CreateDirectory(dir);
 
             using (var wb = new XLWorkbook())
             {
-                WriteSummary(wb, settings, result);
-                WriteByCategory(wb, result);
+                WriteSummary(wb, settings, results, sourceViewNames);
+                WriteByCategoryAggregated(wb, results);
 
                 if (settings.GroupByZone)
-                    WriteByZone(wb, result);
+                    WriteByZoneAggregated(wb, results);
 
                 if (settings.GroupByFormworkType)
-                    WriteByType(wb, result);
+                    WriteByTypeAggregated(wb, results);
 
-                WriteElementDetail(wb, result);
+                WriteElementDetailMulti(wb, results, sourceViewNames);
 
-                if (result.Errors.Count > 0)
-                    WriteErrors(wb, result);
+                if (results.Any(r => r.Errors != null && r.Errors.Count > 0))
+                    WriteErrorsMulti(wb, results, sourceViewNames);
 
                 wb.SaveAs(path);
             }
@@ -43,7 +68,8 @@ namespace Tools28.Commands.FormworkCalculator.Output
             row.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
         }
 
-        private static void WriteSummary(XLWorkbook wb, FormworkSettings settings, FormworkResult result)
+        private static void WriteSummary(XLWorkbook wb, FormworkSettings settings,
+            IList<FormworkResult> results, IList<string> sourceViewNames)
         {
             var ws = wb.Worksheets.Add("総括表");
 
@@ -54,9 +80,12 @@ namespace Tools28.Commands.FormworkCalculator.Output
 
             ws.Cell(3, 1).Value = "計算範囲";
             ws.Cell(3, 2).Value = settings.Scope == CalculationScope.EntireProject
-                ? "プロジェクト全体" : "現在のビュー";
+                ? "プロジェクト全体"
+                : (settings.Scope == CalculationScope.SelectedViews
+                    ? $"選択ビュー ({results.Count}件)"
+                    : "現在のビュー");
             ws.Cell(4, 1).Value = "対象要素数";
-            ws.Cell(4, 2).Value = result.ProcessedElementCount;
+            ws.Cell(4, 2).Value = results.Sum(r => r.ProcessedElementCount);
             ws.Cell(5, 1).Value = "実行日時";
             ws.Cell(5, 2).Value = DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss");
 
@@ -65,15 +94,51 @@ namespace Tools28.Commands.FormworkCalculator.Output
             ws.Cell(r, 2).Value = "面積 (㎡)";
             FormatHeader(ws.Row(r));
 
+            double totalFormwork = results.Sum(x => x.TotalFormworkArea);
+            double totalDeducted = results.Sum(x => x.TotalDeductedArea);
+            double totalInclined = results.Sum(x => x.InclinedFaceArea);
+
             r++;
-            ws.Cell(r++, 1).Value = "型枠面積（合計）"; ws.Cell(r - 1, 2).Value = Round(result.TotalFormworkArea);
-            ws.Cell(r++, 1).Value = "控除面積（合計）"; ws.Cell(r - 1, 2).Value = Round(result.TotalDeductedArea);
-            ws.Cell(r++, 1).Value = "傾斜面（計算対象外）"; ws.Cell(r - 1, 2).Value = Round(result.InclinedFaceArea);
+            ws.Cell(r++, 1).Value = "型枠面積（合計）"; ws.Cell(r - 1, 2).Value = Round(totalFormwork);
+            ws.Cell(r++, 1).Value = "控除面積（合計）"; ws.Cell(r - 1, 2).Value = Round(totalDeducted);
+            ws.Cell(r++, 1).Value = "傾斜面（計算対象外）"; ws.Cell(r - 1, 2).Value = Round(totalInclined);
+
+            // 複数ビュー時はソースビュー別の内訳も追加
+            if (results.Count > 1)
+            {
+                r += 2;
+                ws.Cell(r, 1).Value = "ソースビュー別 内訳";
+                ws.Cell(r, 1).Style.Font.Bold = true;
+                r++;
+                ws.Cell(r, 1).Value = "ソースビュー";
+                ws.Cell(r, 2).Value = "型枠面積 (㎡)";
+                ws.Cell(r, 3).Value = "控除面積 (㎡)";
+                ws.Cell(r, 4).Value = "要素数";
+                FormatHeader(ws.Row(r));
+                r++;
+                for (int i = 0; i < results.Count; i++)
+                {
+                    ws.Cell(r, 1).Value = string.IsNullOrEmpty(sourceViewNames[i])
+                        ? $"(view {i + 1})" : sourceViewNames[i];
+                    ws.Cell(r, 2).Value = Round(results[i].TotalFormworkArea);
+                    ws.Cell(r, 3).Value = Round(results[i].TotalDeductedArea);
+                    ws.Cell(r, 4).Value = results[i].ProcessedElementCount;
+                    r++;
+                }
+                ws.Cell(r, 1).Value = "合計";
+                ws.Cell(r, 1).Style.Font.Bold = true;
+                ws.Cell(r, 2).Value = Round(totalFormwork);
+                ws.Cell(r, 2).Style.Font.Bold = true;
+                ws.Cell(r, 3).Value = Round(totalDeducted);
+                ws.Cell(r, 3).Style.Font.Bold = true;
+                ws.Cell(r, 4).Value = results.Sum(x => x.ProcessedElementCount);
+                ws.Cell(r, 4).Style.Font.Bold = true;
+            }
 
             AutoFitColumns(ws);
         }
 
-        private static void WriteByCategory(XLWorkbook wb, FormworkResult result)
+        private static void WriteByCategoryAggregated(XLWorkbook wb, IList<FormworkResult> results)
         {
             var ws = wb.Worksheets.Add("部位別");
             ws.Cell(1, 1).Value = "部位";
@@ -82,8 +147,25 @@ namespace Tools28.Commands.FormworkCalculator.Output
             ws.Cell(1, 4).Value = "控除面積 (㎡)";
             FormatHeader(ws.Row(1));
 
+            var agg = new Dictionary<CategoryGroup, CategoryResult>();
+            foreach (var res in results)
+            {
+                if (res.CategoryResults == null) continue;
+                foreach (var c in res.CategoryResults)
+                {
+                    if (!agg.TryGetValue(c.Category, out var cur))
+                    {
+                        cur = new CategoryResult { Category = c.Category, CategoryName = c.CategoryName };
+                        agg[c.Category] = cur;
+                    }
+                    cur.ElementCount += c.ElementCount;
+                    cur.FormworkArea += c.FormworkArea;
+                    cur.DeductedArea += c.DeductedArea;
+                }
+            }
+
             int r = 2;
-            foreach (var c in result.CategoryResults)
+            foreach (var c in agg.Values.OrderBy(x => x.Category))
             {
                 ws.Cell(r, 1).Value = CategoryLabel(c.Category);
                 ws.Cell(r, 2).Value = c.ElementCount;
@@ -91,10 +173,19 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 ws.Cell(r, 4).Value = Round(c.DeductedArea);
                 r++;
             }
+            // 合計行
+            ws.Cell(r, 1).Value = "合計";
+            ws.Cell(r, 1).Style.Font.Bold = true;
+            ws.Cell(r, 2).Value = agg.Values.Sum(x => x.ElementCount);
+            ws.Cell(r, 2).Style.Font.Bold = true;
+            ws.Cell(r, 3).Value = Round(agg.Values.Sum(x => x.FormworkArea));
+            ws.Cell(r, 3).Style.Font.Bold = true;
+            ws.Cell(r, 4).Value = Round(agg.Values.Sum(x => x.DeductedArea));
+            ws.Cell(r, 4).Style.Font.Bold = true;
             AutoFitColumns(ws);
         }
 
-        private static void WriteByZone(XLWorkbook wb, FormworkResult result)
+        private static void WriteByZoneAggregated(XLWorkbook wb, IList<FormworkResult> results)
         {
             var ws = wb.Worksheets.Add("工区別");
             ws.Cell(1, 1).Value = "工区";
@@ -102,18 +193,41 @@ namespace Tools28.Commands.FormworkCalculator.Output
             ws.Cell(1, 3).Value = "型枠面積 (㎡)";
             FormatHeader(ws.Row(1));
 
+            var agg = new Dictionary<string, ZoneResult>();
+            foreach (var res in results)
+            {
+                if (res.ZoneResults == null) continue;
+                foreach (var z in res.ZoneResults)
+                {
+                    string key = z.Zone ?? string.Empty;
+                    if (!agg.TryGetValue(key, out var cur))
+                    {
+                        cur = new ZoneResult { Zone = key };
+                        agg[key] = cur;
+                    }
+                    cur.ElementCount += z.ElementCount;
+                    cur.FormworkArea += z.FormworkArea;
+                }
+            }
+
             int r = 2;
-            foreach (var z in result.ZoneResults)
+            foreach (var z in agg.Values.OrderBy(x => x.Zone))
             {
                 ws.Cell(r, 1).Value = z.Zone;
                 ws.Cell(r, 2).Value = z.ElementCount;
                 ws.Cell(r, 3).Value = Round(z.FormworkArea);
                 r++;
             }
+            ws.Cell(r, 1).Value = "合計";
+            ws.Cell(r, 1).Style.Font.Bold = true;
+            ws.Cell(r, 2).Value = agg.Values.Sum(x => x.ElementCount);
+            ws.Cell(r, 2).Style.Font.Bold = true;
+            ws.Cell(r, 3).Value = Round(agg.Values.Sum(x => x.FormworkArea));
+            ws.Cell(r, 3).Style.Font.Bold = true;
             AutoFitColumns(ws);
         }
 
-        private static void WriteByType(XLWorkbook wb, FormworkResult result)
+        private static void WriteByTypeAggregated(XLWorkbook wb, IList<FormworkResult> results)
         {
             var ws = wb.Worksheets.Add("型枠種別");
             ws.Cell(1, 1).Value = "型枠種別";
@@ -121,77 +235,119 @@ namespace Tools28.Commands.FormworkCalculator.Output
             ws.Cell(1, 3).Value = "型枠面積 (㎡)";
             FormatHeader(ws.Row(1));
 
+            var agg = new Dictionary<string, FormworkTypeResult>();
+            foreach (var res in results)
+            {
+                if (res.TypeResults == null) continue;
+                foreach (var t in res.TypeResults)
+                {
+                    string key = t.FormworkType ?? string.Empty;
+                    if (!agg.TryGetValue(key, out var cur))
+                    {
+                        cur = new FormworkTypeResult { FormworkType = key };
+                        agg[key] = cur;
+                    }
+                    cur.ElementCount += t.ElementCount;
+                    cur.FormworkArea += t.FormworkArea;
+                }
+            }
+
             int r = 2;
-            foreach (var t in result.TypeResults)
+            foreach (var t in agg.Values.OrderBy(x => x.FormworkType))
             {
                 ws.Cell(r, 1).Value = t.FormworkType;
                 ws.Cell(r, 2).Value = t.ElementCount;
                 ws.Cell(r, 3).Value = Round(t.FormworkArea);
                 r++;
             }
+            ws.Cell(r, 1).Value = "合計";
+            ws.Cell(r, 1).Style.Font.Bold = true;
+            ws.Cell(r, 2).Value = agg.Values.Sum(x => x.ElementCount);
+            ws.Cell(r, 2).Style.Font.Bold = true;
+            ws.Cell(r, 3).Value = Round(agg.Values.Sum(x => x.FormworkArea));
+            ws.Cell(r, 3).Style.Font.Bold = true;
             AutoFitColumns(ws);
         }
 
-        private static void WriteElementDetail(XLWorkbook wb, FormworkResult result)
+        private static void WriteElementDetailMulti(XLWorkbook wb,
+            IList<FormworkResult> results, IList<string> sourceViewNames)
         {
             var ws = wb.Worksheets.Add("要素明細");
-            ws.Cell(1, 1).Value = "要素ID";
-            ws.Cell(1, 2).Value = "部位";
-            ws.Cell(1, 3).Value = "要素名";
-            ws.Cell(1, 4).Value = "工区";
-            ws.Cell(1, 5).Value = "型枠種別";
-            ws.Cell(1, 6).Value = "型枠面積 (㎡)";
-            ws.Cell(1, 7).Value = "天端控除";
-            ws.Cell(1, 8).Value = "底面控除";
-            ws.Cell(1, 9).Value = "接触控除";
-            ws.Cell(1, 10).Value = "傾斜面";
-            ws.Cell(1, 11).Value = "開口控除";
-            ws.Cell(1, 12).Value = "開口見込み加算";
+            bool multiView = results.Count > 1;
+            int col = 1;
+            ws.Cell(1, col++).Value = "要素ID";
+            ws.Cell(1, col++).Value = "部位";
+            ws.Cell(1, col++).Value = "要素名";
+            if (multiView) ws.Cell(1, col++).Value = "ソースビュー";
+            ws.Cell(1, col++).Value = "工区";
+            ws.Cell(1, col++).Value = "型枠種別";
+            ws.Cell(1, col++).Value = "型枠面積 (㎡)";
+            ws.Cell(1, col++).Value = "天端控除";
+            ws.Cell(1, col++).Value = "底面控除";
+            ws.Cell(1, col++).Value = "接触控除";
+            ws.Cell(1, col++).Value = "傾斜面";
+            ws.Cell(1, col++).Value = "開口控除";
+            ws.Cell(1, col++).Value = "開口見込み加算";
             FormatHeader(ws.Row(1));
 
             int r = 2;
-            foreach (var er in result.ElementResults)
+            for (int i = 0; i < results.Count; i++)
             {
-                ws.Cell(r, 1).Value = er.ElementId;
-                ws.Cell(r, 2).Value = CategoryLabel(er.Category);
-                ws.Cell(r, 3).Value = er.ElementName;
-                ws.Cell(r, 4).Value = er.Zone;
-                ws.Cell(r, 5).Value = er.FormworkType;
-                ws.Cell(r, 6).Value = Round(er.FormworkArea);
-                ws.Cell(r, 7).Value = Round(er.DeductedTopArea);
-                ws.Cell(r, 8).Value = Round(er.DeductedBottomArea);
-                ws.Cell(r, 9).Value = Round(er.DeductedContactArea);
-                ws.Cell(r, 10).Value = Round(er.InclinedArea);
-                ws.Cell(r, 11).Value = Round(er.OpeningAreaDeducted);
-                ws.Cell(r, 12).Value = Round(er.OpeningEdgeAreaAdded);
-                r++;
+                string svName = sourceViewNames[i];
+                foreach (var er in results[i].ElementResults)
+                {
+                    int c = 1;
+                    ws.Cell(r, c++).Value = er.ElementId;
+                    ws.Cell(r, c++).Value = CategoryLabel(er.Category);
+                    ws.Cell(r, c++).Value = er.ElementName;
+                    if (multiView) ws.Cell(r, c++).Value = svName;
+                    ws.Cell(r, c++).Value = er.Zone;
+                    ws.Cell(r, c++).Value = er.FormworkType;
+                    ws.Cell(r, c++).Value = Round(er.FormworkArea);
+                    ws.Cell(r, c++).Value = Round(er.DeductedTopArea);
+                    ws.Cell(r, c++).Value = Round(er.DeductedBottomArea);
+                    ws.Cell(r, c++).Value = Round(er.DeductedContactArea);
+                    ws.Cell(r, c++).Value = Round(er.InclinedArea);
+                    ws.Cell(r, c++).Value = Round(er.OpeningAreaDeducted);
+                    ws.Cell(r, c++).Value = Round(er.OpeningEdgeAreaAdded);
+                    r++;
+                }
             }
             ws.SheetView.FreezeRows(1);
             ws.RangeUsed()?.SetAutoFilter();
-            // オートフィルタの矢印 (約 17px = 約 2.5 文字幅) と日本語の実描画幅を考慮して
-            // 余白を多めに取る
             AutoFitColumns(ws, padding: 8.0);
         }
 
-        private static void WriteErrors(XLWorkbook wb, FormworkResult result)
+        private static void WriteErrorsMulti(XLWorkbook wb,
+            IList<FormworkResult> results, IList<string> sourceViewNames)
         {
             var ws = wb.Worksheets.Add("エラー・注記");
-            ws.Cell(1, 1).Value = "要素ID";
-            ws.Cell(1, 2).Value = "カテゴリ";
-            ws.Cell(1, 3).Value = "要素名";
-            ws.Cell(1, 4).Value = "種別";
-            ws.Cell(1, 5).Value = "メッセージ";
+            bool multiView = results.Count > 1;
+            int col = 1;
+            ws.Cell(1, col++).Value = "要素ID";
+            ws.Cell(1, col++).Value = "カテゴリ";
+            ws.Cell(1, col++).Value = "要素名";
+            if (multiView) ws.Cell(1, col++).Value = "ソースビュー";
+            ws.Cell(1, col++).Value = "種別";
+            ws.Cell(1, col++).Value = "メッセージ";
             FormatHeader(ws.Row(1));
 
             int r = 2;
-            foreach (var e in result.Errors)
+            for (int i = 0; i < results.Count; i++)
             {
-                ws.Cell(r, 1).Value = e.ElementId;
-                ws.Cell(r, 2).Value = e.CategoryName;
-                ws.Cell(r, 3).Value = e.ElementName;
-                ws.Cell(r, 4).Value = e.ErrorKind;
-                ws.Cell(r, 5).Value = e.Message;
-                r++;
+                string svName = sourceViewNames[i];
+                if (results[i].Errors == null) continue;
+                foreach (var e in results[i].Errors)
+                {
+                    int c = 1;
+                    ws.Cell(r, c++).Value = e.ElementId;
+                    ws.Cell(r, c++).Value = e.CategoryName;
+                    ws.Cell(r, c++).Value = e.ElementName;
+                    if (multiView) ws.Cell(r, c++).Value = svName;
+                    ws.Cell(r, c++).Value = e.ErrorKind;
+                    ws.Cell(r, c++).Value = e.Message;
+                    r++;
+                }
             }
             AutoFitColumns(ws);
         }

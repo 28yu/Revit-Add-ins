@@ -173,8 +173,10 @@ namespace Tools28.Commands.FormworkCalculator
                 {
                     try
                     {
-                        // Excel 出力は最初のビューの結果を使う (複数ビューの場合は最初の選択のみ)
-                        ExcelExporter.Export(settings.ExcelOutputPath, settings, firstResult);
+                        // 全ソースビューの結果を集約して出力。集計表（合計）と一致する
+                        // 「全ビュー作成済み型枠 DirectShape の合算」を総括表に表示する。
+                        ExcelExporter.ExportMulti(settings.ExcelOutputPath, settings,
+                            perViewResults, perViewSourceNames);
                     }
                     catch (Exception ex)
                     {
