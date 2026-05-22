@@ -709,7 +709,161 @@ namespace Tools28.Commands.FormworkCalculator.Output
             }
             catch { }
 
+            // 解析ビューの最終状態をログ出力 (表示問題の診断用)
+            DiagnoseAnalysisViewState(doc, view);
+
             return vr;
+        }
+
+        /// <summary>
+        /// 解析ビューの最終的な可視性関連状態をログ出力する。
+        /// 「DSは作成されたが表示されない」問題が発生したときの原因切り分け用。
+        /// </summary>
+        private static void DiagnoseAnalysisViewState(Document doc, View3D view)
+        {
+            if (view == null) return;
+            try
+            {
+                FormworkDebugLog.Log($"  [Visual:ViewState] === '{view.Name}' final state ===");
+
+                // SectionBox
+                try
+                {
+                    bool sbActive = view.IsSectionBoxActive;
+                    var sb = view.GetSectionBox();
+                    string sbInfo = "null";
+                    if (sb != null)
+                    {
+                        var tf = sb.Transform;
+                        bool tfIdentity = tf == null || tf.IsIdentity;
+                        sbInfo = $"min=({sb.Min.X:F2},{sb.Min.Y:F2},{sb.Min.Z:F2}) " +
+                                 $"max=({sb.Max.X:F2},{sb.Max.Y:F2},{sb.Max.Z:F2}) " +
+                                 $"tfIdentity={tfIdentity}";
+                        if (!tfIdentity && tf != null)
+                            sbInfo += $" tfOrigin=({tf.Origin.X:F2},{tf.Origin.Y:F2},{tf.Origin.Z:F2})";
+                    }
+                    FormworkDebugLog.Log($"    SectionBox: active={sbActive} {sbInfo}");
+                }
+                catch (Exception ex)
+                {
+                    FormworkDebugLog.Log($"    SectionBox EX: {ex.Message}");
+                }
+
+                // CropBox
+                try
+                {
+                    bool cropActive = view.CropBoxActive;
+                    bool cropVisible = view.CropBoxVisible;
+                    var cb = view.CropBox;
+                    string cbInfo = "null";
+                    if (cb != null)
+                    {
+                        cbInfo = $"min=({cb.Min.X:F2},{cb.Min.Y:F2},{cb.Min.Z:F2}) " +
+                                 $"max=({cb.Max.X:F2},{cb.Max.Y:F2},{cb.Max.Z:F2})";
+                    }
+                    FormworkDebugLog.Log(
+                        $"    CropBox: active={cropActive} visible={cropVisible} {cbInfo}");
+                }
+                catch (Exception ex)
+                {
+                    FormworkDebugLog.Log($"    CropBox EX: {ex.Message}");
+                }
+
+                // ViewTemplate
+                try
+                {
+                    var tplId = view.ViewTemplateId;
+                    string tplName = "(none)";
+                    if (tplId != null && tplId != ElementId.InvalidElementId)
+                    {
+                        var tpl = doc.GetElement(tplId) as View;
+                        tplName = tpl?.Name ?? "(unknown)";
+                    }
+                    FormworkDebugLog.Log($"    ViewTemplate: {tplName}");
+                }
+                catch { }
+
+                // OST_GenericModel category state
+                try
+                {
+                    var gmId = new ElementId(BuiltInCategory.OST_GenericModel);
+                    bool gmHidden = view.GetCategoryHidden(gmId);
+                    var ogs = view.GetCategoryOverrides(gmId);
+                    string ogsInfo = "null";
+                    if (ogs != null)
+                    {
+                        int trans = ogs.Transparency;
+                        bool fgVisible = ogs.IsSurfaceForegroundPatternVisible;
+                        bool bgVisible = ogs.IsSurfaceBackgroundPatternVisible;
+                        int lw = ogs.ProjectionLineWeight;
+                        var halftone = ogs.Halftone;
+                        ogsInfo = $"trans={trans} fgVis={fgVisible} bgVis={bgVisible} " +
+                                  $"lineWeight={lw} halftone={halftone}";
+                    }
+                    FormworkDebugLog.Log(
+                        $"    OST_GenericModel: hidden={gmHidden} ogs={{ {ogsInfo} }}");
+                }
+                catch (Exception ex)
+                {
+                    FormworkDebugLog.Log($"    OST_GenericModel state EX: {ex.Message}");
+                }
+
+                // Workset 28Tools_型枠
+                try
+                {
+                    if (doc.IsWorkshared)
+                    {
+                        var allWs = new FilteredWorksetCollector(doc).OfKind(WorksetKind.UserWorkset);
+                        var fwWs = allWs.FirstOrDefault(ws => ws.Name == "28Tools_型枠");
+                        if (fwWs != null)
+                        {
+                            var wsVis = view.GetWorksetVisibility(fwWs.Id);
+                            FormworkDebugLog.Log(
+                                $"    Workset '28Tools_型枠': vis={wsVis}");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    FormworkDebugLog.Log($"    Workset state EX: {ex.Message}");
+                }
+
+                // Filters
+                try
+                {
+                    var filterIds = view.GetFilters();
+                    FormworkDebugLog.Log($"    Filters: total={filterIds?.Count ?? 0}");
+                    if (filterIds != null)
+                    {
+                        int idx = 0;
+                        foreach (var fid in filterIds)
+                        {
+                            string fName = "(?)";
+                            bool fVisible = true;
+                            try
+                            {
+                                var fEl = doc.GetElement(fid);
+                                fName = fEl?.Name ?? "(null)";
+                                fVisible = view.GetFilterVisibility(fid);
+                            }
+                            catch { }
+                            FormworkDebugLog.Log(
+                                $"      [{idx}] '{fName}' visible={fVisible}");
+                            idx++;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    FormworkDebugLog.Log($"    Filters EX: {ex.Message}");
+                }
+
+                FormworkDebugLog.Log($"  [Visual:ViewState] === end ===");
+            }
+            catch (Exception ex)
+            {
+                FormworkDebugLog.Log($"  [Visual:ViewState] EX: {ex.Message}");
+            }
         }
 
         /// <summary>
