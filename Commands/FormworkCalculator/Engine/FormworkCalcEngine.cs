@@ -784,6 +784,9 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             if (catGroupForCurve != CategoryGroup.Column)
             {
                 ExcludeCurvedFormworkFaces(elem, faceInfos);
+                // 直径 ≤300mm の小さな穴 (例: 配管スリーブ) は型枠に穴をあけず
+                // そのまま塞いで施工する。穴分の面積を fi.Area に加算する。
+                FillSmallHolesInFormworkFaces(elem, faceInfos);
             }
 
             // 壁の斜めの天端: 斜面の水平射影の短辺 (壁厚方向の幅) が
@@ -878,6 +881,44 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         /// 完全な貫通開口の場合、天端面の Project が貫通穴の真ん中で失敗するが、
         /// その場合は床の XY バウンディングボックスとの距離でフォールバック判定する。
         /// </summary>
+        /// <summary>
+        /// FormworkRequired の平面に空いている直径 ≤300mm の小さな穴を「型枠で塞いだ」
+        /// 扱いにする。穴分の面積を fi.Area に加算するだけで、Visualizer 側の DS 形状調整は
+        /// CreateThinSolidFromFace 内で同じ閾値で穴ループをフィルタする。
+        /// </summary>
+        private static void FillSmallHolesInFormworkFaces(
+            Element elem,
+            List<FaceClassifier.FaceInfo> faceInfos)
+        {
+            if (faceInfos == null || faceInfos.Count == 0) return;
+
+            int totalFilled = 0;
+            double totalFilledAreaFt2 = 0;
+            foreach (var fi in faceInfos)
+            {
+                if (fi == null || fi.Face == null) continue;
+                if (fi.FaceType != FaceType.FormworkRequired) continue;
+                if (!(fi.Face is PlanarFace)) continue; // 平面のみ対象
+
+                var (_, filledAreaFt2, filledCount) = SmallHoleFiller.Process(fi.Face);
+                if (filledCount > 0 && filledAreaFt2 > 0)
+                {
+                    fi.Area += filledAreaFt2;
+                    totalFilled += filledCount;
+                    totalFilledAreaFt2 += filledAreaFt2;
+                }
+            }
+
+            if (totalFilled > 0 && FormworkDebugLog.Enabled)
+            {
+                double areaM2 = UnitUtils.ConvertFromInternalUnits(
+                    totalFilledAreaFt2, UnitTypeId.SquareMeters);
+                FormworkDebugLog.Log(
+                    $"  [SmallHoleFill] E{elem.Id.IntValue()} filled {totalFilled} hole(s) " +
+                    $"(≤{SmallHoleFiller.MaxHoleDimMm:F0}mm), area={areaM2:F3}m²");
+            }
+        }
+
         /// <summary>
         /// 曲面 (CylindricalFace / ConicalFace / RevolvedFace 等の非平面) を
         /// FormworkRequired から DeductedTop に降格して型枠カウントから除外する。
@@ -1284,6 +1325,8 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 if (catGroupForCurve != CategoryGroup.Column)
                 {
                     ExcludeCurvedFormworkFaces(elem, faces);
+                    // 小さな穴塞ぎ (ClassifyElementFaces と同じロジック)
+                    FillSmallHolesInFormworkFaces(elem, faces);
                 }
 
                 BoundingBoxXYZ bb = ComputeWorldBoundingBox(final);

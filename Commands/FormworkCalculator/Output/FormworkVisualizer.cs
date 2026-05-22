@@ -2636,7 +2636,18 @@ namespace Tools28.Commands.FormworkCalculator.Output
         {
             try
             {
-                var edges = fi.Face.GetEdgesAsCurveLoops();
+                IList<CurveLoop> edges;
+                // 直径 ≤300mm の小さな穴 (内側ループ) はフィルタして塞ぐ。
+                // FormworkRequired 平面のみ対象 (曲面は ExcludeCurvedFormworkFaces で除外済み)。
+                if (fi.FaceType == FaceType.FormworkRequired && fi.Face is PlanarFace)
+                {
+                    var (filtered, _, _) = Engine.SmallHoleFiller.Process(fi.Face);
+                    edges = filtered;
+                }
+                else
+                {
+                    edges = fi.Face.GetEdgesAsCurveLoops();
+                }
                 if (edges == null || edges.Count == 0)
                 {
                     FormworkDebugLog.Log($"    [ThinSolid] no-edges area={fi.Area:F4}");
