@@ -2143,7 +2143,6 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 return true; // 例外時は安全側
             }
         }
-        }
 
         /// <summary>
         /// 型枠 DirectShape を除外した分析ビュー専用フィルタ群を作成する。
