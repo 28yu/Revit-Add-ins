@@ -777,6 +777,15 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             // ContactFaceDetector が DeductedContact として処理する)。
             // 旧 ExcludeSlabInteriorVoidFaces の呼び出しは廃止。
 
+            // 曲面 (円形開口・配管貫通など) は円形型枠を実際に組むのが現実的でないため
+            // 型枠不要として除外する。床・壁・梁・基礎・屋根に適用。
+            // 柱 (Column) はラウンド型枠で施工可能なため除外しない。
+            var catGroupForCurve = ElementCollector.ToCategoryGroup(elem);
+            if (catGroupForCurve != CategoryGroup.Column)
+            {
+                ExcludeCurvedFormworkFaces(elem, faceInfos);
+            }
+
             // 壁の斜めの天端: 斜面の水平射影の短辺 (壁厚方向の幅) が
             // しきい値 (既定 30mm) 以上なら型枠不要 (天端扱い) として控除する。
             // 小さな面取り (< 30mm) は型枠必要のまま残す。
@@ -869,6 +878,47 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         /// 完全な貫通開口の場合、天端面の Project が貫通穴の真ん中で失敗するが、
         /// その場合は床の XY バウンディングボックスとの距離でフォールバック判定する。
         /// </summary>
+        /// <summary>
+        /// 曲面 (CylindricalFace / ConicalFace / RevolvedFace 等の非平面) を
+        /// FormworkRequired から DeductedTop に降格して型枠カウントから除外する。
+        /// 円形開口・配管貫通など、現実的に円形型枠を組むのが困難な箇所が対象。
+        ///
+        /// 注意: 柱 (Column) はラウンド型枠で施工可能なので呼出し側で除外していない。
+        /// 曲面壁の主面 (CylindricalFace) も巻き込まれるが、構造体としては稀なので
+        /// トレードオフとして許容する。問題が出たら全周判定や半径しきい値で絞り込む。
+        /// </summary>
+        private static void ExcludeCurvedFormworkFaces(
+            Element elem,
+            List<FaceClassifier.FaceInfo> faceInfos)
+        {
+            if (faceInfos == null || faceInfos.Count == 0) return;
+
+            int excluded = 0;
+            double excludedAreaFt2 = 0;
+            foreach (var fi in faceInfos)
+            {
+                if (fi == null || fi.Face == null) continue;
+                if (fi.FaceType != FaceType.FormworkRequired) continue;
+                // 平面はそのまま (型枠必要)
+                if (fi.Face is PlanarFace) continue;
+
+                // それ以外の Face (CylindricalFace, ConicalFace, RevolvedFace,
+                // HermiteFace, RuledFace 等) は曲面とみなし型枠不要に降格する。
+                fi.FaceType = FaceType.DeductedTop;
+                excluded++;
+                excludedAreaFt2 += fi.Area;
+            }
+
+            if (excluded > 0 && FormworkDebugLog.Enabled)
+            {
+                double excludedAreaM2 = UnitUtils.ConvertFromInternalUnits(
+                    excludedAreaFt2, UnitTypeId.SquareMeters);
+                FormworkDebugLog.Log(
+                    $"  [CurvedFaceExclude] E{elem.Id.IntValue()} excluded {excluded} curved face(s), " +
+                    $"area={excludedAreaM2:F2}m²");
+            }
+        }
+
         private static void ExcludeSlabInteriorVoidFaces(
             Element elem,
             List<FaceClassifier.FaceInfo> faceInfos,
@@ -1228,6 +1278,13 @@ namespace Tools28.Commands.FormworkCalculator.Engine
 
                 // スラブのボイド/開口内部の縦面除外は廃止 (ClassifyElementFaces と同じ理由)。
                 // ボイドの内側面はコンクリート打設時の型枠が必要なため FormworkRequired のまま残す。
+
+                // 曲面 (円形開口など) は ClassifyElementFaces と同じく除外する。柱以外に適用。
+                var catGroupForCurve = ElementCollector.ToCategoryGroup(elem);
+                if (catGroupForCurve != CategoryGroup.Column)
+                {
+                    ExcludeCurvedFormworkFaces(elem, faces);
+                }
 
                 BoundingBoxXYZ bb = ComputeWorldBoundingBox(final);
 
