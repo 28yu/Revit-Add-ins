@@ -1,5 +1,5 @@
-## 最終セッション: 2026-05-21 17:30
-変更ファイル: Commands/FormworkCalculator/Output/FormworkVisualizer.cs, Application.cs
+## 最終セッション: 2026-05-25
+v2.1 リリース完了（`release/v2.1` を `a073cb8` に force-push → GitHub Actions が起動 → `v2.1` タグ・配布ZIP 6本生成）。
 
 
 # 開発ステータス
@@ -74,5 +74,13 @@ FormworkCalculator の 3D ビュー不具合修正（継続中）
 | ExpiryManager（バージョン有効期限） | ✅ 実装済み(v2.1〜) | |
 
 ## 現在のバージョン
-- 最新リリース: 確認が必要（GitHub Releases 参照）
-- 有効期限: ExpiryManager.cs の ExpiryDate 確認
+- 最新リリース: **v2.1**（2026-05-25, `a073cb8`）
+- 有効期限: 2027-06-01（`Licensing/ExpiryManager.cs`）
+- 次回リリース予定: v2.2（`release/v2.2` ブランチは既に remote に存在）
+
+## リリース履歴
+| バージョン | リリース日 | コミット | 主な変更 |
+|-----------|----------|---------|---------|
+| v1.0 | 2026-02-04 | - | 初版（GridBubble / SheetCreation / View系コピペ） |
+| v2.0 | 2026-03-27 | - | 部屋タグ自動配置・塗潰し分割統合・梁色分け・Excel連携 |
+| v2.1 | 2026-05-25 | `a073cb8` | 耐火被覆色分け・型枠数量算出・有効期限管理 |
