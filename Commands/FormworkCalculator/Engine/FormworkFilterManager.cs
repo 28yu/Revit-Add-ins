@@ -23,7 +23,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         {
             var catIds = new List<ElementId>
             {
-                new ElementId(BuiltInCategory.OST_GenericModel),
+                new ElementId(FormworkParameterManager.FormworkCategory),
             };
 
             ElementId solidFillId = GetDraftingSolidFillPatternId(doc);
@@ -52,7 +52,27 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 string filterName = FilterPrefix + ReplaceInvalidChars(key);
 
                 ParameterFilterElement filter = FindFilterByName(doc, filterName);
-                // 既存フィルタを再利用 (削除すると他の分析ビューの参照が切れるため)
+                // 既存フィルタが旧カテゴリ (OST_GenericModel) を対象としていたら作り直す:
+                // 旧バージョンの型枠 DS は OST_GenericModel、新版は FormworkCategory (NurseCallDevices)
+                // なのでカテゴリが合っていないと新規 DS にマッチしない。
+                if (filter != null)
+                {
+                    var fCats = filter.GetCategories();
+                    bool hasNewCat = false;
+                    if (fCats != null)
+                    {
+                        int newCatInt = (int)FormworkParameterManager.FormworkCategory;
+                        foreach (var c in fCats)
+                            if (c.IntValue() == newCatInt) { hasNewCat = true; break; }
+                    }
+                    if (!hasNewCat)
+                    {
+                        try { doc.Delete(filter.Id); } catch { }
+                        filter = null;
+                    }
+                }
+                // 既存フィルタを再利用 (削除すると他の分析ビューの参照が切れるため。
+                // ただしカテゴリ不一致の場合は上で削除済み)
                 if (filter == null)
                 {
                     try
@@ -129,19 +149,24 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         }
 
         /// <summary>
-        /// OST_GenericModel カテゴリの任意の要素から、指定名の共有パラメータの
+        /// 型枠 DirectShape のカテゴリの任意の要素から、指定名の共有パラメータの
         /// ElementId を取得する。Filter Rule 作成に必要。
+        /// 新カテゴリで見つからなければ旧カテゴリ (OST_GenericModel) も探す (移行期対応)。
         /// </summary>
         private static ElementId GetSharedParameterIdFromDirectShape(Document doc, string paramName)
         {
-            var collector = new FilteredElementCollector(doc)
-                .OfCategory(BuiltInCategory.OST_GenericModel)
-                .WhereElementIsNotElementType();
-
-            foreach (Element e in collector)
+            foreach (var bic in new[] { FormworkParameterManager.FormworkCategory,
+                                        FormworkParameterManager.LegacyFormworkCategory })
             {
-                var p = e.LookupParameter(paramName);
-                if (p != null) return p.Id;
+                var collector = new FilteredElementCollector(doc)
+                    .OfCategory(bic)
+                    .WhereElementIsNotElementType();
+
+                foreach (Element e in collector)
+                {
+                    var p = e.LookupParameter(paramName);
+                    if (p != null) return p.Id;
+                }
             }
             return null;
         }

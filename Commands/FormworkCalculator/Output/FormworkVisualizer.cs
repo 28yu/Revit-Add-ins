@@ -209,6 +209,25 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 }
                 try { view.DetailLevel = ViewDetailLevel.Fine; } catch { }
 
+                // ディシプリンを Coordination (調整) に設定して全カテゴリ (構造・電気等) を
+                // 等しく表示できるようにする。型枠 DS のカテゴリ (NurseCallDevices) は
+                // Electrical discipline 所属のため、Structural のままだとデフォルトで
+                // 表示されないリスクがある。
+                try
+                {
+                    var disciplineParam = view.get_Parameter(BuiltInParameter.VIEW_DISCIPLINE);
+                    if (disciplineParam != null && !disciplineParam.IsReadOnly)
+                    {
+                        // Coordination = 4095 (全ディシプリンビット ON)
+                        disciplineParam.Set(4095);
+                        FormworkDebugLog.Log("  [Visual] View discipline set to Coordination");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    FormworkDebugLog.Log($"  [Visual] discipline set EX: {ex.Message}");
+                }
+
                 // 尺度を 1/200 に設定
                 try { view.Scale = 200; }
                 catch (Exception ex) { FormworkDebugLog.Log($"  [Visual] Scale set EX: {ex.Message}"); }
@@ -292,20 +311,20 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     HideClutterCategories(view);
             }
 
-            // OST_GenericModel (DirectShape のカテゴリ) を必ず表示状態にする。
+            // 型枠 DS のカテゴリ (FormworkCategory) を必ず表示状態にする。
             // CopyCategoryVisibilityAndOverrides の後に実行することで、ソースビューが
-            // GenericModel を非表示にしていても型枠 DirectShape が確実に表示される。
+            // 同カテゴリを非表示にしていても型枠 DirectShape が確実に表示される。
             // 更新モードでも防御的に実行 (idempotent)。
             try
             {
-                var gmCatId = new ElementId(BuiltInCategory.OST_GenericModel);
-                if (view.CanCategoryBeHidden(gmCatId))
-                    view.SetCategoryHidden(gmCatId, false);
-                FormworkDebugLog.Log("  [Visual] OST_GenericModel category set visible");
+                var fwCatId = new ElementId(FormworkParameterManager.FormworkCategory);
+                if (view.CanCategoryBeHidden(fwCatId))
+                    view.SetCategoryHidden(fwCatId, false);
+                FormworkDebugLog.Log("  [Visual] FormworkCategory set visible");
             }
             catch (Exception ex)
             {
-                FormworkDebugLog.Log($"  [Visual] OST_GenericModel category set EX: {ex.Message}");
+                FormworkDebugLog.Log($"  [Visual] FormworkCategory set EX: {ex.Message}");
             }
 
             // 元躯体要素を 20% 透過 + RGB(94,94,94) で表示
@@ -515,7 +534,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
                         double areaM2ThisDs = 0.0;
                         try
                         {
-                            var catOst = new ElementId(BuiltInCategory.OST_GenericModel);
+                            var catOst = new ElementId(FormworkParameterManager.FormworkCategory);
                             var ds = DirectShape.CreateElement(doc, catOst);
                             ds.ApplicationId = "Tools28";
                             ds.ApplicationDataId = "Formwork";
@@ -709,12 +728,12 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 catch { }
             }
 
-            // View Filter 適用後もGenericModelが確実に表示状態であることを確認
+            // View Filter 適用後も FormworkCategory が確実に表示状態であることを確認
             try
             {
-                var gmId2 = new ElementId(BuiltInCategory.OST_GenericModel);
-                if (view.CanCategoryBeHidden(gmId2))
-                    view.SetCategoryHidden(gmId2, false);
+                var fwId2 = new ElementId(FormworkParameterManager.FormworkCategory);
+                if (view.CanCategoryBeHidden(fwId2))
+                    view.SetCategoryHidden(fwId2, false);
             }
             catch { }
 
@@ -792,12 +811,12 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 }
                 catch { }
 
-                // OST_GenericModel category state
+                // FormworkCategory state (型枠 DS が属するカテゴリ)
                 try
                 {
-                    var gmId = new ElementId(BuiltInCategory.OST_GenericModel);
-                    bool gmHidden = view.GetCategoryHidden(gmId);
-                    var ogs = view.GetCategoryOverrides(gmId);
+                    var fwId = new ElementId(FormworkParameterManager.FormworkCategory);
+                    bool fwHidden = view.GetCategoryHidden(fwId);
+                    var ogs = view.GetCategoryOverrides(fwId);
                     string ogsInfo = "null";
                     if (ogs != null)
                     {
@@ -810,11 +829,11 @@ namespace Tools28.Commands.FormworkCalculator.Output
                                   $"lineWeight={lw} halftone={halftone}";
                     }
                     FormworkDebugLog.Log(
-                        $"    OST_GenericModel: hidden={gmHidden} ogs={{ {ogsInfo} }}");
+                        $"    FormworkCategory: hidden={fwHidden} ogs={{ {ogsInfo} }}");
                 }
                 catch (Exception ex)
                 {
-                    FormworkDebugLog.Log($"    OST_GenericModel state EX: {ex.Message}");
+                    FormworkDebugLog.Log($"    FormworkCategory state EX: {ex.Message}");
                 }
 
                 // Workset 28Tools_型枠
@@ -1025,7 +1044,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 {
                     try
                     {
-                        var catOst = new ElementId(BuiltInCategory.OST_GenericModel);
+                        var catOst = new ElementId(FormworkParameterManager.FormworkCategory);
                         var ds = DirectShape.CreateElement(doc, catOst);
                         ds.ApplicationId = "Tools28";
                         ds.ApplicationDataId = "FormworkExcluded";
@@ -1168,6 +1187,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
             FormworkDebugLog.Log($"  [Hide] legacy3 analysisViews added to skip: {legacy3Count}");
 
             // ─── Step 2: 全型枠 DirectShape を収集 ───────────────────────────────
+            // 新カテゴリ (FormworkCategory) と旧カテゴリ (LegacyFormworkCategory) の両方を走査。
             var allShapeIds = new List<ElementId>();
             var shapesByView = new Dictionary<string, List<ElementId>>();
             var untaggedShapes = new List<ElementId>();
@@ -1175,7 +1195,9 @@ namespace Tools28.Commands.FormworkCalculator.Output
 
             var collector = new FilteredElementCollector(doc)
                 .OfClass(typeof(DirectShape))
-                .OfCategory(BuiltInCategory.OST_GenericModel);
+                .WherePasses(new LogicalOrFilter(
+                    new ElementCategoryFilter(FormworkParameterManager.FormworkCategory),
+                    new ElementCategoryFilter(FormworkParameterManager.LegacyFormworkCategory)));
             foreach (Element e in collector)
             {
                 try
@@ -1400,7 +1422,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
         /// <summary>
         /// 型枠 DirectShape を全て非表示にするビューフィルタを作成または取得する。
         /// ルール: 28Tools_FormworkMarker パラメータが "28Tools_Formwork" で始まる要素
-        /// カテゴリ: OST_GenericModel のみ
+        /// カテゴリ: FormworkCategory (新) + LegacyFormworkCategory (旧 DS 残骸対応)
         /// </summary>
         private static ElementId GetOrCreateHideAllFormworkFilter(
             Document doc, ElementId markerParamId)
@@ -1413,14 +1435,28 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 .FirstOrDefault(f => f.Name == filterName);
             if (existing != null)
             {
+                // 旧バージョン作成のフィルタが OST_GenericModel のみを対象としている場合は
+                // 作り直す (新カテゴリを含めるため)
+                var eCats = existing.GetCategories();
+                int newCatInt = (int)FormworkParameterManager.FormworkCategory;
+                bool hasNew = false;
+                if (eCats != null)
+                    foreach (var c in eCats) if (c.IntValue() == newCatInt) { hasNew = true; break; }
+                if (hasNew)
+                {
+                    FormworkDebugLog.Log(
+                        $"  [Hide] hideFilter '{filterName}' reused id={existing.Id.IntValue()}");
+                    return existing.Id;
+                }
+                try { doc.Delete(existing.Id); } catch { }
                 FormworkDebugLog.Log(
-                    $"  [Hide] hideFilter '{filterName}' reused id={existing.Id.IntValue()}");
-                return existing.Id;
+                    $"  [Hide] hideFilter '{filterName}' deleted (legacy GenericModel-only) → recreating");
             }
 
             var cats = new List<ElementId>
             {
-                new ElementId(BuiltInCategory.OST_GenericModel)
+                new ElementId(FormworkParameterManager.FormworkCategory),
+                new ElementId(FormworkParameterManager.LegacyFormworkCategory),
             };
 #if REVIT2026
             FilterRule rule = ParameterFilterRuleFactory.CreateBeginsWithRule(
@@ -1601,7 +1637,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
 
             try
             {
-                var catId = new ElementId(BuiltInCategory.OST_GenericModel);
+                var catId = new ElementId(FormworkParameterManager.FormworkCategory);
                 return DirectShapeType.Create(doc, typeName, catId);
             }
             catch
@@ -1772,7 +1808,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
         /// ターゲット 3D ビューにコピーする。ターゲットで非表示にできないカテゴリは
         /// スキップ (例: 平面ビュー専用のカテゴリ)。
         ///
-        /// 解析ビューに必要なカテゴリ (OST_GenericModel = DirectShape) は強制的に表示にする。
+        /// 解析ビューに必要なカテゴリ (FormworkCategory = 型枠 DirectShape) は強制的に表示にする。
         /// 切断ボックスのアウトライン・レベル線は視覚的ノイズなので強制非表示。
         /// </summary>
         private static void CopyCategoryVisibilityAndOverrides(
@@ -1781,12 +1817,13 @@ namespace Tools28.Commands.FormworkCalculator.Output
             int catTotal = 0, catCopied = 0, catSkipped = 0, catErrors = 0;
             int hiddenCopied = 0;
             FormworkDebugLog.Log($"  [Visual] CopyCategoryVisibility 開始: source='{source?.Name}' target='{target?.Name}'");
-            // 型枠 DirectShape カテゴリ。
-            // ソースが OST_GenericModel に透過 100% / SurfaceForegroundPatternVisible=false /
+            // 型枠 DirectShape カテゴリ (新 + 旧)。
+            // ソースが当該カテゴリに透過 100% / SurfaceForegroundPatternVisible=false /
             // ProjectionLineWeight=0 等を設定していると、コピー後の解析ビューで
             // 型枠 DS が「存在するが見えない」状態になる。
             // カテゴリ可視性・V/G ともコピー対象から除外する（後段で明示クリーン化する）。
-            var gmCatIdInt = (int)BuiltInCategory.OST_GenericModel;
+            var fwCatIdInt = (int)FormworkParameterManager.FormworkCategory;
+            var legacyFwCatIdInt = (int)FormworkParameterManager.LegacyFormworkCategory;
 
             try
             {
@@ -1797,7 +1834,8 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     catTotal++;
                     var catId = cat.Id;
                     if (!target.CanCategoryBeHidden(catId)) { catSkipped++; continue; }
-                    bool isFormworkCategory = catId.IntValue() == gmCatIdInt;
+                    bool isFormworkCategory =
+                        catId.IntValue() == fwCatIdInt || catId.IntValue() == legacyFwCatIdInt;
                     try
                     {
                         // 表示/非表示
@@ -1810,7 +1848,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
                         // source.IsCategoryOverridable のチェックは外す:
                         // View Template ロック時に false を返す場合があるが、
                         // GetCategoryOverrides では実効値を取得できる。
-                        // OST_GenericModel はコピーせず、後段で空 OGS を当てる。
+                        // 型枠カテゴリ (新/旧) はコピーせず、後段で空 OGS を当てる。
                         if (!isFormworkCategory && target.IsCategoryOverridable(catId))
                         {
                             try
@@ -1863,21 +1901,26 @@ namespace Tools28.Commands.FormworkCalculator.Output
             //   高くなり、ソースフィルタが OST_GenericModel を非表示にしていても
             //   型枠 DirectShape が確実に表示・色分けされる。
 
-            // DirectShape (OST_GenericModel) は型枠表示の主役なので強制的に表示状態に上書き。
+            // 型枠 DirectShape (FormworkCategory) は型枠表示の主役なので強制的に表示状態に上書き。
             // V/G オーバーライドも空にリセットする (ソース側に透過 100% やパターン不可視等が
             // 設定されていると、Color フィルタを適用しても型枠 DS が見えなくなるため)。
-            try
+            // 旧カテゴリ (LegacyFormworkCategory) も同様に処理する (旧 DS がまだ残っている場合の保険)。
+            foreach (var bic in new[] { FormworkParameterManager.FormworkCategory,
+                                        FormworkParameterManager.LegacyFormworkCategory })
             {
-                var gmId = new ElementId(BuiltInCategory.OST_GenericModel);
-                if (target.CanCategoryBeHidden(gmId))
-                    target.SetCategoryHidden(gmId, false);
-                if (target.IsCategoryOverridable(gmId))
+                try
                 {
-                    target.SetCategoryOverrides(gmId, new OverrideGraphicSettings());
-                    FormworkDebugLog.Log("  [Visual] OST_GenericModel V/G overrides reset");
+                    var fwId = new ElementId(bic);
+                    if (target.CanCategoryBeHidden(fwId))
+                        target.SetCategoryHidden(fwId, false);
+                    if (target.IsCategoryOverridable(fwId))
+                    {
+                        target.SetCategoryOverrides(fwId, new OverrideGraphicSettings());
+                        FormworkDebugLog.Log($"  [Visual] {bic} V/G overrides reset");
+                    }
                 }
+                catch { }
             }
-            catch { }
 
             // 切断ボックスのアウトライン・レベル線は解析ビューで邪魔なので強制非表示
             HideClutterCategories(target);
@@ -2076,19 +2119,21 @@ namespace Tools28.Commands.FormworkCalculator.Output
             {
                 var pfe = doc.GetElement(fid) as ParameterFilterElement;
                 if (pfe == null) return true; // 不明な場合は安全側に倒す
-                // カテゴリチェック: OST_GenericModel を含むかどうか
+                // カテゴリチェック: 型枠 DS のカテゴリ (新/旧) を含むかどうか
                 var cats = pfe.GetCategories();
                 if (cats == null) return false;
-                var gmInt = (int)BuiltInCategory.OST_GenericModel;
+                var newCatInt = (int)FormworkParameterManager.FormworkCategory;
+                var legacyCatInt = (int)FormworkParameterManager.LegacyFormworkCategory;
                 bool hasGm = false;
                 foreach (var cid in cats)
                 {
-                    if (cid.IntValue() == gmInt) { hasGm = true; break; }
+                    if (cid.IntValue() == newCatInt || cid.IntValue() == legacyCatInt)
+                    { hasGm = true; break; }
                 }
                 if (!hasGm) return false;
 
                 var ef = pfe.GetElementFilter();
-                if (ef == null) return true; // カテゴリのみ → 全 GenericModel 一致
+                if (ef == null) return true; // カテゴリのみ → 当該カテゴリ全要素に一致
                 return ef.PassesFilter(doc, sampleFormworkId);
             }
             catch
@@ -2268,9 +2313,13 @@ namespace Tools28.Commands.FormworkCalculator.Output
         {
             var toDelete = new List<ElementId>();
             int total = 0, taggedMatch = 0, untagged = 0, otherView = 0;
+            // 新カテゴリ (FormworkCategory) と旧カテゴリ (LegacyFormworkCategory) の両方を走査。
+            // 旧バージョンで作成された GenericModel DS も対象にしてマイグレーション。
             var collector = new FilteredElementCollector(doc)
                 .OfClass(typeof(DirectShape))
-                .OfCategory(BuiltInCategory.OST_GenericModel);
+                .WherePasses(new LogicalOrFilter(
+                    new ElementCategoryFilter(FormworkParameterManager.FormworkCategory),
+                    new ElementCategoryFilter(FormworkParameterManager.LegacyFormworkCategory)));
             foreach (Element e in collector)
             {
                 try

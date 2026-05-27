@@ -95,7 +95,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
             try
             {
                 schedule = ViewSchedule.CreateSchedule(
-                    doc, new ElementId(BuiltInCategory.OST_GenericModel));
+                    doc, new ElementId(Engine.FormworkParameterManager.FormworkCategory));
             }
             catch
             {
@@ -339,7 +339,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
             try
             {
                 schedule = ViewSchedule.CreateSchedule(
-                    doc, new ElementId(BuiltInCategory.OST_GenericModel));
+                    doc, new ElementId(Engine.FormworkParameterManager.FormworkCategory));
             }
             catch
             {

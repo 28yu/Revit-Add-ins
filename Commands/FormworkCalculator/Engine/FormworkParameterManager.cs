@@ -8,10 +8,22 @@ namespace Tools28.Commands.FormworkCalculator.Engine
 {
     /// <summary>
     /// 型枠数量算出 DirectShape 用の共有パラメータ管理。
-    /// OST_GenericModel（DirectShape が属するカテゴリ）にバインドする。
+    /// FormworkCategory (OST_NurseCallDevices) にバインドする。
+    ///
+    /// 【カテゴリ選定理由】
+    /// 旧バージョンでは OST_GenericModel を使用していたが、ユーザー独自フィルタが
+    /// 一般モデルカテゴリを含むと型枠 DS にもヒットして visible=false の干渉が
+    /// 起こる問題があった。一般建築モデルでは100%使われない「ナースコール装置」を
+    /// 採用することでフィルタ衝突を根本的に回避する。
+    /// 旧 OST_GenericModel カテゴリも互換のためパラメータバインドだけは保持する
+    /// (CleanupExistingFormworkShapes で旧 DS をマーカー値で検出するため)。
     /// </summary>
     internal static class FormworkParameterManager
     {
+        /// <summary>新規型枠 DirectShape のカテゴリ。</summary>
+        public const BuiltInCategory FormworkCategory = BuiltInCategory.OST_NurseCallDevices;
+        /// <summary>v2.1 以前の型枠 DirectShape のカテゴリ。クリーンアップ専用。</summary>
+        public const BuiltInCategory LegacyFormworkCategory = BuiltInCategory.OST_GenericModel;
         public const string ParamMarker = "28Tools_FormworkMarker";   // 識別用マーカー（"28Tools_Formwork" を書き込む）
         public const string ParamCategory = "28Tools_Formwork_部位";   // 柱 / 梁 / 壁 / ...
         public const string ParamLevel = "28Tools_Formwork_レベル";    // 参照レベル名
@@ -69,8 +81,14 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                     ?? defFile.Groups.Create(SharedParamGroupName);
 
                 CategorySet catSet = app.Create.NewCategorySet();
-                var cat = doc.Settings.Categories.get_Item(BuiltInCategory.OST_GenericModel);
-                if (cat != null) catSet.Insert(cat);
+                // 新規 DS のカテゴリ (FormworkCategory) と旧 DS のカテゴリ
+                // (LegacyFormworkCategory) の両方にバインドする。旧 DS は
+                // CleanupExistingFormworkShapes で削除されるが、削除されるまでの間
+                // パラメータ参照が壊れないようにする。
+                var newCat = doc.Settings.Categories.get_Item(FormworkCategory);
+                if (newCat != null) catSet.Insert(newCat);
+                var legacyCat = doc.Settings.Categories.get_Item(LegacyFormworkCategory);
+                if (legacyCat != null) catSet.Insert(legacyCat);
 
                 var binding = app.Create.NewInstanceBinding(catSet);
                 var bindingMap = doc.ParameterBindings;
@@ -142,10 +160,27 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             var it = map.ForwardIterator();
             bool m = false, c = false, l = false, g = false, a = false, p = false, s = false, sv = false,
                  rsv = false, ok = false;
+            int newCatInt = (int)FormworkCategory;
+            // ParamMarker のバインドに新カテゴリ (FormworkCategory) が含まれているかを判定する。
+            // 旧バージョンで OST_GenericModel のみにバインドされているプロジェクトでは false を返し、
+            // EnsureParameters の再バインドで新カテゴリを追加する。
+            bool markerBoundToNewCat = false;
             while (it.MoveNext())
             {
                 var name = it.Key.Name;
-                if (name == ParamMarker) m = true;
+                if (name == ParamMarker)
+                {
+                    m = true;
+                    var bind = it.Current as InstanceBinding;
+                    if (bind != null)
+                    {
+                        foreach (Category bc in bind.Categories)
+                        {
+                            if (bc != null && bc.Id.IntValue() == newCatInt)
+                            { markerBoundToNewCat = true; break; }
+                        }
+                    }
+                }
                 else if (name == ParamCategory) c = true;
                 else if (name == ParamLevel) l = true;
                 else if (name == ParamGroupKey) g = true;
@@ -156,7 +191,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 else if (name == ParamRelatedSourceView) rsv = true;
                 else if (name == ParamOutputKind) ok = true;
             }
-            return m && c && l && g && a && p && s && sv && rsv && ok;
+            return m && c && l && g && a && p && s && sv && rsv && ok && markerBoundToNewCat;
         }
 
         /// <summary>
@@ -231,7 +266,10 @@ namespace Tools28.Commands.FormworkCalculator.Engine
 #endif
                 def = grp.Definitions.Create(opts);
             }
-            if (!map.Contains(def)) map.Insert(def, binding);
+            // ReInsert は既存バインドを置き換える。旧バインド (GenericModel のみ) を
+            // 新バインド (GenericModel + NurseCallDevices) に拡張するために必要。
+            if (map.Contains(def)) map.ReInsert(def, binding);
+            else map.Insert(def, binding);
         }
 
         private static void CreateAndBindArea(
@@ -247,7 +285,8 @@ namespace Tools28.Commands.FormworkCalculator.Engine
 #endif
                 def = grp.Definitions.Create(opts);
             }
-            if (!map.Contains(def)) map.Insert(def, binding);
+            if (map.Contains(def)) map.ReInsert(def, binding);
+            else map.Insert(def, binding);
         }
 
         private static void SetString(Element e, string paramName, string value)
