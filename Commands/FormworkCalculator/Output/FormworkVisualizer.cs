@@ -446,21 +446,30 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     srcForDiag != null && srcForDiag.IsLinked && srcForDiag.Element is WallSweep;
                 int linkSweepDsCreated = 0;
 
-                // 各 FormworkRequired 面の有効面積 (fi.EffectiveAreaM2) を、その面に対応する
-                // DirectShape (Clipper 分割なら最初の 1 個) に割り当てる。
-                // これにより、ユーザーが個々の DirectShape を選択しても正しい面積が表示される。
+                // 各 FormworkRequired 面の有効面積 (fi.EffectiveAreaM2) をスケーリング係数で
+                // 按分して各 DirectShape に乗せる。スケーリングは「面の素の面積合計」と
+                // 「実際の formwork 面積 (= 素の合計 - 開口控除 + 開口縁加算)」の比。
                 //
-                // 開口部の調整 (OpeningEdgeAreaAdded - OpeningAreaDeducted) は要素単位の値で
-                // 面単位に分配できないため、最初の FormworkRequired DirectShape に乗せる。
-                // 結果として:
-                //   sum(全 DirectShape の面積) = sum(fi.EffectiveAreaM2) + 開口調整
-                //                              = er.FormworkArea
-                // 集計表の総合計は維持される。
-                double openingDelta = er.OpeningEdgeAreaAdded - er.OpeningAreaDeducted;
-                bool firstFormworkAssigned = false;
+                // 旧実装は openingDelta を最初の DS に一発で乗せていたが、開口控除が
+                // 巨大な壁 (例: 工作物擁壁の大開口) では最初の DS の面積が負値 (例: -8.3m²)
+                // になる不具合があった。スケーリングなら個々の DS は負にならず、合計も
+                // er.FormworkArea にぴったり一致する。
+                double sumEffectiveFaceAreasM2 = 0;
+                foreach (var fi in faces)
+                {
+                    if (fi.FaceType == FaceType.FormworkRequired)
+                        sumEffectiveFaceAreasM2 += fi.EffectiveAreaM2;
+                }
+                double areaScale = sumEffectiveFaceAreasM2 > 1e-9
+                    ? er.FormworkArea / sumEffectiveFaceAreasM2
+                    : 1.0;
+                // スケール係数が負になる理屈は無いが防御的にクランプ
+                if (areaScale < 0) areaScale = 0;
                 // 合計一致保証用: 実際に DS パラメータに書き込んだ面積の合計と最初の DS の ID
                 double assignedAreaM2 = 0;
                 ElementId firstFormworkDsId = null;
+                // DirectShape (Clipper 分割なら最初の 1 個) に割り当てる。
+                // これにより、ユーザーが個々の DirectShape を選択しても正しい面積が表示される。
 
                 foreach (var fi in faces)
                 {
@@ -547,18 +556,15 @@ namespace Tools28.Commands.FormworkCalculator.Output
 
                             try
                             {
-                                // 面単位の有効面積を、その面の最初の DirectShape ピースに割り当てる。
-                                // Clipper 分割で複数ピースになった場合、2 個目以降は 0。
-                                // 開口調整は要素全体の最初の FormworkRequired DirectShape に乗せる。
+                                // 面単位の有効面積を areaScale で按分し、その面の最初の
+                                // DirectShape ピースに割り当てる。Clipper 分割で複数ピースに
+                                // なった場合、2 個目以降は 0。
+                                // 開口調整 (er.OpeningAreaDeducted / OpeningEdgeAreaAdded) は
+                                // areaScale に既に織り込み済みのため個別加算は不要。
                                 double areaM2 = 0.0;
                                 if (isFormworkRequired && firstPieceForThisFace)
                                 {
-                                    areaM2 = fi.EffectiveAreaM2;
-                                    if (!firstFormworkAssigned)
-                                    {
-                                        areaM2 += openingDelta;
-                                        firstFormworkAssigned = true;
-                                    }
+                                    areaM2 = fi.EffectiveAreaM2 * areaScale;
                                     firstPieceForThisFace = false;
                                 }
                                 string filterKey = IsDeducted(fi.FaceType) ? "控除面" : key;
