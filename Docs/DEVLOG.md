@@ -629,3 +629,85 @@ widthMm = max(headerUnits, maxValueUnits) * 2.6 + 12.0
 - PreToolUse hook が push 前に `git rebase origin/main` を自動実行
 - rebase により旧コミットは `skipped previously applied commit` としてスキップされる
 - hook は dirty working tree も `git stash` で対応済み
+
+---
+
+## 型枠数量算出 v2.1.1 修正の知見（2026-05-27）
+
+v2.1 リリース後に発見された 5 件の不具合と、それぞれの修正方針・教訓を記録する。
+
+### 1. 接触面に型枠 DS が形成される不具合（BuriedFaceDetector の新設）
+
+**症状**:
+- 床と梁の段差フラッシュ接触部や、床と布基礎の体積重なり部分に、不要な型枠 DS が両面分作成される
+
+**原因**:
+- 既存の `ContactFaceDetector` は「anti-parallel + UV-on-face」パターンの直接接触しか検出しない
+- 以下 2 つの盲点があった:
+  1. **SpatialGrid ペアフィルタの取りこぼし**: 床の `ctx.BB.Y` が実体より小さく算出され (例: 5650×600×900mm と報告されるが face 詳細では 5650×2700×900mm)、隣接梁の BB と overlap せずペアテスト自体が走らない
+  2. **「面が他要素のソリッド内部に埋もれている」ケース**: 対向面が存在しないため anti-parallel 判定が成立しない (例: 接合されずに体積が重なっている床×布基礎)
+
+**修正**: `Engine/BuriedFaceDetector.cs` を新設し Pass 2 直後に実行
+- 各 `FormworkRequired` 面の中心点を外向き法線方向に 5mm オフセットしたサンプル点 `p_out` を作る
+- `p_out` が他要素のソリッド内部にあれば `DeductedContact` に降格
+- 内包判定は「凸ソリッド前提の平面署名距離テスト」(高速) → 失敗時は非整列方向へのレイキャスト (非凸対応) の二段構え
+- `ctx.BB` を信頼せず、ソリッドの全エッジ端点 + 全 face UV 中心点から再構築した堅牢 BB で候補絞り込み
+
+**回帰の落とし穴 (柱+梁の取り合いで型枠が消える)**:
+- 柱 950x950 と梁 600x1160 の標準取り合いで、柱の +X 側面 (大面) の中心が梁体積内に入る
+- 単純に「中心が内部 → 全面 DeductedContact」と判定すると、梁からはみ出した柱の上下端 (合計 ~355mm) まで型枠不要扱いになる
+- **対策**: 対象面が相手要素との `PartialContact` を既に保持している場合は、その相手要素についての埋没判定をスキップする (既存の部分接触クリッパーに処理を委ねる)
+
+### 2. 型枠 DS の面積が負値になる不具合（按分スケーリング）
+
+**症状**:
+- 開口の多い壁 (工作物擁壁 t1000～1600 等) で、特定の DS の面積パラメータが -8.299m² 等の負値になる
+
+**原因**:
+- `FormworkVisualizer` 内で、開口部の控除量 `openingDelta = OpeningEdgeAreaAdded - OpeningAreaDeducted` を**最初の `FormworkRequired` DS に一発で全部乗せていた** (`areaM2 += openingDelta`)
+- 開口控除が当該 DS の素の面積より大きいケースで結果が負値に
+- 例: face[0] 29.90m² + openingDelta -38.20m² = -8.30m²
+
+**修正**: 「最初の DS に全部乗せる」方式を廃止し、**スケーリング係数で全 `FormworkRequired` DS に按分**する方式に変更
+- `areaScale = er.FormworkArea / sum(全 FormworkRequired 面の EffectiveAreaM2)`
+- 各 DS area = `fi.EffectiveAreaM2 × areaScale`
+- 個々の DS は決して負にならず、合計はぴったり `er.FormworkArea` に一致
+
+**教訓**: 集合の合計を末端の 1 要素で帳尻合わせする実装は、調整量が大きいと末端が破綻する。集合全体に按分する方が頑健。
+
+### 3. 分析ビューのフィルタが正しく引き継がれない問題
+
+**症状の変遷 (3 段階のイテレーション)**:
+1. 初期: 派生フィルタ `28T_FW_{fid}_GM` / `28T_FW_{fid}_Other` が作成され、名前が不透明
+2. 第1版 (a18ebd5): 派生フィルタ名を `{元名}_型枠除外GM` / `{元名}_型枠除外` に。一部のフィルタだけ別名になる不整合
+3. 最終版 (9525afd〜6574432〜2d64b54): 派生フィルタを廃止。ソースフィルタを直接参照させる
+
+**最終解 — カテゴリ変更による根本回避**:
+- 旧: 型枠 DS は OST_GenericModel カテゴリ。ユーザー独自フィルタが「一般モデル」を含むと型枠 DS にもヒットして visible=false 干渉が起きる
+- 新: 型枠 DS のカテゴリを `OST_NurseCallDevices` (ナースコール装置) に変更。一般建築モデルでは 100% 使われないため、ユーザーフィルタが衝突する確率がほぼ 0
+
+**注意点**:
+- DirectShape のカテゴリ変更は影響範囲が広い (約 25 箇所): DirectShape 作成 / DirectShapeType / フィルタ / 集計表 / カテゴリ可視性 / V/G オーバーライド / CleanupExistingFormworkShapes / FilterMatchesFormwork etc.
+- 旧 GenericModel DS との互換のため `FormworkParameterManager.LegacyFormworkCategory` 定数を導入し、共有パラメータは新旧両カテゴリにバインド
+- `CleanupExistingFormworkShapes` も新旧両カテゴリを走査して旧 DS をマイグレーション
+- `28T_型枠_全非表示` フィルタや `型枠_柱` 等の色フィルタも、旧カテゴリのみ対象の場合は作り直す
+- **ディシプリン**: `OST_NurseCallDevices` は Electrical discipline 所属のため、分析ビューの `BuiltInParameter.VIEW_DISCIPLINE` を Coordination (=4095, 全ビット ON) に明示設定して構造系ビューでも表示できるようにする
+
+### 4. 更新モードで既存ビューのフィルタ設定が変更される
+
+**修正**:
+- 更新モード (`reusedView == true`) では `FormworkFilterManager.ApplyColorFilters` を呼ばないようガード
+- ユーザーが手動で調整した色・可視性設定を保持
+- 新規キーが発生した場合の追加処理は割り切ってスキップ (ユーザーは更新モード = 既存維持の意図)
+
+### 5. シートに過去ビューもレイアウトされる
+
+**修正**:
+- シート作成時のビュー収集を `CollectAllAnalysisViewIds(doc)` (プロジェクト全体) → `perViewAnalysisViewIds` (今回実行分のみ) に変更
+- 「複数の3Dビューを選択して実行」した時、過去の他ソースビュー由来の分析ビューはシートに載せない (ユーザーの自然な期待動作に合致)
+
+### 6. その他の知見
+
+- **Revit フィルタの可視性は AND 結合**: ある要素に複数フィルタがマッチする時、いずれかが `visible=false` なら要素は隠れる。順序やプライオリティは無関係 (グラフィックオーバーライドの優先順位とは別概念)
+- **共有パラメータのカテゴリ追加**: `BindingMap.Insert` は既存バインドに対しては no-op。新カテゴリを追加するには `BindingMap.ReInsert` を使う必要がある
+- **ベリファイ用ログ**: `[Buried]`, `area reconcile`, `[Filter]` 等のタグを debug log に残しておくことで、ユーザー報告時の問題箇所が即座に特定できた
