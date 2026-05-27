@@ -1996,6 +1996,19 @@ namespace Tools28.Commands.FormworkCalculator.Output
         /// 派生フィルタ: 元ルール AND 「28Tools_Formwork_マーカーが '28Tools_Formwork' で
         /// 始まらない」。これで型枠 DS にはマッチしなくなり、元の非型枠要素のみが対象。
         /// </summary>
+        /// <summary>
+        /// ソースビューのフィルタ設定を分析ビューにコピーする。
+        ///
+        /// 派生フィルタは作らず、既存ソースフィルタをそのまま分析ビューに参照させる。
+        /// これによりフィルタ名・内容・ID が完全に一致し、プロジェクト上のフィルタ要素が
+        /// 余計に増えない (データクリーン)。
+        ///
+        /// 唯一の例外: ソースで visible=false のフィルタが型枠 DS にマッチする場合、
+        /// そのまま visible=false で適用すると型枠 DS が新ビューでも隠れてしまうため、
+        /// 分析ビュー側でのみ visibility=true に上書きする。
+        /// この場合、フィルタにヒットしていた非型枠要素 (壁等) も分析ビューでは表示状態に
+        /// なるが、ユーザーが必要であれば手動で visible=false に戻せる。
+        /// </summary>
         private static void CopyFilterSettings(Document doc, View source, View3D target,
             ICollection<ElementId> formworkShapeIds = null)
         {
@@ -2004,28 +2017,19 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 var srcFilterIds = source.GetFilters();
                 if (srcFilterIds == null || srcFilterIds.Count == 0) return;
 
-                // 型枠 DS のサンプルとマーカーパラメータ ID を取得
-                // （ソースフィルタが型枠 DS にマッチするか判定するため）
+                // 型枠 DS のサンプルを取得 (ソースフィルタが型枠 DS にマッチするか判定するため)
                 ElementId sampleFormworkId = null;
-                ElementId formworkMarkerParamId = null;
                 if (formworkShapeIds != null)
                 {
                     foreach (var sid in formworkShapeIds)
                     {
                         if (sid == null || sid == ElementId.InvalidElementId) continue;
                         sampleFormworkId = sid;
-                        try
-                        {
-                            var elem = doc.GetElement(sid);
-                            var p = elem?.LookupParameter(FormworkParameterManager.ParamMarker);
-                            if (p != null) formworkMarkerParamId = p.Id;
-                        }
-                        catch { }
                         break;
                     }
                 }
 
-                int copied = 0, modifiedCopy = 0, forcedVisible = 0;
+                int copied = 0, forcedVisible = 0;
                 var existingTargetFilters = target.GetFilters();
                 foreach (var fid in srcFilterIds)
                 {
@@ -2034,67 +2038,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     {
                         bool srcVis = source.GetFilterVisibility(fid);
 
-                        // visible=false のフィルタが型枠 DS にマッチする場合、
-                        // 派生フィルタ（型枠除外版）に置き換えて適用する。
-                        if (!srcVis && sampleFormworkId != null)
-                        {
-                            bool hitsFormwork = FilterMatchesFormwork(doc, fid, sampleFormworkId);
-                            if (hitsFormwork)
-                            {
-                                if (formworkMarkerParamId != null)
-                                {
-                                    var modFids = CreateAnalysisFiltersExcludingFormwork(
-                                        doc, fid, formworkMarkerParamId);
-                                    if (modFids != null && modFids.Count > 0)
-                                    {
-                                        var srcOgs = source.GetFilterOverrides(fid);
-                                        foreach (var mfid in modFids)
-                                        {
-                                            try
-                                            {
-                                                var existingForMod = target.GetFilters();
-                                                if (!existingForMod.Contains(mfid))
-                                                    target.AddFilter(mfid);
-                                                if (srcOgs != null)
-                                                    target.SetFilterOverrides(mfid, srcOgs);
-                                                target.SetFilterVisibility(mfid, srcVis); // false 維持
-                                            }
-                                            catch (Exception exAdd)
-                                            {
-                                                FormworkDebugLog.Log(
-                                                    $"  [Visual] modified filter add EX: {exAdd.Message}");
-                                            }
-                                        }
-                                        modifiedCopy++;
-                                        copied++;
-                                        FormworkDebugLog.Log(
-                                            $"  [Visual] filter fid={fid.IntValue()} → " +
-                                            $"replaced with {modFids.Count} modified filter(s) " +
-                                            $"(excludes formwork DS)");
-                                        continue;
-                                    }
-                                }
-
-                                // 派生フィルタ生成失敗 → 元フィルタを強制 visible=true で追加
-                                // （型枠 DS を確実に表示するため。非型枠要素は元通り非表示にならないが許容）
-                                if (!existingTargetFilters.Contains(fid))
-                                {
-                                    target.AddFilter(fid);
-                                    existingTargetFilters = target.GetFilters();
-                                }
-                                var ogsForce = source.GetFilterOverrides(fid);
-                                if (ogsForce != null) target.SetFilterOverrides(fid, ogsForce);
-                                target.SetFilterVisibility(fid, true);
-                                forcedVisible++;
-                                copied++;
-                                FormworkDebugLog.Log(
-                                    $"  [Visual] filter fid={fid.IntValue()} → forced visible=true " +
-                                    $"(modified filter creation failed)");
-                                continue;
-                            }
-                        }
-
-                        // 通常コピー（型枠 DS にマッチしない / visible=true のフィルタ）
+                        // ソースフィルタをそのまま分析ビューに参照させる (新規フィルタは作らない)
                         if (!existingTargetFilters.Contains(fid))
                         {
                             target.AddFilter(fid);
@@ -2102,7 +2046,19 @@ namespace Tools28.Commands.FormworkCalculator.Output
                         }
                         var ogs = source.GetFilterOverrides(fid);
                         if (ogs != null) target.SetFilterOverrides(fid, ogs);
-                        target.SetFilterVisibility(fid, srcVis);
+
+                        // visible=false が型枠 DS を隠してしまう場合は分析ビュー側だけ true に上書き
+                        bool targetVis = srcVis;
+                        if (!srcVis && sampleFormworkId != null
+                            && FilterMatchesFormwork(doc, fid, sampleFormworkId))
+                        {
+                            targetVis = true;
+                            forcedVisible++;
+                            FormworkDebugLog.Log(
+                                $"  [Visual] filter fid={fid.IntValue()} '{(doc.GetElement(fid) as ParameterFilterElement)?.Name}' " +
+                                $"→ visibility forced to true on analysis view (formwork DS preservation)");
+                        }
+                        target.SetFilterVisibility(fid, targetVis);
                         copied++;
                     }
                     catch (Exception exFilter)
@@ -2113,7 +2069,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 }
                 FormworkDebugLog.Log(
                     $"  [Visual] CopyFilterSettings: copied={copied}/{srcFilterIds.Count} " +
-                    $"(modifiedCopy={modifiedCopy} forcedVisible={forcedVisible})");
+                    $"(forcedVisible={forcedVisible})");
             }
             catch (Exception ex)
             {
@@ -2153,142 +2109,6 @@ namespace Tools28.Commands.FormworkCalculator.Output
             }
         }
 
-        /// <summary>
-        /// 型枠 DirectShape を除外した分析ビュー専用フィルタ群を作成する。
-        ///
-        /// 【問題】
-        /// 28Tools_FormworkMarker パラメータは OST_GenericModel にしか割当てられていないため、
-        /// 元フィルタが OST_GenericModel 以外のカテゴリ（壁・柱等）を含むと、
-        /// AND ルールに FormworkMarker を追加すると ParameterFilterElement.Create が
-        /// "rule refers to a parameter that does not apply to filter's categories" で失敗する。
-        ///
-        /// 【対策】
-        /// カテゴリを分割して 1〜2 個のフィルタを作成する：
-        ///   フィルタA（"28T_FW_{fid}_GM"）: OST_GenericModel のみ
-        ///        ルール = (元フィルタのルール) AND (FormworkMarker が "28Tools_Formwork" で始まらない)
-        ///        → 型枠 DS は除外され、非形式の GenericModel 要素は元同様に非表示
-        ///   フィルタB（"28T_FW_{fid}_Other"）: 元カテゴリ - OST_GenericModel
-        ///        ルール = 元フィルタのルール（変更なし）
-        ///        → 非 GenericModel 要素を元同様に非表示
-        ///
-        /// 戻り値: 作成したフィルタ要素 ID のリスト。空 = 全て失敗（呼出し側でフォールバック）。
-        /// </summary>
-        private static List<ElementId> CreateAnalysisFiltersExcludingFormwork(
-            Document doc, ElementId originalFid, ElementId formworkMarkerParamId)
-        {
-            var result = new List<ElementId>();
-            try
-            {
-                var pfe = doc.GetElement(originalFid) as ParameterFilterElement;
-                if (pfe == null) return result;
-
-                var cats = pfe.GetCategories();
-                var originalEf = pfe.GetElementFilter();
-                if (cats == null || cats.Count == 0) return result;
-
-                var gmCatIdInt = (int)BuiltInCategory.OST_GenericModel;
-                var gmCatId = new ElementId(BuiltInCategory.OST_GenericModel);
-
-                var gmCats = new List<ElementId>();
-                var otherCats = new List<ElementId>();
-                foreach (var cid in cats)
-                {
-                    if (cid.IntValue() == gmCatIdInt) gmCats.Add(cid);
-                    else otherCats.Add(cid);
-                }
-
-                // 派生フィルタ名は元フィルタ名から派生させ、ユーザーが何の派生か一目で
-                // 分かるようにする (旧名: "28T_FW_{fid}_GM" は不透明だった)。
-                // フィルタ名の最大長を考慮してベース名は最大 80 文字に切り詰める。
-                const int maxBaseNameLen = 80;
-                string baseName = pfe.Name ?? string.Empty;
-                if (baseName.Length > maxBaseNameLen) baseName = baseName.Substring(0, maxBaseNameLen);
-
-                // 「始まる」ルール（inverted=true で「始まらない」フィルタにする）
-                // Revit 2026 では ParameterFilterRuleFactory の caseSensitive 引数が廃止
-#if REVIT2026
-                FilterRule beginsWithRule = ParameterFilterRuleFactory.CreateBeginsWithRule(
-                    formworkMarkerParamId, FormworkParameterManager.MarkerValue);
-#else
-                FilterRule beginsWithRule = ParameterFilterRuleFactory.CreateBeginsWithRule(
-                    formworkMarkerParamId, FormworkParameterManager.MarkerValue, false);
-#endif
-                var notFormworkFilter = new ElementParameterFilter(beginsWithRule, true);
-
-                // フィルタA: OST_GenericModel のみ（型枠 DS 除外ルール付き）
-                // 既存のものがあれば再利用する（複数の分析ビューで同じ派生フィルタを共有可能。
-                // 削除して再作成すると、他の分析ビューの参照が切れてしまうため）
-                if (gmCats.Count > 0)
-                {
-                    string nameA = $"{baseName}_型枠除外GM";
-                    var existingA = FindFilterByExactName(doc, nameA);
-                    if (existingA != null)
-                    {
-                        result.Add(existingA.Id);
-                    }
-                    else
-                    {
-                        try
-                        {
-                            ElementFilter combined;
-                            if (originalEf != null)
-                                combined = new LogicalAndFilter(
-                                    new List<ElementFilter> { originalEf, notFormworkFilter });
-                            else
-                                combined = notFormworkFilter;
-
-                            var newA = ParameterFilterElement.Create(doc, nameA, gmCats, combined);
-                            if (newA != null) result.Add(newA.Id);
-                        }
-                        catch (Exception ex)
-                        {
-                            FormworkDebugLog.Log(
-                                $"  [Visual] FilterA (GenericModel only) create EX " +
-                                $"fid={originalFid.IntValue()}: {ex.Message}");
-                        }
-                    }
-                }
-
-                // フィルタB: OST_GenericModel 以外（元ルールそのまま、型枠 DS とは無関係）
-                if (otherCats.Count > 0)
-                {
-                    string nameB = $"{baseName}_型枠除外";
-                    var existingB = FindFilterByExactName(doc, nameB);
-                    if (existingB != null)
-                    {
-                        result.Add(existingB.Id);
-                    }
-                    else
-                    {
-                        try
-                        {
-                            ParameterFilterElement newB;
-                            if (originalEf != null)
-                                newB = ParameterFilterElement.Create(doc, nameB, otherCats, originalEf);
-                            else
-                                newB = ParameterFilterElement.Create(doc, nameB, otherCats);
-                            if (newB != null) result.Add(newB.Id);
-                        }
-                        catch (Exception ex)
-                        {
-                            FormworkDebugLog.Log(
-                                $"  [Visual] FilterB (Other categories) create EX " +
-                                $"fid={originalFid.IntValue()}: {ex.Message}");
-                        }
-                    }
-                }
-
-                return result;
-            }
-            catch (Exception ex)
-            {
-                FormworkDebugLog.Log(
-                    $"  [Visual] CreateAnalysisFiltersExcludingFormwork " +
-                    $"fid={originalFid.IntValue()} EX: {ex.Message}");
-                return result;
-            }
-        }
-
         private static ParameterFilterElement FindFilterByExactName(Document doc, string name)
         {
             try
@@ -2318,9 +2138,12 @@ namespace Tools28.Commands.FormworkCalculator.Output
         }
 
         /// <summary>
-        /// 旧実装で生成された一時分割フィルタ ("28T_FW_*_GM" / "28T_FW_*_Other") を削除する。
-        /// これらは現行の CopyFilterSettings では不要になったためクリーンアップする。
-        /// トランザクション内で呼び出すこと。
+        /// 旧実装で生成された派生フィルタを削除する:
+        ///   - 旧旧 ("28T_FW_*_GM" / "28T_FW_*_Other"): 数値ID命名の派生
+        ///   - 旧   ("*_型枠除外GM" / "*_型枠除外"):   元名派生の派生
+        ///
+        /// 現行の CopyFilterSettings は派生フィルタを作らずソースフィルタを直接参照させる
+        /// ため、これらは全て不要になった。トランザクション内で呼び出すこと。
         /// </summary>
         internal static void CleanupLegacySplitFilters(Document doc)
         {
@@ -2329,8 +2152,11 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 var toDelete = new FilteredElementCollector(doc)
                     .OfClass(typeof(ParameterFilterElement))
                     .Cast<ParameterFilterElement>()
-                    .Where(f => f.Name.StartsWith("28T_FW_") &&
-                        (f.Name.EndsWith("_GM") || f.Name.EndsWith("_Other")))
+                    .Where(f =>
+                        (f.Name.StartsWith("28T_FW_") &&
+                            (f.Name.EndsWith("_GM") || f.Name.EndsWith("_Other"))) ||
+                        f.Name.EndsWith("_型枠除外GM") ||
+                        f.Name.EndsWith("_型枠除外"))
                     .Select(f => f.Id)
                     .ToList();
                 if (toDelete.Count == 0) return;
