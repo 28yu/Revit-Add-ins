@@ -79,6 +79,13 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                         if (ctxB.ElementId == ctxA.ElementId) continue;
                         if (ctxB.Solids == null || ctxB.Solids.Count == 0) continue;
 
+                        // 既存の ContactFaceDetector が「小面 ctxB が大面 face に部分接触する」
+                        // パターンを PartialContact として記録済みのケースをスキップ。
+                        // 例: 梁端 (小面) が柱側面 (大面) に当たる場合、柱側面の中心は
+                        // 梁体積内に入るが、梁からはみ出た部分は型枠が必要なので
+                        // 面全体を DeductedContact に降格してはならない。
+                        if (HasPartialContactWith(face, ctxB.ElementId)) continue;
+
                         if (!robustBBs.TryGetValue(ctxB.ElementId, out var bbB) || bbB == null) continue;
                         if (!IsPointInsideBBox(pOut, bbB, BBoxMarginFeet)) continue;
 
@@ -183,6 +190,16 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 }
             }
             return result;
+        }
+
+        private static bool HasPartialContactWith(FaceClassifier.FaceInfo face, int otherElementId)
+        {
+            if (face.PartialContacts == null) return false;
+            foreach (var pc in face.PartialContacts)
+            {
+                if (pc.OtherElementId == otherElementId) return true;
+            }
+            return false;
         }
 
         private static XYZ TryGetFaceCenter(Face f)
