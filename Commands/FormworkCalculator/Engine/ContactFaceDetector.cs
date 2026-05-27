@@ -31,6 +31,11 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             public BoundingBoxXYZ BB;
             public List<FaceClassifier.FaceInfo> Faces = new List<FaceClassifier.FaceInfo>();
             /// <summary>
+            /// この要素のワールド座標系ソリッド群。BuriedFaceDetector が
+            /// 「面が他要素のソリッド内部に埋もれているか」を判定するために使用。
+            /// </summary>
+            public List<Solid> Solids;
+            /// <summary>
             /// この要素が WallSweep (壁スイープ・化粧目地リビール) かどうか。
             /// 壁本体側の接触面控除を抑制するために使用。
             /// </summary>

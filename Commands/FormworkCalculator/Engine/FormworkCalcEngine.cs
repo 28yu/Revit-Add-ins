@@ -283,6 +283,15 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             LogLinkSweepFaceTypeDelta(
                 contexts, srcByContext, linkSweepFaceSnapshot, "post-RefineContactFaces");
 
+            // Pass 2b: 隣接要素のソリッド内部に「埋もれている」面を検出して控除
+            // ContactFaceDetector が対向平行面の接触しか見ない盲点を埋める:
+            //  - フラッシュ接触で BB ペアフィルタを通過できない段差面
+            //  - 接合されずに体積が重なっている要素 (床×布基礎等) の埋没面
+            _progress?.Report("Pass 2b: 埋もれ面を検出中...");
+            BuriedFaceDetector.Run(contexts);
+            LogLinkSweepFaceTypeDelta(
+                contexts, srcByContext, linkSweepFaceSnapshot, "post-BuriedFaceDetector");
+
             // Pass 2b: WallSweep (スイープ・リビール) の host 壁面を直接 DeductedContact 化
             // していたが、ユーザー仕様「壁と化粧目地の接触面に型枠を残す」のため無効化。
             // ContactFaceDetector 側で WallSweep 接触の壁側を FormworkRequired のまま保持する
@@ -863,6 +872,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 CategoryName = elem.Category?.Name ?? string.Empty,
                 BB = bb,
                 Faces = faceInfos,
+                Solids = finalSolids,
                 IsWallSweep = elem is WallSweep,
             };
         }
@@ -1338,11 +1348,13 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                     CategoryName = elem.Category?.Name ?? string.Empty,
                     BB = bb,
                     Faces = faces,
+                    Solids = final,
                     IsWallSweep = elem is WallSweep,
                 });
             }
 
             ContactFaceDetector.RefineContactFaces(contexts);
+            BuriedFaceDetector.Run(contexts);
 
             // 各面の有効面積を計算して FaceInfo に保存。
             // RecomputeFaces は新しい FaceInfo インスタンスを作るため、BuildElementResult
