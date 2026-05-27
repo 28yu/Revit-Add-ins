@@ -396,11 +396,11 @@ namespace Tools28.Commands.FormworkCalculator
                             tSheet.Start();
                             try
                             {
-                                // プロジェクト内の全型枠分析ビュー・集計表を収集
-                                var allAnalysisViewIds = FormworkSheetCreator.CollectAllAnalysisViewIds(doc);
-                                var allScheduleIds = FormworkSheetCreator.CollectAllPerViewScheduleIds(doc);
+                                // シートには今回実行で作成 (もしくは更新) した分析ビュー・集計表のみを配置する。
+                                // 過去の実行で作成した他ソースビュー由来のものはプロジェクト内に残るが、
+                                // シートには載せない (ユーザーが「選択したビューだけシートに出したい」というケースに合致)。
                                 sheetId = FormworkSheetCreator.CreateOrUpdateSheet(
-                                    doc, allAnalysisViewIds, allScheduleIds, summaryScheduleId,
+                                    doc, perViewAnalysisViewIds, allMainScheduleIds, summaryScheduleId,
                                     preferredName: savedSheetName, preferredNumber: savedSheetNumber);
                                 tSheet.Commit();
                             }

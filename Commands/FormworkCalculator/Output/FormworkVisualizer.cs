@@ -685,11 +685,20 @@ namespace Tools28.Commands.FormworkCalculator.Output
 
             // View Filter による色分けを適用（個別要素オーバーライドは使わない）
             // ★ この後に追加されるフィルタ（ソースフィルタ）より高優先度になる。
-            try
+            // 更新モードでは既存ビューのフィルタ設定 (ユーザーが手動で調整した色等を含む) を
+            // 保持するため再適用しない。
+            if (!reusedView)
             {
-                FormworkFilterManager.ApplyColorFilters(doc, view, keyAssignment);
+                try
+                {
+                    FormworkFilterManager.ApplyColorFilters(doc, view, keyAssignment);
+                }
+                catch { }
             }
-            catch { }
+            else
+            {
+                FormworkDebugLog.Log("  [Visual] update mode: skip ApplyColorFilters (preserve existing filter settings)");
+            }
 
             // ソースビューのフィルタ設定を分析ビューに追加する。
             // ソースフィルタが visible=false で型枠 DS にマッチする場合は、派生フィルタに
@@ -2188,6 +2197,13 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     else otherCats.Add(cid);
                 }
 
+                // 派生フィルタ名は元フィルタ名から派生させ、ユーザーが何の派生か一目で
+                // 分かるようにする (旧名: "28T_FW_{fid}_GM" は不透明だった)。
+                // フィルタ名の最大長を考慮してベース名は最大 80 文字に切り詰める。
+                const int maxBaseNameLen = 80;
+                string baseName = pfe.Name ?? string.Empty;
+                if (baseName.Length > maxBaseNameLen) baseName = baseName.Substring(0, maxBaseNameLen);
+
                 // 「始まる」ルール（inverted=true で「始まらない」フィルタにする）
                 // Revit 2026 では ParameterFilterRuleFactory の caseSensitive 引数が廃止
 #if REVIT2026
@@ -2204,8 +2220,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 // 削除して再作成すると、他の分析ビューの参照が切れてしまうため）
                 if (gmCats.Count > 0)
                 {
-                    string nameA = $"28T_FW_{originalFid.IntValue()}_GM";
-                    if (nameA.Length > 100) nameA = nameA.Substring(0, 100);
+                    string nameA = $"{baseName}_型枠除外GM";
                     var existingA = FindFilterByExactName(doc, nameA);
                     if (existingA != null)
                     {
@@ -2237,8 +2252,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 // フィルタB: OST_GenericModel 以外（元ルールそのまま、型枠 DS とは無関係）
                 if (otherCats.Count > 0)
                 {
-                    string nameB = $"28T_FW_{originalFid.IntValue()}_Other";
-                    if (nameB.Length > 100) nameB = nameB.Substring(0, 100);
+                    string nameB = $"{baseName}_型枠除外";
                     var existingB = FindFilterByExactName(doc, nameB);
                     if (existingB != null)
                     {
