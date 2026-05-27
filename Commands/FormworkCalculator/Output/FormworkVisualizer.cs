@@ -1985,29 +1985,15 @@ namespace Tools28.Commands.FormworkCalculator.Output
         /// <summary>
         /// ソースビューのフィルタ設定を分析ビューにコピーする。
         ///
-        /// 【重要】 view.AddFilter() の挙動について
-        /// 観察的に、AddFilter は「リスト末尾に追加」する。ただし Revit のフィルタ
-        /// 可視性ルールは「いずれかのフィルタが visible=false でマッチすればその要素は非表示」
-        /// （AND 結合）であり、リスト順序は「グラフィックオーバーライド適用順」を決めるだけ。
-        /// したがって、ソースフィルタが visible=false で型枠 DS にマッチする場合、
-        /// 型枠 DS が非表示になる。これを防ぐためにソースフィルタを「型枠 DS を除外する
-        /// 派生フィルタ」に置き換える。
-        ///
-        /// 派生フィルタ: 元ルール AND 「28Tools_Formwork_マーカーが '28Tools_Formwork' で
-        /// 始まらない」。これで型枠 DS にはマッチしなくなり、元の非型枠要素のみが対象。
-        /// </summary>
-        /// <summary>
-        /// ソースビューのフィルタ設定を分析ビューにコピーする。
-        ///
         /// 派生フィルタは作らず、既存ソースフィルタをそのまま分析ビューに参照させる。
-        /// これによりフィルタ名・内容・ID が完全に一致し、プロジェクト上のフィルタ要素が
-        /// 余計に増えない (データクリーン)。
+        /// フィルタ名・内容・ID・表示設定 (visibility / overrides) を完全にソースから引き継ぐ。
         ///
-        /// 唯一の例外: ソースで visible=false のフィルタが型枠 DS にマッチする場合、
-        /// そのまま visible=false で適用すると型枠 DS が新ビューでも隠れてしまうため、
-        /// 分析ビュー側でのみ visibility=true に上書きする。
-        /// この場合、フィルタにヒットしていた非型枠要素 (壁等) も分析ビューでは表示状態に
-        /// なるが、ユーザーが必要であれば手動で visible=false に戻せる。
+        /// 注意: ソースで visible=false かつ型枠 DS にマッチするフィルタの場合、
+        /// 分析ビューでも型枠 DS が非表示になる可能性がある (Revit 仕様: 一致する
+        /// どれかのフィルタが visible=false なら要素は隠れる)。
+        /// この場合は警告ログを出すだけで動作は変更しない。ユーザーが必要に応じて
+        /// 分析ビュー側で当該フィルタを手動で visible=true に切り替える、または
+        /// ソースフィルタのカテゴリから OST_GenericModel を外すことで解消できる。
         /// </summary>
         private static void CopyFilterSettings(Document doc, View source, View3D target,
             ICollection<ElementId> formworkShapeIds = null)
@@ -2017,7 +2003,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 var srcFilterIds = source.GetFilters();
                 if (srcFilterIds == null || srcFilterIds.Count == 0) return;
 
-                // 型枠 DS のサンプルを取得 (ソースフィルタが型枠 DS にマッチするか判定するため)
+                // 型枠 DS のサンプルを取得 (ソースフィルタが型枠 DS を隠す可能性の警告判定用)
                 ElementId sampleFormworkId = null;
                 if (formworkShapeIds != null)
                 {
@@ -2029,7 +2015,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     }
                 }
 
-                int copied = 0, forcedVisible = 0;
+                int copied = 0, warnHidesFormwork = 0;
                 var existingTargetFilters = target.GetFilters();
                 foreach (var fid in srcFilterIds)
                 {
@@ -2047,18 +2033,20 @@ namespace Tools28.Commands.FormworkCalculator.Output
                         var ogs = source.GetFilterOverrides(fid);
                         if (ogs != null) target.SetFilterOverrides(fid, ogs);
 
-                        // visible=false が型枠 DS を隠してしまう場合は分析ビュー側だけ true に上書き
-                        bool targetVis = srcVis;
+                        // 表示設定もソースの値を完全に引き継ぐ。
+                        target.SetFilterVisibility(fid, srcVis);
+
+                        // visible=false が型枠 DS を隠してしまう可能性のあるフィルタには警告ログを出す。
                         if (!srcVis && sampleFormworkId != null
                             && FilterMatchesFormwork(doc, fid, sampleFormworkId))
                         {
-                            targetVis = true;
-                            forcedVisible++;
+                            warnHidesFormwork++;
+                            string fName = (doc.GetElement(fid) as ParameterFilterElement)?.Name ?? "?";
                             FormworkDebugLog.Log(
-                                $"  [Visual] filter fid={fid.IntValue()} '{(doc.GetElement(fid) as ParameterFilterElement)?.Name}' " +
-                                $"→ visibility forced to true on analysis view (formwork DS preservation)");
+                                $"  [Visual] ⚠️ filter fid={fid.IntValue()} '{fName}' visible=false " +
+                                $"matches formwork DS → 分析ビューで型枠 DS が隠れる可能性あり " +
+                                $"(必要なら当該フィルタを手動で表示=ONに切替)");
                         }
-                        target.SetFilterVisibility(fid, targetVis);
                         copied++;
                     }
                     catch (Exception exFilter)
@@ -2069,7 +2057,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 }
                 FormworkDebugLog.Log(
                     $"  [Visual] CopyFilterSettings: copied={copied}/{srcFilterIds.Count} " +
-                    $"(forcedVisible={forcedVisible})");
+                    $"(warnHidesFormwork={warnHidesFormwork})");
             }
             catch (Exception ex)
             {
