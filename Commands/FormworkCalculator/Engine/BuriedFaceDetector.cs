@@ -45,7 +45,8 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         // 内部判定の前段の高速フィルタなので大きめでも害は少ない。
         private const double BBoxMarginFeet = 0.05;
 
-        internal static void Run(List<ContactFaceDetector.ElementFacesContext> contexts)
+        internal static void Run(List<ContactFaceDetector.ElementFacesContext> contexts,
+            Document doc = null)
         {
             if (contexts == null || contexts.Count == 0) return;
 
@@ -55,7 +56,19 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             // ケースがあるため、ソリッドのエッジ端点 + 面 UV 中心点から再構築する。
             var robustBBs = BuildRobustBBs(contexts);
 
+            // GenericModel カテゴリの「障害物」を別途収集する。
+            // 一般モデル要素 (設備・什器・埋め込み物等) に接している RC 面は型枠不要として
+            // 控除する目的。formwork DS は除外する (旧版の OST_GenericModel DS や、現行版の
+            // OST_NurseCallDevices DS は FormworkMarker パラメータで識別)。
+            var genericModelObstacles = doc != null ? CollectGenericModelObstacles(doc) : new List<GenericModelObstacle>();
+            if (genericModelObstacles.Count > 0)
+            {
+                FormworkDebugLog.Log(
+                    $"  [Buried] GenericModel obstacles collected: {genericModelObstacles.Count}");
+            }
+
             int demoted = 0;
+            int demotedByGm = 0;
             int pointInSolidChecks = 0;
 
             foreach (var ctxA in contexts)
@@ -73,6 +86,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
 
                     XYZ pOut = pCenter + face.Normal.Multiply(SampleOffsetFeet);
 
+                    bool faceDemoted = false;
                     foreach (var ctxB in contexts)
                     {
                         if (ctxB == null) continue;
@@ -94,6 +108,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                         {
                             face.FaceType = FaceType.DeductedContact;
                             demoted++;
+                            faceDemoted = true;
                             if (FormworkDebugLog.Enabled)
                             {
                                 FormworkDebugLog.Log(
@@ -105,13 +120,131 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                             break;
                         }
                     }
+
+                    // GenericModel 障害物との照合 (既に降格された面はスキップ)
+                    if (!faceDemoted && genericModelObstacles.Count > 0)
+                    {
+                        foreach (var gm in genericModelObstacles)
+                        {
+                            if (!IsPointInsideBBox(pOut, gm.BB, BBoxMarginFeet)) continue;
+                            pointInSolidChecks++;
+                            if (IsPointInsideAnySolid(pOut, gm.Solids, InsideTolFeet))
+                            {
+                                face.FaceType = FaceType.DeductedContact;
+                                demoted++;
+                                demotedByGm++;
+                                if (FormworkDebugLog.Enabled)
+                                {
+                                    FormworkDebugLog.Log(
+                                        $"  [Buried] E{ctxA.ElementId} face[{fi}] " +
+                                        $"n=({face.Normal.X:F2},{face.Normal.Y:F2},{face.Normal.Z:F2}) " +
+                                        $"area={face.Area:F3}ft² → DeductedContact " +
+                                        $"(inside GenericModel E{gm.ElementId})");
+                                }
+                                break;
+                            }
+                        }
+                    }
                 }
             }
 
             FormworkDebugLog.Section("Pass 2b Summary");
             FormworkDebugLog.Log($"point-in-solid checks: {pointInSolidChecks}");
-            FormworkDebugLog.Log($"faces demoted to contact: {demoted}");
+            FormworkDebugLog.Log($"faces demoted to contact: {demoted} (by GenericModel: {demotedByGm})");
             FormworkDebugLog.Flush();
+        }
+
+        /// <summary>
+        /// GenericModel カテゴリの「障害物」要素を収集する。
+        /// formwork DS (現行 OST_NurseCallDevices および旧 OST_GenericModel の DS) は
+        /// FormworkMarker パラメータで識別して除外する。
+        /// </summary>
+        private class GenericModelObstacle
+        {
+            public int ElementId;
+            public BoundingBoxXYZ BB;
+            public List<Solid> Solids;
+        }
+
+        private static List<GenericModelObstacle> CollectGenericModelObstacles(Document doc)
+        {
+            var result = new List<GenericModelObstacle>();
+            try
+            {
+                var collector = new FilteredElementCollector(doc)
+                    .OfCategory(BuiltInCategory.OST_GenericModel)
+                    .WhereElementIsNotElementType();
+                foreach (Element e in collector)
+                {
+                    if (e == null) continue;
+                    // formwork DS は除外 (FormworkMarker で識別)
+                    try
+                    {
+                        var p = e.LookupParameter(FormworkParameterManager.ParamMarker);
+                        if (p != null && p.StorageType == StorageType.String)
+                        {
+                            string val = p.AsString();
+                            if (!string.IsNullOrEmpty(val) &&
+                                val.StartsWith(FormworkParameterManager.MarkerValue)) continue;
+                        }
+                    }
+                    catch { }
+
+                    var solids = SolidUnionProcessor.GetSolids(e, null,
+                        skipWallSweepRetry: true);
+                    if (solids.Count == 0) continue;
+
+                    var bb = ComputeBBFromSolids(solids);
+                    if (bb == null) continue;
+
+                    result.Add(new GenericModelObstacle
+                    {
+                        ElementId = e.Id.IntValue(),
+                        BB = bb,
+                        Solids = solids,
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                FormworkDebugLog.Log($"  [Buried] CollectGenericModelObstacles EX: {ex.Message}");
+            }
+            return result;
+        }
+
+        private static BoundingBoxXYZ ComputeBBFromSolids(List<Solid> solids)
+        {
+            double minX = double.MaxValue, minY = double.MaxValue, minZ = double.MaxValue;
+            double maxX = double.MinValue, maxY = double.MinValue, maxZ = double.MinValue;
+            bool any = false;
+            foreach (var s in solids)
+            {
+                if (s == null) continue;
+                foreach (Edge e in s.Edges)
+                {
+                    Curve c = null;
+                    try { c = e.AsCurve(); } catch { }
+                    if (c == null) continue;
+                    for (int i = 0; i <= 1; i++)
+                    {
+                        XYZ p;
+                        try { p = c.GetEndPoint(i); } catch { continue; }
+                        if (p == null) continue;
+                        if (p.X < minX) minX = p.X;
+                        if (p.Y < minY) minY = p.Y;
+                        if (p.Z < minZ) minZ = p.Z;
+                        if (p.X > maxX) maxX = p.X;
+                        if (p.Y > maxY) maxY = p.Y;
+                        if (p.Z > maxZ) maxZ = p.Z;
+                        any = true;
+                    }
+                }
+            }
+            return any ? new BoundingBoxXYZ
+            {
+                Min = new XYZ(minX, minY, minZ),
+                Max = new XYZ(maxX, maxY, maxZ),
+            } : null;
         }
 
         /// <summary>

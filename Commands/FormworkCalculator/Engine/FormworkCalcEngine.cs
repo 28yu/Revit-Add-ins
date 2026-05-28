@@ -288,7 +288,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             //  - フラッシュ接触で BB ペアフィルタを通過できない段差面
             //  - 接合されずに体積が重なっている要素 (床×布基礎等) の埋没面
             _progress?.Report("Pass 2b: 埋もれ面を検出中...");
-            BuriedFaceDetector.Run(contexts);
+            BuriedFaceDetector.Run(contexts, _doc);
             LogLinkSweepFaceTypeDelta(
                 contexts, srcByContext, linkSweepFaceSnapshot, "post-BuriedFaceDetector");
 
@@ -1354,7 +1354,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
             }
 
             ContactFaceDetector.RefineContactFaces(contexts);
-            BuriedFaceDetector.Run(contexts);
+            BuriedFaceDetector.Run(contexts, doc);
 
             // 各面の有効面積を計算して FaceInfo に保存。
             // RecomputeFaces は新しい FaceInfo インスタンスを作るため、BuildElementResult
@@ -1442,6 +1442,19 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                     fi.FaceType = FaceType.DeductedContact;
                     clipperStatus += $" demoted-to-contact(partialSum={partialSum:F4}/face={fi.Area:F4})";
                 }
+            }
+
+            // 絶対閾値: 有効面積が 0.01 m² (≈ 0.108 ft²) 以下の面は集計上ノイズなので
+            // DeductedContact に降格する (型枠としてカウントしない・DS も作らない)。
+            // 部分接触の有無に関わらず適用。施工計画上、cm² 単位の小片に型枠を組む
+            // ことは現実的でないため除外する。
+            double minEffectiveFeetSq = UnitUtils.ConvertToInternalUnits(
+                0.01, UnitTypeId.SquareMeters);
+            if (effectiveFeetSq > 0 && effectiveFeetSq < minEffectiveFeetSq)
+            {
+                effectiveFeetSq = 0;
+                fi.FaceType = FaceType.DeductedContact;
+                clipperStatus += $" demoted-tiny(<0.01m²)";
             }
 
             fi.EffectiveAreaM2 = FeetSqToM2(effectiveFeetSq);
