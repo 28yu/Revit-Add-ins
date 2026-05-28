@@ -534,8 +534,19 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     }
 
                     bool isFormworkRequired = (fi.FaceType == FaceType.FormworkRequired);
-                    // 同一面の中で最初のピース (Clipper 分割時の先頭) のみに面積を乗せる
-                    bool firstPieceForThisFace = true;
+
+                    // 同一面の DirectShape ピース間で面積を按分する: piece.Volume / sum を share とする。
+                    // 単一ピース (Boolean fallback / no-partials 経路) は share=1.0。
+                    // クリッパー分割で複数ピースになる場合に各ピースが幾何学的サイズに比例した
+                    // 面積を持つようにし、「2 個目以降が 0m²」になる旧設計を解消する。
+                    double pieceVolumeSum = 0;
+                    if (isFormworkRequired)
+                    {
+                        foreach (var s in partSolids)
+                        {
+                            try { pieceVolumeSum += s?.Volume ?? 0; } catch { }
+                        }
+                    }
 
                     foreach (var solid in partSolids)
                     {
@@ -556,16 +567,18 @@ namespace Tools28.Commands.FormworkCalculator.Output
 
                             try
                             {
-                                // 面単位の有効面積を areaScale で按分し、その面の最初の
-                                // DirectShape ピースに割り当てる。Clipper 分割で複数ピースに
-                                // なった場合、2 個目以降は 0。
-                                // 開口調整 (er.OpeningAreaDeducted / OpeningEdgeAreaAdded) は
-                                // areaScale に既に織り込み済みのため個別加算は不要。
+                                // 面単位の有効面積 × areaScale を、ピースの体積比で按分する。
+                                // 開口調整 (OpeningAreaDeducted/OpeningEdgeAreaAdded) は areaScale に
+                                // 既に織り込み済みのため個別加算は不要。
                                 double areaM2 = 0.0;
-                                if (isFormworkRequired && firstPieceForThisFace)
+                                if (isFormworkRequired)
                                 {
-                                    areaM2 = fi.EffectiveAreaM2 * areaScale;
-                                    firstPieceForThisFace = false;
+                                    double pieceVol = 0;
+                                    try { pieceVol = solid?.Volume ?? 0; } catch { }
+                                    double pieceShare = pieceVolumeSum > 1e-12
+                                        ? pieceVol / pieceVolumeSum
+                                        : 1.0;
+                                    areaM2 = fi.EffectiveAreaM2 * areaScale * pieceShare;
                                 }
                                 string filterKey = IsDeducted(fi.FaceType) ? "控除面" : key;
                                 string srcDisplay = er.SourceName == ElementSourceRegistry.HostSourceName
