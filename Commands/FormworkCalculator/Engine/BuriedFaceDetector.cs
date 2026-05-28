@@ -194,6 +194,26 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                         skipWallSweepRetry: true);
                     if (solids.Count == 0) continue;
 
+                    // ソリッド体積が大きすぎる GM 要素はサイト・エンベロープ・トポ等の
+                    // 「背景要素」とみなして除外する。実物の障害物 (設備・什器・埋込物)
+                    // は通常 5m³ 以下。50m³ (1765 ft³) を超えるものを除外する。
+                    // (建物全体を覆うエンベロープ GM 等で誤って多くの RC 面が降格される
+                    //  問題への対策)
+                    double totalVolumeFt3 = 0;
+                    foreach (var s in solids)
+                    {
+                        try { totalVolumeFt3 += s?.Volume ?? 0; } catch { }
+                    }
+                    const double maxObstacleVolumeFt3 = 1765.7; // ≈ 50 m³
+                    if (totalVolumeFt3 > maxObstacleVolumeFt3)
+                    {
+                        FormworkDebugLog.Log(
+                            $"  [Buried] skip GenericModel E{e.Id.IntValue()} " +
+                            $"volume={totalVolumeFt3:F1}ft³ ({totalVolumeFt3 * 0.0283:F1}m³) > 50m³ " +
+                            $"(envelope/site 扱い)");
+                        continue;
+                    }
+
                     var bb = ComputeBBFromSolids(solids);
                     if (bb == null) continue;
 
