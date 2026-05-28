@@ -194,28 +194,39 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                         skipWallSweepRetry: true);
                     if (solids.Count == 0) continue;
 
-                    // ソリッド体積が大きすぎる GM 要素はサイト・エンベロープ・トポ等の
-                    // 「背景要素」とみなして除外する。実物の障害物 (設備・什器・埋込物)
-                    // は通常 5m³ 以下。50m³ (1765 ft³) を超えるものを除外する。
-                    // (建物全体を覆うエンベロープ GM 等で誤って多くの RC 面が降格される
-                    //  問題への対策)
+                    var bb = ComputeBBFromSolids(solids);
+                    if (bb == null) continue;
+
+                    // 「エンベロープ/サイト要素」を除外: 体積が大きいか、BB が建物スケールの場合。
+                    //
+                    // 体積基準: 通常の障害物 (設備・什器・埋込物) は 5m³ 以下。
+                    //   ただし薄いシート状エンベロープ (例: 床全体を覆う厚さ 1mm の GM) は
+                    //   体積が小さくても多くの RC 面を誤降格させるため、BB 対角線も併用。
+                    // BB 対角線基準: 30m を超える GM は建物スケール。
                     double totalVolumeFt3 = 0;
                     foreach (var s in solids)
                     {
                         try { totalVolumeFt3 += s?.Volume ?? 0; } catch { }
                     }
-                    const double maxObstacleVolumeFt3 = 1765.7; // ≈ 50 m³
-                    if (totalVolumeFt3 > maxObstacleVolumeFt3)
+                    double dx = bb.Max.X - bb.Min.X;
+                    double dy = bb.Max.Y - bb.Min.Y;
+                    double dz = bb.Max.Z - bb.Min.Z;
+                    double diagonalFt = Math.Sqrt(dx * dx + dy * dy + dz * dz);
+
+                    const double maxObstacleVolumeFt3 = 1765.7;  // ≈ 50 m³
+                    const double maxObstacleDiagonalFt = 98.4;   // ≈ 30 m
+                    bool tooLargeVolume = totalVolumeFt3 > maxObstacleVolumeFt3;
+                    bool tooLargeDiagonal = diagonalFt > maxObstacleDiagonalFt;
+                    if (tooLargeVolume || tooLargeDiagonal)
                     {
                         FormworkDebugLog.Log(
                             $"  [Buried] skip GenericModel E{e.Id.IntValue()} " +
-                            $"volume={totalVolumeFt3:F1}ft³ ({totalVolumeFt3 * 0.0283:F1}m³) > 50m³ " +
-                            $"(envelope/site 扱い)");
+                            $"vol={totalVolumeFt3 * 0.0283:F1}m³ " +
+                            $"diag={diagonalFt * 0.3048:F1}m " +
+                            $"(envelope/site 扱い: " +
+                            $"{(tooLargeVolume ? ">50m³" : "")}{(tooLargeVolume && tooLargeDiagonal ? "+" : "")}{(tooLargeDiagonal ? ">30m" : "")})");
                         continue;
                     }
-
-                    var bb = ComputeBBFromSolids(solids);
-                    if (bb == null) continue;
 
                     result.Add(new GenericModelObstacle
                     {
