@@ -395,3 +395,23 @@ grep -o '"[^"]*"' YourDialog.xaml.cs | grep Loc.S | while read key; do grep $key
 - `CategoryInfo.Name`: Revit提供のカテゴリ名（英語）— 設定保存・内部使用。変更しないこと
 - `CategoryInfo.DisplayLabel`: UI表示用（`CategoryLocalizer.GetLocalizedName()` 経由）
 - `CategoryLocalizer`: BuiltInCategory → `Category.*` Loc.Sキーのマッピング（約60カテゴリ）
+
+## Notion 開発ハブ連携
+
+開発タスク・決定事項・リリースは Notion の「28tools 開発ハブ」で一元管理する。
+ハブ: <https://www.notion.so/370d9148e29781869c63e60ae9c79b01>
+
+### データソースID
+- タスク: bef29460-6e88-46a6-9450-6d61bb235c43
+- 決定事項ログ: 13fc83be-9316-46a6-99c7-0ca76edb9bf8
+- リリース: 907878c5-9a33-4975-8d3b-e3c185d274ac
+- このリポジトリの「対象」値: `アドイン (Revit-Add-ins)`
+
+### セッションの型
+1. 開始時: タスクDB（データソース bef29460-6e88-46a6-9450-6d61bb235c43）から
+   「対象=アドイン (Revit-Add-ins) かつ ステータス≠完了」を読み、着手分を「進行中」に更新
+2. 終了時: 決定事項ログ（13fc83be-9316-46a6-99c7-0ca76edb9bf8）に
+   「何を/なぜ変えたか」を追記し、完了タスクを「完了」に更新
+3. リリース時: リリースDB（907878c5-9a33-4975-8d3b-e3c185d274ac）に `対象=アドイン (Revit-Add-ins)` で記録。
+   サイト告知が必要なら「サイト反映」を未チェックで残し、
+   タスクDBに `対象=サイト (28tools-download)` の反映タスクを作る
