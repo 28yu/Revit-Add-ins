@@ -711,3 +711,91 @@ v2.1 リリース後に発見された 5 件の不具合と、それぞれの修
 - **Revit フィルタの可視性は AND 結合**: ある要素に複数フィルタがマッチする時、いずれかが `visible=false` なら要素は隠れる。順序やプライオリティは無関係 (グラフィックオーバーライドの優先順位とは別概念)
 - **共有パラメータのカテゴリ追加**: `BindingMap.Insert` は既存バインドに対しては no-op。新カテゴリを追加するには `BindingMap.ReInsert` を使う必要がある
 - **ベリファイ用ログ**: `[Buried]`, `area reconcile`, `[Filter]` 等のタグを debug log に残しておくことで、ユーザー報告時の問題箇所が即座に特定できた
+
+---
+
+## 型枠数量算出 v2.1.2 修正の知見（2026-05-28）
+
+v2.1.1 リリース後に発見された 5 件の不具合と対応を記録する。
+
+### 1. DirectShape 面積が負値になる不具合（按分スケーリング）
+
+**症状**: 工作物擁壁 t1000～1600 等の開口の多い壁で、特定の DS の面積パラメータが
+-8.299m² 等の負値になる。
+
+**原因**: `FormworkVisualizer` が `openingDelta = OpeningEdgeAreaAdded - OpeningAreaDeducted`
+を最初の `FormworkRequired` DS に一発で全部乗せていた (`areaM2 += openingDelta`)。
+開口控除が当該 DS の素の面積より大きいケースで結果が負値に。
+例: face[0] 29.90m² + (-38.20m²) = -8.30m²。
+
+**修正**: 「最初の DS に全部乗せる」方式を廃止し、スケーリング係数で全 DS に按分。
+```
+areaScale = er.FormworkArea / sum(全 FormworkRequired 面の EffectiveAreaM2)
+各 DS area = fi.EffectiveAreaM2 × areaScale
+```
+個々の DS は決して負にならず、合計はぴったり `er.FormworkArea` に一致。
+
+**教訓**: 集合の合計を末端の 1 要素で帳尻合わせする実装は、調整量が大きいと末端が
+破綻する。集合全体に按分する方が頑健。
+
+### 2. マルチピース面の 2 個目以降の DS が 0m² になる
+
+**症状**: `PartialContactClipper` が 1 面を複数 Solid に分割して作成した DS のうち、
+2 個目以降の面積が 0m² になる。
+
+**原因**: 旧設計で `bool firstPieceForThisFace = true` フラグを使って「最初のピース
+だけに面の有効面積を全部乗せる」実装になっていた。1 番目の按分スケーリング修正で
+合計が厳密に一致するようになった結果、0m² ピースが目立つようになった。
+
+**修正**: 各ピースに `piece.Volume / sum_of_piece_volumes` で按分。
+```
+pieceShare = piece.Volume / sum_of_piece_volumes
+areaM2 = fi.EffectiveAreaM2 × areaScale × pieceShare
+```
+ピースの体積は「ピース表面積 × 厚さ」なので、体積比 = 面積比。各ピースが幾何学的
+サイズに比例した面積を持つ。
+
+### 3. 一般モデル接触面の自動控除（BuriedFaceDetector 拡張）
+
+**要望**: RC躯体が一般モデル (設備・什器・埋込物等) と接している面の型枠を省きたい。
+
+**実装**: `BuriedFaceDetector.Run` に `Document doc` 引数を追加し、`OST_GenericModel`
+カテゴリの障害物を別途収集して判定に組み込む。`FormworkMarker` パラメータで自前の
+formwork DS (新 `OST_NurseCallDevices` および旧 `OST_GenericModel`) は除外。
+
+### 4. 微小面 (0.01m² 以下) の自動除外
+
+**要望**: 0.01m² 以下の面は集計から省きたい。
+
+**実装**: `ComputeAndSetEffectiveArea` に絶対閾値を追加。
+```
+double minEffectiveFeetSq = UnitUtils.ConvertToInternalUnits(0.01, UnitTypeId.SquareMeters);
+if (effectiveFeetSq > 0 && effectiveFeetSq < minEffectiveFeetSq) {
+    effectiveFeetSq = 0;
+    fi.FaceType = FaceType.DeductedContact;  // demoted-tiny
+}
+```
+ログタグ `demoted-tiny(<0.01m²)` で識別可能。
+
+### 5. エンベロープ GenericModel の誤検出と二段階フィルタリング
+
+**症状**: 一般モデル障害物を有効にしたところ、1 つの巨大 GM (建物全体を覆うサイト
+要素) が 2214 件の RC 面を誤って降格させていた。
+
+**第1版の対策 (失敗)**: 体積 > 50m³ で除外。しかし「薄いシート状エンベロープ」
+(例: 床全体を覆う厚さ 1mm の GM = 体積 25m³) は捕捉できなかった。
+
+**第2版の対策 (採用)**: 体積基準 + BB 対角線基準の OR 条件。
+- 体積 > 50m³ または
+- BB 対角線 > 30m
+のいずれかを満たす GM は「建物スケール」として除外。これで薄い大型シートも捕捉。
+
+**教訓**: 物理的サイズ閾値は単一軸 (体積だけ等) では不十分。形状の多様性を考慮して
+複数軸 (体積・対角線・最大辺等) の OR で判定するべき。
+
+### 6. ログから問題を特定する勘所
+
+- **頻度の集計** (`grep ... | awk '{print $X}' | sort | uniq -c | sort -rn`) で
+  「1 つの要素 (E5325358) が 2214 件の降格を生んでいた」のような偏りを即座に発見
+- `[Buried] skip GenericModel E... vol=... diag=...` のように除外時もログを残すと、
+  「フィルタがどう判断したか」が後から検証可能 (今回の第1版→第2版改善の根拠になった)

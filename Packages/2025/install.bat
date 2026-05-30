@@ -2,7 +2,7 @@
 setlocal enabledelayedexpansion
 
 echo ========================================
-echo   28 Tools v2.1.1 for Revit 2025
+echo   28 Tools v2.1.2 for Revit 2025
 echo ========================================
 echo.
 echo インストール中...
