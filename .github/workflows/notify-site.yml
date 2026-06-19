@@ -1,0 +1,23 @@
+name: Notify 28tools-download of manual updates
+run-name: "配布サイトへマニュアル更新を通知"
+
+# Docs/Features/ 配下のマニュアル Markdown が main に push されたら、
+# 28tools-download リポジトリへ repository_dispatch を送り、
+# マニュアルの再ビルド（build-manuals.yml の types: [manuals-updated]）を起動する。
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Docs/Features/**'
+  workflow_dispatch:
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch manuals-updated event to 28tools-download
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.SITE_DISPATCH_TOKEN }}
+          repository: 28yu/28tools-download
+          event-type: manuals-updated
