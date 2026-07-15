@@ -78,7 +78,7 @@ namespace Tools28.Commands.FillPatternIO
 
             double diag = Math.Sqrt(modelW * modelW + modelH * modelH);
 
-            var pen = new Pen(Brushes.Black, 1.0);
+            var pen = new Pen(Brushes.Black, 0.5);
             pen.Freeze();
 
             Point ToPx(double mx, double my)
