@@ -30,13 +30,13 @@ namespace Tools28.Commands.FillPatternIO
         private void ApplyLocalization()
         {
             this.Title = Loc.S("FillPatternIO.Title");
-            grpFilter.Header = Loc.S("FillPatternIO.Display");
-            RadioAll.Content = Loc.S("FillPatternIO.All");
+            grpFilter.Header = Loc.S("FillPatternIO.PatternType");
             RadioModel.Content = Loc.S("FillPatternIO.Model");
             RadioDrafting.Content = Loc.S("FillPatternIO.Drafting");
             btnSelectAll.Content = Loc.S("FillPatternIO.SelectAll");
             btnClearAll.Content = Loc.S("FillPatternIO.ClearAll");
             colName.Header = Loc.S("FillPatternIO.ColName");
+            colPreview.Header = Loc.S("FillPatternIO.ColPreview");
             colType.Header = Loc.S("FillPatternIO.ColType");
             colGrid.Header = Loc.S("FillPatternIO.ColGrid");
             txtUnitLabel.Text = Loc.S("FillPatternIO.Unit");
@@ -62,13 +62,12 @@ namespace Tools28.Commands.FillPatternIO
         {
             if (ListPatterns == null) return;
 
-            IEnumerable<FillPatternItem> items = _all;
-            if (RadioModel?.IsChecked == true)
-                items = items.Where(i => i.Target == FillPatternTarget.Model);
-            else if (RadioDrafting?.IsChecked == true)
-                items = items.Where(i => i.Target == FillPatternTarget.Drafting);
+            // 表示は「モデル」「製図」のいずれか。既定は製図。
+            var target = RadioModel?.IsChecked == true
+                ? FillPatternTarget.Model
+                : FillPatternTarget.Drafting;
 
-            ListPatterns.ItemsSource = items.ToList();
+            ListPatterns.ItemsSource = _all.Where(i => i.Target == target).ToList();
             UpdateCount();
         }
 

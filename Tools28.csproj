@@ -42,6 +42,11 @@
     <PackageReference Include="ClosedXML" Version="0.102.*" />
   </ItemGroup>
 
+  <!-- .NET 8 (Revit 2025/2026) では Shift-JIS 等のコードページが既定で無効なため補う -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net8.0-windows'">
+    <PackageReference Include="System.Text.Encoding.CodePages" Version="8.0.0" />
+  </ItemGroup>
+
   <!-- リソースファイル -->
   <ItemGroup>
     <Resource Include="Resources\Icons\both.png" />

@@ -219,6 +219,8 @@ namespace Tools28
                         StringComparison.OrdinalIgnoreCase) ||
                     assemblyName.Equals("System.IO.Packaging",
                         StringComparison.OrdinalIgnoreCase) ||
+                    assemblyName.Equals("System.Text.Encoding.CodePages",
+                        StringComparison.OrdinalIgnoreCase) ||
                     assemblyName.Equals("System.Threading.Tasks.Extensions",
                         StringComparison.OrdinalIgnoreCase) ||
                     assemblyName.Equals("System.ValueTuple",

@@ -29,6 +29,50 @@ namespace Tools28.Commands.FillPatternIO
             public List<FillGrid> Grids = new List<FillGrid>();
         }
 
+        private static Encoding _ansi;
+
+        /// <summary>
+        /// .pat ファイルの読み書きに使う ANSI エンコーディング（日本語環境では Shift-JIS）。
+        /// Revit / AutoCAD の .pat は ANSI 前提のため、UTF-8 で書くと日本語パターン名が
+        /// Revit 側で文字化けする。システムの ANSI コードページに合わせて読み書きする。
+        /// </summary>
+        private static Encoding AnsiEncoding()
+        {
+            if (_ansi != null) return _ansi;
+
+            int acp = 932; // フォールバック: Shift-JIS
+            try
+            {
+                int a = CultureInfo.CurrentCulture.TextInfo.ANSICodePage;
+                if (a > 0) acp = a;
+            }
+            catch { }
+
+#if NET8_0_OR_GREATER
+            // .NET 8 では既定でコードページが登録されていないため明示的に登録する
+            try { Encoding.RegisterProvider(CodePagesEncodingProvider.Instance); } catch { }
+#endif
+            try { _ansi = Encoding.GetEncoding(acp); }
+            catch { _ansi = Encoding.Default; }
+
+            return _ansi;
+        }
+
+        /// <summary>BOM を判定しつつ .pat ファイルを行単位で読み込む。</summary>
+        private static string[] ReadLines(string path)
+        {
+            byte[] bytes = File.ReadAllBytes(path);
+
+            Encoding enc;
+            if (bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF)
+                enc = new UTF8Encoding(false); // UTF-8 BOM 付き
+            else
+                enc = AnsiEncoding();
+
+            string text = enc.GetString(bytes).TrimStart('\uFEFF');
+            return text.Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.None);
+        }
+
         private static string Fmt(double v)
             => v.ToString("0.########", CultureInfo.InvariantCulture);
 
@@ -65,7 +109,7 @@ namespace Tools28.Commands.FillPatternIO
         public static void ExportToFile(FillPatternElement fpe, string path, bool useMm)
         {
             string text = BuildPatText(fpe.GetFillPattern(), useMm);
-            File.WriteAllText(path, text, new UTF8Encoding(false));
+            File.WriteAllText(path, text, AnsiEncoding());
         }
 
         private static List<double> ParseNumbers(string line)
@@ -90,7 +134,7 @@ namespace Tools28.Commands.FillPatternIO
             bool useMm = defaultMm;
             ParsedPattern cur = null;
 
-            foreach (var raw in File.ReadAllLines(path))
+            foreach (var raw in ReadLines(path))
             {
                 string line = raw.Trim();
                 if (line.Length == 0) continue;

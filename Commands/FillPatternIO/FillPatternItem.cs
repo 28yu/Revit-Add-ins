@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Windows.Media;
 using Autodesk.Revit.DB;
 using Tools28.Localization;
 
@@ -30,6 +31,9 @@ namespace Tools28.Commands.FillPatternIO
         public bool IsSolid { get; }
         public int GridCount { get; }
 
+        /// <summary>一覧に表示するパターンのプレビュー画像。</summary>
+        public ImageSource Preview { get; }
+
         /// <summary>種類の表示ラベル（ローカライズ）。</summary>
         public string TargetLabel => Target == FillPatternTarget.Model
             ? Loc.S("FillPatternIO.Model")
@@ -43,6 +47,7 @@ namespace Tools28.Commands.FillPatternIO
             Target = fp.Target;
             IsSolid = fp.IsSolidFill;
             GridCount = fp.GetFillGrids().Count;
+            Preview = PatternPreview.Render(fp, 220, 26);
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
