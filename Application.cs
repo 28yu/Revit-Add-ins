@@ -38,6 +38,7 @@ namespace Tools28
             { "SectionBoxPaste", "Ribbon.SectionBox.Paste" },
             { "RoomTagAutoCreator", "Ribbon.RoomTag" },
             { "FilledRegionSplitMerge2", "Ribbon.FilledRegion" },
+            { "FillPatternIO", "Ribbon.FillPatternIO" },
             { "BeamUnderLevel", "Ribbon.BeamUnder" },
             { "BeamTopLevel", "Ribbon.BeamTop" },
             { "FireProtection", "Ribbon.FireProtection" },
@@ -64,6 +65,7 @@ namespace Tools28
             { "SectionBoxPaste", "Ribbon.SectionBox.Paste.Tip" },
             { "RoomTagAutoCreator", "Ribbon.RoomTag.Tip" },
             { "FilledRegionSplitMerge2", "Ribbon.FilledRegion.Tip" },
+            { "FillPatternIO", "Ribbon.FillPatternIO.Tip" },
             { "BeamUnderLevel", "Ribbon.BeamUnder.Tip" },
             { "BeamTopLevel", "Ribbon.BeamTop.Tip" },
             { "FireProtection", "Ribbon.FireProtection.Tip" },
@@ -367,6 +369,10 @@ namespace Tools28
             filledData.ToolTip = Loc.S("Ribbon.FilledRegion.Tip");
             filledData.LargeImage = LoadImage("filled_region.png");
             AddButton(panel, filledData);
+
+            var fillPatternData = new PushButtonData("FillPatternIO", Loc.S("Ribbon.FillPatternIO"), assemblyPath, "Tools28.Commands.FillPatternIO.FillPatternIOCommand");
+            fillPatternData.ToolTip = Loc.S("Ribbon.FillPatternIO.Tip");
+            AddButton(panel, fillPatternData);
         }
 
         private void CreateStructuralPanel(UIControlledApplication application, string tabName, string assemblyPath)

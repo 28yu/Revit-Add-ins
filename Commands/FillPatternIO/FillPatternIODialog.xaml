@@ -1,0 +1,81 @@
+<Window x:Class="Tools28.Commands.FillPatternIO.FillPatternIODialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="塗潰しパターン"
+        Height="540" Width="580"
+        MinHeight="420" MinWidth="500"
+        WindowStartupLocation="CenterScreen">
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- 表示フィルタ -->
+        <GroupBox x:Name="grpFilter" Header="表示" Grid.Row="0" Padding="8" Margin="0,0,0,8">
+            <StackPanel Orientation="Horizontal">
+                <RadioButton x:Name="RadioAll" GroupName="Filter" Content="すべて"
+                             IsChecked="True" Margin="0,0,18,0" Checked="Filter_Changed"/>
+                <RadioButton x:Name="RadioModel" GroupName="Filter" Content="モデル"
+                             Margin="0,0,18,0" Checked="Filter_Changed"/>
+                <RadioButton x:Name="RadioDrafting" GroupName="Filter" Content="製図"
+                             Checked="Filter_Changed"/>
+            </StackPanel>
+        </GroupBox>
+
+        <!-- 全選択操作 -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,6">
+            <Button x:Name="btnSelectAll" Content="全選択" Width="72" Height="24"
+                    Margin="0,0,6,0" Click="SelectAll_Click"/>
+            <Button x:Name="btnClearAll" Content="全解除" Width="72" Height="24"
+                    Click="ClearAll_Click"/>
+            <TextBlock x:Name="txtCount" VerticalAlignment="Center" Margin="14,0,0,0"
+                       Foreground="Gray"/>
+        </StackPanel>
+
+        <!-- パターン一覧 -->
+        <ListView x:Name="ListPatterns" Grid.Row="2">
+            <ListView.View>
+                <GridView>
+                    <GridViewColumn Width="42">
+                        <GridViewColumn.CellTemplate>
+                            <DataTemplate>
+                                <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                          HorizontalAlignment="Center"/>
+                            </DataTemplate>
+                        </GridViewColumn.CellTemplate>
+                    </GridViewColumn>
+                    <GridViewColumn x:Name="colName" Header="名前" Width="320"
+                                    DisplayMemberBinding="{Binding Name}"/>
+                    <GridViewColumn x:Name="colType" Header="種類" Width="90"
+                                    DisplayMemberBinding="{Binding TargetLabel}"/>
+                    <GridViewColumn x:Name="colGrid" Header="グリッド数" Width="80"
+                                    DisplayMemberBinding="{Binding GridCount}"/>
+                </GridView>
+            </ListView.View>
+        </ListView>
+
+        <!-- 単位選択 -->
+        <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,8,0,10">
+            <TextBlock x:Name="txtUnitLabel" Text="単位:" VerticalAlignment="Center"
+                       Margin="0,0,8,0"/>
+            <ComboBox x:Name="ComboUnit" Width="120" Height="24" SelectedIndex="0">
+                <ComboBoxItem Content="mm"/>
+                <ComboBoxItem Content="inch"/>
+            </ComboBox>
+        </StackPanel>
+
+        <!-- アクションボタン -->
+        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button x:Name="btnExport" Content="エクスポート" Width="112" Height="30"
+                    Margin="0,0,8,0" Click="Export_Click"/>
+            <Button x:Name="btnImport" Content="インポート" Width="112" Height="30"
+                    Margin="0,0,8,0" Click="Import_Click"/>
+            <Button x:Name="btnClose" Content="閉じる" Width="92" Height="30"
+                    IsCancel="True" Click="Close_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>

@@ -101,6 +101,18 @@
       }
     },
     {
+      "id": "FillPatternIO",
+      "category": "annotation",
+      "icon": "icons/features/fill_pattern_io.png",
+      "manual": "Features/FillPatternIO.md",
+      "added_in": "2.2",
+      "names": {
+        "ja": "塗潰しパターン入出力",
+        "en": "Fill Pattern Import/Export",
+        "zh": "填充图案导入导出"
+      }
+    },
+    {
       "id": "BeamLevelColor",
       "category": "structure",
       "icon": "icons/features/beam_top_level.png",
