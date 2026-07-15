@@ -5,6 +5,8 @@ using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Autodesk.Revit.DB;
+// System.Windows.Point と Autodesk.Revit.DB.Point の衝突を回避
+using Point = System.Windows.Point;
 
 namespace Tools28.Commands.FillPatternIO
 {
