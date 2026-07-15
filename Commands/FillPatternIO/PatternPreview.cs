@@ -78,8 +78,16 @@ namespace Tools28.Commands.FillPatternIO
 
             double diag = Math.Sqrt(modelW * modelW + modelH * modelH);
 
-            var pen = new Pen(Brushes.Black, 0.5);
+            var pen = new Pen(Brushes.Black, 0.5)
+            {
+                // 端を丸めることで短いダッシュ・点も描画されるようにする
+                StartLineCap = PenLineCap.Round,
+                EndLineCap = PenLineCap.Round
+            };
             pen.Freeze();
+
+            // ドット（長さ0のダッシュ）描画用の半径
+            const double dotRadius = 0.6;
 
             Point ToPx(double mx, double my)
                 => new Point((mx - winMinX) * scale, pxH - (my - winMinY) * scale);
@@ -128,17 +136,24 @@ namespace Tools28.Commands.FillPatternIO
                         foreach (var s in segs)
                         {
                             double len = Math.Abs(s);
-                            if (len < Eps) { continue; }
 
-                            if (s > 0)
+                            // s >= 0 はペンダウン（ダッシュまたは点）、負は空白
+                            if (s >= 0)
                             {
                                 double aa = Math.Max(u, -diag);
                                 double bb = Math.Min(u + len, diag);
-                                if (bb > aa)
+                                if (bb > aa + Eps)
                                 {
+                                    // 通常のダッシュ
                                     dc.DrawLine(pen,
                                         ToPx(bx + aa * dx, by + aa * dy),
                                         ToPx(bx + bb * dx, by + bb * dy));
+                                }
+                                else if (u >= -diag && u <= diag)
+                                {
+                                    // 長さ0のセグメント = 点（ドット）
+                                    dc.DrawEllipse(Brushes.Black, null,
+                                        ToPx(bx + u * dx, by + u * dy), dotRadius, dotRadius);
                                 }
                             }
 

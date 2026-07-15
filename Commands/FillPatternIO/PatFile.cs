@@ -83,7 +83,7 @@ namespace Tools28.Commands.FillPatternIO
             var sb = new StringBuilder();
 
             sb.AppendLine(useMm ? ";%UNITS=MM" : ";%UNITS=INCH");
-            sb.AppendLine($"*{fp.Name},Tools28");
+            sb.AppendLine($"*{fp.Name},28Tools");
             sb.AppendLine(fp.Target == FillPatternTarget.Model ? ";%TYPE=MODEL" : ";%TYPE=DRAFTING");
 
             foreach (FillGrid grid in fp.GetFillGrids())
