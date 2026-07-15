@@ -37,8 +37,6 @@ namespace Tools28.Commands.FillPatternIO
             btnClearAll.Content = Loc.S("FillPatternIO.ClearAll");
             colName.Header = Loc.S("FillPatternIO.ColName");
             colPreview.Header = Loc.S("FillPatternIO.ColPreview");
-            colType.Header = Loc.S("FillPatternIO.ColType");
-            colGrid.Header = Loc.S("FillPatternIO.ColGrid");
             txtUnitLabel.Text = Loc.S("FillPatternIO.Unit");
             btnExport.Content = Loc.S("FillPatternIO.Export");
             btnImport.Content = Loc.S("FillPatternIO.Import");
