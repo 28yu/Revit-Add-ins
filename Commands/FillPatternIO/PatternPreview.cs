@@ -4,22 +4,28 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using Autodesk.Revit.DB;
-// System.Windows.Point と Autodesk.Revit.DB.Point の衝突を回避
-using Point = System.Windows.Point;
 
 namespace Tools28.Commands.FillPatternIO
 {
     /// <summary>
-    /// FillPattern を一覧表示用のプレビュー画像（ハッチの見た目）に描画するユーティリティ。
-    /// Revit の「塗り潰しパターン」ダイアログのように、一目で判別できるようにする。
+    /// PatternData（Revit 非依存のプレーンデータ）をハッチのプレビュー画像へ描画する。
+    /// Revit API を参照しないため、バックグラウンドスレッドから呼び出しても安全。
+    ///
+    /// 表示は「固定の実寸ウィンドウ」で行う（Revit の塗り潰しパターンダイアログと同様）。
+    /// これにより、間隔の細かいパターンは密に、粗いパターンは疎に、忠実に表示される。
     /// </summary>
     internal static class PatternPreview
     {
         private const double Eps = 1e-9;
-        private const double MmToFeet = 1.0 / 304.8;
+        private const double MmPerFoot = 304.8;
 
-        public static ImageSource Render(FillPattern fp, int pxW, int pxH)
+        // プレビューの高さ(px)が表す実寸(mm)。小さいほど拡大表示（本数が減る）。
+        private const double PreviewHeightMm = 12.0;
+
+        // 1グリッドあたりの最大描画本数（これを超える＝サブピクセル間隔なので間引いても見た目は不変）
+        private const int MaxLinesPerGrid = 400;
+
+        public static ImageSource Render(PatternData data, int pxW, int pxH)
         {
             var dv = new DrawingVisual();
             using (DrawingContext dc = dv.RenderOpen())
@@ -30,20 +36,14 @@ namespace Tools28.Commands.FillPatternIO
 
                 try
                 {
-                    if (fp == null || fp.IsSolidFill)
-                    {
+                    if (data == null || data.IsSolid)
                         dc.DrawRectangle(Brushes.Black, null, full);
-                    }
-                    else
-                    {
-                        var grids = fp.GetFillGrids();
-                        if (grids != null && grids.Count > 0)
-                            DrawGrids(dc, grids, pxW, pxH);
-                    }
+                    else if (data.Grids.Count > 0)
+                        DrawGrids(dc, data.Grids, pxW, pxH);
                 }
                 catch
                 {
-                    // 描画に失敗しても空のプレビューを返す
+                    // 描画失敗時は空のプレビュー
                 }
 
                 dc.Pop();
@@ -55,42 +55,33 @@ namespace Tools28.Commands.FillPatternIO
             return rtb;
         }
 
-        private static void DrawGrids(DrawingContext dc, IList<FillGrid> grids, int pxW, int pxH)
+        private static void DrawGrids(DrawingContext dc, List<PatternGridData> grids, int pxW, int pxH)
         {
-            // 代表間隔（最小の正のオフセット）を基準に、高さ方向へ約6本収まるスケールにする
-            double minOffset = grids
-                .Select(g => Math.Abs(g.Offset))
-                .Where(o => o > Eps)
-                .DefaultIfEmpty(MmToFeet)
-                .Min();
-
-            double modelH = minOffset * 6.0;
-            if (modelH < Eps) modelH = MmToFeet;
-
-            double scale = pxH / modelH;
+            double modelH = PreviewHeightMm / MmPerFoot;      // フィート
+            double scale = pxH / modelH;                       // px / フィート
             double modelW = pxW / scale;
-
-            // 表示窓の中心をグリッド原点の平均に合わせる
-            double cU = grids.Average(g => g.Origin.U);
-            double cV = grids.Average(g => g.Origin.V);
-            double winMinX = cU - modelW / 2.0;
-            double winMinY = cV - modelH / 2.0;
-
-            double diag = Math.Sqrt(modelW * modelW + modelH * modelH);
+            double halfW = modelW / 2.0;
+            double halfH = modelH / 2.0;
 
             var pen = new Pen(Brushes.Black, 0.5)
             {
-                // 端を丸めることで短いダッシュ・点も描画されるようにする
                 StartLineCap = PenLineCap.Round,
                 EndLineCap = PenLineCap.Round
             };
             pen.Freeze();
 
-            // ドット（長さ0のダッシュ）描画用の半径
             const double dotRadius = 0.6;
 
+            // モデル座標 → ピクセル座標（ウィンドウ中心を原点(0,0)とする）
             Point ToPx(double mx, double my)
-                => new Point((mx - winMinX) * scale, pxH - (my - winMinY) * scale);
+                => new Point((mx + halfW) * scale, pxH - (my + halfH) * scale);
+
+            // ウィンドウ4隅
+            var corners = new[]
+            {
+                new[] { -halfW, -halfH }, new[] { halfW, -halfH },
+                new[] { -halfW,  halfH }, new[] { halfW,  halfH }
+            };
 
             foreach (var g in grids)
             {
@@ -98,71 +89,82 @@ namespace Tools28.Commands.FillPatternIO
                 if (offset < Eps) continue;
 
                 double dx = Math.Cos(g.Angle), dy = Math.Sin(g.Angle);
-                double perpX = -dy, perpY = dx;
+                double px = -dy, py = dx; // 線に垂直な方向
 
-                var segs = g.GetSegments();
-                double repeat = (segs != null && segs.Count > 0)
-                    ? segs.Sum(s => Math.Abs(s))
-                    : 0.0;
-
-                // ダッシュ周期がサブピクセル（2px未満）なら見た目は実線と同じなので
-                // 実線として描画し、破線ループの負荷を避ける
-                bool asSolid = repeat < Eps || (repeat * scale) < 2.0;
-
-                int nRange = (int)Math.Ceiling(diag / offset) + 1;
-                if (nRange > 4000) nRange = 4000;
-
-                // ピクセル間隔が細かすぎる場合は間引く
-                double pxStep = offset * scale;
-                int nStep = pxStep < 1.0 ? (int)Math.Ceiling(1.0 / pxStep) : 1;
-
-                for (int n = -nRange; n <= nRange; n += nStep)
+                // 各線は O + n*offset*perp を通る。ウィンドウを覆う n の範囲を求める
+                double pMin = double.MaxValue, pMax = double.MinValue;
+                foreach (var c in corners)
                 {
-                    double bx = g.Origin.U + n * offset * perpX;
-                    double by = g.Origin.V + n * offset * perpY;
+                    double proj = (c[0] - g.OriginU) * px + (c[1] - g.OriginV) * py;
+                    if (proj < pMin) pMin = proj;
+                    if (proj > pMax) pMax = proj;
+                }
+                int nMin = (int)Math.Floor(pMin / offset) - 1;
+                int nMax = (int)Math.Ceiling(pMax / offset) + 1;
+
+                int count = nMax - nMin + 1;
+                if (count < 1) continue;
+                int step = count > MaxLinesPerGrid ? (int)Math.Ceiling((double)count / MaxLinesPerGrid) : 1;
+
+                double[] segs = g.Segments ?? new double[0];
+                double repeat = segs.Length > 0 ? segs.Sum(v => Math.Abs(v)) : 0.0;
+
+                // ダッシュ周期がサブピクセル(0.5px未満)なら実線と見分けが付かないので実線化
+                bool asSolid = repeat < Eps || (repeat * scale) < 0.5;
+
+                for (int n = nMin; n <= nMax; n += step)
+                {
+                    double bx = g.OriginU + n * offset * px;
+                    double by = g.OriginV + n * offset * py;
+
+                    // この線がウィンドウを横切る区間 [uStart, uEnd] を厳密に求める
+                    // （4隅を線方向 d に射影）。無駄な描画を避けられる。
+                    double uStart = double.MaxValue, uEnd = double.MinValue;
+                    foreach (var c in corners)
+                    {
+                        double tproj = (c[0] - bx) * dx + (c[1] - by) * dy;
+                        if (tproj < uStart) uStart = tproj;
+                        if (tproj > uEnd) uEnd = tproj;
+                    }
 
                     if (asSolid)
                     {
                         dc.DrawLine(pen,
-                            ToPx(bx - diag * dx, by - diag * dy),
-                            ToPx(bx + diag * dx, by + diag * dy));
+                            ToPx(bx + uStart * dx, by + uStart * dy),
+                            ToPx(bx + uEnd * dx, by + uEnd * dy));
                         continue;
                     }
 
-                    // 破線（ダッシュ）パターン
                     double phase = (n * g.Shift) % repeat;
                     if (phase < 0) phase += repeat;
+                    double u = phase + repeat * Math.Floor((uStart - phase) / repeat);
 
-                    double u = phase - repeat * (Math.Floor((phase + diag) / repeat) + 1);
                     int guard = 0;
-                    while (u < diag && guard++ < 2000)
+                    while (u < uEnd && guard++ < 20000)
                     {
-                        foreach (var s in segs)
+                        foreach (double s in segs)
                         {
                             double len = Math.Abs(s);
-
-                            // s >= 0 はペンダウン（ダッシュまたは点）、負は空白
-                            if (s >= 0)
+                            if (s >= 0) // ペンダウン（ダッシュまたは点）
                             {
-                                double aa = Math.Max(u, -diag);
-                                double bb = Math.Min(u + len, diag);
-                                if (bb > aa + Eps)
+                                if (len < Eps)
                                 {
-                                    // 通常のダッシュ
-                                    dc.DrawLine(pen,
-                                        ToPx(bx + aa * dx, by + aa * dy),
-                                        ToPx(bx + bb * dx, by + bb * dy));
+                                    if (u >= uStart && u <= uEnd)
+                                        dc.DrawEllipse(Brushes.Black, null,
+                                            ToPx(bx + u * dx, by + u * dy), dotRadius, dotRadius);
                                 }
-                                else if (u >= -diag && u <= diag)
+                                else
                                 {
-                                    // 長さ0のセグメント = 点（ドット）
-                                    dc.DrawEllipse(Brushes.Black, null,
-                                        ToPx(bx + u * dx, by + u * dy), dotRadius, dotRadius);
+                                    double aa = Math.Max(u, uStart);
+                                    double bb = Math.Min(u + len, uEnd);
+                                    if (bb > aa)
+                                        dc.DrawLine(pen,
+                                            ToPx(bx + aa * dx, by + aa * dy),
+                                            ToPx(bx + bb * dx, by + bb * dy));
                                 }
                             }
-
                             u += len;
-                            if (u >= diag) break;
+                            if (u >= uEnd) break;
                         }
                     }
                 }

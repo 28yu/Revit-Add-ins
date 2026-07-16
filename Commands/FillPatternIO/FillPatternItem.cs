@@ -1,5 +1,7 @@
+using System;
 using System.ComponentModel;
 using System.Windows.Media;
+using System.Windows.Threading;
 using Autodesk.Revit.DB;
 using Tools28.Localization;
 
@@ -31,24 +33,33 @@ namespace Tools28.Commands.FillPatternIO
         public bool IsSolid { get; }
         public int GridCount { get; }
 
-        private readonly FillPattern _fillPattern;
+        private readonly PatternData _data;
         private ImageSource _preview;
-        private bool _rendered;
+        private bool _requested;
 
         /// <summary>
         /// 一覧に表示するパターンのプレビュー画像。
-        /// 大量パターン時のフリーズを避けるため、初回アクセス時（＝行が実体化された時）に
-        /// 遅延生成する。ListView の仮想化と併せて、画面に見えている行だけ描画される。
+        /// 初回アクセス時（＝行が実体化された時）にバックグラウンドで描画を依頼し、
+        /// 完了したら PropertyChanged で通知して差し替える。UI スレッドはブロックしない。
         /// </summary>
         public ImageSource Preview
         {
             get
             {
-                if (!_rendered)
+                if (!_requested)
                 {
-                    _rendered = true;
-                    try { _preview = PatternPreview.Render(_fillPattern, 220, 26); }
-                    catch { _preview = null; }
+                    _requested = true;
+                    var ui = Dispatcher.CurrentDispatcher; // getter は UI スレッドで呼ばれる
+                    PreviewRenderQueue.Enqueue(_data, 220, 26, img =>
+                    {
+                        Action apply = () =>
+                        {
+                            _preview = img;
+                            OnPropertyChanged(nameof(Preview));
+                        };
+                        if (ui.CheckAccess()) apply();
+                        else ui.BeginInvoke(DispatcherPriority.Background, apply);
+                    });
                 }
                 return _preview;
             }
@@ -62,11 +73,12 @@ namespace Tools28.Commands.FillPatternIO
         public FillPatternItem(FillPatternElement element)
         {
             Id = element.Id;
-            _fillPattern = element.GetFillPattern();
-            Name = _fillPattern.Name;
-            Target = _fillPattern.Target;
-            IsSolid = _fillPattern.IsSolidFill;
-            GridCount = _fillPattern.GetFillGrids().Count;
+            var fp = element.GetFillPattern();
+            Name = fp.Name;
+            Target = fp.Target;
+            IsSolid = fp.IsSolidFill;
+            _data = PatternData.From(fp);
+            GridCount = _data.Grids.Count;
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
