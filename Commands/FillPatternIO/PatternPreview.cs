@@ -105,6 +105,10 @@ namespace Tools28.Commands.FillPatternIO
                     ? segs.Sum(s => Math.Abs(s))
                     : 0.0;
 
+                // ダッシュ周期がサブピクセル（2px未満）なら見た目は実線と同じなので
+                // 実線として描画し、破線ループの負荷を避ける
+                bool asSolid = repeat < Eps || (repeat * scale) < 2.0;
+
                 int nRange = (int)Math.Ceiling(diag / offset) + 1;
                 if (nRange > 4000) nRange = 4000;
 
@@ -117,7 +121,7 @@ namespace Tools28.Commands.FillPatternIO
                     double bx = g.Origin.U + n * offset * perpX;
                     double by = g.Origin.V + n * offset * perpY;
 
-                    if (repeat < Eps)
+                    if (asSolid)
                     {
                         dc.DrawLine(pen,
                             ToPx(bx - diag * dx, by - diag * dy),
@@ -131,7 +135,7 @@ namespace Tools28.Commands.FillPatternIO
 
                     double u = phase - repeat * (Math.Floor((phase + diag) / repeat) + 1);
                     int guard = 0;
-                    while (u < diag && guard++ < 100000)
+                    while (u < diag && guard++ < 2000)
                     {
                         foreach (var s in segs)
                         {

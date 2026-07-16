@@ -31,8 +31,28 @@ namespace Tools28.Commands.FillPatternIO
         public bool IsSolid { get; }
         public int GridCount { get; }
 
-        /// <summary>一覧に表示するパターンのプレビュー画像。</summary>
-        public ImageSource Preview { get; }
+        private readonly FillPattern _fillPattern;
+        private ImageSource _preview;
+        private bool _rendered;
+
+        /// <summary>
+        /// 一覧に表示するパターンのプレビュー画像。
+        /// 大量パターン時のフリーズを避けるため、初回アクセス時（＝行が実体化された時）に
+        /// 遅延生成する。ListView の仮想化と併せて、画面に見えている行だけ描画される。
+        /// </summary>
+        public ImageSource Preview
+        {
+            get
+            {
+                if (!_rendered)
+                {
+                    _rendered = true;
+                    try { _preview = PatternPreview.Render(_fillPattern, 220, 26); }
+                    catch { _preview = null; }
+                }
+                return _preview;
+            }
+        }
 
         /// <summary>種類の表示ラベル（ローカライズ）。</summary>
         public string TargetLabel => Target == FillPatternTarget.Model
@@ -42,12 +62,11 @@ namespace Tools28.Commands.FillPatternIO
         public FillPatternItem(FillPatternElement element)
         {
             Id = element.Id;
-            var fp = element.GetFillPattern();
-            Name = fp.Name;
-            Target = fp.Target;
-            IsSolid = fp.IsSolidFill;
-            GridCount = fp.GetFillGrids().Count;
-            Preview = PatternPreview.Render(fp, 220, 26);
+            _fillPattern = element.GetFillPattern();
+            Name = _fillPattern.Name;
+            Target = _fillPattern.Target;
+            IsSolid = _fillPattern.IsSolidFill;
+            GridCount = _fillPattern.GetFillGrids().Count;
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

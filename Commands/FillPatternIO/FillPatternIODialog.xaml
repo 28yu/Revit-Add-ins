@@ -34,8 +34,11 @@
                        Foreground="Gray"/>
         </StackPanel>
 
-        <!-- パターン一覧 -->
-        <ListView x:Name="ListPatterns" Grid.Row="2">
+        <!-- パターン一覧（仮想化: 画面内の行だけプレビューを生成） -->
+        <ListView x:Name="ListPatterns" Grid.Row="2"
+                  VirtualizingStackPanel.IsVirtualizing="True"
+                  VirtualizingStackPanel.VirtualizationMode="Recycling"
+                  ScrollViewer.CanContentScroll="True">
             <ListView.View>
                 <GridView>
                     <GridViewColumn Width="42">
