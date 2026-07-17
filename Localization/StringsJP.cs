@@ -464,6 +464,7 @@ namespace Tools28.Localization
             { "Ribbon.FillPatternIO.Tip", "rvtファイル内の塗り潰しパターンを一覧表示し、.patファイルへの書き出し／読み込みを行います。" },
             { "FillPatternIO.Title", "塗潰しパターン入出力" },
             { "FillPatternIO.PatternType", "パターン タイプ" },
+            { "FillPatternIO.Search", "検索:" },
             { "FillPatternIO.ColPreview", "パターン" },
             { "FillPatternIO.Model", "モデル" },
             { "FillPatternIO.Drafting", "製図" },

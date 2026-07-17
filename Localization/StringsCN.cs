@@ -464,6 +464,7 @@ namespace Tools28.Localization
             { "Ribbon.FillPatternIO.Tip", "列出当前模型中的填充图案，并以.pat文件形式导出/导入。" },
             { "FillPatternIO.Title", "填充图案导入导出" },
             { "FillPatternIO.PatternType", "图案类型" },
+            { "FillPatternIO.Search", "搜索:" },
             { "FillPatternIO.ColPreview", "图案" },
             { "FillPatternIO.Model", "模型" },
             { "FillPatternIO.Drafting", "绘图" },

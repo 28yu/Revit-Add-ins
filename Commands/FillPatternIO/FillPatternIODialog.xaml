@@ -9,6 +9,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -24,8 +25,16 @@
             </StackPanel>
         </GroupBox>
 
+        <!-- 検索 -->
+        <DockPanel Grid.Row="1" Margin="0,0,0,8">
+            <TextBlock x:Name="txtSearchLabel" Text="検索:" VerticalAlignment="Center"
+                       Margin="0,0,8,0" DockPanel.Dock="Left"/>
+            <TextBox x:Name="SearchBox" Height="24" VerticalContentAlignment="Center"
+                     TextChanged="SearchBox_TextChanged"/>
+        </DockPanel>
+
         <!-- 全選択操作 -->
-        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,6">
+        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,6">
             <Button x:Name="btnSelectAll" Content="全選択" Width="72" Height="24"
                     Margin="0,0,6,0" Click="SelectAll_Click"/>
             <Button x:Name="btnClearAll" Content="全解除" Width="72" Height="24"
@@ -35,7 +44,7 @@
         </StackPanel>
 
         <!-- パターン一覧（仮想化: 画面内の行だけプレビューを生成） -->
-        <ListView x:Name="ListPatterns" Grid.Row="2"
+        <ListView x:Name="ListPatterns" Grid.Row="3"
                   VirtualizingStackPanel.IsVirtualizing="True"
                   VirtualizingStackPanel.VirtualizationMode="Recycling"
                   ScrollViewer.CanContentScroll="True">
@@ -56,7 +65,22 @@
                             <DataTemplate>
                                 <Border BorderBrush="#DDDDDD" BorderThickness="1" Background="White">
                                     <Image Source="{Binding Preview}" Width="220" Height="26"
-                                           Stretch="None" SnapsToDevicePixels="True"/>
+                                           Stretch="None" SnapsToDevicePixels="True"
+                                           ToolTipService.InitialShowDelay="300"
+                                           ToolTipService.BetweenShowDelay="0">
+                                        <Image.ToolTip>
+                                            <StackPanel Background="White">
+                                                <TextBlock Text="{Binding Name}" FontWeight="Bold"
+                                                           Margin="2,2,2,6"/>
+                                                <Border BorderBrush="#AAAAAA" BorderThickness="1"
+                                                        Background="White">
+                                                    <Image Source="{Binding LargePreview}"
+                                                           Width="440" Height="140"
+                                                           Stretch="None" SnapsToDevicePixels="True"/>
+                                                </Border>
+                                            </StackPanel>
+                                        </Image.ToolTip>
+                                    </Image>
                                 </Border>
                             </DataTemplate>
                         </GridViewColumn.CellTemplate>
@@ -66,7 +90,7 @@
         </ListView>
 
         <!-- 単位選択 -->
-        <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,8,0,10">
+        <StackPanel Grid.Row="4" Orientation="Horizontal" Margin="0,8,0,10">
             <TextBlock x:Name="txtUnitLabel" Text="単位:" VerticalAlignment="Center"
                        Margin="0,0,8,0"/>
             <ComboBox x:Name="ComboUnit" Width="120" Height="24" SelectedIndex="0">
@@ -76,7 +100,7 @@
         </StackPanel>
 
         <!-- アクションボタン -->
-        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right">
+        <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Right">
             <Button x:Name="btnExport" Content="エクスポート" Width="112" Height="30"
                     Margin="0,0,8,0" Click="Export_Click"/>
             <Button x:Name="btnImport" Content="インポート" Width="112" Height="30"

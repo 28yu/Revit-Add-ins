@@ -33,6 +33,7 @@ namespace Tools28.Commands.FillPatternIO
             grpFilter.Header = Loc.S("FillPatternIO.PatternType");
             RadioModel.Content = Loc.S("FillPatternIO.Model");
             RadioDrafting.Content = Loc.S("FillPatternIO.Drafting");
+            txtSearchLabel.Text = Loc.S("FillPatternIO.Search");
             btnSelectAll.Content = Loc.S("FillPatternIO.SelectAll");
             btnClearAll.Content = Loc.S("FillPatternIO.ClearAll");
             colName.Header = Loc.S("FillPatternIO.ColName");
@@ -65,7 +66,14 @@ namespace Tools28.Commands.FillPatternIO
                 ? FillPatternTarget.Model
                 : FillPatternTarget.Drafting;
 
-            ListPatterns.ItemsSource = _all.Where(i => i.Target == target).ToList();
+            string keyword = SearchBox?.Text?.Trim() ?? string.Empty;
+
+            IEnumerable<FillPatternItem> items = _all.Where(i => i.Target == target);
+            if (keyword.Length > 0)
+                items = items.Where(i => i.Name != null &&
+                    i.Name.IndexOf(keyword, StringComparison.CurrentCultureIgnoreCase) >= 0);
+
+            ListPatterns.ItemsSource = items.ToList();
             UpdateCount();
         }
 
@@ -78,6 +86,9 @@ namespace Tools28.Commands.FillPatternIO
         }
 
         private void Filter_Changed(object sender, RoutedEventArgs e) => ApplyFilter();
+
+        private void SearchBox_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
+            => ApplyFilter();
 
         private void SelectAll_Click(object sender, RoutedEventArgs e)
             => SetSelectionForVisible(true);

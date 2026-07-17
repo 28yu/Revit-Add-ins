@@ -35,10 +35,12 @@ namespace Tools28.Commands.FillPatternIO
 
         private readonly PatternData _data;
         private ImageSource _preview;
-        private bool _requested;
+        private bool _previewRequested;
+        private ImageSource _largePreview;
+        private bool _largeRequested;
 
         /// <summary>
-        /// 一覧に表示するパターンのプレビュー画像。
+        /// 一覧に表示するパターンのプレビュー画像（小）。
         /// 初回アクセス時（＝行が実体化された時）にバックグラウンドで描画を依頼し、
         /// 完了したら PropertyChanged で通知して差し替える。UI スレッドはブロックしない。
         /// </summary>
@@ -46,23 +48,38 @@ namespace Tools28.Commands.FillPatternIO
         {
             get
             {
-                if (!_requested)
+                if (!_previewRequested)
                 {
-                    _requested = true;
-                    var ui = Dispatcher.CurrentDispatcher; // getter は UI スレッドで呼ばれる
-                    PreviewRenderQueue.Enqueue(_data, 220, 26, img =>
-                    {
-                        Action apply = () =>
-                        {
-                            _preview = img;
-                            OnPropertyChanged(nameof(Preview));
-                        };
-                        if (ui.CheckAccess()) apply();
-                        else ui.BeginInvoke(DispatcherPriority.Background, apply);
-                    });
+                    _previewRequested = true;
+                    RequestRender(220, 26, img => { _preview = img; OnPropertyChanged(nameof(Preview)); });
                 }
                 return _preview;
             }
+        }
+
+        /// <summary>ホバー時に表示する拡大プレビュー画像。初回アクセス時に遅延生成する。</summary>
+        public ImageSource LargePreview
+        {
+            get
+            {
+                if (!_largeRequested)
+                {
+                    _largeRequested = true;
+                    RequestRender(440, 140, img => { _largePreview = img; OnPropertyChanged(nameof(LargePreview)); });
+                }
+                return _largePreview;
+            }
+        }
+
+        private void RequestRender(int w, int h, Action<ImageSource> assign)
+        {
+            var ui = Dispatcher.CurrentDispatcher; // getter は UI スレッドで呼ばれる
+            PreviewRenderQueue.Enqueue(_data, w, h, img =>
+            {
+                Action apply = () => assign(img);
+                if (ui.CheckAccess()) apply();
+                else ui.BeginInvoke(DispatcherPriority.Background, apply);
+            });
         }
 
         /// <summary>種類の表示ラベル（ローカライズ）。</summary>

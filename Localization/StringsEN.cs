@@ -464,6 +464,7 @@ namespace Tools28.Localization
             { "Ribbon.FillPatternIO.Tip", "List the fill patterns in the current model and export/import them as .pat files." },
             { "FillPatternIO.Title", "Fill Pattern Import/Export" },
             { "FillPatternIO.PatternType", "Pattern Type" },
+            { "FillPatternIO.Search", "Search:" },
             { "FillPatternIO.ColPreview", "Pattern" },
             { "FillPatternIO.Model", "Model" },
             { "FillPatternIO.Drafting", "Drafting" },
