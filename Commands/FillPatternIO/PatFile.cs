@@ -96,8 +96,15 @@ namespace Tools28.Commands.FillPatternIO
                     Fmt(grid.Shift * scale),
                     Fmt(grid.Offset * scale)
                 };
-                foreach (double seg in grid.GetSegments())
-                    parts.Add(Fmt(seg * scale));
+                // Revit のセグメントは「偶数index=ダッシュ、奇数index=ギャップ」の全正値。
+                // .pat 標準はギャップを負値で表すため、奇数indexを負にして書き出す。
+                var segments = grid.GetSegments();
+                for (int i = 0; i < segments.Count; i++)
+                {
+                    double val = Math.Abs(segments[i]) * scale;
+                    if (i % 2 == 1) val = -val; // ギャップ
+                    parts.Add(Fmt(val));
+                }
 
                 sb.AppendLine(string.Join(",", parts));
             }
@@ -175,9 +182,11 @@ namespace Tools28.Commands.FillPatternIO
 
                 if (nums.Count > 5)
                 {
+                    // .pat のダッシュ/ギャップ（符号付き）を Revit の全正値・交互形式へ。
+                    // 位置（偶数=ダッシュ、奇数=ギャップ）で表現するため絶対値を格納する。
                     var segs = new List<double>();
                     for (int i = 5; i < nums.Count; i++)
-                        segs.Add(nums[i] / scale);
+                        segs.Add(Math.Abs(nums[i]) / scale);
                     grid.SetSegments(segs);
                 }
 

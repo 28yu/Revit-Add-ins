@@ -142,13 +142,16 @@ namespace Tools28.Commands.FillPatternIO
                     int guard = 0;
                     while (u < uEnd && guard++ < 20000)
                     {
-                        foreach (double s in segs)
+                        // Revit のセグメントは「偶数index=ダッシュ、奇数index=ギャップ」で交互
+                        for (int i = 0; i < segs.Length; i++)
                         {
-                            double len = Math.Abs(s);
-                            if (s >= 0) // ペンダウン（ダッシュまたは点）
+                            double len = Math.Abs(segs[i]);
+                            bool penDown = (i % 2 == 0);
+                            if (penDown)
                             {
                                 if (len < Eps)
                                 {
+                                    // 長さ0のダッシュ = 点（ドット）
                                     if (u >= uStart && u <= uEnd)
                                         dc.DrawEllipse(Brushes.Black, null,
                                             ToPx(bx + u * dx, by + u * dy), dotRadius, dotRadius);
