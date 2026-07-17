@@ -23,12 +23,17 @@ namespace Tools28.Commands.FillPatternIO
     internal sealed class PatternData
     {
         public bool IsSolid;
+        public bool IsModel;
         public readonly List<PatternGridData> Grids = new List<PatternGridData>();
 
         /// <summary>Revit（UI）スレッドで呼び出すこと。</summary>
         public static PatternData From(FillPattern fp)
         {
-            var data = new PatternData { IsSolid = fp == null || fp.IsSolidFill };
+            var data = new PatternData
+            {
+                IsSolid = fp == null || fp.IsSolidFill,
+                IsModel = fp != null && fp.Target == FillPatternTarget.Model
+            };
             if (fp == null || fp.IsSolidFill) return data;
 
             foreach (FillGrid g in fp.GetFillGrids())

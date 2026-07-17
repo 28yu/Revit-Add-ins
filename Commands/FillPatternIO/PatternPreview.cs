@@ -39,7 +39,7 @@ namespace Tools28.Commands.FillPatternIO
                     if (data == null || data.IsSolid)
                         dc.DrawRectangle(Brushes.Black, null, full);
                     else if (data.Grids.Count > 0)
-                        DrawGrids(dc, data.Grids, pxW, pxH);
+                        DrawGrids(dc, data.Grids, pxW, pxH, data.IsModel);
                 }
                 catch
                 {
@@ -55,9 +55,24 @@ namespace Tools28.Commands.FillPatternIO
             return rtb;
         }
 
-        private static void DrawGrids(DrawingContext dc, List<PatternGridData> grids, int pxW, int pxH)
+        private static void DrawGrids(DrawingContext dc, List<PatternGridData> grids, int pxW, int pxH, bool isModel)
         {
-            double modelH = PreviewHeightMm / MmPerFoot;      // フィート
+            // 製図パターンは紙面mm基準の固定ウィンドウ（12mm）で忠実に表示する。
+            // モデルパターンは実寸（数十〜数百mm）のため固定窓に収まらない。
+            // その場合はパターン自身の間隔に合わせてズームアウトする（尺度がおかしくならないように）。
+            double fixedH = PreviewHeightMm / MmPerFoot;       // フィート
+            double modelH = fixedH;
+            if (isModel)
+            {
+                double minOffset = grids
+                    .Select(g => Math.Abs(g.Offset))
+                    .Where(o => o > Eps)
+                    .DefaultIfEmpty(fixedH)
+                    .Min();
+                // 最も細かいグリッドが縦に約6本収まる高さ。固定窓より拡大はしない。
+                modelH = Math.Max(fixedH, minOffset * 6.0);
+            }
+
             double scale = pxH / modelH;                       // px / フィート
             double modelW = pxW / scale;
             double halfW = modelW / 2.0;
