@@ -65,6 +65,7 @@
     <Resource Include="Resources\Icons\cropbox_copy.png" />
     <Resource Include="Resources\Icons\cropbox_paste.png" />
     <Resource Include="Resources\Icons\filled_region.png" />
+    <Resource Include="Resources\Icons\fill_pattern_io.png" />
     <Resource Include="Resources\Icons\beam_under_level.png" />
     <Resource Include="Resources\Icons\beam_top_level.png" />
     <Resource Include="Resources\Icons\fire_protection.png" />

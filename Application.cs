@@ -374,6 +374,7 @@ namespace Tools28
 
             var fillPatternData = new PushButtonData("FillPatternIO", Loc.S("Ribbon.FillPatternIO"), assemblyPath, "Tools28.Commands.FillPatternIO.FillPatternIOCommand");
             fillPatternData.ToolTip = Loc.S("Ribbon.FillPatternIO.Tip");
+            fillPatternData.LargeImage = LoadImage("fill_pattern_io.png");
             AddButton(panel, fillPatternData);
         }
 

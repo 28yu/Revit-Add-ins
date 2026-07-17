@@ -10,7 +10,8 @@ import math
 import os
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-OUT_DIR = os.path.join(SCRIPT_DIR, '..', 'Resources', 'Icons')
+# スクリプトは Docs/tools/ にあるため、リポジトリルートの Resources/Icons は 2 階層上
+OUT_DIR = os.path.join(SCRIPT_DIR, '..', '..', 'Resources', 'Icons')
 
 # Supersampling scale: draw at 4x then downsample to 96x96
 SS = 4
@@ -895,8 +896,56 @@ def make_fire_protection():
 
 
 # ─────────────────────────────────────────
+# fill_pattern_io  （ハッチ模様の塗潰しパターン + ⇄ 入出力矢印）
+# ─────────────────────────────────────────
+def make_fill_pattern_io():
+    img = new_canvas()
+    draw = ImageDraw.Draw(img)
+
+    BLACK = (0, 0, 0, 255)
+    BLUE  = (30, 144, 255, 255)  # 入出力矢印（プロジェクト共通の青）
+
+    # --- ハッチ模様のタイル（上部）---
+    x0, y0, x1, y1 = 4, 2, 28, 16
+
+    # 内部の 45°ハッチ線（"/" 方向 = x + y = k）をマスクでタイル内にクリップ
+    hatch = Image.new('RGBA', img.size, (0, 0, 0, 0))
+    hd = ImageDraw.Draw(hatch)
+    lw = iw(s(0.8))
+    k = x0 + y0
+    kmax = x1 + y1
+    while k <= kmax:
+        # 十分長い線を引き、後段のマスクでタイル内に限定する
+        hd.line([s(k - (y0 - 2)), s(y0 - 2), s(k - (y1 + 2)), s(y1 + 2)],
+                fill=BLACK, width=lw)
+        k += 4.5
+
+    mask = Image.new('L', img.size, 0)
+    ImageDraw.Draw(mask).rectangle([s(x0), s(y0), s(x1), s(y1)], fill=255)
+    img.paste(hatch, (0, 0), mask)
+
+    # タイルの枠線
+    draw.rectangle([s(x0), s(y0), s(x1), s(y1)], outline=BLACK, width=iw(s(0.9)))
+
+    # --- ⇄ 入出力矢印（下部）---
+    def h_arrow(x_tail, x_head, y, color, shaft_w=1.4, head_len=3.4, head_half=2.5):
+        dirn = 1 if x_head >= x_tail else -1
+        base_x = x_head - dirn * head_len
+        draw.line([s(x_tail), s(y), s(base_x), s(y)], fill=color, width=iw(s(shaft_w)))
+        draw.polygon([(s(base_x), s(y - head_half)),
+                      (s(x_head), s(y)),
+                      (s(base_x), s(y + head_half))], fill=color)
+
+    h_arrow(7, 27, 22.5, BLUE)    # 上段: 右向き（書き出し）
+    h_arrow(25, 5, 27.8, BLUE)    # 下段: 左向き（読み込み）
+
+    save_icon_as(img, 'fill_pattern_io.png')
+
+
+# ─────────────────────────────────────────
 if __name__ == '__main__':
     print('Generating icons...')
+    make_fill_pattern_io()
     make_sectionbox_copy()
     make_sectionbox_paste()
     make_cropbox_copy()
