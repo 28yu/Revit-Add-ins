@@ -460,7 +460,7 @@ namespace Tools28.Localization
             { "Expiry.WarningMessage", "此版本将在 {0} 天后到期（到期日：{1}）。\n\n建议尽快更新到最新版本：\nhttps://28tools.com/addins.html" },
 
             // 填充图案导入导出
-            { "Ribbon.FillPatternIO", "填充图案" },
+            { "Ribbon.FillPatternIO", "填充图案\n导入导出" },
             { "Ribbon.FillPatternIO.Tip", "列出当前模型中的填充图案，并以.pat文件形式导出/导入。" },
             { "FillPatternIO.Title", "填充图案导入导出" },
             { "FillPatternIO.PatternType", "图案类型" },

@@ -460,7 +460,7 @@ namespace Tools28.Localization
             { "Expiry.WarningMessage", "このバージョンの使用期限まで残り {0} 日です（期限: {1}）。\n\n最新版へのアップデートをご検討ください：\nhttps://28tools.com/addins.html" },
 
             // 塗潰しパターン入出力
-            { "Ribbon.FillPatternIO", "塗潰しパターン" },
+            { "Ribbon.FillPatternIO", "塗潰しパターン\n入出力" },
             { "Ribbon.FillPatternIO.Tip", "rvtファイル内の塗り潰しパターンを一覧表示し、.patファイルへの書き出し／読み込みを行います。" },
             { "FillPatternIO.Title", "塗潰しパターン入出力" },
             { "FillPatternIO.PatternType", "パターン タイプ" },

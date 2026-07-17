@@ -460,7 +460,7 @@ namespace Tools28.Localization
             { "Expiry.WarningMessage", "This version will expire in {0} days (on {1}).\n\nPlease consider updating to the latest version:\nhttps://28tools.com/addins.html" },
 
             // Fill pattern import/export
-            { "Ribbon.FillPatternIO", "Fill Patterns" },
+            { "Ribbon.FillPatternIO", "Fill Pattern\nI/O" },
             { "Ribbon.FillPatternIO.Tip", "List the fill patterns in the current model and export/import them as .pat files." },
             { "FillPatternIO.Title", "Fill Pattern Import/Export" },
             { "FillPatternIO.PatternType", "Pattern Type" },
