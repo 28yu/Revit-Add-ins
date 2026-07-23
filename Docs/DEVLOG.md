@@ -315,6 +315,25 @@ git pull origin main
 - **配布サイト側**: `js/main.js` の `downloadConfig.urls` を GitHub API (`releases/latest`) で自動取得に改修済み
 - リリース本文は `build-and-release.yml` の body セクション（2箇所: Revit-Add-ins用 と 28tools-download用）を更新
 
+### パラメータ名の `I-` / `T-` プレフィックスの意味
+- `ParameterInfo` コンストラクタで付与（`Models/ParameterInfo.cs`）
+  - `I-` = インスタンス（要素）パラメータ（`isTypeParameter == false`）
+  - `T-` = タイプパラメータ（`isTypeParameter == true`）
+- エクスポートダイアログのパラメータ欄下部に凡例を常時表示（`Export.ParamPrefixLegend`）
+
+### ⚠️ 大容量RVTでパラメータのチェック/ホバーが重い問題（グループ化と仮想化）
+- **症状**: 要素数の多いカテゴリ（例: 構造フレーム 38749 要素）を選ぶと、パラメータ欄の
+  チェックボックスにカーソルを合わせただけでカーソルがクルクル回り、チェック操作も重い
+- **原因**: `ParameterListBox` / `OutputListBox` は `ListCollectionView` + `PropertyGroupDescription`
+  でカテゴリ別グループ表示している。**WPF はグループ化すると UI 仮想化が既定で無効になる**ため、
+  全パラメータのチェックボックスが一度に実体化され、ヒットテスト・レイアウトが重くなる
+- **修正**: 両 ListBox に以下を付与し、グループ化時も仮想化を有効化
+  - `VirtualizingPanel.IsVirtualizingWhenGrouping="True"`（.NET 4.5+ で追加、これが肝）
+  - `VirtualizingPanel.VirtualizationMode="Recycling"` / `IsVirtualizing="True"` / `ScrollUnit="Pixel"`
+  - `ScrollViewer.CanContentScroll="True"`
+- **注意**: `ParameterInfo` はチェック状態（`IsChecked`）をモデル側に保持するため、
+  コンテナのリサイクルが起きても選択状態は失われない
+
 ---
 
 ## FireProtection 開発知見

@@ -311,6 +311,7 @@ namespace Tools28.Localization
             { "Export.SettingsLoadFailed", "加载设置失败。\n{0}" },
             { "Export.SelectParams", "请选择要输出的参数。" },
             { "Export.SelectCategory", "请选择类别。" },
+            { "Export.ParamPrefixLegend", "图例  I- : 实例（图元）参数　　T- : 类型参数" },
             { "Export.Scope.WindowTitle", "Excel导出" },
             { "Export.Scope.Title", "选择导出范围" },
             { "Export.Scope.Description", "请选择要导出的元素范围。" },

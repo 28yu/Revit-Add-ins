@@ -69,6 +69,7 @@ namespace Tools28.Commands.ExcelExportImport.Views
             btnSearchCat.Content = Loc.S("Common.Search");
             grpParameter.Header = Loc.S("Export.Parameter");
             btnSearchParam.Content = Loc.S("Common.Search");
+            ParamPrefixLegend.Text = Loc.S("Export.ParamPrefixLegend");
             btnAddToOutput.ToolTip = Loc.S("Export.AddToOutput");
             btnRemoveFromOutput.ToolTip = Loc.S("Export.RemoveFromOutput");
             grpOutput.Header = Loc.S("Export.Output");
