@@ -92,6 +92,17 @@
 - `& .\QuickBuild.ps1` の `$LASTEXITCODE` は信頼できない（PowerShell スクリプト呼び出しでは正しく伝搬しない）
 - **解決策**: ビルド前後の DLL タイムスタンプを比較して成功判定
 
+### コミット件名マーカーによる対象バージョン切替（`[build:XXXX]`）
+- **目的**: デフォルトは `dev-config.json`（通常 2022）のまま、特定のコミットだけ別バージョンでオートビルドしたい
+- **仕組み**: `Get-BuildVersions` が HEAD コミットメッセージ（`git log HEAD -1 --format="%B"`）を正規表現
+  `\[build:\s*([0-9,\s]+|all)\s*\]` で解析。マーカーがあればそのバージョンのみ、なければ
+  `Get-DefaultRevitVersion`（dev-config.json）にフォールバック。`Run-Build` は解決した各バージョンを
+  `QuickBuild.ps1 -RevitVersion` で**明示ビルド**（dev-config には依存しない）
+- **⚠️ マーカーは必ずコミット件名（1行目）に置く**: `auto-merge-claude.yml` の squash は
+  `head -n 1` で件名のみを `main` に残すため、本文マーカーは `origin/main` に伝わらず機能しない
+- `[build:all]` で全6バージョンを順次ビルド。複数指定 `[build:2024,2025]` も可
+- 状態を持たない設計（コミット単位）なので、次のコミットで自動的にデフォルトへ戻る
+
 ---
 
 ## 解決済みバグ: 塗潰し領域ボタンの名称・アイコン変更がRevitに反映されない問題

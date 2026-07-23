@@ -307,6 +307,20 @@ _buttonTipKeys["FeatureName"] = "Ribbon.FeatureName.Button.Tip";
 - **ファイル構成**: `StartAutoBuild.vbs`（管理者昇格）/ `AutoBuild.ps1`（監視ループ）/ `AutoBuild.log`
 - **再起動**: タスクマネージャーで `powershell.exe` を終了 → `StartAutoBuild.vbs` を再実行
 
+#### AutoBuild の対象 Revit バージョン
+- **デフォルト**: `dev-config.json` の `defaultRevitVersion`（通常 **2022**）。指示がなければ常にこれでビルドする
+- **一時的にバージョンを指定する方法**: コミットの **1行目（件名）** に `[build:XXXX]` マーカーを入れる。
+  そのコミットのビルドだけ指定バージョンになり、次回以降はデフォルト（2022）に自動で戻る
+  - `[build:2024]` → Revit 2024
+  - `[build:2024,2025]` → Revit 2024 と 2025
+  - `[build:all]` → 全バージョン（2021〜2026）
+- **⚠️ マーカーは必ずコミット件名（1行目）に書くこと**。`claude/**` の自動マージは squash 時に
+  **件名のみ**を `main` に残すため（`auto-merge-claude.yml`）、本文に書くと `main` に伝わらず無効になる
+- **Claude への運用ルール**: ユーザーが「今回は Revit20XX でオートビルドして」等と指示したら、
+  **その回の最後のコミットの件名末尾**に対応するマーカーを付ける（例: `エクスポート改善　[build:2024]`）。
+  複数コミットを積む場合、`origin/main` に反映されるのは push の HEAD コミット件名なので、
+  **HEAD となる最後のコミット件名**にマーカーを入れること。指示がなければマーカーは付けない
+
 ### ⚠️ ローカルでの pull 失敗に注意
 - ローカルに未コミット変更があると `git pull` がエラーで中止される
 - pull 後は `git log --oneline -3` で期待するコミットが反映されたか確認する

@@ -46,58 +46,108 @@ function Show-Notification {
     Start-Process powershell -ArgumentList '-NoProfile', '-WindowStyle', 'Hidden', '-EncodedCommand', $encoded -WindowStyle Hidden
 }
 
-function Get-RevitVersion {
+$AllRevitVersions = @("2021", "2022", "2023", "2024", "2025", "2026")
+
+# Versions built by the most recent Run-Build call (for notifications)
+$script:LastBuildVersions = @()
+
+function Get-DefaultRevitVersion {
     $configPath = ".\dev-config.json"
     $ver = "2022"
     if (Test-Path $configPath) {
         try {
             $cfg = Get-Content $configPath -Raw | ConvertFrom-Json
-            $ver = $cfg.defaultRevitVersion
+            if ($cfg.defaultRevitVersion) { $ver = "$($cfg.defaultRevitVersion)" }
         } catch { }
     }
     return $ver
 }
 
-function Run-Build {
-    # Run QuickBuild and check success by DLL timestamp (exit code is unreliable via & .\script.ps1)
-    $revitVer = Get-RevitVersion
-    $dllPath = ".\bin\Release\Revit$revitVer\Tools28.dll"
-
-    # Record DLL timestamp before build
-    $dllTimeBefore = $null
-    if (Test-Path $dllPath) {
-        $dllTimeBefore = (Get-Item $dllPath).LastWriteTime
-    }
-
-    # Capture build output to log file for diagnostics
-    $buildLog = Join-Path $PSScriptRoot "AutoBuild_detail.log"
-    $output = & .\QuickBuild.ps1 2>&1
-    $exitCode = $LASTEXITCODE
-    $output | Out-File -FilePath $buildLog -Encoding UTF8 -Force
-
-    # Check success: DLL exists AND was updated (newer timestamp)
-    $dllExists = Test-Path $dllPath
-    $dllUpdated = $false
-    if ($dllExists) {
-        $dllTimeAfter = (Get-Item $dllPath).LastWriteTime
-        $dllUpdated = ($dllTimeBefore -eq $null) -or ($dllTimeAfter -gt $dllTimeBefore)
-    }
-    $success = $dllExists -and $dllUpdated
-
-    Write-Log "Build result: exitCode=$exitCode, dllExists=$dllExists, dllUpdated=$dllUpdated, success=$success" "Gray"
-
-    # Log build details on failure
-    if (-not $success) {
-        Write-Log "--- Build output (last 20 lines) ---" "Yellow"
-        if (Test-Path $buildLog) {
-            Get-Content $buildLog -Tail 20 | ForEach-Object { Write-Log "  $_" "Gray" }
-        } else {
-            Write-Log "  (no build log created)" "Red"
+function Get-BuildVersions {
+    # Determine which Revit version(s) to build for the current HEAD commit.
+    #
+    # If the commit message contains a marker, use those versions for THIS build only:
+    #   [build:2024]          -> Revit 2024
+    #   [build:2024,2025]     -> Revit 2024 and 2025
+    #   [build:all]           -> all supported versions (2021-2026)
+    # Otherwise, fall back to the default from dev-config.json (normally 2022).
+    #
+    # NOTE: The claude/** auto-merge workflow squashes to main keeping only the
+    # FIRST LINE of the commit, so the marker must be placed in the commit SUBJECT.
+    $msg = (git log HEAD -1 --format="%B" 2>$null) -join "`n"
+    if ($msg) {
+        $m = [regex]::Match($msg, '\[build:\s*([0-9,\s]+|all)\s*\]',
+            [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+        if ($m.Success) {
+            $raw = $m.Groups[1].Value.Trim()
+            if ($raw -match '(?i)all') {
+                return ,@($AllRevitVersions)
+            }
+            $vers = $raw -split ',' |
+                ForEach-Object { $_.Trim() } |
+                Where-Object { $AllRevitVersions -contains $_ } |
+                Select-Object -Unique
+            if ($vers.Count -gt 0) {
+                return ,@($vers)
+            }
         }
-        Write-Log "--- End build output ---" "Yellow"
+    }
+    return ,@((Get-DefaultRevitVersion))
+}
+
+function Run-Build {
+    # Run QuickBuild for each target version and check success by DLL timestamp
+    # (exit code is unreliable via & .\script.ps1).
+    $versions = Get-BuildVersions
+    $script:LastBuildVersions = $versions
+    Write-Log "Build target version(s): $($versions -join ', ')" "Cyan"
+
+    # Fresh build log for this run (per-version output is appended below)
+    $buildLog = Join-Path $PSScriptRoot "AutoBuild_detail.log"
+    Set-Content -Path $buildLog -Value "" -Encoding UTF8 -ErrorAction SilentlyContinue
+
+    $allSuccess = $true
+
+    foreach ($revitVer in $versions) {
+        $dllPath = ".\bin\Release\Revit$revitVer\Tools28.dll"
+
+        # Record DLL timestamp before build
+        $dllTimeBefore = $null
+        if (Test-Path $dllPath) {
+            $dllTimeBefore = (Get-Item $dllPath).LastWriteTime
+        }
+
+        # Build the explicitly-requested version (do NOT rely on dev-config default)
+        Add-Content -Path $buildLog -Value "===== Revit $revitVer =====" -Encoding UTF8 -ErrorAction SilentlyContinue
+        $output = & .\QuickBuild.ps1 -RevitVersion $revitVer 2>&1
+        $exitCode = $LASTEXITCODE
+        $output | Out-File -FilePath $buildLog -Encoding UTF8 -Append
+
+        # Check success: DLL exists AND was updated (newer timestamp)
+        $dllExists = Test-Path $dllPath
+        $dllUpdated = $false
+        if ($dllExists) {
+            $dllTimeAfter = (Get-Item $dllPath).LastWriteTime
+            $dllUpdated = ($dllTimeBefore -eq $null) -or ($dllTimeAfter -gt $dllTimeBefore)
+        }
+        $success = $dllExists -and $dllUpdated
+
+        Write-Log "Build[$revitVer] result: exitCode=$exitCode, dllExists=$dllExists, dllUpdated=$dllUpdated, success=$success" "Gray"
+
+        # Log build details on failure
+        if (-not $success) {
+            $allSuccess = $false
+            Write-Log "--- Build[$revitVer] output (last 20 lines) ---" "Yellow"
+            if (Test-Path $buildLog) {
+                Get-Content $buildLog -Tail 20 | ForEach-Object { Write-Log "  $_" "Gray" }
+            } else {
+                Write-Log "  (no build log created)" "Red"
+            }
+            Write-Log "--- End build output ---" "Yellow"
+        }
     }
 
-    return $success
+    return $allSuccess
 }
 
 # ========================================
@@ -168,7 +218,7 @@ if ($localHead -ne $remoteLatest) {
     if ($buildSuccess) {
         Write-Log "Startup build OK! Restart Revit to test." "Green"
         $t = "Tools28 " + (-join([char[]]@(0x30D3,0x30EB,0x30C9,0x6210,0x529F)))
-        $b = (-join([char[]]@(0x30C7,0x30D7,0x30ED,0x30A4,0x5B8C,0x4E86))) + "`n`n$commitMsg`n`nRevit " + (-join([char[]]@(0x3092,0x518D,0x8D77,0x52D5,0x3057,0x3066,0x304F,0x3060,0x3055,0x3044)))
+        $b = (-join([char[]]@(0x30C7,0x30D7,0x30ED,0x30A4,0x5B8C,0x4E86))) + "`n`n$commitMsg`n`nRevit $($script:LastBuildVersions -join ', ') " + (-join([char[]]@(0x3092,0x518D,0x8D77,0x52D5,0x3057,0x3066,0x304F,0x3060,0x3055,0x3044)))
         Show-Notification $b $t "Information"
     } else {
         Write-Log "Startup build FAILED." "Red"
@@ -236,7 +286,7 @@ while ($true) {
             if ($buildSuccess) {
                 Write-Log "Build & Deploy OK! Restart Revit to test." "Green"
                 $t = "Tools28 " + (-join([char[]]@(0x30D3,0x30EB,0x30C9,0x6210,0x529F)))
-                $b = (-join([char[]]@(0x30C7,0x30D7,0x30ED,0x30A4,0x5B8C,0x4E86))) + "`n`n$commitMsg`n`nRevit " + (-join([char[]]@(0x3092,0x518D,0x8D77,0x52D5,0x3057,0x3066,0x304F,0x3060,0x3055,0x3044)))
+                $b = (-join([char[]]@(0x30C7,0x30D7,0x30ED,0x30A4,0x5B8C,0x4E86))) + "`n`n$commitMsg`n`nRevit $($script:LastBuildVersions -join ', ') " + (-join([char[]]@(0x3092,0x518D,0x8D77,0x52D5,0x3057,0x3066,0x304F,0x3060,0x3055,0x3044)))
                 Show-Notification $b $t "Information"
             } else {
                 Write-Log "Build FAILED." "Red"
