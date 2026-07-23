@@ -301,7 +301,7 @@ namespace Tools28.Localization
             { "Export.RemoveFromOutput", "Remove from output" },
             { "Export.MoveUp", "Move up" },
             { "Export.MoveDown", "Move down" },
-            { "Export.SeparateSheets", "Separate sheets by category" },
+            { "Export.SeparateSheets", "Split output Excel into sheets per category" },
             { "Export.RestoreSettings", "Restore" },
             { "Export.LoadSettings", "Load" },
             { "Export.SaveSettings", "Save" },

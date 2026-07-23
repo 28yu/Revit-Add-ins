@@ -301,7 +301,7 @@ namespace Tools28.Localization
             { "Export.RemoveFromOutput", "出力から削除" },
             { "Export.MoveUp", "上へ移動" },
             { "Export.MoveDown", "下へ移動" },
-            { "Export.SeparateSheets", "カテゴリ毎にシートを分ける" },
+            { "Export.SeparateSheets", "出力Excelをカテゴリ毎にシートに分ける" },
             { "Export.RestoreSettings", "設定復元" },
             { "Export.LoadSettings", "設定読込" },
             { "Export.SaveSettings", "設定保存" },

@@ -301,7 +301,7 @@ namespace Tools28.Localization
             { "Export.RemoveFromOutput", "从输出中删除" },
             { "Export.MoveUp", "上移" },
             { "Export.MoveDown", "下移" },
-            { "Export.SeparateSheets", "按类别分工作表" },
+            { "Export.SeparateSheets", "将输出Excel按类别分成工作表" },
             { "Export.RestoreSettings", "恢复" },
             { "Export.LoadSettings", "加载" },
             { "Export.SaveSettings", "保存" },

@@ -319,6 +319,11 @@ git pull origin main
 - 旧: `.Take(50)` で先頭 50 要素だけサンプリング → レアなタイプのパラメータが漏れる
 - 新: 「各タイプにつき先頭インスタンス 1 件」+「カテゴリの全タイプ（`WhereElementIsElementType`）」で重複排除しつつ網羅
 
+### ヘッダー行の固定（ウィンドウ枠固定）
+- 書き出した Excel はスクロールしても1行目（ヘッダー）が常に見えるように固定する
+- ClosedXML: ヘッダー書き込み後に `worksheet.SheetView.FreezeRows(1)` を呼ぶ
+- 分割シート／単一シートの両方の書き出しパスに追加
+
 ### 配布ZIP自動アップロード（設定済み情報）
 - **PAT**: Classic token（`repo` スコープ）— Fine-grained token では権限不足でリリース作成が失敗する
 - **Secret名**: `DOWNLOAD_SITE_TOKEN`（Revit-Add-ins リポジトリの Settings → Secrets → Actions に登録）

@@ -106,6 +106,9 @@ namespace Tools28.Commands.ExcelExportImport.Services
                 // 1行目の高さを25に設定
                 worksheet.Row(1).Height = 25;
 
+                // ヘッダー行（1行目）を固定してスクロール時も常に表示
+                worksheet.SheetView.FreezeRows(1);
+
                 // データ行を作成
                 var elements = RevitCategoryHelper.GetElementsByCategory(
                     doc, category.BuiltInCategory, scope, activeView, selectionIds);
@@ -210,6 +213,9 @@ namespace Tools28.Commands.ExcelExportImport.Services
             headerRange.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
 
             worksheet.Row(1).Height = 25;
+
+            // ヘッダー行（1行目）を固定してスクロール時も常に表示
+            worksheet.SheetView.FreezeRows(1);
 
             // 列幅計算用（ヘッダー幅で初期化）
             int totalCols = allParams.Count + 2;
