@@ -109,23 +109,33 @@ namespace Tools28.Commands.ExcelExportImport.Services
                 // データ行を作成
                 var elements = RevitCategoryHelper.GetElementsByCategory(
                     doc, category.BuiltInCategory, scope, activeView, selectionIds);
+
+                // 列幅計算用（ヘッダー幅で初期化。2回目の全走査を避けるため書き込みと同時に集計）
+                int totalCols = categoryParams.Count + 2;
+                double[] colWidths = new double[totalCols];
+                for (int c = 0; c < totalCols; c++)
+                    colWidths[c] = CalculateTextWidth(worksheet.Cell(1, c + 1).GetString() ?? "") + 8;
+
+                // タイプパラメータ値のキャッシュ（同一タイプのインスタンスは値が同じ）
+                var typeElemCache = new Dictionary<long, Element>();
+                var typeValueCache = new Dictionary<string, string>();
+
                 int row = 2;
 
                 foreach (var elem in elements)
                 {
-#if REVIT2026
-                    worksheet.Cell(row, 1).Value = elem.Id.Value;
-#else
-                    worksheet.Cell(row, 1).Value = elem.Id.IntValue();
-#endif
+                    long elemId = ElementIdToLong(elem.Id);
+                    worksheet.Cell(row, 1).Value = elemId;
+                    UpdateColWidth(colWidths, 0, elemId.ToString());
+
                     worksheet.Cell(row, 2).Value = category.Name;
+                    UpdateColWidth(colWidths, 1, category.Name);
 
                     for (int i = 0; i < categoryParams.Count; i++)
                     {
                         var paramInfo = categoryParams[i];
-                        var param = ParameterService.FindParameter(
-                            elem, paramInfo.RawName, paramInfo.IsTypeParameter, doc);
-                        string value = ParameterService.GetParameterValueAsString(param);
+                        string value = ResolveParameterValue(
+                            elem, paramInfo, doc, typeElemCache, typeValueCache);
 
                         if (double.TryParse(value, out double numValue))
                         {
@@ -135,17 +145,18 @@ namespace Tools28.Commands.ExcelExportImport.Services
                         {
                             worksheet.Cell(row, i + 3).Value = value;
                         }
+                        UpdateColWidth(colWidths, i + 2, value);
                     }
 
                     row++;
                 }
 
-                AdjustColumnWidths(worksheet, categoryParams.Count + 2, row - 1);
+                ApplyColumnWidths(worksheet, colWidths);
 
-                // オートフィルタを設定
+                // オートフィルタを設定（全走査を避けるため既知の範囲を直接指定）
                 if (row > 2)
                 {
-                    worksheet.RangeUsed().SetAutoFilter();
+                    worksheet.Range(1, 1, row - 1, totalCols).SetAutoFilter();
                 }
 
                 results[category.Name] = elements.Count;
@@ -200,6 +211,16 @@ namespace Tools28.Commands.ExcelExportImport.Services
 
             worksheet.Row(1).Height = 25;
 
+            // 列幅計算用（ヘッダー幅で初期化）
+            int totalCols = allParams.Count + 2;
+            double[] colWidths = new double[totalCols];
+            for (int c = 0; c < totalCols; c++)
+                colWidths[c] = CalculateTextWidth(worksheet.Cell(1, c + 1).GetString() ?? "") + 8;
+
+            // タイプパラメータ値のキャッシュ（同一タイプのインスタンスは値が同じ）
+            var typeElemCache = new Dictionary<long, Element>();
+            var typeValueCache = new Dictionary<string, string>();
+
             int row = 2;
 
             foreach (var category in selectedCategories)
@@ -211,32 +232,33 @@ namespace Tools28.Commands.ExcelExportImport.Services
                 if (categoryParams.Count == 0)
                     continue;
 
+                // ヘッダー列（DisplayName）→ このカテゴリのパラメータ の対応を事前構築
+                var paramByDisplay = new Dictionary<string, ParameterInfo>();
+                foreach (var p in categoryParams)
+                    if (!paramByDisplay.ContainsKey(p.DisplayName))
+                        paramByDisplay[p.DisplayName] = p;
+
                 var elements = RevitCategoryHelper.GetElementsByCategory(
                     doc, category.BuiltInCategory, scope, activeView, selectionIds);
 
                 foreach (var elem in elements)
                 {
-#if REVIT2026
-                    worksheet.Cell(row, 1).Value = elem.Id.Value;
-#else
-                    worksheet.Cell(row, 1).Value = elem.Id.IntValue();
-#endif
+                    long elemId = ElementIdToLong(elem.Id);
+                    worksheet.Cell(row, 1).Value = elemId;
+                    UpdateColWidth(colWidths, 0, elemId.ToString());
+
                     worksheet.Cell(row, 2).Value = category.Name;
+                    UpdateColWidth(colWidths, 1, category.Name);
 
                     // 各パラメータの値を対応する列に書き込む
                     for (int i = 0; i < allParams.Count; i++)
                     {
-                        var headerParam = allParams[i];
                         // このカテゴリに該当パラメータがあるか確認
-                        var matchParam = categoryParams
-                            .FirstOrDefault(p => p.DisplayName == headerParam.DisplayName);
-
-                        if (matchParam == null)
+                        if (!paramByDisplay.TryGetValue(allParams[i].DisplayName, out var matchParam))
                             continue;
 
-                        var param = ParameterService.FindParameter(
-                            elem, matchParam.RawName, matchParam.IsTypeParameter, doc);
-                        string value = ParameterService.GetParameterValueAsString(param);
+                        string value = ResolveParameterValue(
+                            elem, matchParam, doc, typeElemCache, typeValueCache);
 
                         if (double.TryParse(value, out double numValue))
                         {
@@ -246,6 +268,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
                         {
                             worksheet.Cell(row, i + 3).Value = value;
                         }
+                        UpdateColWidth(colWidths, i + 2, value);
                     }
 
                     row++;
@@ -254,35 +277,94 @@ namespace Tools28.Commands.ExcelExportImport.Services
                 results[category.Name] = elements.Count;
             }
 
-            AdjustColumnWidths(worksheet, allParams.Count + 2, row - 1);
+            ApplyColumnWidths(worksheet, colWidths);
 
-            // オートフィルタを設定
+            // オートフィルタを設定（全走査を避けるため既知の範囲を直接指定）
             if (row > 2)
             {
-                worksheet.RangeUsed().SetAutoFilter();
+                worksheet.Range(1, 1, row - 1, totalCols).SetAutoFilter();
             }
         }
 
         /// <summary>
-        /// 列幅を自動調整
+        /// ElementId を long に変換（バージョン差異を吸収）
         /// </summary>
-        private static void AdjustColumnWidths(IXLWorksheet worksheet, int lastCol, int lastRow)
+        private static long ElementIdToLong(ElementId id)
         {
-            for (int col = 1; col <= lastCol; col++)
+#if REVIT2026
+            return id.Value;
+#else
+            return id.IntValue();
+#endif
+        }
+
+        /// <summary>
+        /// パラメータ値を文字列で取得（タイプパラメータはキャッシュを利用）
+        /// </summary>
+        /// <remarks>
+        /// タイプパラメータは同一タイプの全インスタンスで値が同じため、
+        /// (タイプID, パラメータ名) 単位でキャッシュして再計算を避ける。
+        /// インスタンスパラメータは <see cref="Element.LookupParameter"/> で直接引く
+        /// （全パラメータの線形走査を回避）。
+        /// </remarks>
+        private static string ResolveParameterValue(
+            Element elem,
+            ParameterInfo paramInfo,
+            Document doc,
+            Dictionary<long, Element> typeElemCache,
+            Dictionary<string, string> typeValueCache)
+        {
+            if (paramInfo.IsTypeParameter)
             {
-                double maxDataWidth = 0;
-                for (int r = 2; r <= lastRow; r++)
+                var typeId = elem.GetTypeId();
+                if (typeId == null || typeId == ElementId.InvalidElementId)
+                    return "";
+
+                long tid = ElementIdToLong(typeId);
+                string cacheKey = tid + "|" + paramInfo.RawName;
+                if (typeValueCache.TryGetValue(cacheKey, out string cached))
+                    return cached;
+
+                if (!typeElemCache.TryGetValue(tid, out Element typeElem))
                 {
-                    string text = worksheet.Cell(r, col).GetString();
-                    if (string.IsNullOrEmpty(text)) continue;
-                    double w = CalculateTextWidth(text);
-                    if (w > maxDataWidth) maxDataWidth = w;
+                    typeElem = doc.GetElement(typeId);
+                    typeElemCache[tid] = typeElem;
                 }
-                string headerText = worksheet.Cell(1, col).GetString();
-                double headerWidth = CalculateTextWidth(headerText ?? "") + 8;
-                double dataWidth = maxDataWidth + 2;
-                worksheet.Column(col).Width = Math.Max(headerWidth, dataWidth);
+
+                string value = "";
+                if (typeElem != null)
+                {
+                    var p = typeElem.LookupParameter(paramInfo.RawName);
+                    value = ParameterService.GetParameterValueAsString(p);
+                }
+
+                typeValueCache[cacheKey] = value;
+                return value;
             }
+            else
+            {
+                var p = elem.LookupParameter(paramInfo.RawName);
+                return ParameterService.GetParameterValueAsString(p);
+            }
+        }
+
+        /// <summary>
+        /// 指定列の最大表示幅を更新（書き込みと同時に集計するためのヘルパー）
+        /// </summary>
+        private static void UpdateColWidth(double[] colWidths, int colIndex, string text)
+        {
+            if (string.IsNullOrEmpty(text)) return;
+            double w = CalculateTextWidth(text) + 2;
+            if (w > colWidths[colIndex]) colWidths[colIndex] = w;
+        }
+
+        /// <summary>
+        /// 集計済みの列幅をワークシートに適用
+        /// </summary>
+        private static void ApplyColumnWidths(IXLWorksheet worksheet, double[] colWidths)
+        {
+            for (int c = 0; c < colWidths.Length; c++)
+                worksheet.Column(c + 1).Width = colWidths[c];
 
             // 要素ID列の最小幅を確保
             if (worksheet.Column(1).Width < 12)
