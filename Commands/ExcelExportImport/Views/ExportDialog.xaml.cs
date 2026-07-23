@@ -357,35 +357,45 @@ namespace Tools28.Commands.ExcelExportImport.Views
 
         private void ApplySettings(ExportSettings settings)
         {
-            // カテゴリ選択を復元
+            // カテゴリ選択を復元（Contains の O(n) を避けるため HashSet 化）
+            var selectedSet = new HashSet<string>(settings.SelectedCategories ?? new List<string>());
             foreach (var cat in _allCategories)
             {
-                cat.IsChecked = settings.SelectedCategories.Contains(cat.Name);
+                cat.IsChecked = selectedSet.Contains(cat.Name);
             }
 
             CategoryListBox.ItemsSource = null;
             CategoryListBox.ItemsSource = _allCategories;
 
-            // パラメータ一覧を更新
+            // パラメータ一覧を更新（Revitからのパラメータ取得はここで1回だけ実行）
             UpdateParameterList();
+
+            // 出力パラメータの照合用に辞書を構築（線形探索の繰り返しを回避）
+            var paramLookup = new Dictionary<string, ParameterInfo>();
+            foreach (var p in _allParameters)
+            {
+                string key = p.RawName + "|" + p.IsTypeParameter + "|" + p.CategoryName;
+                if (!paramLookup.ContainsKey(key))
+                    paramLookup[key] = p;
+            }
 
             // 出力パラメータを復元
             _outputParameters.Clear();
             foreach (var entry in settings.OutputParameters)
             {
-                var match = _allParameters.FirstOrDefault(p =>
-                    p.RawName == entry.RawName &&
-                    p.IsTypeParameter == entry.IsTypeParameter &&
-                    p.CategoryName == entry.CategoryName);
-
-                if (match != null)
+                string key = entry.RawName + "|" + entry.IsTypeParameter + "|" + entry.CategoryName;
+                if (paramLookup.TryGetValue(key, out var match))
                 {
                     _outputParameters.Add(match);
                 }
             }
 
             RefreshOutputList();
-            UpdateParameterList();
+
+            // 出力に移したパラメータを中央リストから除外して再表示。
+            // ここで UpdateParameterList() を再呼び出しすると Revit へのパラメータ取得が
+            // もう一度走って重いため、取得済みの _allParameters から表示だけ更新する。
+            FilterParameterList(null);
         }
 
         #endregion

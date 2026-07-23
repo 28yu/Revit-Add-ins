@@ -159,8 +159,9 @@ namespace Tools28.Commands.ExcelExportImport.Services
                 bool anyMarked = false;
                 try
                 {
-                    // 画面更新を一時停止（パフォーマンス向上＋最後に一括更新）
+                    // 画面更新・イベントを一時停止（COM往復削減＋最後に一括反映）
                     try { app.ScreenUpdating = false; } catch { }
+                    try { app.EnableEvents = false; } catch { }
 
                     // Excel COM の Interior.Color は R + G*256 + B*65536 形式
                     // R=255, G=255, B=153
@@ -189,74 +190,73 @@ namespace Tools28.Commands.ExcelExportImport.Services
                             if (rowCount < 2 || colCount < 3)
                                 continue;
 
-                            // ヘッダー行からパラメータ名を取得（(*変更不可)サフィックスは除去）
-                            var paramHeaders = new List<string>();
-                            for (int col = 3; col <= colCount; col++)
+                            // ヘッダー行とID列を「一括」で読み取る（セル単位のCOM往復を回避）
+                            // ※ 従来は全セルを1つずつ読んでいたため、大きな表で膨大なCOM呼び出しとなりフリーズしていた
+                            var paramHeaders = ReadRowValues(sheet, 1, 3, colCount);
+                            var idValues = ReadColumnValues(sheet, 2, rowCount, 1);
+
+                            for (int i = 0; i < paramHeaders.Count; i++)
                             {
-                                dynamic cell = sheet.Cells[1, col];
-                                string headerText = Convert.ToString(cell.Value ?? "");
-                                if (headerText.EndsWith("(*変更不可)"))
-                                    headerText = headerText.Substring(0, headerText.Length - "(*変更不可)".Length);
-                                paramHeaders.Add(headerText);
-                                Marshal.ReleaseComObject(cell);
+                                if (paramHeaders[i] != null && paramHeaders[i].EndsWith("(*変更不可)"))
+                                    paramHeaders[i] = paramHeaders[i].Substring(0, paramHeaders[i].Length - "(*変更不可)".Length);
                             }
 
-                            // データ行を走査して変更がある行全体に色を付ける
+                            // データ行を走査（メモリ上で判定し、色付けが必要な行だけCOM操作）
                             for (int row = 2; row <= rowCount; row++)
                             {
+                                object idValue = idValues[row - 2];
+                                if (idValue == null)
+                                    continue;
+
+                                // ElementIdを整数文字列に正規化
+                                string elementIdStr;
+                                if (idValue is double dVal)
+                                    elementIdStr = ((int)dVal).ToString();
+                                else
+                                    elementIdStr = Convert.ToString(idValue).Trim();
+
+                                // セル単位で成功/失敗を判定
+                                var successCols = new List<int>();
+                                var failedCols = new List<int>();
+                                for (int i = 0; i < paramHeaders.Count; i++)
+                                {
+                                    string key = elementIdStr + "|" + paramHeaders[i];
+                                    if (changedSet != null && changedSet.Contains(key))
+                                        successCols.Add(i + 3);
+                                    else if (failedSet != null && failedSet.Contains(key))
+                                        failedCols.Add(i + 3);
+                                }
+
+                                if (successCols.Count == 0 && failedCols.Count == 0)
+                                    continue;
+
                                 try
                                 {
-                                    dynamic idCell = sheet.Cells[row, 1];
-                                    object idValue = idCell.Value;
-                                    Marshal.ReleaseComObject(idCell);
+                                    // 背景色: 行全体を1回のCOM呼び出しで着色
+                                    dynamic c1 = sheet.Cells[row, 1];
+                                    dynamic c2 = sheet.Cells[row, colCount];
+                                    dynamic rowRange = sheet.Range[c1, c2];
+                                    rowRange.Interior.Color = excelColor;
+                                    Marshal.ReleaseComObject(rowRange);
+                                    Marshal.ReleaseComObject(c2);
+                                    Marshal.ReleaseComObject(c1);
 
-                                    if (idValue == null)
-                                        continue;
-
-                                    // ElementIdを整数文字列に正規化
-                                    string elementIdStr;
-                                    if (idValue is double dVal)
-                                        elementIdStr = ((int)dVal).ToString();
-                                    else
-                                        elementIdStr = Convert.ToString(idValue).Trim();
-
-                                    // セル単位で成功/失敗を判定
-                                    var successCols = new HashSet<int>();
-                                    var failedCols = new HashSet<int>();
-                                    for (int i = 0; i < paramHeaders.Count; i++)
+                                    // フォント色: 変更のあったセルのみ（通常は少数）
+                                    foreach (int col in successCols)
                                     {
-                                        string key = elementIdStr + "|" + paramHeaders[i];
-                                        if (changedSet != null && changedSet.Contains(key))
-                                            successCols.Add(i + 3);
-                                        else if (failedSet != null && failedSet.Contains(key))
-                                            failedCols.Add(i + 3);
+                                        dynamic cell = sheet.Cells[row, col];
+                                        cell.Font.Color = blueColor;
+                                        cell.Font.Bold = true;
+                                        Marshal.ReleaseComObject(cell);
                                     }
-
-                                    // 変更・失敗がある行は全列に背景色、セル単位で色分け
-                                    if (successCols.Count > 0 || failedCols.Count > 0)
+                                    foreach (int col in failedCols)
                                     {
-                                        for (int col = 1; col <= colCount; col++)
-                                        {
-                                            dynamic cell = sheet.Cells[row, col];
-                                            cell.Interior.Color = excelColor;
-                                            Marshal.ReleaseComObject(cell);
-                                        }
-                                        foreach (int col in successCols)
-                                        {
-                                            dynamic cell = sheet.Cells[row, col];
-                                            cell.Font.Color = blueColor;
-                                            cell.Font.Bold = true;
-                                            Marshal.ReleaseComObject(cell);
-                                        }
-                                        foreach (int col in failedCols)
-                                        {
-                                            dynamic cell = sheet.Cells[row, col];
-                                            cell.Font.Color = redColor;
-                                            cell.Font.Bold = true;
-                                            Marshal.ReleaseComObject(cell);
-                                        }
-                                        anyMarked = true;
+                                        dynamic cell = sheet.Cells[row, col];
+                                        cell.Font.Color = redColor;
+                                        cell.Font.Bold = true;
+                                        Marshal.ReleaseComObject(cell);
                                     }
+                                    anyMarked = true;
                                 }
                                 catch
                                 {
@@ -316,7 +316,8 @@ namespace Tools28.Commands.ExcelExportImport.Services
                 }
                 finally
                 {
-                    // 画面更新を再開（これにより色付けが画面に反映される）
+                    // 画面更新・イベントを再開（これにより色付けが画面に反映される）
+                    try { app.EnableEvents = true; } catch { }
                     try { app.ScreenUpdating = true; } catch { }
                     Marshal.ReleaseComObject(targetWb);
                 }
@@ -355,6 +356,66 @@ namespace Tools28.Commands.ExcelExportImport.Services
             {
                 return null;
             }
+        }
+
+        /// <summary>
+        /// 1行分のセル値を一括読み取り（col1..col2 を1回のCOM呼び出しで取得）
+        /// </summary>
+        private static List<string> ReadRowValues(dynamic sheet, int row, int col1, int col2)
+        {
+            var list = new List<string>();
+            dynamic c1 = sheet.Cells[row, col1];
+            dynamic c2 = sheet.Cells[row, col2];
+            dynamic range = sheet.Range[c1, c2];
+            object val = range.Value2;
+            Marshal.ReleaseComObject(range);
+            Marshal.ReleaseComObject(c2);
+            Marshal.ReleaseComObject(c1);
+
+            if (val is object[,] arr)
+            {
+                int lo1 = arr.GetLowerBound(0);
+                int lo2 = arr.GetLowerBound(1);
+                int cols = arr.GetLength(1);
+                for (int c = 0; c < cols; c++)
+                    list.Add(Convert.ToString(arr[lo1, lo2 + c] ?? ""));
+            }
+            else
+            {
+                // 単一セル（col1 == col2）
+                list.Add(Convert.ToString(val ?? ""));
+            }
+            return list;
+        }
+
+        /// <summary>
+        /// 1列分のセル値を一括読み取り（row1..row2 を1回のCOM呼び出しで取得）
+        /// </summary>
+        private static object[] ReadColumnValues(dynamic sheet, int row1, int row2, int col)
+        {
+            int n = row2 - row1 + 1;
+            var values = new object[n];
+            dynamic c1 = sheet.Cells[row1, col];
+            dynamic c2 = sheet.Cells[row2, col];
+            dynamic range = sheet.Range[c1, c2];
+            object val = range.Value2;
+            Marshal.ReleaseComObject(range);
+            Marshal.ReleaseComObject(c2);
+            Marshal.ReleaseComObject(c1);
+
+            if (val is object[,] arr)
+            {
+                int lo1 = arr.GetLowerBound(0);
+                int lo2 = arr.GetLowerBound(1);
+                for (int r = 0; r < n; r++)
+                    values[r] = arr[lo1 + r, lo2];
+            }
+            else
+            {
+                // 単一セル（row1 == row2）
+                values[0] = val;
+            }
+            return values;
         }
 
         /// <summary>

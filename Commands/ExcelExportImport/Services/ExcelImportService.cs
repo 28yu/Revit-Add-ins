@@ -58,7 +58,17 @@ namespace Tools28.Commands.ExcelExportImport.Services
         /// </summary>
         public static List<ImportPreviewRow> GeneratePreview(Document doc, string filePath)
         {
+            return GeneratePreview(doc, filePath, out _);
+        }
+
+        /// <summary>
+        /// Excelファイルからインポートプレビューを生成し、シート名一覧も同時に取得する。
+        /// （ファイルを1回開くだけで済み、GetSheetNames の別途オープン（二重読込）を避けられる）
+        /// </summary>
+        public static List<ImportPreviewRow> GeneratePreview(Document doc, string filePath, out List<string> sheetNames)
+        {
             var preview = new List<ImportPreviewRow>();
+            sheetNames = new List<string>();
 
             // タイプパラメータの現在値・読取専用フラグは同一タイプの全インスタンスで共通。
             // プレビューは読み取りのみなので (タイプID|パラメータ名) 単位でキャッシュして再計算を避ける。
@@ -70,6 +80,8 @@ namespace Tools28.Commands.ExcelExportImport.Services
             {
                 foreach (var worksheet in workbook.Worksheets)
                 {
+                    sheetNames.Add(worksheet.Name);
+
                     var lastRow = worksheet.LastRowUsed();
                     var lastCol = worksheet.LastColumnUsed();
                     if (lastRow == null || lastCol == null)

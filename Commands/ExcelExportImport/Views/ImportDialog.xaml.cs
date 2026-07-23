@@ -220,12 +220,11 @@ namespace Tools28.Commands.ExcelExportImport.Views
         {
             try
             {
-                // シート情報を表示
-                var sheetNames = ExcelImportService.GetSheetNames(_selectedFilePath);
-                SheetInfoText.Text = $"シート数: {sheetNames.Count}  ({string.Join(", ", sheetNames)})";
+                // プレビューを生成（同時にシート名も取得し、ファイルを1回開くだけで済ませる）
+                _previewRows = ExcelImportService.GeneratePreview(_doc, _selectedFilePath, out var sheetNames);
 
-                // プレビューを生成
-                _previewRows = ExcelImportService.GeneratePreview(_doc, _selectedFilePath);
+                // シート情報を表示
+                SheetInfoText.Text = $"シート数: {sheetNames.Count}  ({string.Join(", ", sheetNames)})";
 
                 // 書き込み可能な変更のみ表示（読み取り専用パラメータは除外）
                 var changedRows = _previewRows

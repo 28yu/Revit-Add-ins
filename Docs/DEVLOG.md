@@ -324,6 +324,26 @@ git pull origin main
 - ClosedXML: ヘッダー書き込み後に `worksheet.SheetView.FreezeRows(1)` を呼ぶ
 - 分割シート／単一シートの両方の書き出しパスに追加
 
+### ⚠️ 開いているExcelを読み込む/色付けするとフリーズする問題（COMのセル単位アクセス）
+- **症状**: インポート対象のExcelが**開いている**とき、読み込み〜色付けでRevitがフリーズする
+- **原因**: `ExcelProcessHelper.MarkCellsViaCom`（開いているExcelにCOMで色付け）が
+  `sheet.Cells[row, col]` を**1セルずつ**アクセスしていた。COMはプロセス間呼び出しのため、
+  大きな表では全セル分の往復（O(行×列)）が発生し数十秒〜フリーズになる
+  （※Excelが閉じている場合は ClosedXML でディスク上のファイルを編集するのでこの経路には入らない）
+- **修正**:
+  1. ヘッダー行・ID列を **`Range.Value2` で一括読み取り**（1シートあたり数回のCOM呼び出しに削減）
+  2. メモリ上で対象行を判定し、**色付けが必要な行だけ**COM操作。背景色は行範囲を1回で着色
+  3. `Application.ScreenUpdating=false` に加え `EnableEvents=false` も設定（finallyで復元）
+- **読み込み側**: `GeneratePreview` にシート名一覧の out 版を追加し、`GetSheetNames` の
+  別途オープン（ClosedXML二重パース）を解消。プレビュー生成でファイルを1回だけ開く
+
+### ⚠️ 設定ファイル(.json)読込が遅い問題（パラメータ二重取得の解消）
+- **原因**: `ExportDialog.ApplySettings` が `UpdateParameterList()`（選択カテゴリの
+  Revitパラメータ取得）を**2回**呼んでいた。JSONパース自体は軽く、遅さの主因はこの二重取得
+- **修正**:
+  1. 2回目は Revit 再取得ではなく、取得済み `_allParameters` から表示だけ更新する `FilterParameterList(null)` に変更
+  2. カテゴリ照合を `HashSet`、出力パラメータ照合を `Dictionary` にして線形探索を排除
+
 ### ⚠️ 大容量モデルでインポートが遅い問題（二重全走査の解消）
 - **症状**: エクスポート同様、要素数の多いモデルでエクセルインポートが重い
 - **原因**:
