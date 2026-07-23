@@ -60,6 +60,11 @@ namespace Tools28.Commands.ExcelExportImport.Services
         {
             var preview = new List<ImportPreviewRow>();
 
+            // タイプパラメータの現在値・読取専用フラグは同一タイプの全インスタンスで共通。
+            // プレビューは読み取りのみなので (タイプID|パラメータ名) 単位でキャッシュして再計算を避ける。
+            var typeCurrentCache = new Dictionary<string, string>();
+            var typeReadOnlyCache = new Dictionary<string, bool>();
+
             using (var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
             using (var workbook = new XLWorkbook(stream))
             {
@@ -128,11 +133,34 @@ namespace Tools28.Commands.ExcelExportImport.Services
                                 ? headerName.Substring(2)
                                 : headerName;
 
-                            var param = ParameterService.FindParameter(elem, rawName, isTypeParam, doc);
-                            string currentValue = ParameterService.GetParameterValueAsString(param);
-                            // タイプ変更パラメータはIsReadOnlyでもChangeTypeIdで変更可能
-                            bool isReadOnly = param == null
-                                || (param.IsReadOnly && !ParameterService.IsTypeChangeParameter(param));
+                            string currentValue;
+                            bool isReadOnly;
+                            if (isTypeParam)
+                            {
+                                // タイプパラメータ: (タイプID|名前) でキャッシュ
+                                string tkey = ElementIdToLong(elem.GetTypeId()) + "|" + rawName;
+                                if (!typeCurrentCache.TryGetValue(tkey, out currentValue))
+                                {
+                                    var tp = ParameterService.FindParameter(elem, rawName, true, doc);
+                                    currentValue = ParameterService.GetParameterValueAsString(tp);
+                                    isReadOnly = tp == null
+                                        || (tp.IsReadOnly && !ParameterService.IsTypeChangeParameter(tp));
+                                    typeCurrentCache[tkey] = currentValue;
+                                    typeReadOnlyCache[tkey] = isReadOnly;
+                                }
+                                else
+                                {
+                                    isReadOnly = typeReadOnlyCache[tkey];
+                                }
+                            }
+                            else
+                            {
+                                var param = ParameterService.FindParameter(elem, rawName, false, doc);
+                                currentValue = ParameterService.GetParameterValueAsString(param);
+                                // タイプ変更パラメータはIsReadOnlyでもChangeTypeIdで変更可能
+                                isReadOnly = param == null
+                                    || (param.IsReadOnly && !ParameterService.IsTypeChangeParameter(param));
+                            }
                             bool hasChange = !ValuesAreEqual(currentValue, newValue);
 
                             preview.Add(new ImportPreviewRow
@@ -278,6 +306,81 @@ namespace Tools28.Commands.ExcelExportImport.Services
         }
 
         /// <summary>
+        /// プレビュー結果を使って「変更あり かつ 書込み可能」なセルのみをインポートする。
+        /// Excel の再読込・全セル走査を行わないため、大容量データでも高速。
+        /// （プレビューは <see cref="GeneratePreview"/> で生成済みの値を再利用する）
+        /// </summary>
+        public static ImportResult ImportFromPreview(Document doc, List<ImportPreviewRow> previewRows)
+        {
+            var result = new ImportResult();
+            if (previewRows == null)
+                return result;
+
+            // 読み取り専用で変更できないセルはスキップ扱いで集計
+            result.SkipCount = previewRows.Count(r => r.HasChange && r.IsReadOnly);
+
+            // 実際に書き込む対象（変更あり かつ 書込み可能）だけを処理
+            foreach (var pr in previewRows.Where(r => r.HasChange && !r.IsReadOnly))
+            {
+                var elem = doc.GetElement(new ElementId(pr.ElementId));
+                if (elem == null)
+                {
+                    result.FailCount++;
+                    result.Errors.Add($"要素 {pr.ElementId} が見つかりません（パラメータ '{pr.ParameterName}'）");
+                    continue;
+                }
+
+                string headerName = pr.ParameterName;
+                bool isTypeParam = headerName.StartsWith("T-");
+                string rawName = headerName.StartsWith("T-") || headerName.StartsWith("I-")
+                    ? headerName.Substring(2)
+                    : headerName;
+
+                var param = ParameterService.FindParameter(elem, rawName, isTypeParam, doc);
+                if (param == null)
+                {
+                    result.Warnings.Add($"パラメータ '{headerName}' が見つかりません（要素 {pr.ElementId}）");
+                    result.SkipCount++;
+                    continue;
+                }
+
+                // 読み取り専用（タイプ変更パラメータは除く）は書込み不可
+                if (param.IsReadOnly && !ParameterService.IsTypeChangeParameter(param))
+                {
+                    result.SkipCount++;
+                    continue;
+                }
+
+                // プレビュー生成後にモデルが変わった場合に備えて現在値を再確認
+                string currentValue = ParameterService.GetParameterValueAsString(param);
+                if (ValuesAreEqual(currentValue, pr.NewValue))
+                {
+                    result.SkipCount++;
+                    continue;
+                }
+
+                bool success = ParameterService.IsTypeChangeParameter(param)
+                    ? ParameterService.ChangeElementType(elem, pr.NewValue, doc)
+                    : ParameterService.SetParameterValue(param, pr.NewValue);
+
+                if (success)
+                {
+                    result.SuccessCount++;
+                }
+                else
+                {
+                    result.FailCount++;
+                    result.FailedCells.Add(pr.ElementId.ToString() + "|" + headerName);
+                    result.Errors.Add(ParameterService.IsTypeChangeParameter(param)
+                        ? $"タイプ変更に失敗（要素 {pr.ElementId}, 値: '{pr.NewValue}'）— 一致するタイプが見つかりません"
+                        : $"パラメータ '{headerName}' の値設定に失敗（要素 {pr.ElementId}, 値: '{pr.NewValue}'）");
+                }
+            }
+
+            return result;
+        }
+
+        /// <summary>
         /// インポートで変更されたセルにExcelファイル上で色を付ける
         /// Excelが開いている場合はCOM経由で直接色付け、閉じている場合はClosedXMLで上書き
         /// </summary>
@@ -319,6 +422,19 @@ namespace Tools28.Commands.ExcelExportImport.Services
         public static string MarkImportedCells(string filePath, List<ImportPreviewRow> previewRows)
         {
             return MarkImportedCells(filePath, previewRows, out _);
+        }
+
+        /// <summary>
+        /// ElementId を long に変換（バージョン差異を吸収）
+        /// </summary>
+        private static long ElementIdToLong(ElementId id)
+        {
+            if (id == null) return -1;
+#if REVIT2026
+            return id.Value;
+#else
+            return id.IntValue();
+#endif
         }
 
         /// <summary>

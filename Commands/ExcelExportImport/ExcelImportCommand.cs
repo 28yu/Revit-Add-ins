@@ -39,7 +39,8 @@ namespace Tools28.Commands.ExcelExportImport
                 {
                     trans.Start();
 
-                    importResult = ExcelImportService.Import(doc, dialog.SelectedFilePath);
+                    // プレビューで計算済みの変更セルのみを書き込む（Excel再読込・全走査を回避して高速化）
+                    importResult = ExcelImportService.ImportFromPreview(doc, previewRows);
 
                     if (importResult.SuccessCount > 0)
                     {

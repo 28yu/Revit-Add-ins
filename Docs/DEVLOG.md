@@ -324,6 +324,23 @@ git pull origin main
 - ClosedXML: ヘッダー書き込み後に `worksheet.SheetView.FreezeRows(1)` を呼ぶ
 - 分割シート／単一シートの両方の書き出しパスに追加
 
+### ⚠️ 大容量モデルでインポートが遅い問題（二重全走査の解消）
+- **症状**: エクスポート同様、要素数の多いモデルでエクセルインポートが重い
+- **原因**:
+  1. `ParameterService.FindParameter` が要素の全パラメータを線形走査（エクスポートと同じ）
+  2. **同じ全セル走査を2回**実行: `GeneratePreview`（ダイアログ）と `Import`（トランザクション）で
+     Excel を再度開き、全セルに対し `FindParameter` + 値取得を繰り返していた
+- **修正**:
+  1. `FindParameterByName` を `Element.LookupParameter()`（ネイティブ）に変更 → 線形走査を廃止（プレビュー・インポート両方が高速化）
+  2. **`ImportFromPreview(doc, previewRows)` を新設**。プレビューで計算済みの「変更あり かつ 書込み可能」
+     セルのみを書き込む。トランザクション側での Excel 再読込・全セル走査が不要になり、
+     実際に変更したセル数だけ処理する（例: 38万セル中100セル変更なら100セルのみ処理）
+  3. `GeneratePreview` はタイプパラメータの現在値・読取専用フラグを `(タイプID|名前)` でキャッシュ
+     （読み取りのみで安全。同一タイプの全インスタンスで共通の値を再計算しない）
+- **カウント表示の変化**: `ImportFromPreview` は変更セル基準のため、旧 `Import` が空セル等も
+  スキップ数に含めて水増ししていた「スキップ」件数がプレビュー表示と整合する値になる（成功≒変更あり件数）
+- 旧 `Import(doc, filePath)`（ファイル直読みの全走査版）はフォールバックとして残置
+
 ### 配布ZIP自動アップロード（設定済み情報）
 - **PAT**: Classic token（`repo` スコープ）— Fine-grained token では権限不足でリリース作成が失敗する
 - **Secret名**: `DOWNLOAD_SITE_TOKEN`（Revit-Add-ins リポジトリの Settings → Secrets → Actions に登録）

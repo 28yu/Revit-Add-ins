@@ -354,12 +354,9 @@ namespace Tools28.Commands.ExcelExportImport.Services
 
         private static Parameter FindParameterByName(Element elem, string paramName)
         {
-            foreach (Parameter param in elem.Parameters)
-            {
-                if (param.Definition != null && param.Definition.Name == paramName)
-                    return param;
-            }
-            return null;
+            // LookupParameter はネイティブの名前引き（全パラメータの線形走査を回避）。
+            // 同名が複数ある場合は最初の1件を返す（旧実装と同じ挙動）。
+            return elem.LookupParameter(paramName);
         }
     }
 }
