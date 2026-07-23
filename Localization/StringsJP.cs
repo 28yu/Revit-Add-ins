@@ -311,7 +311,7 @@ namespace Tools28.Localization
             { "Export.SettingsLoadFailed", "設定の読み込みに失敗しました。\n{0}" },
             { "Export.SelectParams", "出力するパラメータを選択してください。" },
             { "Export.SelectCategory", "カテゴリを選択してください。" },
-            { "Export.ParamPrefixLegend", "凡例  I- : インスタンス（要素）パラメータ　　T- : タイプパラメータ" },
+            { "Export.ParamPrefixLegend", "I- : インスタンス（要素）パラメータ\nT- : タイプパラメータ" },
             { "Export.Scope.WindowTitle", "EXCELエクスポート" },
             { "Export.Scope.Title", "書出し範囲の選択" },
             { "Export.Scope.Description", "書出す要素の範囲を選択してください。" },

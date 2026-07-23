@@ -300,12 +300,10 @@
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
             <!-- パラメータ プレフィックス凡例（I- / T-） -->
-            <Border Grid.Column="1" Margin="4,6,4,0"
-                    Background="#FFF9E6" BorderBrush="#E0D080" BorderThickness="1" CornerRadius="2">
-                <TextBlock x:Name="ParamPrefixLegend" Text="凡例  I- : インスタンス（要素）パラメータ　　T- : タイプパラメータ"
-                           FontSize="10" Foreground="#555555" TextWrapping="Wrap"
-                           Margin="6,3" VerticalAlignment="Center"/>
-            </Border>
+            <TextBlock x:Name="ParamPrefixLegend" Grid.Column="1" Margin="4,6,4,0"
+                       Text="I- : インスタンス（要素）パラメータ&#x0a;T- : タイプパラメータ"
+                       FontSize="10" Foreground="#555555" TextWrapping="Wrap"
+                       VerticalAlignment="Center"/>
             <StackPanel Grid.Column="3" Orientation="Horizontal" HorizontalAlignment="Center" Margin="4,6,0,0">
                 <Button x:Name="btnMoveUp" Content="▲" ToolTip="上へ移動"
                         Style="{StaticResource MoveButtonStyle}"

@@ -311,7 +311,7 @@ namespace Tools28.Localization
             { "Export.SettingsLoadFailed", "Failed to load settings.\n{0}" },
             { "Export.SelectParams", "Please select parameters to export." },
             { "Export.SelectCategory", "Please select a category." },
-            { "Export.ParamPrefixLegend", "Legend  I- : Instance (element) parameter    T- : Type parameter" },
+            { "Export.ParamPrefixLegend", "I- : Instance (element) parameter\nT- : Type parameter" },
             { "Export.Scope.WindowTitle", "Excel Export" },
             { "Export.Scope.Title", "Select Export Scope" },
             { "Export.Scope.Description", "Choose which elements to export." },
