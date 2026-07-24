@@ -5,7 +5,11 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Data;
+using System.Windows.Input;
+using System.Windows.Media;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using Tools28.Commands.ParameterCleanup.Models;
@@ -26,6 +30,14 @@ namespace Tools28.Commands.ParameterCleanup.Views
         private bool _scanning;
         private bool _valuesChecked;
         private bool _ready;   // 初期化完了フラグ（InitializeComponent 中のイベント発火を無視）
+
+        // ===== Excel風 列フィルター/並べ替え =====
+        private readonly Dictionary<string, HashSet<string>> _columnFilters = new Dictionary<string, HashSet<string>>();
+        private readonly Dictionary<string, Func<ParamRow, string>> _colAccessors = new Dictionary<string, Func<ParamRow, string>>();
+        private readonly Dictionary<string, string> _colSortPaths = new Dictionary<string, string>();
+        private readonly Dictionary<string, DataGridTextColumn> _colByKey = new Dictionary<string, DataGridTextColumn>();
+        private readonly Dictionary<string, Button> _filterButtons = new Dictionary<string, Button>();
+        private Popup _activePopup;
 
         public ParameterCleanupDialog(Document doc)
         {
@@ -59,29 +71,9 @@ namespace Tools28.Commands.ParameterCleanup.Views
             rbKindShared.Content = Loc.S("ParamCleanup.Kind.Shared");
             rbKindGlobal.Content = Loc.S("ParamCleanup.Kind.Global");
 
-            // 列ヘッダー（DataGrid の Header は string 直指定）
-            // 並べ替え可能な列には「▾」を付けてクリックで並べ替えできることを明示する。
-            const string sortMark = "  ▾";
+            // 列ヘッダー：選択列は文字列、その他は Excel 風の並べ替え/フィルターボタン付き
             ParamGrid.Columns[0].Header = Loc.S("ParamCleanup.Col.Select");
-            colName.Header = Loc.S("ParamCleanup.Col.Name") + sortMark;
-            colKind.Header = Loc.S("ParamCleanup.Col.Kind") + sortMark;
-            colScope.Header = Loc.S("ParamCleanup.Col.Scope") + sortMark;
-            colCategories.Header = Loc.S("ParamCleanup.Col.Categories") + sortMark;
-            colSchedRef.Header = Loc.S("ParamCleanup.Col.ScheduleRef") + sortMark;
-            colState.Header = Loc.S("ParamCleanup.Col.Value") + sortMark;
-
-            // 列見出しにツールチップとカーソルを付与して並べ替え操作を分かりやすくする
-            try
-            {
-                var headerStyle = new System.Windows.Style(
-                    typeof(System.Windows.Controls.Primitives.DataGridColumnHeader));
-                headerStyle.Setters.Add(new System.Windows.Setter(
-                    System.Windows.FrameworkElement.ToolTipProperty, Loc.S("ParamCleanup.SortHint")));
-                headerStyle.Setters.Add(new System.Windows.Setter(
-                    System.Windows.FrameworkElement.CursorProperty, System.Windows.Input.Cursors.Hand));
-                ParamGrid.ColumnHeaderStyle = headerStyle;
-            }
-            catch { }
+            SetupFilterableColumns();
 
             btnCheck.Content = Loc.S("ParamCleanup.Btn.Check");
             btnDelete.Content = Loc.S("ParamCleanup.Btn.Delete");
@@ -118,6 +110,16 @@ namespace Tools28.Commands.ParameterCleanup.Views
             if (rbKindShared?.IsChecked == true && r.Kind != ParamKind.Shared) return false;
             if (rbKindGlobal?.IsChecked == true && r.Kind != ParamKind.Global) return false;
 
+            // Excel風 列フィルタ（列ごとの許可値セット）
+            foreach (var kv in _columnFilters)
+            {
+                if (_colAccessors.TryGetValue(kv.Key, out var acc))
+                {
+                    var val = acc(r) ?? "";
+                    if (!kv.Value.Contains(val)) return false;
+                }
+            }
+
             return true;
         }
 
@@ -134,6 +136,243 @@ namespace Tools28.Commands.ParameterCleanup.Views
             int shown = _view?.Cast<object>().Count() ?? total;
             int selected = _rows.Count(r => r.IsSelected);
             txtCount.Text = string.Format(Loc.S("ParamCleanup.Count.Summary"), total, shown, selected);
+        }
+
+        // ===================== Excel風 列メニュー（並べ替え/フィルター） =====================
+
+        /// <summary>フィルター対象列に、並べ替え/フィルターメニュー付きヘッダーを設定する。</summary>
+        private void SetupFilterableColumns()
+        {
+            RegisterColumn("Name", colName, "ParamCleanup.Col.Name", "Name", r => r.Name ?? "");
+            RegisterColumn("Kind", colKind, "ParamCleanup.Col.Kind", "KindText", r => r.KindText ?? "");
+            RegisterColumn("Scope", colScope, "ParamCleanup.Col.Scope", "ScopeText", r => r.ScopeText ?? "");
+            RegisterColumn("Categories", colCategories, "ParamCleanup.Col.Categories", "CategoriesText", r => r.CategoriesText ?? "");
+            RegisterColumn("SchedRef", colSchedRef, "ParamCleanup.Col.ScheduleRef", "ScheduleRefText", r => r.ScheduleRefText ?? "");
+            RegisterColumn("Value", colState, "ParamCleanup.Col.Value", "StateText", r => r.StateText ?? "");
+        }
+
+        private void RegisterColumn(string key, DataGridTextColumn col, string titleKey,
+                                    string sortPath, Func<ParamRow, string> accessor)
+        {
+            _colByKey[key] = col;
+            _colSortPaths[key] = sortPath;
+            _colAccessors[key] = accessor;
+            col.CanUserSort = false;   // 既定のヘッダークリックソートは使わず、独自メニューに統一
+            col.Header = BuildFilterHeader(key, Loc.S(titleKey));
+        }
+
+        private FrameworkElement BuildFilterHeader(string key, string title)
+        {
+            var dock = new DockPanel { LastChildFill = true, HorizontalAlignment = HorizontalAlignment.Stretch };
+
+            var btn = new Button
+            {
+                Content = "▾",
+                Width = 20,
+                Padding = new Thickness(0),
+                Margin = new Thickness(4, 0, 0, 0),
+                FontSize = 10,
+                Focusable = false,
+                Cursor = Cursors.Hand,
+                Background = Brushes.Transparent,
+                BorderThickness = new Thickness(0),
+                Foreground = Brushes.Gray,
+                Tag = key,
+                ToolTip = Loc.S("ParamCleanup.FilterHint"),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            btn.Click += ColumnMenuButton_Click;
+            DockPanel.SetDock(btn, Dock.Right);
+            dock.Children.Add(btn);
+            _filterButtons[key] = btn;
+
+            var tb = new TextBlock
+            {
+                Text = title,
+                VerticalAlignment = VerticalAlignment.Center,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                FontWeight = FontWeights.SemiBold
+            };
+            dock.Children.Add(tb);
+            return dock;
+        }
+
+        private void ColumnMenuButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.Tag is string key)
+                ShowColumnMenu(key, btn);
+        }
+
+        private void ShowColumnMenu(string key, UIElement anchor)
+        {
+            CloseActivePopup();
+            if (!_colAccessors.TryGetValue(key, out var accessor)) return;
+
+            // 候補値（現在の全行から。空白は (空白) として表示）
+            var distinct = _rows.Select(r => accessor(r) ?? "").Distinct().ToList();
+            distinct.Sort(StringComparer.CurrentCultureIgnoreCase);
+            HashSet<string> allowed = _columnFilters.TryGetValue(key, out var f) ? f : null;
+
+            var root = new StackPanel { Margin = new Thickness(6) };
+
+            // --- 並べ替え ---
+            var btnAsc = MenuButton(Loc.S("ParamCleanup.Filter.SortAsc"));
+            btnAsc.Click += (s, ev) => { SortByColumn(key, ListSortDirection.Ascending); CloseActivePopup(); };
+            var btnDesc = MenuButton(Loc.S("ParamCleanup.Filter.SortDesc"));
+            btnDesc.Click += (s, ev) => { SortByColumn(key, ListSortDirection.Descending); CloseActivePopup(); };
+            root.Children.Add(btnAsc);
+            root.Children.Add(btnDesc);
+            root.Children.Add(new Separator { Margin = new Thickness(0, 4, 0, 4) });
+
+            // --- 検索 ---
+            var search = new TextBox { Height = 24, Margin = new Thickness(0, 0, 0, 4) };
+            root.Children.Add(search);
+
+            // --- (すべて選択) ---
+            var selectAll = new CheckBox
+            {
+                Content = Loc.S("ParamCleanup.Filter.SelectAll"),
+                Margin = new Thickness(0, 0, 0, 4),
+                FontWeight = FontWeights.SemiBold
+            };
+            root.Children.Add(selectAll);
+
+            // --- 値リスト ---
+            var listPanel = new StackPanel();
+            var checks = new List<CheckBox>();
+            foreach (var val in distinct)
+            {
+                var cb = new CheckBox
+                {
+                    Content = string.IsNullOrEmpty(val) ? Loc.S("ParamCleanup.Filter.Blank") : val,
+                    Tag = val,
+                    IsChecked = allowed == null || allowed.Contains(val),
+                    Margin = new Thickness(0, 1, 0, 1)
+                };
+                checks.Add(cb);
+                listPanel.Children.Add(cb);
+            }
+
+            selectAll.IsChecked = checks.All(c => c.IsChecked == true) ? true
+                                : checks.Any(c => c.IsChecked == true) ? (bool?)null : false;
+            selectAll.Click += (s, ev) =>
+            {
+                bool on = selectAll.IsChecked == true;
+                foreach (var c in checks)
+                    if (c.Visibility == Visibility.Visible) c.IsChecked = on;
+            };
+
+            search.TextChanged += (s, ev) =>
+            {
+                string q = search.Text.Trim();
+                foreach (var c in checks)
+                {
+                    string disp = c.Content?.ToString() ?? "";
+                    c.Visibility = (q.Length == 0 || disp.IndexOf(q, StringComparison.CurrentCultureIgnoreCase) >= 0)
+                        ? Visibility.Visible : Visibility.Collapsed;
+                }
+            };
+
+            root.Children.Add(new ScrollViewer
+            {
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                MaxHeight = 240,
+                Content = listPanel
+            });
+
+            // --- OK / クリア / キャンセル ---
+            var buttons = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                Margin = new Thickness(0, 6, 0, 0)
+            };
+            var btnClear = MenuButton(Loc.S("ParamCleanup.Filter.Clear"));
+            btnClear.Width = 64; btnClear.Margin = new Thickness(0, 0, 4, 0);
+            btnClear.Click += (s, ev) =>
+            {
+                _columnFilters.Remove(key);
+                UpdateFilterIndicator(key);
+                _view?.Refresh(); UpdateCount();
+                CloseActivePopup();
+            };
+            var btnOk = MenuButton(Loc.S("Common.OK"));
+            btnOk.Width = 64; btnOk.Margin = new Thickness(0, 0, 4, 0);
+            btnOk.Click += (s, ev) =>
+            {
+                var sel = new HashSet<string>(checks.Where(c => c.IsChecked == true).Select(c => (string)c.Tag));
+                if (sel.Count >= distinct.Count) _columnFilters.Remove(key);  // 全選択＝フィルタ無し
+                else _columnFilters[key] = sel;
+                UpdateFilterIndicator(key);
+                _view?.Refresh(); UpdateCount();
+                CloseActivePopup();
+            };
+            var btnCancel = MenuButton(Loc.S("Common.Cancel"));
+            btnCancel.Width = 64;
+            btnCancel.Click += (s, ev) => CloseActivePopup();
+            buttons.Children.Add(btnClear);
+            buttons.Children.Add(btnOk);
+            buttons.Children.Add(btnCancel);
+            root.Children.Add(buttons);
+
+            var border = new Border
+            {
+                Background = Brushes.White,
+                BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xCC, 0xCC, 0xCC)),
+                BorderThickness = new Thickness(1),
+                Child = root,
+                MinWidth = 230
+            };
+
+            _activePopup = new Popup
+            {
+                PlacementTarget = anchor,
+                Placement = PlacementMode.Bottom,
+                StaysOpen = false,
+                AllowsTransparency = true,
+                Child = border,
+                IsOpen = true
+            };
+        }
+
+        private static Button MenuButton(string text)
+        {
+            return new Button
+            {
+                Content = text,
+                Height = 26,
+                Margin = new Thickness(0, 1, 0, 1),
+                Padding = new Thickness(8, 0, 8, 0),
+                HorizontalContentAlignment = HorizontalAlignment.Left,
+                Background = Brushes.White,
+                Cursor = Cursors.Hand
+            };
+        }
+
+        private void SortByColumn(string key, ListSortDirection dir)
+        {
+            if (_view == null || !_colSortPaths.TryGetValue(key, out var path)) return;
+            _view.SortDescriptions.Clear();
+            _view.SortDescriptions.Add(new SortDescription(path, dir));
+            _view.Refresh();
+        }
+
+        private void UpdateFilterIndicator(string key)
+        {
+            if (!_filterButtons.TryGetValue(key, out var btn)) return;
+            bool active = _columnFilters.ContainsKey(key);
+            btn.Foreground = active ? Brushes.RoyalBlue : Brushes.Gray;
+            btn.Content = active ? "▼" : "▾";
+            btn.FontWeight = active ? FontWeights.Bold : FontWeights.Normal;
+        }
+
+        private void CloseActivePopup()
+        {
+            if (_activePopup != null)
+            {
+                _activePopup.IsOpen = false;
+                _activePopup = null;
+            }
         }
 
         // ===== 値の有無を確認（スキャン）=====
@@ -329,6 +568,7 @@ namespace Tools28.Commands.ParameterCleanup.Views
 
         protected override void OnClosing(CancelEventArgs e)
         {
+            CloseActivePopup();
             if (_scanning)
                 _cts?.Cancel();
             base.OnClosing(e);
