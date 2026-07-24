@@ -1,5 +1,7 @@
-## 最終セッション: 2026-05-25
-v2.1 リリース完了（`release/v2.1` を `a073cb8` に force-push → GitHub Actions が起動 → `v2.1` タグ・配布ZIP 6本生成）。
+## 最終セッション: 2026-07-24
+新機能 **ParameterCleanup（パラメータ整理）** を追加。プロジェクト内の削除可能な
+パラメータ（プロジェクト/共有/グローバル）を一覧化し、同名特定・値の有無の自動判定・
+不要パラメータ削除を行う。Excel風の列並べ替え/フィルターも実装。
 
 
 # 開発ステータス
@@ -7,7 +9,28 @@ v2.1 リリース完了（`release/v2.1` を `a073cb8` に force-push → GitHub
 > このファイルはセッション終了時に更新すること
 
 ## 現在作業中
-Excel エクスポート／インポートの改善（動作確認しながら継続）
+ParameterCleanup（パラメータ整理）機能（動作確認完了・改善継続中）
+ブランチ: `claude/revit-addin-parameter-cleanup-hdss4v`
+
+### 完了（2026-07-24 ParameterCleanup セッション）
+- [x] 新機能 ParameterCleanup を追加（`Commands/ParameterCleanup/`）。リボン「パラメータ」パネル＞「パラメータ整理」
+  - Command / ParameterScanner / ParamRow / ParameterCleanupDialog（WPF DataGrid）
+  - 対象: プロジェクト/共有パラメータ（`ParameterElement`/`SharedParameterElement`）＋グローバルパラメータ
+- [x] 大容量モデルのフリーズ回避設計（列挙は軽量／値判定はカテゴリ限定・キャッシュ・early-exit／Stopwatch で約50ms毎に UI へ制御を返し進捗＋中止対応）
+- [x] バインド解決を `get_Item` から `ForwardIterator`（名前キー）へ変更（多数が誤って「対象外」になる不具合を修正）
+- [x] 値判定の意味を明確化：「空（未使用）」＝バインド済みだが全要素で値なし／「バインドなし」＝カテゴリ未バインド。値セルにツールチップで説明
+- [x] 値の有無をダイアログ表示時に自動確認（削除後も自動再確認）。確認後に「値あり◯/空◯」サマリー表示
+- [x] 集計表参照列を追加（`ScheduleField.ParameterId` で軽量取得。フィルタ/タグ/数式はAPI制約により対象外）
+- [x] 種別ラジオ（すべて/プロジェクト/共有/グローバル）で絞り込み
+- [x] Excel風の列メニュー（各見出し「▾」）：昇順/降順並べ替え＋値チェックリストで絞り込み（検索・全選択/選択解除・長い値は…省略＋ツールチップ・幅上限420）
+- [x] 一覧下に「全選択」「選択解除」ボタン（フィルターで表示中の行のみ対象に削除用チェックを一括操作）
+- [x] 行間の水平罫線を薄いグレー（#ECECEC）に
+- [x] 3言語（JP/EN/CN）対応、`Docs/features.json`（added_in 2.2）・マニュアル `Docs/Features/ParameterCleanup.md` 追加
+- ⚠️ ビルド時のハマりどころ（DEVLOG参照）: `Window` のインスタンスプロパティと同名の列挙型（`Visibility`/`HorizontalAlignment`/`VerticalAlignment`）は CS0176、`TextBox` は `Autodesk.Revit.UI.TextBox` と衝突し CS0104 → いずれも完全修飾で解決
+
+---
+
+### 旧・現在作業中（参考）: Excel エクスポート／インポートの改善
 ブランチ: `claude/excel-export-improvements-r2q928`
 
 ### 完了（2026-07-23 セッション）

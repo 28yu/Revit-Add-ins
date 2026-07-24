@@ -356,6 +356,7 @@ _buttonTipKeys["FeatureName"] = "Ribbon.FeatureName.Button.Tip";
 | ExcelExportImport（Excel連携） | `Commands/ExcelExportImport/` | `Docs/DEVLOG.md#ExcelExportImport` |
 | FireProtection（耐火被覆色分け） | `Commands/FireProtection/` | `Docs/DEVLOG.md#FireProtection` |
 | FormworkCalculator（型枠数量算出） | `Commands/FormworkCalculator/` | `Docs/DEVLOG.md#FormworkCalculator` |
+| ParameterCleanup（パラメータ整理/未使用削除） | `Commands/ParameterCleanup/` | `Docs/DEVLOG.md#ParameterCleanup` |
 | LanguageSwitch / Localization（多言語UI） | `Commands/LanguageSwitch/` + `Localization/` | `Docs/DEVLOG.md#LocSystem` |
 
 ### リボンパネル構成（左から順）
@@ -365,7 +366,8 @@ _buttonTipKeys["FeatureName"] = "Ribbon.FeatureName.Button.Tip";
 4. **注釈・詳細** — 部屋タグ自動配置、塗潰し領域 分割・統合、塗潰しパターン入出力
 5. **構造** — 梁下端色分け、梁天端色分け、耐火被覆色分け、型枠数量算出
 6. **データ** — EXCELエクスポート、EXCELインポート
-7. **設定** — 言語切替（JP/US/CN）、バージョン情報、マニュアル
+7. **パラメータ** — パラメータ整理（同名特定・値の有無確認・未使用削除）
+8. **設定** — 言語切替（JP/US/CN）、バージョン情報、マニュアル
 
 実装: `Application.cs` の `CreateGridLevelPanel()` 等、パネル別メソッドで構築
 
