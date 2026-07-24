@@ -170,6 +170,18 @@
       }
     },
     {
+      "id": "ParameterCleanup",
+      "category": "data",
+      "icon": "icons/features/parameter_cleanup.png",
+      "manual": "Features/ParameterCleanup.md",
+      "added_in": "2.2",
+      "names": {
+        "ja": "パラメータ整理（未使用パラメータ削除）",
+        "en": "Parameter Cleanup (Delete Unused Parameters)",
+        "zh": "参数整理（删除未使用参数）"
+      }
+    },
+    {
       "id": "LanguageSwitch",
       "category": "settings",
       "icon": "icons/features/flag_jp_32.png",

@@ -19,7 +19,7 @@ namespace Tools28
         private static readonly string[] _panelKeys = {
             "Ribbon.Panel.GridBubble", "Ribbon.Panel.SheetView", "Ribbon.Panel.3DView",
             "Ribbon.Panel.Annotation", "Ribbon.Panel.Structural", "Ribbon.Panel.Quantity",
-            "Ribbon.Panel.Excel", "Ribbon.Panel.Settings"
+            "Ribbon.Panel.Excel", "Ribbon.Panel.Parameter", "Ribbon.Panel.Settings"
         };
 
         private static readonly Dictionary<string, string> _buttonTextKeys = new Dictionary<string, string>
@@ -45,6 +45,7 @@ namespace Tools28
             { "Formwork", "Ribbon.Formwork" },
             { "ExcelExport", "Ribbon.Excel.Export" },
             { "ExcelImport", "Ribbon.Excel.Import" },
+            { "ParameterCleanup", "Ribbon.ParamCleanup" },
             { "About", "Ribbon.Settings.About" },
             { "Manual", "Ribbon.Settings.Manual" },
         };
@@ -72,6 +73,7 @@ namespace Tools28
             { "Formwork", "Ribbon.Formwork.Tip" },
             { "ExcelExport", "Ribbon.Excel.Export.Tip" },
             { "ExcelImport", "Ribbon.Excel.Import.Tip" },
+            { "ParameterCleanup", "Ribbon.ParamCleanup.Tip" },
             { "About", "Ribbon.Settings.About.Tip" },
             { "Manual", "Ribbon.Settings.Manual.Tip" },
         };
@@ -128,6 +130,7 @@ namespace Tools28
                 CreateStructuralPanel(application, tabName, assemblyPath);
                 CreateQuantityPanel(application, tabName, assemblyPath);
                 CreateExcelPanel(application, tabName, assemblyPath);
+                CreateParameterPanel(application, tabName, assemblyPath);
                 CreateSettingsPanel(application, tabName, assemblyPath);
                 Log("全パネル作成完了");
 
@@ -426,6 +429,18 @@ namespace Tools28
             importData.ToolTip = Loc.S("Ribbon.Excel.Import.Tip");
             importData.LargeImage = LoadImage("excel_import.png");
             AddButton(panel, importData);
+        }
+
+        private void CreateParameterPanel(UIControlledApplication application, string tabName, string assemblyPath)
+        {
+            RibbonPanel panel = application.CreateRibbonPanel(tabName, Loc.S("Ribbon.Panel.Parameter"));
+            _panels.Add(panel);
+
+            var cleanupData = new PushButtonData("ParameterCleanup", Loc.S("Ribbon.ParamCleanup"), assemblyPath, "Tools28.Commands.ParameterCleanup.ParameterCleanupCommand");
+            cleanupData.ToolTip = Loc.S("Ribbon.ParamCleanup.Tip");
+            cleanupData.Image = LoadImage("parameter_cleanup_16.png");
+            cleanupData.LargeImage = LoadImage("parameter_cleanup.png");
+            AddButton(panel, cleanupData);
         }
 
         private void CreateSettingsPanel(UIControlledApplication application, string tabName, string assemblyPath)
