@@ -424,23 +424,30 @@ namespace Tools28.Commands.ExcelExportImport.Services
         {
             colorMethod = null;
 
-            // 実際にインポートされたセル（変更あり＋書き込み可能）を検索用セットに
+            // 変更・追加（値あり）で成功したセル → 文字を青字にする
             var changedSet = new HashSet<string>(
                 previewRows
-                    .Where(r => r.HasChange && !r.IsReadOnly)
+                    .Where(r => r.HasChange && !r.IsReadOnly && !string.IsNullOrEmpty(r.NewValue))
+                    .Select(r => r.ElementId.ToString() + "|" + r.ParameterName));
+
+            // 値を削除（空欄化）して成功したセル → セルを青で塗りつぶす（文字が無いため）
+            var clearedSet = new HashSet<string>(
+                previewRows
+                    .Where(r => r.HasChange && !r.IsReadOnly && string.IsNullOrEmpty(r.NewValue))
                     .Select(r => r.ElementId.ToString() + "|" + r.ParameterName));
 
             // 成功セットから失敗セルを除外
             if (failedSet != null && failedSet.Count > 0)
             {
                 changedSet.ExceptWith(failedSet);
+                clearedSet.ExceptWith(failedSet);
             }
 
-            if (changedSet.Count == 0 && (failedSet == null || failedSet.Count == 0))
+            if (changedSet.Count == 0 && clearedSet.Count == 0 && (failedSet == null || failedSet.Count == 0))
                 return null;
 
             // まずCOM経由（開いているExcelに直接色付け）を試行
-            if (ExcelProcessHelper.MarkCellsViaCom(filePath, changedSet, failedSet))
+            if (ExcelProcessHelper.MarkCellsViaCom(filePath, changedSet, clearedSet, failedSet))
             {
                 colorMethod = "COM";
                 return filePath;
@@ -448,7 +455,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
 
             // Excelが開いていない or COM失敗の場合、ClosedXMLでファイルを直接編集
             colorMethod = "ClosedXML";
-            return MarkCellsViaClosedXml(filePath, changedSet, failedSet);
+            return MarkCellsViaClosedXml(filePath, changedSet, clearedSet, failedSet);
         }
 
         /// <summary>
@@ -518,7 +525,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
         /// <summary>
         /// ClosedXMLを使用してExcelファイルのセルに色を付ける（Excelが閉じている場合のフォールバック）
         /// </summary>
-        private static string MarkCellsViaClosedXml(string filePath, HashSet<string> changedSet, HashSet<string> failedSet = null)
+        private static string MarkCellsViaClosedXml(string filePath, HashSet<string> changedSet, HashSet<string> clearedSet = null, HashSet<string> failedSet = null)
         {
             byte[] fileBytes;
             try
@@ -570,20 +577,23 @@ namespace Tools28.Commands.ExcelExportImport.Services
                             elementIdStr = ((int)idDouble).ToString();
                         }
 
-                        // セル単位で成功/失敗を判定
+                        // セル単位で成功(変更)/削除(クリア)/失敗を判定
                         var successCols = new HashSet<int>();
+                        var clearedCols = new HashSet<int>();
                         var failedCols = new HashSet<int>();
                         for (int i = 0; i < paramHeaders.Count; i++)
                         {
                             string key = elementIdStr + "|" + paramHeaders[i];
-                            if (changedSet.Contains(key))
+                            if (clearedSet != null && clearedSet.Contains(key))
+                                clearedCols.Add(i + 3);
+                            else if (changedSet.Contains(key))
                                 successCols.Add(i + 3);
                             else if (failedSet != null && failedSet.Contains(key))
                                 failedCols.Add(i + 3);
                         }
 
-                        // 変更・失敗がある行は全列に背景色、セル単位で色分け
-                        if (successCols.Count > 0 || failedCols.Count > 0)
+                        // 変更・削除・失敗がある行は全列に背景色、セル単位で色分け
+                        if (successCols.Count > 0 || clearedCols.Count > 0 || failedCols.Count > 0)
                         {
                             for (int col = 1; col <= colCount; col++)
                             {
@@ -594,6 +604,11 @@ namespace Tools28.Commands.ExcelExportImport.Services
                             {
                                 worksheet.Cell(row, col).Style.Font.FontColor = blueColor;
                                 worksheet.Cell(row, col).Style.Font.Bold = true;
+                            }
+                            // 削除（空欄）セルは文字が無いため、セルを青で塗りつぶす
+                            foreach (int col in clearedCols)
+                            {
+                                worksheet.Cell(row, col).Style.Fill.BackgroundColor = blueColor;
                             }
                             foreach (int col in failedCols)
                             {
@@ -618,10 +633,10 @@ namespace Tools28.Commands.ExcelExportImport.Services
                     var legendCell = worksheet.Cell(1, legendCol);
                     var richText = legendCell.CreateRichText();
                     richText.AddText("(*");
-                    var bluePart = richText.AddText("青字");
+                    var bluePart = richText.AddText("青字・青セル");
                     bluePart.SetFontColor(blueColor);
                     bluePart.SetBold(true);
-                    richText.AddText("はインポート成功、");
+                    richText.AddText("はインポート成功（青セルは値の削除）、");
                     var redPart = richText.AddText("赤字");
                     redPart.SetFontColor(XLColor.Red);
                     redPart.SetBold(true);
