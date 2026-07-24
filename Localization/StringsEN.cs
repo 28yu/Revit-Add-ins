@@ -505,6 +505,8 @@ namespace Tools28.Localization
             { "ParamCleanup.DuplicateOnly", "Duplicates only" },
             { "ParamCleanup.EmptyOnly", "Empty only" },
             { "ParamCleanup.SelectEmpty", "Select all empty" },
+            { "ParamCleanup.SelectAll", "Select All" },
+            { "ParamCleanup.DeselectAll", "Deselect All" },
             { "ParamCleanup.Filter.Kind", "Kind:" },
             { "ParamCleanup.Filter.All", "All" },
             { "ParamCleanup.Filter.SortAsc", "Sort Ascending" },

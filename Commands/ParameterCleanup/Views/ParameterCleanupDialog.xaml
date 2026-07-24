@@ -242,7 +242,11 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <StackPanel Grid.Column="0" Orientation="Horizontal">
-                <ProgressBar x:Name="Progress" Width="260" Height="16" Minimum="0" Maximum="100"
+                <Button x:Name="btnSelectAllVisible" Content="全選択" Style="{StaticResource SecondaryButtonStyle}"
+                        Margin="0,0,4,0" ToolTip="表示中の行をすべて選択" Click="SelectAllVisible_Click"/>
+                <Button x:Name="btnDeselectAllVisible" Content="選択解除" Style="{StaticResource SecondaryButtonStyle}"
+                        Margin="0,0,12,0" ToolTip="表示中の行の選択をすべて解除" Click="DeselectAllVisible_Click"/>
+                <ProgressBar x:Name="Progress" Width="220" Height="16" Minimum="0" Maximum="100"
                              Visibility="Collapsed" VerticalAlignment="Center"/>
                 <TextBlock x:Name="txtStatus" Text="" FontSize="11" Foreground="#555555"
                            VerticalAlignment="Center" Margin="8,0,0,0" TextTrimming="CharacterEllipsis"/>

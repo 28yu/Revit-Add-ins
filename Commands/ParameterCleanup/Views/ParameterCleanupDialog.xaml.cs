@@ -64,6 +64,8 @@ namespace Tools28.Commands.ParameterCleanup.Views
             chkDuplicateOnly.Content = Loc.S("ParamCleanup.DuplicateOnly");
             chkEmptyOnly.Content = Loc.S("ParamCleanup.EmptyOnly");
             btnSelectEmpty.Content = Loc.S("ParamCleanup.SelectEmpty");
+            btnSelectAllVisible.Content = Loc.S("ParamCleanup.SelectAll");
+            btnDeselectAllVisible.Content = Loc.S("ParamCleanup.DeselectAll");
 
             lblKindFilter.Text = Loc.S("ParamCleanup.Filter.Kind");
             rbKindAll.Content = Loc.S("ParamCleanup.Filter.All");
@@ -506,6 +508,18 @@ namespace Tools28.Commands.ParameterCleanup.Views
                 r.IsSelected = r.State == ValueState.Empty;
 
             _view?.Refresh();
+            UpdateCount();
+        }
+
+        // 表示中（フィルター/並べ替え適用後に見えている）行だけを対象に選択/解除する
+        private void SelectAllVisible_Click(object sender, RoutedEventArgs e) => SetSelectionForVisible(true);
+        private void DeselectAllVisible_Click(object sender, RoutedEventArgs e) => SetSelectionForVisible(false);
+
+        private void SetSelectionForVisible(bool selected)
+        {
+            if (_view == null) return;
+            foreach (var o in _view.Cast<object>())
+                if (o is ParamRow r) r.IsSelected = selected;
             UpdateCount();
         }
 
