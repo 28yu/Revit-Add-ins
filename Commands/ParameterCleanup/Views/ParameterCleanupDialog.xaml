@@ -150,6 +150,7 @@
         <DataGrid x:Name="ParamGrid" Grid.Row="3"
                   AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
                   HeadersVisibility="Column" GridLinesVisibility="Horizontal"
+                  HorizontalGridLinesBrush="#ECECEC"
                   RowHeaderWidth="0" SelectionMode="Extended" IsReadOnly="False"
                   BorderBrush="#CCCCCC" BorderThickness="1" FontSize="12"
                   EnableRowVirtualization="True" EnableColumnVirtualization="True"
