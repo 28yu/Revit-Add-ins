@@ -564,6 +564,15 @@ namespace Tools28.Commands.ParameterCleanup.Views
                 using (var t = new Transaction(_doc, Loc.S("ParamCleanup.Txn")))
                 {
                     t.Start();
+
+                    // 削除に伴う Revit の警告ダイアログ（要素が削除されます等）を自動で閉じる。
+                    // 複数パラメータ削除で警告が連続表示されるのを防ぐ。
+                    var fho = t.GetFailureHandlingOptions();
+                    fho = fho.SetForcedModalHandling(false);
+                    fho = fho.SetClearAfterRollback(true);
+                    fho = fho.SetFailuresPreprocessor(new WarningSwallower());
+                    t.SetFailureHandlingOptions(fho);
+
                     ICollection<ElementId> deleted = null;
                     try
                     {
@@ -609,6 +618,16 @@ namespace Tools28.Commands.ParameterCleanup.Views
         private void Close_Click(object sender, RoutedEventArgs e)
         {
             Close();
+        }
+
+        /// <summary>削除トランザクション中の警告を自動的に無視（ダイアログを出さない）。</summary>
+        private class WarningSwallower : IFailuresPreprocessor
+        {
+            public FailureProcessingResult PreprocessFailures(FailuresAccessor a)
+            {
+                a.DeleteAllWarnings();
+                return FailureProcessingResult.Continue;
+            }
         }
 
         protected override void OnClosing(CancelEventArgs e)
