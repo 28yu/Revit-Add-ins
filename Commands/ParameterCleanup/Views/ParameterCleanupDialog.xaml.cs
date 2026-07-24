@@ -163,7 +163,7 @@ namespace Tools28.Commands.ParameterCleanup.Views
 
         private FrameworkElement BuildFilterHeader(string key, string title)
         {
-            var dock = new DockPanel { LastChildFill = true, HorizontalAlignment = HorizontalAlignment.Stretch };
+            var dock = new DockPanel { LastChildFill = true, HorizontalAlignment = System.Windows.HorizontalAlignment.Stretch };
 
             var btn = new Button
             {
@@ -179,7 +179,7 @@ namespace Tools28.Commands.ParameterCleanup.Views
                 Foreground = Brushes.Gray,
                 Tag = key,
                 ToolTip = Loc.S("ParamCleanup.FilterHint"),
-                VerticalAlignment = VerticalAlignment.Center
+                VerticalAlignment = System.Windows.VerticalAlignment.Center
             };
             btn.Click += ColumnMenuButton_Click;
             DockPanel.SetDock(btn, Dock.Right);
@@ -189,7 +189,7 @@ namespace Tools28.Commands.ParameterCleanup.Views
             var tb = new TextBlock
             {
                 Text = title,
-                VerticalAlignment = VerticalAlignment.Center,
+                VerticalAlignment = System.Windows.VerticalAlignment.Center,
                 TextTrimming = TextTrimming.CharacterEllipsis,
                 FontWeight = FontWeights.SemiBold
             };
@@ -259,7 +259,7 @@ namespace Tools28.Commands.ParameterCleanup.Views
             {
                 bool on = selectAll.IsChecked == true;
                 foreach (var c in checks)
-                    if (c.Visibility == Visibility.Visible) c.IsChecked = on;
+                    if (c.Visibility == System.Windows.Visibility.Visible) c.IsChecked = on;
             };
 
             search.TextChanged += (s, ev) =>
@@ -269,7 +269,7 @@ namespace Tools28.Commands.ParameterCleanup.Views
                 {
                     string disp = c.Content?.ToString() ?? "";
                     c.Visibility = (q.Length == 0 || disp.IndexOf(q, StringComparison.CurrentCultureIgnoreCase) >= 0)
-                        ? Visibility.Visible : Visibility.Collapsed;
+                        ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
                 }
             };
 
@@ -284,7 +284,7 @@ namespace Tools28.Commands.ParameterCleanup.Views
             var buttons = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
-                HorizontalAlignment = HorizontalAlignment.Right,
+                HorizontalAlignment = System.Windows.HorizontalAlignment.Right,
                 Margin = new Thickness(0, 6, 0, 0)
             };
             var btnClear = MenuButton(Loc.S("ParamCleanup.Filter.Clear"));
@@ -343,7 +343,7 @@ namespace Tools28.Commands.ParameterCleanup.Views
                 Height = 26,
                 Margin = new Thickness(0, 1, 0, 1),
                 Padding = new Thickness(8, 0, 8, 0),
-                HorizontalContentAlignment = HorizontalAlignment.Left,
+                HorizontalContentAlignment = System.Windows.HorizontalAlignment.Left,
                 Background = Brushes.White,
                 Cursor = Cursors.Hand
             };
