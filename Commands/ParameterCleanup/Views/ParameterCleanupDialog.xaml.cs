@@ -340,6 +340,9 @@ namespace Tools28.Commands.ParameterCleanup.Views
                 MinWidth = 230,
                 MaxWidth = 420
             };
+            // ポップアップは配置元ボタン（FontSize=10）からフォントを継承して小さくなるため、
+            // ダイアログ本体と同じ 12 を明示指定する。
+            System.Windows.Documents.TextElement.SetFontSize(border, 12d);
 
             _activePopup = new Popup
             {
