@@ -344,6 +344,16 @@ git pull origin main
   1. 2回目は Revit 再取得ではなく、取得済み `_allParameters` から表示だけ更新する `FilterParameterList(null)` に変更
   2. カテゴリ照合を `HashSet`、出力パラメータ照合を `Dictionary` にして線形探索を排除
 
+### パラメータ欄のカテゴリ見出しを折りたたみ可能に（▼/▶）
+- **目的**: 複数カテゴリ選択時にパラメータが大量に並びスクロールが煩雑 → カテゴリ単位で開閉したい
+- **実装**: `ParameterListBox` の `GroupStyle` を `HeaderTemplate` から `ContainerStyle`（`GroupItem` を
+  Expander で再テンプレート）に変更。カテゴリ名の左に `▼`（展開）/`▶`（折りたたみ）を表示し、
+  見出しクリックで開閉。既定は全て展開（`IsExpanded=True`）
+- Expander は独自 `ControlTemplate` でテーマ非依存化。`ToggleButton.IsChecked` を `Expander.IsExpanded` に
+  TwoWay バインド（`ToggleButton.IsChecked` は既定で双方向）
+- グループ化時のUI仮想化（`IsVirtualizingWhenGrouping`）はそのまま。折りたたみ中の行は描画されないため
+  スクロール対象も減る
+
 ### 削除（クリア）成功セルの色付け（青字ではなく青塗り）
 - 変更・追加の成功セルは**青字**（文字色）で示すが、削除（空欄化）の成功セルは**文字が無い**ため青字にならない
 - そこで削除成功セルは**セルを青で塗りつぶす**（背景色）ことで示す
