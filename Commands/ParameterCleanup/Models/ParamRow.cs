@@ -77,6 +77,7 @@ namespace Tools28.Commands.ParameterCleanup.Models
                     _state = value;
                     OnChanged(nameof(State));
                     OnChanged(nameof(StateText));
+                    OnChanged(nameof(StateTooltip));
                 }
             }
         }
@@ -134,6 +135,26 @@ namespace Tools28.Commands.ParameterCleanup.Models
                         return Kind == ParamKind.Global
                             ? GlobalValueText
                             : Loc.S("ParamCleanup.State.NotApplicable");
+                    default: return "";
+                }
+            }
+        }
+
+        /// <summary>値の状態の意味（マウスオーバー時のツールチップ用）</summary>
+        public string StateTooltip
+        {
+            get
+            {
+                switch (State)
+                {
+                    case ValueState.HasValue: return Loc.S("ParamCleanup.Tip.HasValue");
+                    case ValueState.Empty: return Loc.S("ParamCleanup.Tip.Empty");
+                    case ValueState.Unchecked: return Loc.S("ParamCleanup.Tip.Unchecked");
+                    case ValueState.Checking: return Loc.S("ParamCleanup.Tip.Checking");
+                    case ValueState.NotApplicable:
+                        return Kind == ParamKind.Global
+                            ? Loc.S("ParamCleanup.Tip.Global")
+                            : Loc.S("ParamCleanup.Tip.NotBound");
                     default: return "";
                 }
             }
