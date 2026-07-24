@@ -120,7 +120,7 @@ namespace Tools28.Commands.ParameterCleanup.Views
 
             btnCheck.Content = Loc.S("ParamCleanup.Btn.Cancel");
             SetBusy(true);
-            Progress.Visibility = Visibility.Visible;
+            Progress.Visibility = System.Windows.Visibility.Visible;
             Progress.Value = 0;
             Progress.Maximum = Math.Max(1, targets.Count);
 
@@ -167,7 +167,7 @@ namespace Tools28.Commands.ParameterCleanup.Views
 
                 btnCheck.Content = Loc.S("ParamCleanup.Btn.Check");
                 SetBusy(false);
-                Progress.Visibility = Visibility.Collapsed;
+                Progress.Visibility = System.Windows.Visibility.Collapsed;
                 txtStatus.Text = cancelled
                     ? Loc.S("ParamCleanup.Status.Cancelled")
                     : Loc.S("ParamCleanup.Status.Done");
