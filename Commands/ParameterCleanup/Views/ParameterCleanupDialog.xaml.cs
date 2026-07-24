@@ -62,8 +62,8 @@ namespace Tools28.Commands.ParameterCleanup.Views
             txtDescription.Text = Loc.S("ParamCleanup.Description");
             lblSearch.Text = Loc.S("ParamCleanup.Search");
             chkDuplicateOnly.Content = Loc.S("ParamCleanup.DuplicateOnly");
-            chkEmptyOnly.Content = Loc.S("ParamCleanup.EmptyOnly");
             btnSelectEmpty.Content = Loc.S("ParamCleanup.SelectEmpty");
+            btnSelectNotBound.Content = Loc.S("ParamCleanup.SelectNotBound");
             btnSelectAllVisible.Content = Loc.S("ParamCleanup.SelectAll");
             btnDeselectAllVisible.Content = Loc.S("ParamCleanup.DeselectAll");
 
@@ -102,9 +102,6 @@ namespace Tools28.Commands.ParameterCleanup.Views
                 return false;
 
             if (chkDuplicateOnly?.IsChecked == true && !r.IsDuplicateName)
-                return false;
-
-            if (chkEmptyOnly?.IsChecked == true && r.State != ValueState.Empty)
                 return false;
 
             // 種別ラジオフィルタ
@@ -506,6 +503,16 @@ namespace Tools28.Commands.ParameterCleanup.Views
 
             foreach (var r in _rows)
                 r.IsSelected = r.State == ValueState.Empty;
+
+            _view?.Refresh();
+            UpdateCount();
+        }
+
+        // 「バインドなし」（どのカテゴリにもバインドされていない非グローバル）を全選択
+        private void SelectNotBound_Click(object sender, RoutedEventArgs e)
+        {
+            foreach (var r in _rows)
+                r.IsSelected = r.State == ValueState.NotApplicable && r.Kind != ParamKind.Global;
 
             _view?.Refresh();
             UpdateCount();

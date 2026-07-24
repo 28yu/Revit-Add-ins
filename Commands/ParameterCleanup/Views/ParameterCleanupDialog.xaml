@@ -127,10 +127,10 @@
                      BorderBrush="#CCCCCC" TextChanged="Filter_Changed"/>
             <CheckBox x:Name="chkDuplicateOnly" Grid.Column="2" Content="同名のみ" VerticalAlignment="Center"
                       FontSize="12" Margin="12,0,0,0" Click="Filter_Changed"/>
-            <CheckBox x:Name="chkEmptyOnly" Grid.Column="3" Content="空のみ" VerticalAlignment="Center"
-                      FontSize="12" Margin="12,0,0,0" Click="Filter_Changed"/>
-            <Button x:Name="btnSelectEmpty" Grid.Column="4" Content="空を全選択" Style="{StaticResource SecondaryButtonStyle}"
+            <Button x:Name="btnSelectEmpty" Grid.Column="3" Content="空を全選択" Style="{StaticResource SecondaryButtonStyle}"
                     Margin="12,0,0,0" Click="SelectEmpty_Click"/>
+            <Button x:Name="btnSelectNotBound" Grid.Column="4" Content="バインドなしを全選択" Style="{StaticResource SecondaryButtonStyle}"
+                    Margin="6,0,0,0" Click="SelectNotBound_Click"/>
         </Grid>
 
         <!-- 種別フィルタ（ラジオボタン）-->
