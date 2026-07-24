@@ -136,14 +136,37 @@ namespace Tools28.Commands.ExcelExportImport.Services
                             string headerName = paramHeaders[i];
                             string newValue = GetCellValueAsString(worksheet.Cell(row, i + 3));
 
-                            // 空セルはスキップ（シート統合モードで該当カテゴリに存在しないパラメータ列）
-                            if (string.IsNullOrEmpty(newValue))
-                                continue;
-
                             bool isTypeParam = headerName.StartsWith("T-");
                             string rawName = headerName.StartsWith("T-") || headerName.StartsWith("I-")
                                 ? headerName.Substring(2)
                                 : headerName;
+
+                            // 空セルの扱い:
+                            //  - パラメータが要素に存在しない → N/A（シート統合モードの他カテゴリ列など）→ スキップ
+                            //  - 文字列パラメータで現在値が空でない → 「値の削除（クリア）」として取り込む
+                            //    （数値・ElementId 型は Revit 上で空にできないためスキップ）
+                            if (string.IsNullOrEmpty(newValue))
+                            {
+                                var clearParam = ParameterService.FindParameter(elem, rawName, isTypeParam, doc);
+                                if (clearParam == null || clearParam.StorageType != StorageType.String)
+                                    continue;
+
+                                string clearCurrent = ParameterService.GetParameterValueAsString(clearParam);
+                                if (string.IsNullOrEmpty(clearCurrent))
+                                    continue; // 既に空 → 変更なし
+
+                                preview.Add(new ImportPreviewRow
+                                {
+                                    ElementId = elementIdInt,
+                                    CategoryName = categoryName,
+                                    ParameterName = headerName,
+                                    CurrentValue = clearCurrent,
+                                    NewValue = "",
+                                    HasChange = true,
+                                    IsReadOnly = clearParam.IsReadOnly && !ParameterService.IsTypeChangeParameter(clearParam)
+                                });
+                                continue;
+                            }
 
                             string currentValue;
                             bool isReadOnly;
