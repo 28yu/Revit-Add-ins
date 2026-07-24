@@ -410,10 +410,10 @@ grep -o '"[^"]*"' YourDialog.xaml.cs | grep Loc.S | while read key; do grep $key
 
 過去事例一覧: `Docs/DEVLOG.md#多言語バグ過去事例` 参照
 
-### カテゴリ名ローカライズ（ExcelExportImport）
-- `CategoryInfo.Name`: Revit提供のカテゴリ名（英語）— 設定保存・内部使用。変更しないこと
-- `CategoryInfo.DisplayLabel`: UI表示用（`CategoryLocalizer.GetLocalizedName()` 経由）
-- `CategoryLocalizer`: BuiltInCategory → `Category.*` Loc.Sキーのマッピング（約60カテゴリ）
+### カテゴリ名の表示（ExcelExportImport）
+- `CategoryInfo.Name`: Revit が返す実際のカテゴリ名（`Category.Name`）。設定保存・内部使用・Excelシート名・ヘッダー・パラメータ/出力欄の見出しに使用。
+- `CategoryInfo.DisplayLabel`: UI表示用。**`Name` をそのまま使う**（`= $"{Name} ({ElementCount})"`）。
+- ⚠️ 旧 `CategoryLocalizer`（BuiltInCategory→固定翻訳）は撤去した。固定翻訳は Revit のバージョン/言語で実名とずれ、カテゴリ選択欄だけ別名（例: OST_Site を「敷地」と表示するが実名は「外構」）になる不具合を起こしたため。**カテゴリ名は必ず Revit の `Category.Name` を単一の情報源として使い、二重管理しないこと。**
 
 ## Notion 開発ハブ連携
 
