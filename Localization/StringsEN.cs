@@ -499,7 +499,7 @@ namespace Tools28.Localization
             { "Ribbon.ParamCleanup", "Parameter Cleanup" },
             { "Ribbon.ParamCleanup.Tip", "Lists deletable parameters in the project (project / shared / global), highlights duplicate names, checks whether each parameter holds any value, and lets you delete unused (empty) ones. To avoid freezing on large models, the value check runs only on demand with progress display and cancellation support." },
             { "ParamCleanup.Title", "Parameter Cleanup" },
-            { "ParamCleanup.Description", "Lists deletable parameters in the project and automatically checks whether any element holds a value for each parameter. Parameters that share a name are highlighted. Select and delete unused (empty) parameters." },
+            { "ParamCleanup.Description", "Lists deletable parameters in the project and automatically checks whether any element holds a value for each parameter.\nParameters that share a name are highlighted. Select and delete unused (empty) parameters." },
             { "ParamCleanup.SortHint", "Click a column header to sort" },
             { "ParamCleanup.Search", "Search:" },
             { "ParamCleanup.DuplicateOnly", "Duplicates only" },
