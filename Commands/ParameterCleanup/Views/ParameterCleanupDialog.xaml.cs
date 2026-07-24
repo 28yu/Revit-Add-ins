@@ -305,6 +305,7 @@ namespace Tools28.Commands.ParameterCleanup.Views
             };
             var btnClear = MenuButton(Loc.S("ParamCleanup.Filter.Clear"));
             btnClear.Width = 64; btnClear.Margin = new Thickness(0, 0, 4, 0);
+            btnClear.HorizontalContentAlignment = System.Windows.HorizontalAlignment.Center;
             btnClear.Click += (s, ev) =>
             {
                 _columnFilters.Remove(key);
@@ -314,6 +315,7 @@ namespace Tools28.Commands.ParameterCleanup.Views
             };
             var btnOk = MenuButton(Loc.S("Common.OK"));
             btnOk.Width = 64; btnOk.Margin = new Thickness(0, 0, 4, 0);
+            btnOk.HorizontalContentAlignment = System.Windows.HorizontalAlignment.Center;
             btnOk.Click += (s, ev) =>
             {
                 var sel = new HashSet<string>(checks.Where(c => c.IsChecked == true).Select(c => (string)c.Tag));
@@ -325,6 +327,7 @@ namespace Tools28.Commands.ParameterCleanup.Views
             };
             var btnCancel = MenuButton(Loc.S("Common.Cancel"));
             btnCancel.Width = 64;
+            btnCancel.HorizontalContentAlignment = System.Windows.HorizontalAlignment.Center;
             btnCancel.Click += (s, ev) => CloseActivePopup();
             buttons.Children.Add(btnClear);
             buttons.Children.Add(btnOk);
