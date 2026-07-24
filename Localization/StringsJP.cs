@@ -512,6 +512,8 @@ namespace Tools28.Localization
             { "ParamCleanup.Filter.SelectAll", "(すべて選択)" },
             { "ParamCleanup.Filter.Blank", "(空白)" },
             { "ParamCleanup.Filter.Clear", "クリア" },
+            { "ParamCleanup.Filter.CheckAll", "全選択" },
+            { "ParamCleanup.Filter.UncheckAll", "選択解除" },
             { "ParamCleanup.FilterHint", "並べ替え・フィルター" },
             { "ParamCleanup.Col.Select", "選択" },
             { "ParamCleanup.Col.Name", "パラメータ名" },

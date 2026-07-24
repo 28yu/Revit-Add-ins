@@ -228,47 +228,63 @@ namespace Tools28.Commands.ParameterCleanup.Views
             var search = new System.Windows.Controls.TextBox { Height = 24, Margin = new Thickness(0, 0, 0, 4) };
             root.Children.Add(search);
 
-            // --- (すべて選択) ---
-            var selectAll = new CheckBox
-            {
-                Content = Loc.S("ParamCleanup.Filter.SelectAll"),
-                Margin = new Thickness(0, 0, 0, 4),
-                FontWeight = FontWeights.SemiBold
-            };
-            root.Children.Add(selectAll);
-
-            // --- 値リスト ---
+            // --- 値リスト（長い値は … で省略、全文はツールチップ）---
             var listPanel = new StackPanel();
             var checks = new List<CheckBox>();
             foreach (var val in distinct)
             {
+                string disp = string.IsNullOrEmpty(val) ? Loc.S("ParamCleanup.Filter.Blank") : val;
                 var cb = new CheckBox
                 {
-                    Content = string.IsNullOrEmpty(val) ? Loc.S("ParamCleanup.Filter.Blank") : val,
                     Tag = val,
                     IsChecked = allowed == null || allowed.Contains(val),
-                    Margin = new Thickness(0, 1, 0, 1)
+                    Margin = new Thickness(0, 1, 0, 1),
+                    Content = new TextBlock
+                    {
+                        Text = disp,
+                        TextTrimming = TextTrimming.CharacterEllipsis,
+                        MaxWidth = 340,
+                        ToolTip = disp
+                    }
                 };
                 checks.Add(cb);
                 listPanel.Children.Add(cb);
             }
 
-            selectAll.IsChecked = checks.All(c => c.IsChecked == true) ? true
-                                : checks.Any(c => c.IsChecked == true) ? (bool?)null : false;
-            selectAll.Click += (s, ev) =>
+            // --- 全選択 / 選択解除 ボタン（検索で表示中の項目のみ対象）---
+            var selRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 4) };
+            var btnAll = new Button
             {
-                bool on = selectAll.IsChecked == true;
-                foreach (var c in checks)
-                    if (c.Visibility == System.Windows.Visibility.Visible) c.IsChecked = on;
+                Content = Loc.S("ParamCleanup.Filter.CheckAll"),
+                Height = 24, Padding = new Thickness(8, 0, 8, 0), Margin = new Thickness(0, 0, 4, 0), Cursor = Cursors.Hand
             };
+            btnAll.Click += (s, ev) =>
+            {
+                foreach (var c in checks)
+                    if (c.Visibility == System.Windows.Visibility.Visible) c.IsChecked = true;
+            };
+            var btnNone = new Button
+            {
+                Content = Loc.S("ParamCleanup.Filter.UncheckAll"),
+                Height = 24, Padding = new Thickness(8, 0, 8, 0), Cursor = Cursors.Hand
+            };
+            btnNone.Click += (s, ev) =>
+            {
+                foreach (var c in checks)
+                    if (c.Visibility == System.Windows.Visibility.Visible) c.IsChecked = false;
+            };
+            selRow.Children.Add(btnAll);
+            selRow.Children.Add(btnNone);
+            root.Children.Add(selRow);
 
+            // --- 検索でリスト絞り込み（実値でマッチ）---
             search.TextChanged += (s, ev) =>
             {
                 string q = search.Text.Trim();
                 foreach (var c in checks)
                 {
-                    string disp = c.Content?.ToString() ?? "";
-                    c.Visibility = (q.Length == 0 || disp.IndexOf(q, StringComparison.CurrentCultureIgnoreCase) >= 0)
+                    string t = (c.Tag as string) ?? "";
+                    c.Visibility = (q.Length == 0 || t.IndexOf(q, StringComparison.CurrentCultureIgnoreCase) >= 0)
                         ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
                 }
             };
@@ -276,6 +292,7 @@ namespace Tools28.Commands.ParameterCleanup.Views
             root.Children.Add(new ScrollViewer
             {
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
                 MaxHeight = 240,
                 Content = listPanel
             });
@@ -321,7 +338,8 @@ namespace Tools28.Commands.ParameterCleanup.Views
                 BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xCC, 0xCC, 0xCC)),
                 BorderThickness = new Thickness(1),
                 Child = root,
-                MinWidth = 230
+                MinWidth = 230,
+                MaxWidth = 420
             };
 
             _activePopup = new Popup

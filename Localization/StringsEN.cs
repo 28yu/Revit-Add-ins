@@ -512,6 +512,8 @@ namespace Tools28.Localization
             { "ParamCleanup.Filter.SelectAll", "(Select All)" },
             { "ParamCleanup.Filter.Blank", "(Blank)" },
             { "ParamCleanup.Filter.Clear", "Clear" },
+            { "ParamCleanup.Filter.CheckAll", "Check All" },
+            { "ParamCleanup.Filter.UncheckAll", "Uncheck All" },
             { "ParamCleanup.FilterHint", "Sort / Filter" },
             { "ParamCleanup.Col.Select", "Select" },
             { "ParamCleanup.Col.Name", "Parameter Name" },

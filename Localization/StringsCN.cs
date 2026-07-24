@@ -512,6 +512,8 @@ namespace Tools28.Localization
             { "ParamCleanup.Filter.SelectAll", "(全选)" },
             { "ParamCleanup.Filter.Blank", "(空白)" },
             { "ParamCleanup.Filter.Clear", "清除" },
+            { "ParamCleanup.Filter.CheckAll", "全选" },
+            { "ParamCleanup.Filter.UncheckAll", "取消全选" },
             { "ParamCleanup.FilterHint", "排序 / 筛选" },
             { "ParamCleanup.Col.Select", "选择" },
             { "ParamCleanup.Col.Name", "参数名称" },
