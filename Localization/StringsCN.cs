@@ -496,7 +496,7 @@ namespace Tools28.Localization
 
             // === ParameterCleanup（参数整理）===
             { "Ribbon.Panel.Parameter", "参数" },
-            { "Ribbon.ParamCleanup", "参数整理" },
+            { "Ribbon.ParamCleanup", "参数\n整理" },
             { "Ribbon.ParamCleanup.Tip", "列出项目中可删除的参数（项目／共享／全局），高亮同名参数，检查每个参数是否有值，并删除未使用（空）的参数。为避免在大型模型上卡顿，值检查仅在需要时执行，并支持进度显示和中止。" },
             { "ParamCleanup.Title", "参数整理" },
             { "ParamCleanup.Description", "列出项目中可删除的参数，并自动检查每个参数是否有元素填入了值。\n同名参数将被高亮显示。选择并删除未使用（空）的参数。" },

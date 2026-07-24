@@ -496,7 +496,7 @@ namespace Tools28.Localization
 
             // === ParameterCleanup（パラメータ整理）===
             { "Ribbon.Panel.Parameter", "パラメータ" },
-            { "Ribbon.ParamCleanup", "パラメータ整理" },
+            { "Ribbon.ParamCleanup", "パラメータ\n整理" },
             { "Ribbon.ParamCleanup.Tip", "プロジェクト内の削除可能なパラメータ（プロジェクト／共有／グローバル）を一覧表示し、同名パラメータの特定・値の有無の確認・不要（未使用）パラメータの削除を行います。大容量モデルでもフリーズしないよう、値の確認は必要なときだけ実行され、進捗表示と中止に対応します。" },
             { "ParamCleanup.Title", "パラメータ整理" },
             { "ParamCleanup.Description", "プロジェクト内の削除可能なパラメータを一覧表示し、各パラメータに値が入った要素があるかを自動で確認します。\n同名のパラメータは強調表示されます。不要（空）なパラメータを選択して削除できます。" },
