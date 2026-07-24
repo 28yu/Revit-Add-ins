@@ -102,6 +102,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -132,8 +133,21 @@
                     Margin="12,0,0,0" Click="SelectEmpty_Click"/>
         </Grid>
 
+        <!-- 種別フィルタ（ラジオボタン）-->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,6" VerticalAlignment="Center">
+            <TextBlock x:Name="lblKindFilter" Text="種別:" VerticalAlignment="Center" FontSize="12" Margin="0,0,8,0"/>
+            <RadioButton x:Name="rbKindAll" Content="すべて" GroupName="KindFilter" IsChecked="True"
+                         VerticalAlignment="Center" FontSize="12" Margin="0,0,14,0" Checked="Filter_Changed"/>
+            <RadioButton x:Name="rbKindProject" Content="プロジェクト" GroupName="KindFilter"
+                         VerticalAlignment="Center" FontSize="12" Margin="0,0,14,0" Checked="Filter_Changed"/>
+            <RadioButton x:Name="rbKindShared" Content="共有" GroupName="KindFilter"
+                         VerticalAlignment="Center" FontSize="12" Margin="0,0,14,0" Checked="Filter_Changed"/>
+            <RadioButton x:Name="rbKindGlobal" Content="グローバル" GroupName="KindFilter"
+                         VerticalAlignment="Center" FontSize="12" Checked="Filter_Changed"/>
+        </StackPanel>
+
         <!-- 一覧 -->
-        <DataGrid x:Name="ParamGrid" Grid.Row="2"
+        <DataGrid x:Name="ParamGrid" Grid.Row="3"
                   AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
                   HeadersVisibility="Column" GridLinesVisibility="Horizontal"
                   RowHeaderWidth="0" SelectionMode="Extended" IsReadOnly="False"
@@ -208,7 +222,7 @@
         </DataGrid>
 
         <!-- 進捗・件数 -->
-        <Grid Grid.Row="3" Margin="0,8,0,0">
+        <Grid Grid.Row="4" Margin="0,8,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
@@ -224,7 +238,7 @@
         </Grid>
 
         <!-- ボタン行 -->
-        <Grid Grid.Row="4" Margin="0,8,0,0">
+        <Grid Grid.Row="5" Margin="0,8,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>

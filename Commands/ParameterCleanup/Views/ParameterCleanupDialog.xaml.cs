@@ -25,6 +25,7 @@ namespace Tools28.Commands.ParameterCleanup.Views
         private CancellationTokenSource _cts;
         private bool _scanning;
         private bool _valuesChecked;
+        private bool _ready;   // 初期化完了フラグ（InitializeComponent 中のイベント発火を無視）
 
         public ParameterCleanupDialog(Document doc)
         {
@@ -32,6 +33,7 @@ namespace Tools28.Commands.ParameterCleanup.Views
             InitializeComponent();
             ApplyLocalization();
             LoadRows();
+            _ready = true;
         }
 
         private void ApplyLocalization()
@@ -42,6 +44,12 @@ namespace Tools28.Commands.ParameterCleanup.Views
             chkDuplicateOnly.Content = Loc.S("ParamCleanup.DuplicateOnly");
             chkEmptyOnly.Content = Loc.S("ParamCleanup.EmptyOnly");
             btnSelectEmpty.Content = Loc.S("ParamCleanup.SelectEmpty");
+
+            lblKindFilter.Text = Loc.S("ParamCleanup.Filter.Kind");
+            rbKindAll.Content = Loc.S("ParamCleanup.Filter.All");
+            rbKindProject.Content = Loc.S("ParamCleanup.Kind.Project");
+            rbKindShared.Content = Loc.S("ParamCleanup.Kind.Shared");
+            rbKindGlobal.Content = Loc.S("ParamCleanup.Kind.Global");
 
             // 列ヘッダー（DataGrid の Header は string 直指定）
             ParamGrid.Columns[0].Header = Loc.S("ParamCleanup.Col.Select");
@@ -81,11 +89,17 @@ namespace Tools28.Commands.ParameterCleanup.Views
             if (chkEmptyOnly?.IsChecked == true && r.State != ValueState.Empty)
                 return false;
 
+            // 種別ラジオフィルタ
+            if (rbKindProject?.IsChecked == true && r.Kind != ParamKind.Project) return false;
+            if (rbKindShared?.IsChecked == true && r.Kind != ParamKind.Shared) return false;
+            if (rbKindGlobal?.IsChecked == true && r.Kind != ParamKind.Global) return false;
+
             return true;
         }
 
         private void Filter_Changed(object sender, RoutedEventArgs e)
         {
+            if (!_ready) return;   // 初期化中のイベントは無視
             _view?.Refresh();
             UpdateCount();
         }

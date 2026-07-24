@@ -34,12 +34,41 @@ namespace Tools28.Commands.ParameterCleanup.Services
         {
             var rows = new List<ParamRow>();
 
+            // --- バインド情報を先に構築 ---
+            // get_Item(Definition) は解決に失敗する場合があるため、実績のある
+            // ForwardIterator でバインドマップを一度走査し、パラメータ名でキー化する。
+            // （プロジェクトにバインド済みのパラメータ名は実質一意なので名前キーで安全）
+            var bindingByName = new Dictionary<string, BindingInfo>();
+            try
+            {
+                var it = doc.ParameterBindings.ForwardIterator();
+                it.Reset();
+                while (it.MoveNext())
+                {
+                    Definition def = it.Key;
+                    if (def == null || string.IsNullOrEmpty(def.Name)) continue;
+
+                    var info = new BindingInfo();
+                    var binding = it.Current as Binding;
+                    if (binding is InstanceBinding ib)
+                    {
+                        info.IsTypeBinding = false;
+                        CollectCategories(ib.Categories, info.Categories);
+                    }
+                    else if (binding is TypeBinding tb)
+                    {
+                        info.IsTypeBinding = true;
+                        CollectCategories(tb.Categories, info.Categories);
+                    }
+                    bindingByName[def.Name] = info;
+                }
+            }
+            catch { }
+
             // --- プロジェクト／共有パラメータ（ParameterElement / SharedParameterElement）---
             var paramElems = new Dictionary<ElementId, ParameterElement>();
             AddParameterElements(doc, typeof(ParameterElement), paramElems);
             AddParameterElements(doc, typeof(SharedParameterElement), paramElems);
-
-            var bindings = doc.ParameterBindings;
 
             foreach (var pe in paramElems.Values)
             {
@@ -56,24 +85,18 @@ namespace Tools28.Commands.ParameterCleanup.Services
                     Kind = (pe is SharedParameterElement) ? ParamKind.Shared : ParamKind.Project
                 };
 
-                // バインド情報（インスタンス／タイプ・対象カテゴリ）
-                Binding binding = null;
-                try { binding = bindings.get_Item(def); }
-                catch { binding = null; }
-
-                if (binding is InstanceBinding ib)
+                if (bindingByName.TryGetValue(def.Name, out var bi) && bi.Categories.Count > 0)
                 {
-                    row.IsTypeBinding = false;
-                    FillCategories(row, ib.Categories);
-                }
-                else if (binding is TypeBinding tb)
-                {
-                    row.IsTypeBinding = true;
-                    FillCategories(row, tb.Categories);
+                    row.IsTypeBinding = bi.IsTypeBinding;
+                    row.BoundCategories = bi.Categories;
+                    var names = bi.Categories.Select(c => c.Name).ToList();
+                    names.Sort(StringComparer.CurrentCulture);
+                    row.CategoriesText = string.Join(", ", names);
+                    // State は Unchecked のまま（スキャン対象）
                 }
                 else
                 {
-                    // バインドされていない共有パラメータ（ファミリ用に読込済み等）
+                    // どのカテゴリにもバインドされていない（ファミリ用に読込済みの共有パラメータ等）
                     row.IsTypeBinding = null;
                     row.State = ValueState.NotApplicable;
                 }
@@ -131,18 +154,20 @@ namespace Tools28.Commands.ParameterCleanup.Services
             catch { }
         }
 
-        private static void FillCategories(ParamRow row, CategorySet cats)
+        /// <summary>バインドマップの1エントリ分のバインド情報</summary>
+        private class BindingInfo
+        {
+            public bool? IsTypeBinding;
+            public List<Category> Categories = new List<Category>();
+        }
+
+        private static void CollectCategories(CategorySet cats, List<Category> bucket)
         {
             if (cats == null) return;
-            var names = new List<string>();
             foreach (Category c in cats)
             {
-                if (c == null) continue;
-                row.BoundCategories.Add(c);
-                names.Add(c.Name);
+                if (c != null) bucket.Add(c);
             }
-            names.Sort(StringComparer.CurrentCulture);
-            row.CategoriesText = string.Join(", ", names);
         }
 
         /// <summary>
