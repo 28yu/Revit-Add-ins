@@ -225,7 +225,7 @@ namespace Tools28.Commands.ParameterCleanup.Views
             root.Children.Add(new Separator { Margin = new Thickness(0, 4, 0, 4) });
 
             // --- 検索 ---
-            var search = new TextBox { Height = 24, Margin = new Thickness(0, 0, 0, 4) };
+            var search = new System.Windows.Controls.TextBox { Height = 24, Margin = new Thickness(0, 0, 0, 4) };
             root.Children.Add(search);
 
             // --- (すべて選択) ---
