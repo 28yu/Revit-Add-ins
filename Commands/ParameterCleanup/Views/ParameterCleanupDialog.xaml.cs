@@ -34,6 +34,14 @@ namespace Tools28.Commands.ParameterCleanup.Views
             ApplyLocalization();
             LoadRows();
             _ready = true;
+            Loaded += OnDialogLoaded;
+        }
+
+        // ダイアログ表示直後に値の有無を自動確認する
+        private async void OnDialogLoaded(object sender, RoutedEventArgs e)
+        {
+            Loaded -= OnDialogLoaded;   // 初回のみ
+            await RunValueCheckAsync();
         }
 
         private void ApplyLocalization()
@@ -52,13 +60,28 @@ namespace Tools28.Commands.ParameterCleanup.Views
             rbKindGlobal.Content = Loc.S("ParamCleanup.Kind.Global");
 
             // 列ヘッダー（DataGrid の Header は string 直指定）
+            // 並べ替え可能な列には「▾」を付けてクリックで並べ替えできることを明示する。
+            const string sortMark = "  ▾";
             ParamGrid.Columns[0].Header = Loc.S("ParamCleanup.Col.Select");
-            colName.Header = Loc.S("ParamCleanup.Col.Name");
-            colKind.Header = Loc.S("ParamCleanup.Col.Kind");
-            colScope.Header = Loc.S("ParamCleanup.Col.Scope");
-            colCategories.Header = Loc.S("ParamCleanup.Col.Categories");
-            colSchedRef.Header = Loc.S("ParamCleanup.Col.ScheduleRef");
-            colState.Header = Loc.S("ParamCleanup.Col.Value");
+            colName.Header = Loc.S("ParamCleanup.Col.Name") + sortMark;
+            colKind.Header = Loc.S("ParamCleanup.Col.Kind") + sortMark;
+            colScope.Header = Loc.S("ParamCleanup.Col.Scope") + sortMark;
+            colCategories.Header = Loc.S("ParamCleanup.Col.Categories") + sortMark;
+            colSchedRef.Header = Loc.S("ParamCleanup.Col.ScheduleRef") + sortMark;
+            colState.Header = Loc.S("ParamCleanup.Col.Value") + sortMark;
+
+            // 列見出しにツールチップとカーソルを付与して並べ替え操作を分かりやすくする
+            try
+            {
+                var headerStyle = new System.Windows.Style(
+                    typeof(System.Windows.Controls.Primitives.DataGridColumnHeader));
+                headerStyle.Setters.Add(new System.Windows.Setter(
+                    System.Windows.FrameworkElement.ToolTipProperty, Loc.S("ParamCleanup.SortHint")));
+                headerStyle.Setters.Add(new System.Windows.Setter(
+                    System.Windows.FrameworkElement.CursorProperty, System.Windows.Input.Cursors.Hand));
+                ParamGrid.ColumnHeaderStyle = headerStyle;
+            }
+            catch { }
 
             btnCheck.Content = Loc.S("ParamCleanup.Btn.Check");
             btnDelete.Content = Loc.S("ParamCleanup.Btn.Delete");
@@ -114,13 +137,21 @@ namespace Tools28.Commands.ParameterCleanup.Views
         }
 
         // ===== 値の有無を確認（スキャン）=====
-        private async void Check_Click(object sender, RoutedEventArgs e)
+        // ダイアログ表示時に自動実行され、ボタンでの再確認・中止も同じ処理を使う。
+        private void Check_Click(object sender, RoutedEventArgs e)
         {
             if (_scanning)
             {
                 _cts?.Cancel();   // 実行中はキャンセルボタンとして機能
                 return;
             }
+            _ = RunValueCheckAsync();
+        }
+
+        /// <summary>値の有無スキャンを実行（自動確認・手動再確認の共通処理）。</summary>
+        private async Task RunValueCheckAsync()
+        {
+            if (_scanning) return;
 
             var targets = _rows.Where(r => r.IsScannable).ToList();
             if (targets.Count == 0)
@@ -286,8 +317,9 @@ namespace Tools28.Commands.ParameterCleanup.Views
             TaskDialog.Show(Loc.S("ParamCleanup.Result.Title"),
                 string.Format(Loc.S("ParamCleanup.Result.Msg"), ok, fail));
 
-            LoadRows();   // 一覧を再構築
+            LoadRows();          // 一覧を再構築
             txtStatus.Text = "";
+            _ = RunValueCheckAsync();   // 削除後に自動で再確認
         }
 
         private void Close_Click(object sender, RoutedEventArgs e)
