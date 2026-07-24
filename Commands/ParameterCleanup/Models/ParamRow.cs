@@ -52,6 +52,9 @@ namespace Tools28.Commands.ParameterCleanup.Models
         /// <summary>カテゴリ表示文字列</summary>
         public string CategoriesText { get; set; } = "";
 
+        /// <summary>このパラメータを参照している集計表名（カンマ区切り）。無ければ空。</summary>
+        public string ScheduleRefText { get; set; } = "";
+
         /// <summary>グローバルパラメータの現在値（表示用）</summary>
         public string GlobalValueText { get; set; } = "";
 

@@ -57,6 +57,7 @@ namespace Tools28.Commands.ParameterCleanup.Views
             colKind.Header = Loc.S("ParamCleanup.Col.Kind");
             colScope.Header = Loc.S("ParamCleanup.Col.Scope");
             colCategories.Header = Loc.S("ParamCleanup.Col.Categories");
+            colSchedRef.Header = Loc.S("ParamCleanup.Col.ScheduleRef");
             colState.Header = Loc.S("ParamCleanup.Col.Value");
 
             btnCheck.Content = Loc.S("ParamCleanup.Btn.Check");
@@ -182,9 +183,16 @@ namespace Tools28.Commands.ParameterCleanup.Views
                 btnCheck.Content = Loc.S("ParamCleanup.Btn.Check");
                 SetBusy(false);
                 Progress.Visibility = System.Windows.Visibility.Collapsed;
-                txtStatus.Text = cancelled
-                    ? Loc.S("ParamCleanup.Status.Cancelled")
-                    : Loc.S("ParamCleanup.Status.Done");
+                if (cancelled)
+                {
+                    txtStatus.Text = Loc.S("ParamCleanup.Status.Cancelled");
+                }
+                else
+                {
+                    int hasVal = _rows.Count(r => r.State == ValueState.HasValue);
+                    int empty = _rows.Count(r => r.State == ValueState.Empty);
+                    txtStatus.Text = string.Format(Loc.S("ParamCleanup.Status.DoneSummary"), hasVal, empty);
+                }
 
                 _view?.Refresh();
                 UpdateCount();

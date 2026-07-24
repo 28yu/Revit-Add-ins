@@ -193,6 +193,18 @@
                     </DataGridTextColumn.ElementStyle>
                 </DataGridTextColumn>
 
+                <DataGridTextColumn x:Name="colSchedRef" Header="集計表参照" Binding="{Binding ScheduleRefText}" Width="1.4*" IsReadOnly="True">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                            <Setter Property="VerticalAlignment" Value="Center"/>
+                            <Setter Property="Margin" Value="4,0"/>
+                            <Setter Property="Foreground" Value="#8E44AD"/>
+                            <Setter Property="ToolTip" Value="{Binding ScheduleRefText}"/>
+                        </Style>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+
                 <DataGridTextColumn x:Name="colState" Header="値" Binding="{Binding StateText}" Width="Auto" MinWidth="90" IsReadOnly="True">
                     <DataGridTextColumn.ElementStyle>
                         <Style TargetType="TextBlock">

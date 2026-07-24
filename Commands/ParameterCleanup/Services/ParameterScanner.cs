@@ -65,6 +65,9 @@ namespace Tools28.Commands.ParameterCleanup.Services
             }
             catch { }
 
+            // --- 集計表（スケジュール）での参照を先に構築（軽量：集計表を舐めるだけ）---
+            var scheduleRefs = BuildScheduleReferences(doc);
+
             // --- プロジェクト／共有パラメータ（ParameterElement / SharedParameterElement）---
             var paramElems = new Dictionary<ElementId, ParameterElement>();
             AddParameterElements(doc, typeof(ParameterElement), paramElems);
@@ -100,6 +103,9 @@ namespace Tools28.Commands.ParameterCleanup.Services
                     row.IsTypeBinding = null;
                     row.State = ValueState.NotApplicable;
                 }
+
+                if (scheduleRefs.TryGetValue(row.Id, out var sref))
+                    row.ScheduleRefText = string.Join(", ", sref);
 
                 rows.Add(row);
             }
@@ -168,6 +174,55 @@ namespace Tools28.Commands.ParameterCleanup.Services
             {
                 if (c != null) bucket.Add(c);
             }
+        }
+
+        /// <summary>
+        /// 集計表（ViewSchedule）のフィールドが参照するパラメータ要素Id -> 集計表名リスト を構築する。
+        /// 全要素走査ではなく集計表とそのフィールドを舐めるだけなので軽量。
+        /// 組み込みパラメータ（負のId）は除外し、ユーザー作成パラメータのみ対象とする。
+        /// </summary>
+        private static Dictionary<ElementId, List<string>> BuildScheduleReferences(Document doc)
+        {
+            var map = new Dictionary<ElementId, List<string>>();
+            try
+            {
+                var schedules = new FilteredElementCollector(doc)
+                    .OfClass(typeof(ViewSchedule))
+                    .Cast<ViewSchedule>();
+
+                foreach (var vs in schedules)
+                {
+                    if (vs == null || vs.IsTemplate) continue;
+
+                    ScheduleDefinition sd;
+                    try { sd = vs.Definition; } catch { continue; }
+                    if (sd == null) continue;
+
+                    int count;
+                    try { count = sd.GetFieldCount(); } catch { continue; }
+
+                    for (int i = 0; i < count; i++)
+                    {
+                        ScheduleField f;
+                        try { f = sd.GetField(i); } catch { continue; }
+                        if (f == null) continue;
+
+                        ElementId pid;
+                        try { pid = f.ParameterId; } catch { continue; }
+                        if (pid == null || pid == ElementId.InvalidElementId) continue;
+                        if (pid.IntValue() <= 0) continue;   // 組み込みパラメータを除外
+
+                        if (!map.TryGetValue(pid, out var list))
+                        {
+                            list = new List<string>();
+                            map[pid] = list;
+                        }
+                        if (!list.Contains(vs.Name)) list.Add(vs.Name);
+                    }
+                }
+            }
+            catch { }
+            return map;
         }
 
         /// <summary>
