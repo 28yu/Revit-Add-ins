@@ -1136,14 +1136,13 @@ v2.1.x のパッチではバージョン番号 + 修正点追記がメインな�
 - **カテゴリ名は Revit の `Category.Name` を単一の情報源にする。** 固定翻訳表で二重管理すると、Revit のバージョン/言語差で必ずどこかがずれる。
 - パラメータ値・ファミリ名など他の表示も Revit 言語で出るため、カテゴリ名だけ別言語に訳すのはむしろ不整合。実名統一が最も安全。
 
-## ExcelExportImport: エクスポートダイアログに全選択/選択解除・パラメータ種別フィルタを追加（2026-07-26）
+## ExcelExportImport: エクスポートダイアログに全選択/選択解除ボタンを追加（2026-07-26）
 
 ### 追加内容
-- 「カテゴリを選択」欄・「パラメータ」欄の検索ボックス下に **全選択 / 選択解除** ボタンを設置。いずれも**現在の絞り込み（検索テキスト・種別フィルタ）で表示中の項目だけ**を対象に一括チェック/解除する。
-- 「パラメータ」欄に **種別フィルタ用コンボ**（すべて / インスタンス(I-) / タイプ(T-)）を追加。テキスト検索と AND で合成し、`ApplyParameterFilters()` に一本化。
+- 「カテゴリを選択」欄・「パラメータ」欄の検索ボックス下に **全選択 / 選択解除** ボタンを設置。いずれも**現在の検索絞り込みで表示中の項目だけ**を対象に一括チェック/解除する。
+- ※当初はパラメータ欄に種別フィルタ用コンボ（すべて/インスタンス/タイプ）も追加したが、既存のテキスト検索で足りるため削除した。
 
 ### 実装メモ
 - `CategoryInfo` / `ParameterInfo` の `IsChecked` を **`INotifyPropertyChanged`** 化。コードから一括変更した際に CheckBox へ即時反映させるため（再バインドに頼らず、仮想化された `ParameterListBox` でも整合）。
 - カテゴリの一括変更中は `_suppressCategoryUpdate` フラグで `CategoryCheckBox_Changed`→`UpdateParameterList()`（Revit へのパラメータ取得）の連続発火を抑制し、最後に1回だけ更新。
-- 種別コンボの生成時 `SelectionChanged` は `_paramFilterInitialized` フラグで無視。
-- 絞り込みロジックは `GetVisibleCategories()` / `GetBaseParameters()`＋`ApplyParameterFilters()` に集約し、表示と全選択対象で同じ判定を共有。
+- 絞り込みロジックは `GetVisibleCategories()` / `GetBaseParameters()`＋`ApplyParameterFilters()`（テキスト検索）に集約し、表示と全選択対象で同じ判定を共有。

@@ -285,25 +285,14 @@
                                 Style="{StaticResource SecondaryButtonStyle}"
                                 Click="ParameterSearchButton_Click"/>
                     </Grid>
-                    <Grid Grid.Row="1" Margin="0,0,0,4">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <ComboBox x:Name="ParameterFilterCombo" Grid.Column="0"
-                                  Height="22" FontSize="11" MinWidth="110"
-                                  VerticalContentAlignment="Center"
-                                  SelectionChanged="ParameterFilterCombo_SelectionChanged"/>
-                        <StackPanel Grid.Column="2" Orientation="Horizontal">
-                            <Button x:Name="btnParamSelectAll" Content="全選択"
-                                    Style="{StaticResource SmallButtonStyle}"
-                                    Click="ParameterSelectAllButton_Click"/>
-                            <Button x:Name="btnParamSelectNone" Content="選択解除"
-                                    Style="{StaticResource SmallButtonStyle}"
-                                    Click="ParameterSelectNoneButton_Click"/>
-                        </StackPanel>
-                    </Grid>
+                    <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,4">
+                        <Button x:Name="btnParamSelectAll" Content="全選択"
+                                Style="{StaticResource SmallButtonStyle}"
+                                Click="ParameterSelectAllButton_Click"/>
+                        <Button x:Name="btnParamSelectNone" Content="選択解除"
+                                Style="{StaticResource SmallButtonStyle}"
+                                Click="ParameterSelectNoneButton_Click"/>
+                    </StackPanel>
                     <ListBox x:Name="ParameterListBox" Grid.Row="2"
                              BorderThickness="1" BorderBrush="#CCCCCC"
                              SelectionMode="Extended"
