@@ -29,6 +29,13 @@ namespace Tools28.Commands.ExcelExportImport.Views
         // 出力パラメータリスト
         private List<ParameterInfo> _outputParameters = new List<ParameterInfo>();
 
+        // 全選択/選択解除でカテゴリのチェックを一括変更する際、
+        // CheckBox の Checked/Unchecked からの UpdateParameterList を抑制するフラグ
+        private bool _suppressCategoryUpdate;
+
+        // パラメータ種別フィルタ用コンボの初期化完了フラグ
+        private bool _paramFilterInitialized;
+
         /// <summary>エクスポート対象カテゴリ</summary>
         public List<CategoryInfo> SelectedCategories { get; private set; }
 
@@ -69,6 +76,11 @@ namespace Tools28.Commands.ExcelExportImport.Views
             btnSearchCat.Content = Loc.S("Common.Search");
             grpParameter.Header = Loc.S("Export.Parameter");
             btnSearchParam.Content = Loc.S("Common.Search");
+            btnCatSelectAll.Content = Loc.S("Common.SelectAll");
+            btnCatSelectNone.Content = Loc.S("Common.SelectNone");
+            btnParamSelectAll.Content = Loc.S("Common.SelectAll");
+            btnParamSelectNone.Content = Loc.S("Common.SelectNone");
+            PopulateParameterFilter();
             ParamPrefixLegend.Text = Loc.S("Export.ParamPrefixLegend");
             btnAddToOutput.ToolTip = Loc.S("Export.AddToOutput");
             btnRemoveFromOutput.ToolTip = Loc.S("Export.RemoveFromOutput");
@@ -93,6 +105,8 @@ namespace Tools28.Commands.ExcelExportImport.Views
 
         private void CategoryCheckBox_Changed(object sender, RoutedEventArgs e)
         {
+            // 全選択/選択解除による一括変更中は個別更新を抑制（最後に1回だけ更新する）
+            if (_suppressCategoryUpdate) return;
             UpdateParameterList();
         }
 
@@ -106,20 +120,44 @@ namespace Tools28.Commands.ExcelExportImport.Views
             FilterCategoryList();
         }
 
-        private void FilterCategoryList()
+        /// <summary>検索テキストで絞り込んだ、現在表示中のカテゴリ一覧を返す</summary>
+        private List<CategoryInfo> GetVisibleCategories()
         {
             string filter = CategorySearchBox.Text.Trim();
             if (string.IsNullOrEmpty(filter))
-            {
-                CategoryListBox.ItemsSource = _allCategories;
-            }
-            else
-            {
-                CategoryListBox.ItemsSource = _allCategories
-                    .Where(c => c.Name.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0
-                             || c.DisplayLabel.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0)
-                    .ToList();
-            }
+                return _allCategories;
+
+            return _allCategories
+                .Where(c => c.Name.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0
+                         || c.DisplayLabel.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0)
+                .ToList();
+        }
+
+        private void FilterCategoryList()
+        {
+            CategoryListBox.ItemsSource = GetVisibleCategories();
+        }
+
+        private void CategorySelectAllButton_Click(object sender, RoutedEventArgs e)
+        {
+            SetVisibleCategoriesChecked(true);
+        }
+
+        private void CategorySelectNoneButton_Click(object sender, RoutedEventArgs e)
+        {
+            SetVisibleCategoriesChecked(false);
+        }
+
+        /// <summary>現在表示中（検索絞り込み後）のカテゴリを一括でチェック/解除する</summary>
+        private void SetVisibleCategoriesChecked(bool value)
+        {
+            _suppressCategoryUpdate = true;
+            foreach (var cat in GetVisibleCategories())
+                cat.IsChecked = value;
+            _suppressCategoryUpdate = false;
+
+            // 一括変更後にパラメータ一覧を1回だけ更新
+            UpdateParameterList();
         }
 
         #endregion
@@ -139,15 +177,42 @@ namespace Tools28.Commands.ExcelExportImport.Views
                 _allParameters.AddRange(parameters);
             }
 
-            // 重複を除去し、出力リストに既にあるものは除外
+            FilterParameterList(null);
+        }
+
+        /// <summary>
+        /// 重複を除去し、出力リストに既にあるものを除いたパラメータ一覧（絞り込み前）を返す。
+        /// </summary>
+        private List<ParameterInfo> GetBaseParameters()
+        {
             var outputDisplayNames = new HashSet<string>(_outputParameters.Select(p => p.DisplayName + "|" + p.CategoryName));
-            var filteredParams = _allParameters
+            return _allParameters
                 .GroupBy(p => p.DisplayName + "|" + p.CategoryName)
                 .Select(g => g.First())
                 .Where(p => !outputDisplayNames.Contains(p.DisplayName + "|" + p.CategoryName))
                 .ToList();
+        }
 
-            FilterParameterList(filteredParams);
+        /// <summary>
+        /// 種別フィルタ（すべて/インスタンス/タイプ）とテキスト検索を適用した表示対象を返す。
+        /// </summary>
+        private List<ParameterInfo> ApplyParameterFilters(List<ParameterInfo> source)
+        {
+            IEnumerable<ParameterInfo> query = source;
+
+            // 種別フィルタ: 1=インスタンス(I-), 2=タイプ(T-), それ以外=すべて
+            int kind = ParameterFilterCombo?.SelectedIndex ?? 0;
+            if (kind == 1)
+                query = query.Where(p => !p.IsTypeParameter);
+            else if (kind == 2)
+                query = query.Where(p => p.IsTypeParameter);
+
+            // テキスト検索
+            string filter = ParameterSearchBox.Text.Trim();
+            if (!string.IsNullOrEmpty(filter))
+                query = query.Where(p => p.DisplayName.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0);
+
+            return query.ToList();
         }
 
         private void ParameterSearchBox_TextChanged(object sender, TextChangedEventArgs e)
@@ -160,36 +225,54 @@ namespace Tools28.Commands.ExcelExportImport.Views
             FilterParameterList(null);
         }
 
+        private void ParameterFilterCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            // 初期化（コンボ生成）時の発火は無視
+            if (!_paramFilterInitialized) return;
+            FilterParameterList(null);
+        }
+
+        /// <summary>パラメータ種別フィルタのコンボボックスを（再）構築する</summary>
+        private void PopulateParameterFilter()
+        {
+            _paramFilterInitialized = false;
+            ParameterFilterCombo.Items.Clear();
+            ParameterFilterCombo.Items.Add(Loc.S("Export.Filter.All"));
+            ParameterFilterCombo.Items.Add(Loc.S("Export.Filter.Instance"));
+            ParameterFilterCombo.Items.Add(Loc.S("Export.Filter.Type"));
+            ParameterFilterCombo.SelectedIndex = 0;
+            _paramFilterInitialized = true;
+        }
+
         private void FilterParameterList(List<ParameterInfo> source)
         {
             if (source == null)
-            {
-                // 現在のソースから再フィルタ
-                var outputDisplayNames = new HashSet<string>(_outputParameters.Select(p => p.DisplayName + "|" + p.CategoryName));
-                source = _allParameters
-                    .GroupBy(p => p.DisplayName + "|" + p.CategoryName)
-                    .Select(g => g.First())
-                    .Where(p => !outputDisplayNames.Contains(p.DisplayName + "|" + p.CategoryName))
-                    .ToList();
-            }
+                source = GetBaseParameters();
 
-            string filter = ParameterSearchBox.Text.Trim();
-            List<ParameterInfo> filtered;
-            if (string.IsNullOrEmpty(filter))
-            {
-                filtered = source;
-            }
-            else
-            {
-                filtered = source
-                    .Where(p => p.DisplayName.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0)
-                    .ToList();
-            }
+            var filtered = ApplyParameterFilters(source);
 
             // カテゴリ別にグループ化して表示
             var view = new ListCollectionView(filtered);
             view.GroupDescriptions.Add(new PropertyGroupDescription("CategoryName"));
             ParameterListBox.ItemsSource = view;
+        }
+
+        private void ParameterSelectAllButton_Click(object sender, RoutedEventArgs e)
+        {
+            SetVisibleParametersChecked(true);
+        }
+
+        private void ParameterSelectNoneButton_Click(object sender, RoutedEventArgs e)
+        {
+            SetVisibleParametersChecked(false);
+        }
+
+        /// <summary>現在表示中（種別フィルタ・検索絞り込み後）のパラメータを一括でチェック/解除する</summary>
+        private void SetVisibleParametersChecked(bool value)
+        {
+            // 表示中の対象のみを一括変更（INotifyPropertyChanged で CheckBox に即時反映）
+            foreach (var p in ApplyParameterFilters(GetBaseParameters()))
+                p.IsChecked = value;
         }
 
         #endregion

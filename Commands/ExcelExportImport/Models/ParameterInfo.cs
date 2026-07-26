@@ -1,10 +1,15 @@
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
+
 namespace Tools28.Commands.ExcelExportImport.Models
 {
     /// <summary>
     /// パラメータ情報を保持するモデル
     /// </summary>
-    public class ParameterInfo
+    public class ParameterInfo : INotifyPropertyChanged
     {
+        private bool _isChecked;
+
         /// <summary>パラメータ名（T-/I-プレフィックス付き）</summary>
         public string DisplayName { get; set; }
 
@@ -20,8 +25,27 @@ namespace Tools28.Commands.ExcelExportImport.Models
         /// <summary>所属カテゴリ名</summary>
         public string CategoryName { get; set; }
 
-        /// <summary>チェック状態（パラメータリスト用）</summary>
-        public bool IsChecked { get; set; }
+        /// <summary>
+        /// チェック状態（パラメータリスト用）。全選択/選択解除でコードから
+        /// 変更した際に CheckBox へ即時反映させるため通知する。
+        /// </summary>
+        public bool IsChecked
+        {
+            get => _isChecked;
+            set
+            {
+                if (_isChecked == value) return;
+                _isChecked = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        private void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
 
         public ParameterInfo(string rawName, bool isTypeParameter, bool isReadOnly, string categoryName)
         {

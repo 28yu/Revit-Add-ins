@@ -120,6 +120,39 @@
             </Style.Triggers>
         </Style>
 
+        <!-- 全選択/選択解除など小さめのリンク風ボタン -->
+        <Style x:Key="SmallButtonStyle" TargetType="Button">
+            <Setter Property="Height" Value="22"/>
+            <Setter Property="MinWidth" Value="56"/>
+            <Setter Property="Padding" Value="6,0"/>
+            <Setter Property="Margin" Value="0,0,4,0"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="Foreground" Value="{StaticResource RevitDarkGray}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="#CCCCCC"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="2"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                            VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#F0F0F0"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
         <!-- 検索ボックススタイル -->
         <Style x:Key="SearchBoxStyle" TargetType="TextBox">
             <Setter Property="Height" Value="24"/>
@@ -192,6 +225,7 @@
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
                     <Grid Grid.Row="0" Margin="0,4,0,4">
@@ -206,7 +240,15 @@
                                 Style="{StaticResource SecondaryButtonStyle}"
                                 Click="CategorySearchButton_Click"/>
                     </Grid>
-                    <ListBox x:Name="CategoryListBox" Grid.Row="1"
+                    <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,4">
+                        <Button x:Name="btnCatSelectAll" Content="全選択"
+                                Style="{StaticResource SmallButtonStyle}"
+                                Click="CategorySelectAllButton_Click"/>
+                        <Button x:Name="btnCatSelectNone" Content="選択解除"
+                                Style="{StaticResource SmallButtonStyle}"
+                                Click="CategorySelectNoneButton_Click"/>
+                    </StackPanel>
+                    <ListBox x:Name="CategoryListBox" Grid.Row="2"
                              BorderThickness="1" BorderBrush="#CCCCCC"
                              SelectionChanged="CategoryListBox_SelectionChanged">
                         <ListBox.ItemTemplate>
@@ -228,6 +270,7 @@
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
                     <Grid Grid.Row="0" Margin="0,4,0,4">
@@ -242,7 +285,26 @@
                                 Style="{StaticResource SecondaryButtonStyle}"
                                 Click="ParameterSearchButton_Click"/>
                     </Grid>
-                    <ListBox x:Name="ParameterListBox" Grid.Row="1"
+                    <Grid Grid.Row="1" Margin="0,0,0,4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <ComboBox x:Name="ParameterFilterCombo" Grid.Column="0"
+                                  Height="22" FontSize="11" MinWidth="110"
+                                  VerticalContentAlignment="Center"
+                                  SelectionChanged="ParameterFilterCombo_SelectionChanged"/>
+                        <StackPanel Grid.Column="2" Orientation="Horizontal">
+                            <Button x:Name="btnParamSelectAll" Content="全選択"
+                                    Style="{StaticResource SmallButtonStyle}"
+                                    Click="ParameterSelectAllButton_Click"/>
+                            <Button x:Name="btnParamSelectNone" Content="選択解除"
+                                    Style="{StaticResource SmallButtonStyle}"
+                                    Click="ParameterSelectNoneButton_Click"/>
+                        </StackPanel>
+                    </Grid>
+                    <ListBox x:Name="ParameterListBox" Grid.Row="2"
                              BorderThickness="1" BorderBrush="#CCCCCC"
                              SelectionMode="Extended"
                              ScrollViewer.CanContentScroll="True"
