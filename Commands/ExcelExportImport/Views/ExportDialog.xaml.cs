@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
@@ -26,8 +27,13 @@ namespace Tools28.Commands.ExcelExportImport.Views
         private List<CategoryInfo> _allCategories;
         // 全パラメータ一覧（カテゴリ選択に応じて更新）
         private List<ParameterInfo> _allParameters = new List<ParameterInfo>();
-        // 出力パラメータリスト
+        // 出力パラメータリスト（エクスポート順の情報源）
         private List<ParameterInfo> _outputParameters = new List<ParameterInfo>();
+
+        // 出力欄の表示用コレクション。ItemsSource を作り直さず要素の Move で
+        // 並べ替えることで、上下移動時にスクロール位置を維持する。
+        private readonly ObservableCollection<ParameterInfo> _outputDisplay = new ObservableCollection<ParameterInfo>();
+        private ListCollectionView _outputView;
 
         // 全選択/選択解除でカテゴリのチェックを一括変更する際、
         // CheckBox の Checked/Unchecked からの UpdateParameterList を抑制するフラグ
@@ -342,33 +348,60 @@ namespace Tools28.Commands.ExcelExportImport.Views
             }
             if (target < 0) return; // 同カテゴリ内で既に端
 
-            // 選択中の要素と対象要素を入れ替え
-            _outputParameters[index] = _outputParameters[target];
+            // エクスポート順の情報源（_outputParameters）を入れ替え
+            var other = _outputParameters[target];
+            _outputParameters[index] = other;
             _outputParameters[target] = selected;
 
-            RefreshOutputList();
+            // 表示コレクションは ItemsSource を作り直さず、要素を Move で移動して
+            // スクロール位置を維持する（先頭に戻らない）。
+            int dispSel = _outputDisplay.IndexOf(selected);
+            int dispOther = _outputDisplay.IndexOf(other);
+            if (dispSel >= 0 && dispOther >= 0)
+            {
+                try
+                {
+                    _outputDisplay.Move(dispSel, dispOther);
+                }
+                catch
+                {
+                    // 予期しない例外時は安全側に倒して全体を作り直す
+                    RefreshOutputList();
+                }
+            }
+            else
+            {
+                // フィルタ等で相手が非表示の場合のみ全体を作り直す
+                RefreshOutputList();
+            }
+
             OutputListBox.SelectedItem = selected;
+
+            // ScrollIntoView は最小スクロール（表示中なら何もしない／枠外なら
+            // 見える分だけスクロール）なので、そのまま呼んで枠外時だけ追従させる。
             OutputListBox.ScrollIntoView(selected);
         }
 
         private void RefreshOutputList()
         {
-            string filter = OutputSearchBox.Text.Trim();
-            List<ParameterInfo> source;
-            if (string.IsNullOrEmpty(filter))
+            // 表示用の ListCollectionView（グループ化）を一度だけ生成して使い回す。
+            // 以降は _outputDisplay の中身を差し替えるだけにして、並べ替え時の
+            // ItemsSource 再設定（＝スクロールリセット）を避ける。
+            if (_outputView == null)
             {
-                source = _outputParameters;
-            }
-            else
-            {
-                source = _outputParameters
-                    .Where(p => p.DisplayName.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0)
-                    .ToList();
+                _outputView = new ListCollectionView(_outputDisplay);
+                _outputView.GroupDescriptions.Add(new PropertyGroupDescription("CategoryName"));
+                OutputListBox.ItemsSource = _outputView;
             }
 
-            var view = new ListCollectionView(source);
-            view.GroupDescriptions.Add(new PropertyGroupDescription("CategoryName"));
-            OutputListBox.ItemsSource = view;
+            string filter = OutputSearchBox.Text.Trim();
+            IEnumerable<ParameterInfo> source = string.IsNullOrEmpty(filter)
+                ? _outputParameters
+                : _outputParameters.Where(p => p.DisplayName.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0);
+
+            _outputDisplay.Clear();
+            foreach (var p in source)
+                _outputDisplay.Add(p);
         }
 
         private void OutputSearchBox_TextChanged(object sender, TextChangedEventArgs e)

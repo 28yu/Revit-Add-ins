@@ -1164,3 +1164,21 @@ v2.1.x のパッチではバージョン番号 + 修正点追記がメインな�
 
 ### 教訓
 - グループ化/フィルタ表示のリストで並べ替えるときは、**表示インデックスで元データを触らない**。必ず選択オブジェクト参照から元データの位置を引き直す。
+
+## ExcelExportImport: 出力欄の▲▼移動でスクロール位置が先頭に飛ぶ不具合を修正（2026-07-27）
+
+### 症状
+出力欄で上下移動すると、表示位置がずれてスクロールバーが動いたように見える（先頭付近へジャンプ）。
+
+### 原因
+- `MoveSelectedOutput` が移動のたびに `RefreshOutputList()` を呼び、**毎回 `OutputListBox.ItemsSource` に新しい `ListCollectionView` を代入**していた。
+- ItemsSource を差し替えるとスクロールは先頭(offset 0)にリセットされ、その直後の `ScrollIntoView(selected)` が選択項目まで大きくスクロールし直すため、視覚的に大きく飛ぶ。
+
+### 修正
+- 出力欄の表示を **`ObservableCollection<ParameterInfo> _outputDisplay`** で保持し、`ListCollectionView`（グループ化）は**一度だけ生成して使い回す**（`_outputView`）。`RefreshOutputList()` は中身を差し替えるだけにした。
+- 上下移動時は ItemsSource を作り直さず、**`_outputDisplay.Move()` で該当2要素だけを移動**。ObservableCollection の Move 通知でコンテナが移動するだけなので**スクロール位置が保持**される。
+- `ScrollIntoView` は「表示中なら何もしない／枠外なら最小限スクロール」の挙動になるため、そのまま呼んで**枠の上下に出たときだけ追従**するようにした。
+- フィルタ等で相手要素が非表示のときのみ従来どおり `RefreshOutputList()` にフォールバック。
+
+### メモ
+- `_outputDisplay` のフラット順は、複数カテゴリをまたぐ Move で `_outputParameters` とずれ得るが、表示はカテゴリでグループ化され**カテゴリ内の相対順のみ**が意味を持つため表示は一致する。エクスポート順の情報源はあくまで `_outputParameters`。
