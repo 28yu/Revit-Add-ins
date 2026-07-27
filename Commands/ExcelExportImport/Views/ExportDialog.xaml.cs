@@ -92,7 +92,7 @@ namespace Tools28.Commands.ExcelExportImport.Views
             btnClearOutput.ToolTip = Loc.S("Export.ClearOutput.Desc");
             btnMoveUp.ToolTip = Loc.S("Export.MoveUp");
             btnMoveDown.ToolTip = Loc.S("Export.MoveDown");
-            SplitByCategoryCheckBox.Content = Loc.S("Export.SeparateSheets");
+            SplitByCategoryLabel.Text = Loc.S("Export.SeparateSheets");
             // 設定ボタンはコンパクト表示。説明はホバー時のツールチップで出す。
             btnLoadSettings.Content = Loc.S("Export.LoadSettings");
             btnLoadSettings.ToolTip = Loc.S("Export.LoadSettings.Desc");

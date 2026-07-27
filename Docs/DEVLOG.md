@@ -1210,3 +1210,7 @@ v2.1.x のパッチではバージョン番号 + 修正点追記がメインな�
 
 ### 後片付け
 - `ResetSettingsButton_Click` と `Export.RestoreSettings` / `Export.RestoreSettings.Desc` / `Export.LoadSettingsFromExcel.Tip` を削除。ラベルキー（LoadSettings/LoadSettingsFromExcel/SaveSettings）は短縮値に更新。
+
+### 追記（2026-07-27）
+- 「出力Excelをカテゴリ毎にシートに分ける」チェックボックスを、ダイアログ下部のオプション行から**出力セクション内（クリア/読込/Excel読込/保存ボタンの下）へ移動**。出力関係の機能を出力セクションに集約する意図。
+- 出力欄は横幅が狭いためラベルは `TextBlock`＋`TextWrapping` で折り返し。多言語更新は `SplitByCategoryLabel.Text`（旧 `SplitByCategoryCheckBox.Content`）へ。

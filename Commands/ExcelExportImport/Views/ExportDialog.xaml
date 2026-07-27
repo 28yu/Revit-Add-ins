@@ -208,7 +208,6 @@
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <!-- メインエリア: カテゴリ | パラメータ | ＞＜ | 出力 -->
@@ -350,6 +349,7 @@
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
                     <Grid Grid.Row="0" Margin="0,4,0,4">
@@ -378,7 +378,13 @@
                                 Style="{StaticResource SmallButtonStyle}"
                                 Click="SaveSettingsButton_Click"/>
                     </StackPanel>
-                    <ListBox x:Name="OutputListBox" Grid.Row="2"
+                    <CheckBox x:Name="SplitByCategoryCheckBox" Grid.Row="2"
+                              IsChecked="True" Margin="0,0,0,4" VerticalContentAlignment="Center">
+                        <TextBlock x:Name="SplitByCategoryLabel"
+                                   Text="出力Excelをカテゴリ毎にシートに分ける"
+                                   FontSize="11" TextWrapping="Wrap"/>
+                    </CheckBox>
+                    <ListBox x:Name="OutputListBox" Grid.Row="3"
                              BorderThickness="1" BorderBrush="#CCCCCC"
                              SelectionMode="Single"
                              ScrollViewer.CanContentScroll="True"
@@ -430,14 +436,8 @@
             </StackPanel>
         </Grid>
 
-        <!-- オプション -->
-        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,6,0,0">
-            <CheckBox x:Name="SplitByCategoryCheckBox" Content="カテゴリ毎にシートを分ける"
-                      IsChecked="True" FontSize="12" VerticalAlignment="Center"/>
-        </StackPanel>
-
         <!-- 下部ボタンエリア（OK/キャンセルのみ） -->
-        <Grid Grid.Row="3" Margin="0,8,0,0">
+        <Grid Grid.Row="2" Margin="0,8,0,0">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                 <Button x:Name="btnOK" Content="OK" Style="{StaticResource PrimaryButtonStyle}"
                         Click="OkButton_Click"/>
