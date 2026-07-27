@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using ClosedXML.Excel;
 using Tools28.Commands.ExcelExportImport.Models;
 
@@ -61,90 +60,91 @@ namespace Tools28.Commands.ExcelExportImport.Services
             {
                 foreach (var worksheet in workbook.Worksheets)
                 {
-                    var lastRow = worksheet.LastRowUsed();
-                    var lastCol = worksheet.LastColumnUsed();
-                    if (lastRow == null || lastCol == null)
-                        continue;
-
-                    int rowCount = lastRow.RowNumber();
-                    int colCount = lastCol.ColumnNumber();
-                    if (colCount < 3)
-                        continue; // パラメータ列（3列目以降）が無い
-
-                    // ヘッダー（3列目以降）をパース。I-/T- プレフィックスの無い列は
-                    // パラメータ列ではないとみなしてスキップ（null で場所だけ確保）。
+                    // ヘッダーは1行目だけを読む（全データ走査は行わない）。
+                    // 3列目以降がパラメータ列。ClosedXML のセルアクセスは重いため、
+                    // Row(1).CellsUsed() で1行目の使用セルだけを一度に走査する。
                     var headerParams = new List<ParsedHeader>();
-                    for (int col = 3; col <= colCount; col++)
+                    foreach (var cell in worksheet.Row(1).CellsUsed())
                     {
-                        headerParams.Add(ParseHeader(worksheet.Cell(1, col).GetString()));
+                        int col = cell.Address.ColumnNumber;
+                        if (col < 3) continue; // 1列目=要素ID, 2列目=カテゴリ
+                        var parsed = ParseHeader(cell.GetString());
+                        if (parsed != null)
+                        {
+                            parsed.Column = col;
+                            headerParams.Add(parsed);
+                        }
                     }
-                    if (headerParams.All(h => h == null))
+                    if (headerParams.Count == 0)
                         continue; // このシートに有効なパラメータ列が無い
 
-                    // データ行の2列目から実カテゴリ名を出現順に収集
-                    var sheetCategories = new List<string>();
-                    var sheetCatSet = new HashSet<string>();
-                    for (int row = 2; row <= rowCount; row++)
+                    // 統合シート（ExportSingleSheet が付ける固定名 "データ"）だけは
+                    // 複数カテゴリが混在するため列→カテゴリの対応判定が要る。
+                    // それ以外（カテゴリ毎シート分割）は 1シート=1カテゴリなので、
+                    // 先頭データ行(2行目)の2列目からカテゴリ名を1回読むだけで済む。
+                    if (worksheet.Name != "データ")
                     {
-                        string cat = worksheet.Cell(row, 2).GetString();
-                        if (!string.IsNullOrWhiteSpace(cat) && sheetCatSet.Add(cat))
-                            sheetCategories.Add(cat);
-                    }
-
-                    // データ行が無い（要素0件）シートはシート名をカテゴリ名として代用
-                    if (sheetCategories.Count == 0)
-                        sheetCategories.Add(worksheet.Name);
-
-                    if (sheetCategories.Count == 1)
-                    {
-                        // カテゴリ毎シート（または単一カテゴリの統合シート）
-                        string cat = sheetCategories[0];
+                        string cat = worksheet.Cell(2, 2).GetString();
+                        if (string.IsNullOrWhiteSpace(cat))
+                            cat = worksheet.Name; // データ行なし（要素0件）→ シート名で代用
                         RegisterCategory(cat);
                         foreach (var h in headerParams)
-                        {
-                            if (h == null) continue;
                             AddEntry(cat, h.RawName, h.IsType);
-                        }
                     }
                     else
                     {
-                        // 1シート統合: どのパラメータ列がどのカテゴリに属すかは
-                        // 「そのカテゴリの行に非空セルがあるか」で判定する
-                        foreach (var cat in sheetCategories)
-                            RegisterCategory(cat);
-
-                        var nonEmpty = new HashSet<string>(); // key: "cat|colIndex"
-                        for (int row = 2; row <= rowCount; row++)
-                        {
-                            string cat = worksheet.Cell(row, 2).GetString();
-                            if (string.IsNullOrWhiteSpace(cat)) continue;
-
-                            for (int i = 0; i < headerParams.Count; i++)
-                            {
-                                if (headerParams[i] == null) continue;
-                                string key = cat + "|" + i;
-                                if (nonEmpty.Contains(key)) continue;
-                                if (!string.IsNullOrEmpty(worksheet.Cell(row, i + 3).GetString()))
-                                    nonEmpty.Add(key);
-                            }
-                        }
-
-                        foreach (var cat in sheetCategories)
-                        {
-                            for (int i = 0; i < headerParams.Count; i++)
-                            {
-                                var h = headerParams[i];
-                                if (h == null) continue;
-                                if (nonEmpty.Contains(cat + "|" + i))
-                                    AddEntry(cat, h.RawName, h.IsType);
-                            }
-                        }
+                        ReadSingleSheet(worksheet, headerParams, RegisterCategory, AddEntry);
                     }
                 }
             }
 
             settings.SelectedCategories = categoryOrder;
             return settings;
+        }
+
+        /// <summary>
+        /// 1シート統合形式（"データ"）の読み取り。複数カテゴリが混在するため、
+        /// 2列目のカテゴリと各パラメータ列の非空判定で列→カテゴリを対応付ける。
+        /// （この形式は既定ではないため、必要時のみ全行走査する）
+        /// </summary>
+        private static void ReadSingleSheet(
+            IXLWorksheet worksheet,
+            List<ParsedHeader> headerParams,
+            System.Action<string> registerCategory,
+            System.Action<string, string, bool> addEntry)
+        {
+            var lastRow = worksheet.LastRowUsed();
+            int rowCount = lastRow?.RowNumber() ?? 1;
+
+            var sheetCategories = new List<string>();
+            var sheetCatSet = new HashSet<string>();
+            var nonEmpty = new HashSet<string>(); // key: "cat|column"
+
+            for (int row = 2; row <= rowCount; row++)
+            {
+                var r = worksheet.Row(row);
+                string cat = r.Cell(2).GetString();
+                if (string.IsNullOrWhiteSpace(cat)) continue;
+
+                if (sheetCatSet.Add(cat))
+                    sheetCategories.Add(cat);
+
+                foreach (var h in headerParams)
+                {
+                    string key = cat + "|" + h.Column;
+                    if (nonEmpty.Contains(key)) continue;
+                    if (!string.IsNullOrEmpty(r.Cell(h.Column).GetString()))
+                        nonEmpty.Add(key);
+                }
+            }
+
+            foreach (var cat in sheetCategories)
+            {
+                registerCategory(cat);
+                foreach (var h in headerParams)
+                    if (nonEmpty.Contains(cat + "|" + h.Column))
+                        addEntry(cat, h.RawName, h.IsType);
+            }
         }
 
         /// <summary>ヘッダー見出しをパースする。パラメータ列でなければ null。</summary>
@@ -169,6 +169,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
         {
             public string RawName;
             public bool IsType;
+            public int Column;
         }
     }
 }

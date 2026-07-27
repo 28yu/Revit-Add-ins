@@ -449,7 +449,7 @@
         <!-- 下部ボタンエリア（OK/キャンセルのみ） -->
         <Grid Grid.Row="2" Margin="0,8,0,0">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                <Button x:Name="btnOK" Content="書き出し" Style="{StaticResource PrimaryButtonStyle}"
+                <Button x:Name="btnOK" Content="エクスポート実行" Style="{StaticResource PrimaryButtonStyle}"
                         Click="OkButton_Click"/>
                 <Button x:Name="btnCancel" Content="キャンセル" Style="{StaticResource SecondaryButtonStyle}"
                         Click="CancelButton_Click"/>

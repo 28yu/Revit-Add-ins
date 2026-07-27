@@ -1214,3 +1214,17 @@ v2.1.x のパッチではバージョン番号 + 修正点追記がメインな�
 ### 追記（2026-07-27）
 - 「出力Excelをカテゴリ毎にシートに分ける」チェックボックスを、ダイアログ下部のオプション行から**出力セクション内（クリア/読込/Excel読込/保存ボタンの下）へ移動**。出力関係の機能を出力セクションに集約する意図。
 - 出力欄は横幅が狭いためラベルは `TextBlock`＋`TextWrapping` で折り返し。多言語更新は `SplitByCategoryLabel.Text`（旧 `SplitByCategoryCheckBox.Content`）へ。
+
+## ExcelExportImport: エクスポート実行への改名・Excel設定読込の高速化・インポートのシート情報削除（2026-07-27）
+
+### 1. OK ボタンを「エクスポート実行」に改名
+- インポート側（「インポート実行」）と表現を統一。専用キー `Export.RunExport`（JP=エクスポート実行 / EN=Export / CN=执行导出）。
+
+### 2. Excel設定読込（`ExportSettingsExcelReader`）の高速化
+- 症状: 大きな書き出し済み Excel だと読込が非常に遅い。
+- 原因: カテゴリ毎シート（既定）でも**全データ行の2列目をループ**しており、ClosedXML の重いセルアクセスが行数分走っていた。
+- 対処: 既定の分割形式では **1行目ヘッダー＋先頭データ行(2行目)の2列目だけ**を読む方式に変更（`Row(1).CellsUsed()` で1行目のみ、カテゴリ名は `Cell(2,2)` 1回）。全行走査を排除。
+- 1シート統合（"データ"）だけは複数カテゴリ混在のため従来どおり走査（`ReadSingleSheet`）。既定ではないため影響は限定的。
+
+### 3. Excelインポートダイアログの「シート情報」を削除
+- 実用上不要な情報のため `grpSheetInfo` / `SheetInfoText` を撤去。`LoadPreview` は `GeneratePreview(doc, path)`（out なし）を使用。未使用化した `Import.SheetInfo` / `Import.SelectFile` キーも削除。

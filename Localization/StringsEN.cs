@@ -335,8 +335,6 @@ namespace Tools28.Localization
             { "Import.ExcelFile", "Excel File" },
             { "Import.OpenFile", "Open File" },
             { "Import.Browse", "Browse..." },
-            { "Import.SheetInfo", "Sheet Info" },
-            { "Import.SelectFile", "Select an Excel file" },
             { "Import.Preview", "Change Preview" },
             { "Import.ColElementId", "Element ID" },
             { "Import.ColCategory", "Category" },

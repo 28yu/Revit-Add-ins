@@ -87,7 +87,6 @@
     <Grid Margin="10">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -115,15 +114,8 @@
             </Grid>
         </GroupBox>
 
-        <!-- シート情報 -->
-        <GroupBox x:Name="grpSheetInfo" Grid.Row="1" Header="シート情報" FontSize="12" Margin="0,0,0,8">
-            <TextBlock x:Name="SheetInfoText" FontSize="11" Margin="8,4"
-                       Text="Excelファイルを選択してください"
-                       Foreground="#666666"/>
-        </GroupBox>
-
         <!-- プレビュー -->
-        <GroupBox x:Name="grpPreview" Grid.Row="2" Header="変更プレビュー" FontSize="12">
+        <GroupBox x:Name="grpPreview" Grid.Row="1" Header="変更プレビュー" FontSize="12">
             <DataGrid x:Name="PreviewDataGrid"
                       AutoGenerateColumns="False"
                       IsReadOnly="True"
@@ -148,11 +140,11 @@
         </GroupBox>
 
         <!-- サマリー -->
-        <TextBlock x:Name="SummaryText" Grid.Row="3" FontSize="11"
+        <TextBlock x:Name="SummaryText" Grid.Row="2" FontSize="11"
                    Margin="4,8,4,4" Foreground="#666666"/>
 
         <!-- ボタンエリア -->
-        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,4,0,0">
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,4,0,0">
             <Button x:Name="ImportButton" Content="インポート実行"
                     Style="{StaticResource PrimaryButtonStyle}"
                     IsEnabled="False"

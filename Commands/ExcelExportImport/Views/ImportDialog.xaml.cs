@@ -42,8 +42,6 @@ namespace Tools28.Commands.ExcelExportImport.Views
             grpExcelFile.Header = Loc.S("Import.ExcelFile");
             btnOpenFiles.Content = Loc.S("Import.OpenFile");
             btnBrowse.Content = Loc.S("Import.Browse");
-            grpSheetInfo.Header = Loc.S("Import.SheetInfo");
-            SheetInfoText.Text = Loc.S("Import.SelectFile");
             grpPreview.Header = Loc.S("Import.Preview");
             PreviewDataGrid.Columns[0].Header = Loc.S("Import.ColElementId");
             PreviewDataGrid.Columns[1].Header = Loc.S("Import.ColCategory");
@@ -220,11 +218,8 @@ namespace Tools28.Commands.ExcelExportImport.Views
         {
             try
             {
-                // プレビューを生成（同時にシート名も取得し、ファイルを1回開くだけで済ませる）
-                _previewRows = ExcelImportService.GeneratePreview(_doc, _selectedFilePath, out var sheetNames);
-
-                // シート情報を表示
-                SheetInfoText.Text = $"シート数: {sheetNames.Count}  ({string.Join(", ", sheetNames)})";
+                // プレビューを生成
+                _previewRows = ExcelImportService.GeneratePreview(_doc, _selectedFilePath);
 
                 // 書き込み可能な変更のみ表示（読み取り専用パラメータは除外）
                 var changedRows = _previewRows
