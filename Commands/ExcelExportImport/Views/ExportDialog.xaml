@@ -349,6 +349,7 @@
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
                     <Grid Grid.Row="0" Margin="0,4,0,4">
@@ -363,7 +364,12 @@
                                 Style="{StaticResource SecondaryButtonStyle}"
                                 Click="OutputSearchButton_Click"/>
                     </Grid>
-                    <ListBox x:Name="OutputListBox" Grid.Row="1"
+                    <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,4">
+                        <Button x:Name="btnClearOutput" Content="クリア"
+                                Style="{StaticResource SmallButtonStyle}"
+                                Click="ClearOutputButton_Click"/>
+                    </StackPanel>
+                    <ListBox x:Name="OutputListBox" Grid.Row="2"
                              BorderThickness="1" BorderBrush="#CCCCCC"
                              SelectionMode="Single"
                              ScrollViewer.CanContentScroll="True"

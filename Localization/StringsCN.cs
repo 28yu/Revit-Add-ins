@@ -314,6 +314,8 @@ namespace Tools28.Localization
             { "Export.ParamPrefixLegend", "I- : 实例（图元）参数\nT- : 类型参数" },
             { "Common.SelectAll", "全选" },
             { "Common.SelectNone", "取消选择" },
+            { "Export.ClearOutput", "清空" },
+            { "Export.ClearOutputConfirm", "确定清空输出栏中的所有参数吗？" },
             { "Export.Scope.WindowTitle", "Excel导出" },
             { "Export.Scope.Title", "选择导出范围" },
             { "Export.Scope.Description", "请选择要导出的元素范围。" },

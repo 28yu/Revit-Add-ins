@@ -82,6 +82,7 @@ namespace Tools28.Commands.ExcelExportImport.Views
             btnRemoveFromOutput.ToolTip = Loc.S("Export.RemoveFromOutput");
             grpOutput.Header = Loc.S("Export.Output");
             btnSearchOutput.Content = Loc.S("Common.Search");
+            btnClearOutput.Content = Loc.S("Export.ClearOutput");
             btnMoveUp.ToolTip = Loc.S("Export.MoveUp");
             btnMoveDown.ToolTip = Loc.S("Export.MoveDown");
             SplitByCategoryCheckBox.Content = Loc.S("Export.SeparateSheets");
@@ -284,6 +285,23 @@ namespace Tools28.Commands.ExcelExportImport.Views
 
             _outputParameters.Remove(selected);
             RefreshOutputList();
+            UpdateParameterList();
+        }
+
+        private void ClearOutputButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_outputParameters.Count == 0) return;
+
+            // 並べ替え等の作業を失うため、誤操作防止に確認する
+            var result = MessageBox.Show(
+                Loc.S("Export.ClearOutputConfirm"), Loc.S("Common.Confirm"),
+                MessageBoxButton.YesNo, MessageBoxImage.Question);
+            if (result != MessageBoxResult.Yes) return;
+
+            _outputParameters.Clear();
+            RefreshOutputList();
+
+            // クリアした分を選択中カテゴリのパラメータ欄へ戻す
             UpdateParameterList();
         }
 

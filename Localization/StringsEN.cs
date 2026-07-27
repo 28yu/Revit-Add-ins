@@ -314,6 +314,8 @@ namespace Tools28.Localization
             { "Export.ParamPrefixLegend", "I- : Instance (element) parameter\nT- : Type parameter" },
             { "Common.SelectAll", "Select All" },
             { "Common.SelectNone", "Clear" },
+            { "Export.ClearOutput", "Clear" },
+            { "Export.ClearOutputConfirm", "Clear all parameters from the output list?" },
             { "Export.Scope.WindowTitle", "Excel Export" },
             { "Export.Scope.Title", "Select Export Scope" },
             { "Export.Scope.Description", "Choose which elements to export." },

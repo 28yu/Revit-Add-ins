@@ -314,6 +314,8 @@ namespace Tools28.Localization
             { "Export.ParamPrefixLegend", "I- : インスタンス（要素）パラメータ\nT- : タイプパラメータ" },
             { "Common.SelectAll", "全選択" },
             { "Common.SelectNone", "選択解除" },
+            { "Export.ClearOutput", "クリア" },
+            { "Export.ClearOutputConfirm", "出力欄のパラメータをすべてクリアします。よろしいですか？" },
             { "Export.Scope.WindowTitle", "EXCELエクスポート" },
             { "Export.Scope.Title", "書出し範囲の選択" },
             { "Export.Scope.Description", "書出す要素の範囲を選択してください。" },
