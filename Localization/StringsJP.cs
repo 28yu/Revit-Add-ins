@@ -302,6 +302,7 @@ namespace Tools28.Localization
             { "Export.MoveUp", "上へ移動" },
             { "Export.MoveDown", "下へ移動" },
             { "Export.SeparateSheets", "出力Excelをカテゴリ毎にシートに分ける" },
+            { "Export.RunExport", "書き出し" },
             { "Export.LoadSettings", "読込" },
             { "Export.LoadSettingsFromExcel", "Excel読込" },
             { "Export.ExcelSettingsNoParams", "選択したExcelから出力設定を読み取れませんでした。\nこのアドインで書き出したExcelファイルを選択してください。" },

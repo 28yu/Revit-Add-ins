@@ -302,6 +302,7 @@ namespace Tools28.Localization
             { "Export.MoveUp", "Move up" },
             { "Export.MoveDown", "Move down" },
             { "Export.SeparateSheets", "Split output Excel into sheets per category" },
+            { "Export.RunExport", "Export" },
             { "Export.LoadSettings", "Load" },
             { "Export.LoadSettingsFromExcel", "Excel Load" },
             { "Export.ExcelSettingsNoParams", "Could not read output settings from the selected Excel.\nPlease choose an Excel file exported by this add-in." },

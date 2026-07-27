@@ -100,7 +100,7 @@ namespace Tools28.Commands.ExcelExportImport.Views
             btnLoadSettingsFromExcel.ToolTip = Loc.S("Export.LoadSettingsFromExcel.Desc");
             btnSaveSettings.Content = Loc.S("Export.SaveSettings");
             btnSaveSettings.ToolTip = Loc.S("Export.SaveSettings.Desc");
-            btnOK.Content = Loc.S("Common.OK");
+            btnOK.Content = Loc.S("Export.RunExport");
             btnCancel.Content = Loc.S("Common.Cancel");
         }
 

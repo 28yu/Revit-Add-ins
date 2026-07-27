@@ -394,13 +394,23 @@
                              VirtualizingPanel.ScrollUnit="Pixel">
                         <ListBox.GroupStyle>
                             <GroupStyle>
-                                <GroupStyle.HeaderTemplate>
-                                    <DataTemplate>
-                                        <TextBlock Text="{Binding Name}" FontWeight="Bold"
-                                                   FontSize="11" Margin="4,6,4,2"
-                                                   Foreground="#0066CC"/>
-                                    </DataTemplate>
-                                </GroupStyle.HeaderTemplate>
+                                <GroupStyle.ContainerStyle>
+                                    <Style TargetType="{x:Type GroupItem}">
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="{x:Type GroupItem}">
+                                                    <Expander Style="{StaticResource CategoryGroupExpanderStyle}">
+                                                        <Expander.Header>
+                                                            <TextBlock Text="{Binding Name}" FontWeight="Bold"
+                                                                       FontSize="11" Foreground="#0066CC"/>
+                                                        </Expander.Header>
+                                                        <ItemsPresenter Margin="14,0,0,0"/>
+                                                    </Expander>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </GroupStyle.ContainerStyle>
                             </GroupStyle>
                         </ListBox.GroupStyle>
                         <ListBox.ItemTemplate>
@@ -439,7 +449,7 @@
         <!-- 下部ボタンエリア（OK/キャンセルのみ） -->
         <Grid Grid.Row="2" Margin="0,8,0,0">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                <Button x:Name="btnOK" Content="OK" Style="{StaticResource PrimaryButtonStyle}"
+                <Button x:Name="btnOK" Content="書き出し" Style="{StaticResource PrimaryButtonStyle}"
                         Click="OkButton_Click"/>
                 <Button x:Name="btnCancel" Content="キャンセル" Style="{StaticResource SecondaryButtonStyle}"
                         Click="CancelButton_Click"/>
