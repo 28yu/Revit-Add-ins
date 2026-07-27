@@ -89,18 +89,17 @@ namespace Tools28.Commands.ExcelExportImport.Views
             grpOutput.Header = Loc.S("Export.Output");
             btnSearchOutput.Content = Loc.S("Common.Search");
             btnClearOutput.Content = Loc.S("Export.ClearOutput");
+            btnClearOutput.ToolTip = Loc.S("Export.ClearOutput.Desc");
             btnMoveUp.ToolTip = Loc.S("Export.MoveUp");
             btnMoveDown.ToolTip = Loc.S("Export.MoveDown");
             SplitByCategoryCheckBox.Content = Loc.S("Export.SeparateSheets");
-            btnResetSettings.Content = Loc.S("Export.RestoreSettings");
-            lblResetSettingsDesc.Text = Loc.S("Export.RestoreSettings.Desc");
+            // 設定ボタンはコンパクト表示。説明はホバー時のツールチップで出す。
             btnLoadSettings.Content = Loc.S("Export.LoadSettings");
-            lblLoadSettingsDesc.Text = Loc.S("Export.LoadSettings.Desc");
+            btnLoadSettings.ToolTip = Loc.S("Export.LoadSettings.Desc");
             btnLoadSettingsFromExcel.Content = Loc.S("Export.LoadSettingsFromExcel");
-            btnLoadSettingsFromExcel.ToolTip = Loc.S("Export.LoadSettingsFromExcel.Tip");
-            lblLoadSettingsFromExcelDesc.Text = Loc.S("Export.LoadSettingsFromExcel.Desc");
+            btnLoadSettingsFromExcel.ToolTip = Loc.S("Export.LoadSettingsFromExcel.Desc");
             btnSaveSettings.Content = Loc.S("Export.SaveSettings");
-            lblSaveSettingsDesc.Text = Loc.S("Export.SaveSettings.Desc");
+            btnSaveSettings.ToolTip = Loc.S("Export.SaveSettings.Desc");
             btnOK.Content = Loc.S("Common.OK");
             btnCancel.Content = Loc.S("Common.Cancel");
         }
@@ -515,21 +514,6 @@ namespace Tools28.Commands.ExcelExportImport.Views
                 MessageBox.Show(string.Format(Loc.S("Export.SettingsLoadFailed"), ex.Message),
                     Loc.S("Common.Error"), MessageBoxButton.OK, MessageBoxImage.Error);
             }
-        }
-
-        private void ResetSettingsButton_Click(object sender, RoutedEventArgs e)
-        {
-            // 全カテゴリのチェックを外す
-            foreach (var cat in _allCategories)
-                cat.IsChecked = false;
-
-            _outputParameters.Clear();
-            _allParameters.Clear();
-
-            CategoryListBox.ItemsSource = null;
-            CategoryListBox.ItemsSource = _allCategories;
-            ParameterListBox.ItemsSource = null;
-            RefreshOutputList();
         }
 
         private void ApplySettings(ExportSettings settings)
