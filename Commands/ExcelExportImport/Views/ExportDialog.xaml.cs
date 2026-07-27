@@ -94,6 +94,8 @@ namespace Tools28.Commands.ExcelExportImport.Views
             SplitByCategoryCheckBox.Content = Loc.S("Export.SeparateSheets");
             btnResetSettings.Content = Loc.S("Export.RestoreSettings");
             btnLoadSettings.Content = Loc.S("Export.LoadSettings");
+            btnLoadSettingsFromExcel.Content = Loc.S("Export.LoadSettingsFromExcel");
+            btnLoadSettingsFromExcel.ToolTip = Loc.S("Export.LoadSettingsFromExcel.Tip");
             btnSaveSettings.Content = Loc.S("Export.SaveSettings");
             btnOK.Content = Loc.S("Common.OK");
             btnCancel.Content = Loc.S("Common.Cancel");
@@ -462,6 +464,52 @@ namespace Tools28.Commands.ExcelExportImport.Views
                 {
                     MessageBox.Show(string.Format(Loc.S("Export.SettingsLoadFailed"), ex.Message), Loc.S("Common.Error"), MessageBoxButton.OK, MessageBoxImage.Error);
                 }
+            }
+        }
+
+        /// <summary>
+        /// このアドインで書き出し済みの Excel ファイルから出力設定を読み込む。
+        /// 設定JSONを保存し忘れた場合や、他ユーザーが書き出した Excel の並びを
+        /// そのまま再利用したい場合に使う。
+        /// </summary>
+        private void LoadSettingsFromExcelButton_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new OpenFileDialog
+            {
+                Filter = "Excelファイル (*.xlsx)|*.xlsx",
+                DefaultExt = ".xlsx"
+            };
+
+            if (dialog.ShowDialog(this) != true) return;
+
+            try
+            {
+                var settings = ExportSettingsExcelReader.ReadFromExcel(dialog.FileName);
+
+                if (settings.OutputParameters.Count == 0)
+                {
+                    // 出力設定として解釈できる列が無い（このアドイン以外で作った Excel 等）
+                    MessageBox.Show(Loc.S("Export.ExcelSettingsNoParams"),
+                        Loc.S("Common.Warning"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                ApplySettings(settings);
+
+                // 現在の対象カテゴリに存在せず復元できなかったものがあれば知らせる
+                int restored = _outputParameters.Count;
+                int total = settings.OutputParameters.Count;
+                if (restored < total)
+                {
+                    MessageBox.Show(
+                        string.Format(Loc.S("Export.ExcelSettingsPartial"), restored, total),
+                        Loc.S("Common.Confirm"), MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(string.Format(Loc.S("Export.SettingsLoadFailed"), ex.Message),
+                    Loc.S("Common.Error"), MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 

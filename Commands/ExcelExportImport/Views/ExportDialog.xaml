@@ -441,6 +441,10 @@
                         Click="ResetSettingsButton_Click"/>
                 <Button x:Name="btnLoadSettings" Content="設定読込" Style="{StaticResource SecondaryButtonStyle}"
                         Click="LoadSettingsButton_Click"/>
+                <Button x:Name="btnLoadSettingsFromExcel" Content="Excel設定読込"
+                        ToolTip="書き出し済みExcelから出力設定を読み込む"
+                        Style="{StaticResource SecondaryButtonStyle}"
+                        Click="LoadSettingsFromExcelButton_Click"/>
                 <Button x:Name="btnSaveSettings" Content="設定保存" Style="{StaticResource SecondaryButtonStyle}"
                         Click="SaveSettingsButton_Click"/>
             </StackPanel>
