@@ -303,7 +303,7 @@ namespace Tools28.Localization
             { "Export.MoveDown", "下移" },
             { "Export.SeparateSheets", "将输出Excel按类别分成工作表" },
             { "Export.LoadSettings", "加载" },
-            { "Export.LoadSettingsFromExcel", "Excel" },
+            { "Export.LoadSettingsFromExcel", "Excel加载" },
             { "Export.ExcelSettingsNoParams", "无法从所选Excel读取输出设置。\n请选择由本插件导出的Excel文件。" },
             { "Export.ExcelSettingsPartial", "已读取输出设置。\n在{1}项中恢复了{0}项（当前对象中不存在的参数已被排除）。" },
             { "Export.SaveSettings", "保存" },

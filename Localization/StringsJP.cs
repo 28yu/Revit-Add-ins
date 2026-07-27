@@ -303,7 +303,7 @@ namespace Tools28.Localization
             { "Export.MoveDown", "下へ移動" },
             { "Export.SeparateSheets", "出力Excelをカテゴリ毎にシートに分ける" },
             { "Export.LoadSettings", "読込" },
-            { "Export.LoadSettingsFromExcel", "Excel" },
+            { "Export.LoadSettingsFromExcel", "Excel読込" },
             { "Export.ExcelSettingsNoParams", "選択したExcelから出力設定を読み取れませんでした。\nこのアドインで書き出したExcelファイルを選択してください。" },
             { "Export.ExcelSettingsPartial", "出力設定を読み込みました。\n{1}件中{0}件を復元しました（現在の対象に存在しないパラメータは除外されました）。" },
             { "Export.SaveSettings", "保存" },

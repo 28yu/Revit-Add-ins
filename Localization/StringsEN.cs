@@ -303,7 +303,7 @@ namespace Tools28.Localization
             { "Export.MoveDown", "Move down" },
             { "Export.SeparateSheets", "Split output Excel into sheets per category" },
             { "Export.LoadSettings", "Load" },
-            { "Export.LoadSettingsFromExcel", "Excel" },
+            { "Export.LoadSettingsFromExcel", "Excel Load" },
             { "Export.ExcelSettingsNoParams", "Could not read output settings from the selected Excel.\nPlease choose an Excel file exported by this add-in." },
             { "Export.ExcelSettingsPartial", "Output settings loaded.\nRestored {0} of {1} (parameters not present in the current targets were skipped)." },
             { "Export.SaveSettings", "Save" },
