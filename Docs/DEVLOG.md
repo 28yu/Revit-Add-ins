@@ -1146,3 +1146,21 @@ v2.1.x のパッチではバージョン番号 + 修正点追記がメインな�
 - `CategoryInfo` / `ParameterInfo` の `IsChecked` を **`INotifyPropertyChanged`** 化。コードから一括変更した際に CheckBox へ即時反映させるため（再バインドに頼らず、仮想化された `ParameterListBox` でも整合）。
 - カテゴリの一括変更中は `_suppressCategoryUpdate` フラグで `CategoryCheckBox_Changed`→`UpdateParameterList()`（Revit へのパラメータ取得）の連続発火を抑制し、最後に1回だけ更新。
 - 絞り込みロジックは `GetVisibleCategories()` / `GetBaseParameters()`＋`ApplyParameterFilters()`（テキスト検索）に集約し、表示と全選択対象で同じ判定を共有。
+
+## ExcelExportImport: 出力欄の▲▼で選択と違うパラメータが動く不具合を修正（2026-07-27）
+
+### 症状
+出力セクションでパラメータを選択し▲/▼を押すと、選択したものではなく別のパラメータが移動することがある。
+
+### 原因
+- 出力リストは `RefreshOutputList()` で `CategoryName` によりグループ化して表示している。
+- 一方 `MoveUpButton_Click`/`MoveDownButton_Click` は **表示上のインデックス** `OutputListBox.SelectedIndex` で内部リスト `_outputParameters` を直接 `RemoveAt/Insert` していた。
+- カテゴリが複数あると表示順（グループ順）と `_outputParameters` の並びがずれるため、`SelectedIndex` の位置には別カテゴリの要素があり、それが動いてしまう。テキストフィルタ適用時も同様にずれる。
+
+### 修正
+- `MoveSelectedOutput(direction)` に集約。`OutputListBox.SelectedItem`（選択中の要素そのもの）を基準に `_outputParameters.IndexOf` で実インデックスを取得。
+- 表示がカテゴリ単位でグループ化されているため、**同一カテゴリ内で移動方向の隣にある要素**を探して入れ替える（グループをまたいで“何も動かない”誤操作感を防ぐ）。
+- 移動後は同じ要素を再選択し `ScrollIntoView` する。
+
+### 教訓
+- グループ化/フィルタ表示のリストで並べ替えるときは、**表示インデックスで元データを触らない**。必ず選択オブジェクト参照から元データの位置を引き直す。

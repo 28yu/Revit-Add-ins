@@ -289,26 +289,48 @@ namespace Tools28.Commands.ExcelExportImport.Views
 
         private void MoveUpButton_Click(object sender, RoutedEventArgs e)
         {
-            int index = OutputListBox.SelectedIndex;
-            if (index <= 0) return;
-
-            var item = _outputParameters[index];
-            _outputParameters.RemoveAt(index);
-            _outputParameters.Insert(index - 1, item);
-            RefreshOutputList();
-            OutputListBox.SelectedIndex = index - 1;
+            MoveSelectedOutput(-1);
         }
 
         private void MoveDownButton_Click(object sender, RoutedEventArgs e)
         {
-            int index = OutputListBox.SelectedIndex;
-            if (index < 0 || index >= _outputParameters.Count - 1) return;
+            MoveSelectedOutput(+1);
+        }
 
-            var item = _outputParameters[index];
-            _outputParameters.RemoveAt(index);
-            _outputParameters.Insert(index + 1, item);
+        /// <summary>
+        /// 出力リストで選択中のパラメータを上(-1)/下(+1)に移動する。
+        /// 表示はカテゴリでグループ化されているため、表示上のインデックス
+        /// (SelectedIndex) は内部リスト _outputParameters の並びとずれる。
+        /// そこで「選択中の要素そのもの」を基準にし、同一カテゴリ内で隣接する
+        /// 要素と入れ替えることで、常に選択したパラメータが動くようにする。
+        /// </summary>
+        private void MoveSelectedOutput(int direction)
+        {
+            var selected = OutputListBox.SelectedItem as ParameterInfo;
+            if (selected == null) return;
+
+            int index = _outputParameters.IndexOf(selected);
+            if (index < 0) return;
+
+            // 同じカテゴリ内で移動方向の隣にある要素を探す
+            int target = -1;
+            for (int i = index + direction; i >= 0 && i < _outputParameters.Count; i += direction)
+            {
+                if (_outputParameters[i].CategoryName == selected.CategoryName)
+                {
+                    target = i;
+                    break;
+                }
+            }
+            if (target < 0) return; // 同カテゴリ内で既に端
+
+            // 選択中の要素と対象要素を入れ替え
+            _outputParameters[index] = _outputParameters[target];
+            _outputParameters[target] = selected;
+
             RefreshOutputList();
-            OutputListBox.SelectedIndex = index + 1;
+            OutputListBox.SelectedItem = selected;
+            OutputListBox.ScrollIntoView(selected);
         }
 
         private void RefreshOutputList()
