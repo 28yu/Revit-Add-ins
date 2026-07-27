@@ -93,10 +93,14 @@ namespace Tools28.Commands.ExcelExportImport.Views
             btnMoveDown.ToolTip = Loc.S("Export.MoveDown");
             SplitByCategoryCheckBox.Content = Loc.S("Export.SeparateSheets");
             btnResetSettings.Content = Loc.S("Export.RestoreSettings");
+            lblResetSettingsDesc.Text = Loc.S("Export.RestoreSettings.Desc");
             btnLoadSettings.Content = Loc.S("Export.LoadSettings");
+            lblLoadSettingsDesc.Text = Loc.S("Export.LoadSettings.Desc");
             btnLoadSettingsFromExcel.Content = Loc.S("Export.LoadSettingsFromExcel");
             btnLoadSettingsFromExcel.ToolTip = Loc.S("Export.LoadSettingsFromExcel.Tip");
+            lblLoadSettingsFromExcelDesc.Text = Loc.S("Export.LoadSettingsFromExcel.Desc");
             btnSaveSettings.Content = Loc.S("Export.SaveSettings");
+            lblSaveSettingsDesc.Text = Loc.S("Export.SaveSettings.Desc");
             btnOK.Content = Loc.S("Common.OK");
             btnCancel.Content = Loc.S("Common.Cancel");
         }

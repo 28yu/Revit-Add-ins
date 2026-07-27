@@ -3,9 +3,9 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="EXCELエクスポート"
         Width="750"
-        Height="520"
+        Height="600"
         MinWidth="650"
-        MinHeight="420"
+        MinHeight="500"
         WindowStartupLocation="CenterScreen"
         Background="#F5F5F5">
 
@@ -428,29 +428,70 @@
         </StackPanel>
 
         <!-- 下部ボタンエリア -->
-        <Grid Grid.Row="3" Margin="0,6,0,0">
+        <Grid Grid.Row="3" Margin="0,8,0,0">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
-            <!-- 設定ボタン群 -->
-            <StackPanel Grid.Column="0" Orientation="Horizontal">
-                <Button x:Name="btnResetSettings" Content="設定復元" Style="{StaticResource SecondaryButtonStyle}"
-                        Click="ResetSettingsButton_Click"/>
-                <Button x:Name="btnLoadSettings" Content="設定読込" Style="{StaticResource SecondaryButtonStyle}"
-                        Click="LoadSettingsButton_Click"/>
-                <Button x:Name="btnLoadSettingsFromExcel" Content="Excel設定読込"
-                        ToolTip="書き出し済みExcelから出力設定を読み込む"
-                        Style="{StaticResource SecondaryButtonStyle}"
-                        Click="LoadSettingsFromExcelButton_Click"/>
-                <Button x:Name="btnSaveSettings" Content="設定保存" Style="{StaticResource SecondaryButtonStyle}"
-                        Click="SaveSettingsButton_Click"/>
+            <!-- 設定ボタン群（縦並び＋説明） -->
+            <StackPanel Grid.Column="0" Orientation="Vertical">
+                <Grid Margin="0,0,0,4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Button x:Name="btnResetSettings" Grid.Column="0" Width="128" Margin="0"
+                            Content="設定復元" Style="{StaticResource SecondaryButtonStyle}"
+                            Click="ResetSettingsButton_Click"/>
+                    <TextBlock x:Name="lblResetSettingsDesc" Grid.Column="1" Margin="10,0,0,0"
+                               VerticalAlignment="Center" FontSize="11" Foreground="#555555"
+                               TextTrimming="CharacterEllipsis"
+                               Text="カテゴリ選択と出力欄をすべてクリアして初期状態に戻す"/>
+                </Grid>
+                <Grid Margin="0,0,0,4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Button x:Name="btnLoadSettings" Grid.Column="0" Width="128" Margin="0"
+                            Content="設定読込" Style="{StaticResource SecondaryButtonStyle}"
+                            Click="LoadSettingsButton_Click"/>
+                    <TextBlock x:Name="lblLoadSettingsDesc" Grid.Column="1" Margin="10,0,0,0"
+                               VerticalAlignment="Center" FontSize="11" Foreground="#555555"
+                               TextTrimming="CharacterEllipsis"
+                               Text="保存した設定ファイル(.json)から設定を読み込む"/>
+                </Grid>
+                <Grid Margin="0,0,0,4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Button x:Name="btnLoadSettingsFromExcel" Grid.Column="0" Width="128" Margin="0"
+                            Content="Excel設定読込" Style="{StaticResource SecondaryButtonStyle}"
+                            Click="LoadSettingsFromExcelButton_Click"/>
+                    <TextBlock x:Name="lblLoadSettingsFromExcelDesc" Grid.Column="1" Margin="10,0,0,0"
+                               VerticalAlignment="Center" FontSize="11" Foreground="#555555"
+                               TextTrimming="CharacterEllipsis"
+                               Text="書き出し済みのExcelから出力設定を読み込む"/>
+                </Grid>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Button x:Name="btnSaveSettings" Grid.Column="0" Width="128" Margin="0"
+                            Content="設定保存" Style="{StaticResource SecondaryButtonStyle}"
+                            Click="SaveSettingsButton_Click"/>
+                    <TextBlock x:Name="lblSaveSettingsDesc" Grid.Column="1" Margin="10,0,0,0"
+                               VerticalAlignment="Center" FontSize="11" Foreground="#555555"
+                               TextTrimming="CharacterEllipsis"
+                               Text="現在の設定をファイル(.json)に保存する"/>
+                </Grid>
             </StackPanel>
 
-            <!-- OK/キャンセルボタン -->
-            <StackPanel Grid.Column="2" Orientation="Horizontal">
+            <!-- OK/キャンセルボタン（右下） -->
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Bottom">
                 <Button x:Name="btnOK" Content="OK" Style="{StaticResource PrimaryButtonStyle}"
                         Click="OkButton_Click"/>
                 <Button x:Name="btnCancel" Content="キャンセル" Style="{StaticResource SecondaryButtonStyle}"
