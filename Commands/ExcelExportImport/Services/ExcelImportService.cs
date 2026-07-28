@@ -367,7 +367,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
 
             // 実際に書き込む対象（変更あり かつ 書込み可能、除外指定を除く）だけを処理
             foreach (var pr in previewRows.Where(r => r.HasChange && !r.IsReadOnly
-                        && (excludeElementIds == null || !excludeElementIds.Contains(pr.ElementId))))
+                        && (excludeElementIds == null || !excludeElementIds.Contains(r.ElementId))))
             {
                 var elem = doc.GetElement(new ElementId(pr.ElementId));
                 if (elem == null)
