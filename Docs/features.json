@@ -90,6 +90,18 @@
       }
     },
     {
+      "id": "Room3DColor",
+      "category": "annotation",
+      "icon": "icons/features/room_3d_color.png",
+      "manual": "Features/Room3DColor.md",
+      "added_in": "2.3",
+      "names": {
+        "ja": "部屋3D色分け",
+        "en": "Room 3D Color",
+        "zh": "房间3D配色"
+      }
+    },
+    {
       "id": "FilledRegionSplitMerge",
       "category": "annotation",
       "icon": "icons/features/filled_region.png",

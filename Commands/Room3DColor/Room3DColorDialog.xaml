@@ -1,0 +1,178 @@
+<Window x:Class="Tools28.Commands.Room3DColor.Room3DColorDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="部屋 3D 色分け"
+        Width="520"
+        Height="600"
+        WindowStartupLocation="CenterScreen"
+        Background="#F5F5F5"
+        KeyDown="Window_KeyDown">
+
+    <Window.Resources>
+        <SolidColorBrush x:Key="RevitBlue" Color="#0066CC"/>
+        <SolidColorBrush x:Key="RevitHoverBlue" Color="#0052A3"/>
+        <SolidColorBrush x:Key="RevitDarkGray" Color="#333333"/>
+        <SolidColorBrush x:Key="RevitLightGray" Color="#E6E6E6"/>
+
+        <Style x:Key="SectionHeader" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="{StaticResource RevitDarkGray}"/>
+            <Setter Property="Margin" Value="0,0,0,6"/>
+        </Style>
+        <Style x:Key="LabelStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Foreground" Value="{StaticResource RevitDarkGray}"/>
+            <Setter Property="Margin" Value="0,2"/>
+        </Style>
+        <Style x:Key="NoteStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="Foreground" Value="#666666"/>
+            <Setter Property="Margin" Value="0,4,0,0"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <Style x:Key="ComboBoxStyle" TargetType="ComboBox">
+            <Setter Property="Height" Value="28"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Padding" Value="6,4"/>
+            <Setter Property="BorderBrush" Value="{StaticResource RevitLightGray}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="PrimaryButtonStyle" TargetType="Button">
+            <Setter Property="MinWidth" Value="90"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="Padding" Value="12,0"/>
+            <Setter Property="Margin" Value="5,0,0,0"/>
+            <Setter Property="Background" Value="{StaticResource RevitBlue}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="{StaticResource RevitBlue}"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="2" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{StaticResource RevitHoverBlue}"/>
+                    <Setter Property="BorderBrush" Value="{StaticResource RevitHoverBlue}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="SecondaryButtonStyle" TargetType="Button">
+            <Setter Property="MinWidth" Value="90"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="Padding" Value="12,0"/>
+            <Setter Property="Margin" Value="5,0,0,0"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="Foreground" Value="{StaticResource RevitDarkGray}"/>
+            <Setter Property="BorderBrush" Value="#ADADAD"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="2" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#E5F3FF"/>
+                    <Setter Property="BorderBrush" Value="#0078D7"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0" Background="White" BorderBrush="#D3D3D3"
+                BorderThickness="0,0,0,1" Padding="20,12">
+            <TextBlock x:Name="HeaderText" FontSize="14" FontWeight="Bold"
+                       Foreground="{StaticResource RevitDarkGray}"
+                       Text="部屋を 3D ビューで色分け"/>
+        </Border>
+
+        <!-- Content -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="20,15,20,10">
+            <StackPanel>
+                <!-- 色分け基準 -->
+                <Border Background="White" BorderBrush="#D3D3D3"
+                        BorderThickness="1" CornerRadius="3" Padding="15,12" Margin="0,0,0,10">
+                    <StackPanel>
+                        <TextBlock x:Name="txtBasisLabel" Style="{StaticResource SectionHeader}" Text="色分け基準"/>
+                        <ComboBox x:Name="BasisComboBox" Style="{StaticResource ComboBoxStyle}"
+                                  SelectionChanged="Basis_Changed"/>
+                        <StackPanel x:Name="ParameterPanel" Margin="0,8,0,0">
+                            <TextBlock x:Name="txtParameterLabel" Style="{StaticResource LabelStyle}" Text="対象パラメータ"/>
+                            <ComboBox x:Name="ParameterComboBox" Style="{StaticResource ComboBoxStyle}"
+                                      SelectionChanged="Parameter_Changed"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- プレビュー -->
+                <Border Background="White" BorderBrush="#D3D3D3"
+                        BorderThickness="1" CornerRadius="3" Padding="15,12" Margin="0,0,0,10">
+                    <StackPanel>
+                        <TextBlock x:Name="txtPreviewLabel" Style="{StaticResource SectionHeader}" Text="グループと色"/>
+                        <TextBlock x:Name="txtColorHint" Margin="0,0,0,6" FontSize="10" Foreground="Red"
+                                   Text="※ 色の四角をクリックすると変更できます"/>
+                        <StackPanel x:Name="GroupPreviewPanel"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- 出力設定 -->
+                <Border Background="White" BorderBrush="#D3D3D3"
+                        BorderThickness="1" CornerRadius="3" Padding="15,12">
+                    <StackPanel>
+                        <TextBlock x:Name="txtOutputLabel" Style="{StaticResource SectionHeader}" Text="出力設定"/>
+                        <TextBlock x:Name="txtViewNameLabel" Style="{StaticResource LabelStyle}" Text="作成する3Dビュー名"/>
+                        <TextBox x:Name="ViewNameTextBox" Height="26" FontSize="12" Padding="4,2"
+                                 VerticalContentAlignment="Center" Text="部屋3D色分け"/>
+                        <CheckBox x:Name="DeleteExistingCheckBox" IsChecked="True" Margin="0,10,0,0"
+                                  Content="既存の部屋色分けソリッドを削除して作り直す" FontSize="12"/>
+                        <CheckBox x:Name="CreateLegendCheckBox" IsChecked="True" Margin="0,6,0,0"
+                                  Content="凡例（製図ビュー）を作成する" FontSize="12"/>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Buttons -->
+        <Border Grid.Row="2" Background="White" BorderBrush="#D3D3D3"
+                BorderThickness="0,1,0,0" Padding="20,12">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button x:Name="OkButton" Content="実行"
+                        Style="{StaticResource PrimaryButtonStyle}"
+                        Click="OkButton_Click"/>
+                <Button x:Name="CancelButton" Content="キャンセル"
+                        Style="{StaticResource SecondaryButtonStyle}"
+                        Click="CancelButton_Click"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>

@@ -351,6 +351,7 @@ _buttonTipKeys["FeatureName"] = "Ribbon.FeatureName.Button.Tip";
 | BeamUnderLevel（梁下端色分け） | `Commands/BeamUnderLevel/` | `Docs/DEVLOG.md#BeamUnderLevel` |
 | BeamTopLevel（梁天端色分け） | `Commands/BeamTopLevel/` | `Docs/DEVLOG.md#BeamTopLevel` |
 | RoomTagCreator（部屋タグ自動配置） | `Commands/RoomTagCreator/` | `Docs/DEVLOG.md#RoomTagCreator` |
+| Room3DColor（部屋3D色分け） | `Commands/Room3DColor/` | `Docs/DEVLOG.md#Room3DColor` |
 | FilledRegionSplitMerge（塗潰し領域分割統合） | `Commands/FilledRegionSplitMerge/` | `Docs/DEVLOG.md#FilledRegionSplitMerge` |
 | FillPatternIO（塗潰しパターン入出力/.pat） | `Commands/FillPatternIO/` | `Docs/DEVLOG.md#FillPatternIO` |
 | ExcelExportImport（Excel連携） | `Commands/ExcelExportImport/` | `Docs/DEVLOG.md#ExcelExportImport` |
@@ -363,7 +364,7 @@ _buttonTipKeys["FeatureName"] = "Ribbon.FeatureName.Button.Tip";
 1. **通り芯・レベル** — 符号表示切替（両方/左/右）
 2. **シート** — シート一括作成
 3. **ビュー** — ビューポート位置/トリミング領域/3Dビュー/セクションボックスのコピー
-4. **注釈・詳細** — 部屋タグ自動配置、塗潰し領域 分割・統合、塗潰しパターン入出力
+4. **注釈・詳細** — 部屋タグ自動配置、部屋3D色分け、塗潰し領域 分割・統合、塗潰しパターン入出力
 5. **構造** — 梁下端色分け、梁天端色分け、耐火被覆色分け、型枠数量算出
 6. **データ** — EXCELエクスポート、EXCELインポート
 7. **パラメータ** — パラメータ整理（同名特定・値の有無確認・未使用削除）

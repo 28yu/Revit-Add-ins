@@ -71,6 +71,7 @@
     <Resource Include="Resources\Icons\fire_protection.png" />
     <Resource Include="Resources\Icons\formwork.png" />
     <Resource Include="Resources\Icons\room_tag.png" />
+    <Resource Include="Resources\Icons\room_3d_color.png" />
     <Resource Include="Resources\Icons\excel_export.png" />
     <Resource Include="Resources\Icons\excel_import.png" />
     <Resource Include="Resources\Icons\flag_jp_16.png" />

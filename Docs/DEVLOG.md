@@ -1327,3 +1327,26 @@ v2.1.x のパッチではバージョン番号 + 修正点追記がメインな�
 - `ExcelImportService.ImportFromPreview`：各セルの `elem/param/storage/current/new` と設定結果。
 - `ParameterService`：ElementId 名前解決の成否、例外内容。
 - 問題再現時はこのログを送ってもらえば失敗理由（名前不一致・制約エラー等）を特定できる。
+
+<a id="Room3DColor"></a>
+## Room3DColor 開発知見
+
+### 背景・Revit の仕様上の制約
+- Revit では **Room（部屋）は 3D ビューに標準では描画されない**（面・タグは平面/断面用）。3D で部屋を可視化するには立体形状を別要素として生成する必要がある。
+- 実現手法として **`Room.GetClosedShell()`（watertight な閉じたソリッドを返す）→ `DirectShape.SetShape()`** を採用。Autodesk 公式（Jeremy Tammik / RoomVolumeDirectShape）で確立された方式。
+- 生成した DirectShape は **汎用モデル（OST_GenericModel）** カテゴリになる。
+
+### 実装の要点（`Commands/Room3DColor/`）
+- `RoomSolidGenerator`：部屋収集（`Location != null && Area > 0`）、体積計算の有効化（`AreaVolumeSettings.ComputeVolumes`）、DirectShape 生成、専用等角3Dビュー作成（`View3D.CreateIsometric`）、表示絞り込み。
+- `RoomColorManager`：色分け基準（部屋名/レベル/パラメータ/部屋ごと）でのグルーピングと色パレット生成（BeamTopLevel と同系統のパステル）、`OverrideGraphicSettings`（サーフェス前景ソリッド塗り＋色）作成。
+- 色付けは **DirectShape へ要素単位で `view.SetElementOverrides`** を適用（フィルタではなく直接オーバーライド）。生成要素を自分で把握しているため。
+- 「部屋のみ表示」：専用ビューで汎用モデル以外の全カテゴリを `SetCategoryHidden`、さらに今回生成分以外の汎用モデル要素を `HideElements` で個別非表示。
+- 再生成用に DirectShape の Comments に識別マーカー `Tools28_Room3DColor` を保存し、削除オプションで一括削除。
+
+### トランザクション構成
+- `TransactionGroup` 内で「体積計算の有効化」を**別トランザクション**で先に commit（ジオメトリ再計算を確定してから `GetClosedShell` を呼ぶため）→ 続くトランザクションで生成・色分け・凡例。
+
+### 注意点
+- 非囲繞・体積0の部屋は `GetClosedShell` が有効なソリッドを返さずスキップ（完了メッセージに件数表示）。
+- 体積計算はモデル全体設定のため、有効化した場合はその旨を通知。
+- 表示スタイルは `DisplayStyleType.HLR` に設定（サーフェス前景パターンの色が確実に見える）。

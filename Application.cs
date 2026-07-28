@@ -37,6 +37,7 @@ namespace Tools28
             { "SectionBoxCopy", "Ribbon.SectionBox.Copy" },
             { "SectionBoxPaste", "Ribbon.SectionBox.Paste" },
             { "RoomTagAutoCreator", "Ribbon.RoomTag" },
+            { "Room3DColor", "Ribbon.Room3DColor" },
             { "FilledRegionSplitMerge2", "Ribbon.FilledRegion" },
             { "FillPatternIO", "Ribbon.FillPatternIO" },
             { "BeamUnderLevel", "Ribbon.BeamUnder" },
@@ -65,6 +66,7 @@ namespace Tools28
             { "SectionBoxCopy", "Ribbon.SectionBox.Copy.Tip" },
             { "SectionBoxPaste", "Ribbon.SectionBox.Paste.Tip" },
             { "RoomTagAutoCreator", "Ribbon.RoomTag.Tip" },
+            { "Room3DColor", "Ribbon.Room3DColor.Tip" },
             { "FilledRegionSplitMerge2", "Ribbon.FilledRegion.Tip" },
             { "FillPatternIO", "Ribbon.FillPatternIO.Tip" },
             { "BeamUnderLevel", "Ribbon.BeamUnder.Tip" },
@@ -367,6 +369,11 @@ namespace Tools28
             roomTagData.ToolTip = Loc.S("Ribbon.RoomTag.Tip");
             roomTagData.LargeImage = LoadImage("room_tag.png");
             AddButton(panel, roomTagData);
+
+            var room3dColorData = new PushButtonData("Room3DColor", Loc.S("Ribbon.Room3DColor"), assemblyPath, "Tools28.Commands.Room3DColor.Room3DColorCommand");
+            room3dColorData.ToolTip = Loc.S("Ribbon.Room3DColor.Tip");
+            room3dColorData.LargeImage = LoadImage("room_3d_color.png");
+            AddButton(panel, room3dColorData);
 
             panel.AddSeparator();
 
