@@ -309,7 +309,7 @@ namespace Tools28.Commands.Room3DColor
             try { view.ViewTemplateId = ElementId.InvalidElementId; } catch { }
 
             // サーフェス塗り分けが確実に見えるよう陰線処理表示にする
-            try { view.DisplayStyle = DisplayStyleType.HLR; } catch { }
+            try { view.DisplayStyle = DisplayStyle.HLR; } catch { }
             try { view.DetailLevel = ViewDetailLevel.Fine; } catch { }
 
             return view;
