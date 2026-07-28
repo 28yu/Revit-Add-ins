@@ -24,6 +24,11 @@ namespace Tools28.Commands.ExcelExportImport.Services
     {
         private const string ReadOnlySuffix = "(*変更不可)";
 
+        // ExcelExportService が出力する固定ヘッダー名（1列目・2列目）。
+        // 列位置ではなくこの見出しで列を特定するため、列を入れ替えても読める。
+        private const string ElementIdHeader = "要素ID";
+        private const string CategoryHeader = "カテゴリ";
+
         /// <summary>
         /// エクスポート済み Excel から出力設定を復元する。
         /// パラメータ列を1つも読み取れなかった場合は OutputParameters が空になる。
@@ -60,18 +65,26 @@ namespace Tools28.Commands.ExcelExportImport.Services
             {
                 foreach (var worksheet in workbook.Worksheets)
                 {
-                    // ヘッダーは1行目だけを読む（全データ走査は行わない）。
-                    // 3列目以降がパラメータ列。ClosedXML のセルアクセスは重いため、
-                    // Row(1).CellsUsed() で1行目の使用セルだけを一度に走査する。
+                    // ヘッダー（1行目）だけを読む（全データ走査は行わない）。
+                    // 列位置は固定で仮定せず、見出し文字列で「要素ID列」「カテゴリ列」を
+                    // 特定し、それ以外で I-/T- プレフィックスを持つ列をパラメータ列とする。
+                    // → ユーザーが Excel 上で列を入れ替え・並べ替えても正しく読める。
                     var headerParams = new List<ParsedHeader>();
+                    int categoryCol = -1;
                     foreach (var cell in worksheet.Row(1).CellsUsed())
                     {
-                        int col = cell.Address.ColumnNumber;
-                        if (col < 3) continue; // 1列目=要素ID, 2列目=カテゴリ
-                        var parsed = ParseHeader(cell.GetString());
+                        string text = cell.GetString();
+                        if (text == ElementIdHeader)
+                            continue; // 要素ID列（設定復元には不要）
+                        if (text == CategoryHeader)
+                        {
+                            categoryCol = cell.Address.ColumnNumber; // カテゴリ列を記録
+                            continue;
+                        }
+                        var parsed = ParseHeader(text);
                         if (parsed != null)
                         {
-                            parsed.Column = col;
+                            parsed.Column = cell.Address.ColumnNumber;
                             headerParams.Add(parsed);
                         }
                     }
@@ -81,19 +94,24 @@ namespace Tools28.Commands.ExcelExportImport.Services
                     // 統合シート（ExportSingleSheet が付ける固定名 "データ"）だけは
                     // 複数カテゴリが混在するため列→カテゴリの対応判定が要る。
                     // それ以外（カテゴリ毎シート分割）は 1シート=1カテゴリなので、
-                    // 先頭データ行(2行目)の2列目からカテゴリ名を1回読むだけで済む。
+                    // 先頭データ行(2行目)のカテゴリ列からカテゴリ名を1回読むだけで済む。
                     if (worksheet.Name != "データ")
                     {
-                        string cat = worksheet.Cell(2, 2).GetString();
+                        // カテゴリ列が見つかればその値、無ければシート名（サニタイズ済みの実名）を使う
+                        string cat = null;
+                        if (categoryCol > 0)
+                            cat = worksheet.Cell(2, categoryCol).GetString();
                         if (string.IsNullOrWhiteSpace(cat))
-                            cat = worksheet.Name; // データ行なし（要素0件）→ シート名で代用
+                            cat = worksheet.Name; // カテゴリ列なし/データ行なし → シート名で代用
                         RegisterCategory(cat);
                         foreach (var h in headerParams)
                             AddEntry(cat, h.RawName, h.IsType);
                     }
                     else
                     {
-                        ReadSingleSheet(worksheet, headerParams, RegisterCategory, AddEntry);
+                        // カテゴリ列が見つからない場合のみ従来の2列目にフォールバック
+                        int catCol = categoryCol > 0 ? categoryCol : 2;
+                        ReadSingleSheet(worksheet, headerParams, catCol, RegisterCategory, AddEntry);
                     }
                 }
             }
@@ -110,6 +128,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
         private static void ReadSingleSheet(
             IXLWorksheet worksheet,
             List<ParsedHeader> headerParams,
+            int categoryCol,
             System.Action<string> registerCategory,
             System.Action<string, string, bool> addEntry)
         {
@@ -123,7 +142,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
             for (int row = 2; row <= rowCount; row++)
             {
                 var r = worksheet.Row(row);
-                string cat = r.Cell(2).GetString();
+                string cat = r.Cell(categoryCol).GetString();
                 if (string.IsNullOrWhiteSpace(cat)) continue;
 
                 if (sheetCatSet.Add(cat))
