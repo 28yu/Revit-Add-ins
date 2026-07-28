@@ -154,15 +154,31 @@ namespace Tools28.Commands.ExcelExportImport.Services
                         return false;
 
                     case StorageType.Double:
-                        // AsValueString形式での設定を試行
-                        if (param.SetValueString(value))
-                            return true;
-                        // 直接数値設定
+                        // Excel の数値は「表示単位」（mm・㎡ 等）。表示単位→内部単位へ変換して設定する。
+                        // 直接 param.Set(数値) すると内部単位(ft 等)として扱われ、例えば部屋の
+                        // 上限オフセットに -100 を入れても -100ft 相当になり反映されない不具合になる。
+                        // SetValueString は一部パラメータ（部屋の上限オフセット等）で正しく反映されない
+                        // ため、数値として解釈できる場合は単位変換して直接 Set する方を優先する。
                         if (double.TryParse(value, out double dblVal))
                         {
-                            param.Set(dblVal);
-                            return true;
+                            double internalVal = dblVal;
+                            try
+                            {
+                                var unitTypeId = param.GetUnitTypeId();
+                                if (unitTypeId != null && !unitTypeId.Empty())
+                                    internalVal = UnitUtils.ConvertToInternalUnits(dblVal, unitTypeId);
+                            }
+                            catch
+                            {
+                                // 単位を持たない数値パラメータ（比率・個数等）はそのままの値を使う
+                                internalVal = dblVal;
+                            }
+                            // Set の戻り値をそのまま返す（実際に失敗したら失敗として報告する）
+                            return param.Set(internalVal);
                         }
+                        // 数値として解釈できない（書式付き文字列等）は表示文字列として設定を試みる
+                        if (param.SetValueString(value))
+                            return true;
                         return false;
 
                     case StorageType.ElementId:
