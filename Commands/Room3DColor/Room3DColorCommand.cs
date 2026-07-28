@@ -71,7 +71,7 @@ namespace Tools28.Commands.Room3DColor
 
                         // 専用ワークセット（ワークシェアモデルのみ）を取得・作成
                         WorksetId roomWorksetId = workshared
-                            ? RoomSolidGenerator.EnsureRoomWorkset(doc, Loc.S("Room3D.WorksetName"))
+                            ? RoomSolidGenerator.EnsureRoomWorkset(doc, result.WorksetName)
                             : null;
 
                         // 専用3Dビューを作成
@@ -150,7 +150,7 @@ namespace Tools28.Commands.Room3DColor
                     : "";
 
                 string visibilityInfo = workshared
-                    ? "\n" + string.Format(Loc.S("Room3D.DoneWorkset"), Loc.S("Room3D.WorksetName"))
+                    ? "\n" + string.Format(Loc.S("Room3D.DoneWorkset"), result.WorksetName)
                     : "\n" + Loc.S("Room3D.DoneHiddenOtherViews");
 
                 string doneMessage = string.Format(Loc.S("Room3D.DoneMessage"),

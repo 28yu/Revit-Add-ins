@@ -46,9 +46,11 @@ namespace Tools28.Commands.Room3DColor
             txtColorHint.Text = Loc.S("Room3D.ColorHint");
             txtOutputLabel.Text = Loc.S("Room3D.OutputLabel");
             txtViewNameLabel.Text = Loc.S("Room3D.ViewNameLabel");
+            txtWorksetNameLabel.Text = Loc.S("Room3D.WorksetNameLabel");
             DeleteExistingCheckBox.Content = Loc.S("Room3D.DeleteExisting");
             CreateLegendCheckBox.Content = Loc.S("Room3D.CreateLegend");
             ViewNameTextBox.Text = Loc.S("Room3D.DefaultViewName");
+            WorksetNameTextBox.Text = Loc.S("Room3D.WorksetName");
             OkButton.Content = Loc.S("Common.Execute");
             CancelButton.Content = Loc.S("Common.Cancel");
         }
@@ -61,6 +63,7 @@ namespace Tools28.Commands.Room3DColor
                 new BasisItem { Basis = RoomColorBasis.ByLevel, Display = Loc.S("Room3D.BasisLevel") },
                 new BasisItem { Basis = RoomColorBasis.ByParameter, Display = Loc.S("Room3D.BasisParameter") },
                 new BasisItem { Basis = RoomColorBasis.PerRoom, Display = Loc.S("Room3D.BasisPerRoom") },
+                new BasisItem { Basis = RoomColorBasis.All, Display = Loc.S("Room3D.BasisAll") },
             };
             BasisComboBox.ItemsSource = basisItems;
             BasisComboBox.SelectedIndex = 0;
@@ -177,12 +180,17 @@ namespace Tools28.Commands.Room3DColor
             if (string.IsNullOrEmpty(viewName))
                 viewName = Loc.S("Room3D.DefaultViewName");
 
+            string worksetName = WorksetNameTextBox.Text?.Trim();
+            if (string.IsNullOrEmpty(worksetName))
+                worksetName = Loc.S("Room3D.WorksetName");
+
             return new RoomColorResult
             {
                 Basis = SelectedBasis,
                 ParameterName = ParameterComboBox.SelectedItem as string,
                 Groups = _groups,
                 ViewName = viewName,
+                WorksetName = worksetName,
                 DeleteExisting = DeleteExistingCheckBox.IsChecked == true,
                 CreateLegend = CreateLegendCheckBox.IsChecked == true
             };

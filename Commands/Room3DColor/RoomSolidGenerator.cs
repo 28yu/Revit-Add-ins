@@ -186,6 +186,9 @@ namespace Tools28.Commands.Room3DColor
             // マーカーを保存（再生成時の識別用）
             SetComment(ds, ShapeMarker);
 
+            // マーク パラメータに対象部屋の要素IDを記載
+            SetMark(ds, room.Id.IntValue().ToString());
+
             // 指定ワークセットへ割り当て
             if (worksetId != null)
             {
@@ -370,6 +373,17 @@ namespace Tools28.Commands.Room3DColor
             try
             {
                 Parameter p = e.get_Parameter(BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS);
+                if (p != null && !p.IsReadOnly)
+                    p.Set(value);
+            }
+            catch { }
+        }
+
+        private static void SetMark(Element e, string value)
+        {
+            try
+            {
+                Parameter p = e.get_Parameter(BuiltInParameter.ALL_MODEL_MARK);
                 if (p != null && !p.IsReadOnly)
                     p.Set(value);
             }

@@ -153,6 +153,10 @@
                         <TextBlock x:Name="txtViewNameLabel" Style="{StaticResource LabelStyle}" Text="作成する3Dビュー名"/>
                         <TextBox x:Name="ViewNameTextBox" Height="26" FontSize="12" Padding="4,2"
                                  VerticalContentAlignment="Center" Text="部屋3D色分け"/>
+                        <TextBlock x:Name="txtWorksetNameLabel" Style="{StaticResource LabelStyle}"
+                                   Margin="0,8,0,2" Text="ワークセット名（ワークシェア時）"/>
+                        <TextBox x:Name="WorksetNameTextBox" Height="26" FontSize="12" Padding="4,2"
+                                 VerticalContentAlignment="Center" Text="部屋3D色分け"/>
                         <CheckBox x:Name="DeleteExistingCheckBox" IsChecked="True" Margin="0,10,0,0"
                                   Content="既存の部屋色分けソリッドを削除して作り直す" FontSize="12"/>
                         <CheckBox x:Name="CreateLegendCheckBox" IsChecked="True" Margin="0,6,0,0"

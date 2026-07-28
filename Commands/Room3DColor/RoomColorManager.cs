@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Autodesk.Revit.DB;
+using Tools28.Localization;
 
 namespace Tools28.Commands.Room3DColor
 {
@@ -13,6 +14,9 @@ namespace Tools28.Commands.Room3DColor
         /// <summary>値が未設定の場合のラベル</summary>
         public const string NoValueLabel = "(未設定)";
 
+        /// <summary>輪郭線（投影線）用の薄いグレー</summary>
+        public static readonly Color OutlineColor = new Color(190, 190, 190);
+
         /// <summary>
         /// 色分け基準に応じて部屋をグループ化し、各グループに色を割り当てる
         /// </summary>
@@ -23,7 +27,17 @@ namespace Tools28.Commands.Room3DColor
         {
             var groups = new List<RoomColorGroup>();
 
-            if (basis == RoomColorBasis.PerRoom)
+            if (basis == RoomColorBasis.All)
+            {
+                // 全部屋を1グループにまとめる
+                groups.Add(new RoomColorGroup
+                {
+                    Key = "All",
+                    Label = Loc.S("Room3D.AllGroupLabel"),
+                    RoomIds = entries.Select(e => e.Id).ToList()
+                });
+            }
+            else if (basis == RoomColorBasis.PerRoom)
             {
                 // 部屋ごとに1グループ
                 foreach (var e in entries.OrderBy(e => e.Name))
@@ -83,6 +97,8 @@ namespace Tools28.Commands.Room3DColor
                     return NoValueLabel;
                 case RoomColorBasis.PerRoom:
                     return e.Id.IntValue().ToString();
+                case RoomColorBasis.All:
+                    return "All";
                 default:
                     return NoValueLabel;
             }
@@ -116,8 +132,9 @@ namespace Tools28.Commands.Room3DColor
                 overrides.SetSurfaceForegroundPatternColor(color);
             }
 
-            // 投影線も同色にして立体のエッジを馴染ませる
-            overrides.SetProjectionLineColor(color);
+            // 輪郭線（投影線）は薄いグレー・最細にして目立たせない
+            overrides.SetProjectionLineColor(OutlineColor);
+            overrides.SetProjectionLineWeight(1);
 
             return overrides;
         }

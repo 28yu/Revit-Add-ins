@@ -15,7 +15,9 @@ namespace Tools28.Commands.Room3DColor
         /// <summary>指定パラメータの値ごと</summary>
         ByParameter,
         /// <summary>部屋ごとに個別</summary>
-        PerRoom
+        PerRoom,
+        /// <summary>すべて（全部屋を同色・1グループ）</summary>
+        All
     }
 
     /// <summary>
@@ -55,6 +57,7 @@ namespace Tools28.Commands.Room3DColor
         public string ParameterName { get; set; }
         public List<RoomColorGroup> Groups { get; set; } = new List<RoomColorGroup>();
         public string ViewName { get; set; }
+        public string WorksetName { get; set; }
         public bool DeleteExisting { get; set; }
         public bool CreateLegend { get; set; }
     }
