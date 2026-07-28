@@ -291,10 +291,11 @@ namespace Tools28.Commands.ExcelExportImport.Views
 
         private void RemoveFromOutputButton_Click(object sender, RoutedEventArgs e)
         {
-            var selected = OutputListBox.SelectedItem as ParameterInfo;
-            if (selected == null) return;
+            var selected = OutputListBox.SelectedItems.Cast<ParameterInfo>().ToList();
+            if (selected.Count == 0) return;
 
-            _outputParameters.Remove(selected);
+            foreach (var p in selected)
+                _outputParameters.Remove(p);
             RefreshOutputList();
             UpdateParameterList();
         }
@@ -327,64 +328,114 @@ namespace Tools28.Commands.ExcelExportImport.Views
         }
 
         /// <summary>
-        /// 出力リストで選択中のパラメータを上(-1)/下(+1)に移動する。
-        /// 表示はカテゴリでグループ化されているため、表示上のインデックス
-        /// (SelectedIndex) は内部リスト _outputParameters の並びとずれる。
-        /// そこで「選択中の要素そのもの」を基準にし、同一カテゴリ内で隣接する
-        /// 要素と入れ替えることで、常に選択したパラメータが動くようにする。
+        /// 出力リストで選択中のパラメータ（複数可）を上(-1)/下(+1)に移動する。
+        /// 表示はカテゴリでグループ化されているため、カテゴリ単位で「選択ブロック」を
+        /// 1つ分ずらす。選択した要素そのものを基準にするため、表示位置と内部リストの
+        /// ずれや、複数選択・飛び選択でも常に選択したものが動く。
         /// </summary>
         private void MoveSelectedOutput(int direction)
         {
-            var selected = OutputListBox.SelectedItem as ParameterInfo;
-            if (selected == null) return;
+            var selected = OutputListBox.SelectedItems.Cast<ParameterInfo>().ToList();
+            if (selected.Count == 0) return;
 
-            int index = _outputParameters.IndexOf(selected);
-            if (index < 0) return;
+            var selectedSet = new HashSet<ParameterInfo>(selected);
 
-            // 同じカテゴリ内で移動方向の隣にある要素を探す
-            int target = -1;
-            for (int i = index + direction; i >= 0 && i < _outputParameters.Count; i += direction)
+            bool anyMoved = false;
+            // 選択に含まれるカテゴリごとに、そのカテゴリ内の並びだけを対象に移動する
+            foreach (var cat in selected.Select(p => p.CategoryName).Distinct().ToList())
             {
-                if (_outputParameters[i].CategoryName == selected.CategoryName)
+                // このカテゴリのパラメータが _outputParameters 上で占める位置（順序保持）
+                var positions = new List<int>();
+                for (int i = 0; i < _outputParameters.Count; i++)
+                    if (_outputParameters[i].CategoryName == cat)
+                        positions.Add(i);
+
+                var seq = positions.Select(i => _outputParameters[i]).ToList();
+                if (ReorderBlock(seq, selectedSet, direction))
                 {
-                    target = i;
-                    break;
+                    anyMoved = true;
+                    // 並べ替え結果を同じ位置（他カテゴリの位置は動かさない）へ書き戻す
+                    for (int k = 0; k < positions.Count; k++)
+                        _outputParameters[positions[k]] = seq[k];
                 }
             }
-            if (target < 0) return; // 同カテゴリ内で既に端
 
-            // エクスポート順の情報源（_outputParameters）を入れ替え
-            var other = _outputParameters[target];
-            _outputParameters[index] = other;
-            _outputParameters[target] = selected;
+            if (!anyMoved) return;
 
-            // 表示コレクションは ItemsSource を作り直さず、要素を Move で移動して
-            // スクロール位置を維持する（先頭に戻らない）。
-            int dispSel = _outputDisplay.IndexOf(selected);
-            int dispOther = _outputDisplay.IndexOf(other);
-            if (dispSel >= 0 && dispOther >= 0)
+            // 表示コレクションを _outputParameters の並びへ同期（可能なら Move でスクロール維持）
+            SyncDisplayToParameters();
+
+            // 選択を復元し、移動方向側の端が見えるようにする
+            OutputListBox.SelectedItems.Clear();
+            foreach (var p in selected)
+                OutputListBox.SelectedItems.Add(p);
+            OutputListBox.ScrollIntoView(direction < 0 ? selected[0] : selected[selected.Count - 1]);
+        }
+
+        /// <summary>
+        /// カテゴリ内の並び seq に対し、選択要素を1つ分だけ上(-1)/下(+1)へ移動する。
+        /// 隣が選択要素なら詰めず（ブロックを保つ）、端では止まる。移動が起きたら true。
+        /// </summary>
+        private static bool ReorderBlock(List<ParameterInfo> seq, HashSet<ParameterInfo> selectedSet, int direction)
+        {
+            bool moved = false;
+            if (direction < 0)
             {
-                try
+                for (int i = 1; i < seq.Count; i++)
                 {
-                    _outputDisplay.Move(dispSel, dispOther);
-                }
-                catch
-                {
-                    // 予期しない例外時は安全側に倒して全体を作り直す
-                    RefreshOutputList();
+                    if (selectedSet.Contains(seq[i]) && !selectedSet.Contains(seq[i - 1]))
+                    {
+                        var t = seq[i]; seq[i] = seq[i - 1]; seq[i - 1] = t;
+                        moved = true;
+                    }
                 }
             }
             else
             {
-                // フィルタ等で相手が非表示の場合のみ全体を作り直す
+                for (int i = seq.Count - 2; i >= 0; i--)
+                {
+                    if (selectedSet.Contains(seq[i]) && !selectedSet.Contains(seq[i + 1]))
+                    {
+                        var t = seq[i]; seq[i] = seq[i + 1]; seq[i + 1] = t;
+                        moved = true;
+                    }
+                }
+            }
+            return moved;
+        }
+
+        /// <summary>
+        /// 表示コレクション(_outputDisplay)を _outputParameters の並びへ合わせる。
+        /// 検索フィルタが無い場合は要素を Move で並べ替えてスクロール位置を維持する。
+        /// フィルタ中は表示が部分集合のため素直に作り直す。
+        /// </summary>
+        private void SyncDisplayToParameters()
+        {
+            if (!string.IsNullOrEmpty(OutputSearchBox.Text.Trim()))
+            {
                 RefreshOutputList();
+                return;
             }
 
-            OutputListBox.SelectedItem = selected;
+            // 同一要素集合の並べ替えなので、先頭から順に位置合わせ（各ズレを Move で解消）
+            for (int i = 0; i < _outputParameters.Count && i < _outputDisplay.Count; i++)
+            {
+                if (ReferenceEquals(_outputDisplay[i], _outputParameters[i])) continue;
 
-            // ScrollIntoView は最小スクロール（表示中なら何もしない／枠外なら
-            // 見える分だけスクロール）なので、そのまま呼んで枠外時だけ追従させる。
-            OutputListBox.ScrollIntoView(selected);
+                int j = -1;
+                for (int k = i + 1; k < _outputDisplay.Count; k++)
+                {
+                    if (ReferenceEquals(_outputDisplay[k], _outputParameters[i])) { j = k; break; }
+                }
+                if (j > i)
+                    _outputDisplay.Move(j, i);
+                else
+                {
+                    // 想定外（フィルタ等で不整合）→ 安全側に作り直す
+                    RefreshOutputList();
+                    return;
+                }
+            }
         }
 
         private void RefreshOutputList()

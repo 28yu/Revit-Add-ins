@@ -386,7 +386,7 @@
                     </CheckBox>
                     <ListBox x:Name="OutputListBox" Grid.Row="3"
                              BorderThickness="1" BorderBrush="#CCCCCC"
-                             SelectionMode="Single"
+                             SelectionMode="Extended"
                              ScrollViewer.CanContentScroll="True"
                              VirtualizingPanel.IsVirtualizing="True"
                              VirtualizingPanel.IsVirtualizingWhenGrouping="True"
