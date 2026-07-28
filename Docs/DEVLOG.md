@@ -1356,3 +1356,5 @@ v2.1.x のパッチではバージョン番号 + 修正点追記がメインな�
 - **ワークシェアあり**: `Workset.Create`（要トランザクション）で専用ワークセット「部屋3D色分け」を作成/取得し、`ELEM_PARTITION_PARAM` で各 DirectShape を割当。`WorksetDefaultVisibilitySettings.SetWorksetVisibility(id, false)` で既定を非表示にする（新規ワークセットは既存ビューもこの既定に従うため、全ビューで非表示になる）。専用色分けビューのみ `View.SetWorksetVisibility(id, WorksetVisibility.Visible)` で表示。
 - **ワークシェアなし**: ワークセットが作れないため、`Element.CanBeHidden(view)` で判定しつつ専用ビュー以外の全ビューで `View.HideElements` により要素単位で非表示（同等動作）。この処理以降に作成された新規ビューには出てしまう制約あり。
 - `WorksetId.IntegerValue` は 2026 でも維持されている（`ElementId.IntegerValue` のみが `Value` に変更）ため、`ELEM_PARTITION_PARAM.Set(worksetId.IntegerValue)` はバージョン分岐不要。
+
+- 2026-07-28: Room3DColor を Revit 2022 / 2024 でオートビルド確認（DisplayStyle / ClosedShell のAPI名修正後）。
