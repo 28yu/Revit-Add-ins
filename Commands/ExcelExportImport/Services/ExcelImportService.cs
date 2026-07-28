@@ -347,6 +347,17 @@ namespace Tools28.Commands.ExcelExportImport.Services
         /// </summary>
         public static ImportResult ImportFromPreview(Document doc, List<ImportPreviewRow> previewRows)
         {
+            return ImportFromPreview(doc, previewRows, null);
+        }
+
+        /// <summary>
+        /// <see cref="ImportFromPreview(Document, List{ImportPreviewRow})"/> の除外指定付き版。
+        /// excludeElementIds に含まれる要素は書き込み対象から外す。
+        /// （制約エラー（部屋の高さ&gt;0 等）で失敗した要素を除いて再実行するために使う）
+        /// </summary>
+        public static ImportResult ImportFromPreview(
+            Document doc, List<ImportPreviewRow> previewRows, HashSet<long> excludeElementIds)
+        {
             var result = new ImportResult();
             if (previewRows == null)
                 return result;
@@ -354,8 +365,9 @@ namespace Tools28.Commands.ExcelExportImport.Services
             // 読み取り専用で変更できないセルはスキップ扱いで集計
             result.SkipCount = previewRows.Count(r => r.HasChange && r.IsReadOnly);
 
-            // 実際に書き込む対象（変更あり かつ 書込み可能）だけを処理
-            foreach (var pr in previewRows.Where(r => r.HasChange && !r.IsReadOnly))
+            // 実際に書き込む対象（変更あり かつ 書込み可能、除外指定を除く）だけを処理
+            foreach (var pr in previewRows.Where(r => r.HasChange && !r.IsReadOnly
+                        && (excludeElementIds == null || !excludeElementIds.Contains(pr.ElementId))))
             {
                 var elem = doc.GetElement(new ElementId(pr.ElementId));
                 if (elem == null)
