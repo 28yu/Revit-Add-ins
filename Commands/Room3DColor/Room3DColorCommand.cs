@@ -46,6 +46,7 @@ namespace Tools28.Commands.Room3DColor
                 int shapeSuccess = 0;
                 int shapeFailure = 0;
                 bool volumeEnabled = false;
+                bool workshared = doc.IsWorkshared;
                 ElementId legendViewId = null;
                 View3D colorView = null;
 
@@ -68,6 +69,11 @@ namespace Tools28.Commands.Room3DColor
                         if (result.DeleteExisting)
                             RoomSolidGenerator.DeleteExistingShapes(doc);
 
+                        // 専用ワークセット（ワークシェアモデルのみ）を取得・作成
+                        WorksetId roomWorksetId = workshared
+                            ? RoomSolidGenerator.EnsureRoomWorkset(doc, Loc.S("Room3D.WorksetName"))
+                            : null;
+
                         // 専用3Dビューを作成
                         colorView = RoomSolidGenerator.CreateColorView(doc, result.ViewName);
 
@@ -88,7 +94,7 @@ namespace Tools28.Commands.Room3DColor
                                 }
 
                                 ElementId shapeId =
-                                    RoomSolidGenerator.CreateRoomShape(doc, room, group.Label);
+                                    RoomSolidGenerator.CreateRoomShape(doc, room, roomWorksetId);
                                 if (shapeId == null)
                                 {
                                     shapeFailure++;
@@ -103,6 +109,18 @@ namespace Tools28.Commands.Room3DColor
 
                         // 部屋ソリッドのみ表示に絞り込み
                         RoomSolidGenerator.IsolateRoomShapes(doc, colorView, allShapeIds);
+
+                        // 他ビューでの非表示処理
+                        if (workshared && roomWorksetId != null)
+                        {
+                            // 専用ビューのみワークセットを表示（既定は非表示に設定済み）
+                            RoomSolidGenerator.ShowWorksetInView(colorView, roomWorksetId);
+                        }
+                        else if (!workshared)
+                        {
+                            // ワークセット未使用モデルは要素単位で他ビューを非表示に
+                            RoomSolidGenerator.HideShapesInOtherViews(doc, colorView.Id, allShapeIds);
+                        }
 
                         // 凡例作成
                         if (result.CreateLegend)
@@ -131,9 +149,13 @@ namespace Tools28.Commands.Room3DColor
                     ? "\n" + Loc.S("Room3D.VolumeEnabledNote")
                     : "";
 
+                string visibilityInfo = workshared
+                    ? "\n" + string.Format(Loc.S("Room3D.DoneWorkset"), Loc.S("Room3D.WorksetName"))
+                    : "\n" + Loc.S("Room3D.DoneHiddenOtherViews");
+
                 string doneMessage = string.Format(Loc.S("Room3D.DoneMessage"),
                     result.ViewName, shapeSuccess, result.Groups.Count) +
-                    "\n" + legendInfo + volumeInfo;
+                    "\n" + legendInfo + visibilityInfo + volumeInfo;
 
                 if (shapeFailure > 0)
                     doneMessage += "\n" + string.Format(Loc.S("Room3D.DoneFailure"), shapeFailure);

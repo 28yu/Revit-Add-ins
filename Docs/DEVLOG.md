@@ -1350,3 +1350,9 @@ v2.1.x のパッチではバージョン番号 + 修正点追記がメインな�
 - 非囲繞・体積0の部屋は `GetClosedShell` が有効なソリッドを返さずスキップ（完了メッセージに件数表示）。
 - 体積計算はモデル全体設定のため、有効化した場合はその旨を通知。
 - 表示スタイルは `DisplayStyleType.HLR` に設定（サーフェス前景パターンの色が確実に見える）。
+
+### ワークセットによる表示制御（追加対応）
+永続要素（DirectShape）が他ビューに出ないよう、専用ワークセットで制御する。
+- **ワークシェアあり**: `Workset.Create`（要トランザクション）で専用ワークセット「部屋3D色分け」を作成/取得し、`ELEM_PARTITION_PARAM` で各 DirectShape を割当。`WorksetDefaultVisibilitySettings.SetWorksetVisibility(id, false)` で既定を非表示にする（新規ワークセットは既存ビューもこの既定に従うため、全ビューで非表示になる）。専用色分けビューのみ `View.SetWorksetVisibility(id, WorksetVisibility.Visible)` で表示。
+- **ワークシェアなし**: ワークセットが作れないため、`Element.CanBeHidden(view)` で判定しつつ専用ビュー以外の全ビューで `View.HideElements` により要素単位で非表示（同等動作）。この処理以降に作成された新規ビューには出てしまう制約あり。
+- `WorksetId.IntegerValue` は 2026 でも維持されている（`ElementId.IntegerValue` のみが `Value` に変更）ため、`ELEM_PARTITION_PARAM.Set(worksetId.IntegerValue)` はバージョン分岐不要。

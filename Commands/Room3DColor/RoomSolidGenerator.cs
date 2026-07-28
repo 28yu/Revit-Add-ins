@@ -138,9 +138,10 @@ namespace Tools28.Commands.Room3DColor
 
         /// <summary>
         /// 部屋の閉じたソリッドから DirectShape（汎用モデル）を生成。トランザクション内で呼ぶこと。
+        /// worksetId が指定されている場合は生成要素をそのワークセットに割り当てる。
         /// </summary>
         /// <returns>生成した DirectShape のId。生成できない場合は null。</returns>
-        public static ElementId CreateRoomShape(Document doc, Room room, string groupLabel)
+        public static ElementId CreateRoomShape(Document doc, Room room, WorksetId worksetId)
         {
             GeometryElement shell;
             try
@@ -184,7 +185,95 @@ namespace Tools28.Commands.Room3DColor
             // マーカーを保存（再生成時の識別用）
             SetComment(ds, ShapeMarker);
 
+            // 指定ワークセットへ割り当て
+            if (worksetId != null)
+            {
+                try
+                {
+                    Parameter wp = ds.get_Parameter(BuiltInParameter.ELEM_PARTITION_PARAM);
+                    if (wp != null && !wp.IsReadOnly)
+                        wp.Set(worksetId.IntegerValue);
+                }
+                catch { }
+            }
+
             return ds.Id;
+        }
+
+        /// <summary>
+        /// 部屋色分け専用ワークセットを取得または作成する。トランザクション内で呼ぶこと。
+        /// ワークシェアされていないモデルでは null を返す。
+        /// 作成したワークセットは既定で全ビュー非表示に設定する。
+        /// </summary>
+        public static WorksetId EnsureRoomWorkset(Document doc, string worksetName)
+        {
+            if (!doc.IsWorkshared)
+                return null;
+
+            Workset existing = new FilteredWorksetCollector(doc)
+                .OfKind(WorksetKind.UserWorkset)
+                .FirstOrDefault(w => w.Name == worksetName);
+
+            WorksetId id = existing != null ? existing.Id : Workset.Create(doc, worksetName).Id;
+
+            // 既定の表示を「非表示」にする（新規ワークセットは既存ビューもこの既定に従う）
+            try
+            {
+                var visSettings = WorksetDefaultVisibilitySettings
+                    .GetWorksetDefaultVisibilitySettings(doc);
+                visSettings.SetWorksetVisibility(id, false);
+            }
+            catch { }
+
+            return id;
+        }
+
+        /// <summary>
+        /// 指定ビューでのみワークセットを表示にする。トランザクション内で呼ぶこと。
+        /// </summary>
+        public static void ShowWorksetInView(View view, WorksetId worksetId)
+        {
+            if (view == null || worksetId == null)
+                return;
+            try { view.SetWorksetVisibility(worksetId, WorksetVisibility.Visible); }
+            catch { }
+        }
+
+        /// <summary>
+        /// ワークシェアされていないモデル向けの代替処理。
+        /// 指定ビュー以外の全ビューで部屋ソリッドを要素単位で非表示にする。トランザクション内で呼ぶこと。
+        /// </summary>
+        public static void HideShapesInOtherViews(
+            Document doc, ElementId colorViewId, ICollection<ElementId> shapeIds)
+        {
+            if (shapeIds == null || shapeIds.Count == 0)
+                return;
+
+            var views = new FilteredElementCollector(doc)
+                .OfClass(typeof(View))
+                .Cast<View>()
+                .Where(v => !v.IsTemplate && v.Id != colorViewId)
+                .ToList();
+
+            foreach (var v in views)
+            {
+                var hideable = new List<ElementId>();
+                foreach (var id in shapeIds)
+                {
+                    try
+                    {
+                        Element e = doc.GetElement(id);
+                        if (e != null && e.CanBeHidden(v))
+                            hideable.Add(id);
+                    }
+                    catch { }
+                }
+
+                if (hideable.Count > 0)
+                {
+                    try { v.HideElements(hideable); } catch { }
+                }
+            }
         }
 
         /// <summary>
