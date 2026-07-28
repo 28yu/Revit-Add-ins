@@ -146,7 +146,8 @@ namespace Tools28.Commands.Room3DColor
             GeometryElement shell;
             try
             {
-                shell = room.GetClosedShell();
+                // ClosedShell プロパティは体積計算が有効なとき部屋の閉じたソリッドを返す
+                shell = room.ClosedShell;
             }
             catch
             {
