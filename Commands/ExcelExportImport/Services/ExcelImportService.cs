@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using Autodesk.Revit.DB;
 using ClosedXML.Excel;
+using Tools28;
 using Tools28.Commands.ExcelExportImport.Models;
 
 namespace Tools28.Commands.ExcelExportImport.Services
@@ -316,7 +317,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
                             }
                             else
                             {
-                                success = ParameterService.SetParameterValue(param, newValue);
+                                success = ParameterService.SetParameterValue(param, newValue, doc);
                             }
 
                             if (success)
@@ -406,9 +407,14 @@ namespace Tools28.Commands.ExcelExportImport.Services
                     continue;
                 }
 
+                DiagLog.Write($"[Import] elem={pr.ElementId} param='{headerName}' storage={param.StorageType} " +
+                    $"isType={ParameterService.IsTypeChangeParameter(param)} current='{currentValue}' new='{pr.NewValue}'");
+
                 bool success = ParameterService.IsTypeChangeParameter(param)
                     ? ParameterService.ChangeElementType(elem, pr.NewValue, doc)
-                    : ParameterService.SetParameterValue(param, pr.NewValue);
+                    : ParameterService.SetParameterValue(param, pr.NewValue, doc);
+
+                DiagLog.Write($"[Import] -> result={success}");
 
                 if (success)
                 {

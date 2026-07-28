@@ -132,10 +132,13 @@ namespace Tools28.Commands.ExcelExportImport.Services
         /// <summary>
         /// パラメータ値を文字列から設定
         /// </summary>
-        public static bool SetParameterValue(Parameter param, string value)
+        public static bool SetParameterValue(Parameter param, string value, Document doc)
         {
             if (param == null || param.IsReadOnly)
+            {
+                DiagLog.Write($"[SetParam] skip: param={(param == null ? "null" : "readonly")} value='{value}'");
                 return false;
+            }
 
             try
             {
@@ -147,10 +150,8 @@ namespace Tools28.Commands.ExcelExportImport.Services
 
                     case StorageType.Integer:
                         if (int.TryParse(value, out int intVal))
-                        {
-                            param.Set(intVal);
-                            return true;
-                        }
+                            return param.Set(intVal);
+                        DiagLog.Write($"[SetParam] Integer 解析失敗 '{value}' ({param.Definition?.Name})");
                         return false;
 
                     case StorageType.Double:
@@ -184,29 +185,98 @@ namespace Tools28.Commands.ExcelExportImport.Services
                         return false;
 
                     case StorageType.ElementId:
-                        // SetValueStringを試行
-                        try
-                        {
-                            if (param.SetValueString(value))
-                                return true;
-                        }
-                        catch { }
-                        // 直接ElementId設定
-                        if (int.TryParse(value, out int idVal))
-                        {
-                            param.Set(new ElementId(idVal));
-                            return true;
-                        }
-                        return false;
+                        return SetElementIdParameter(param, value, doc);
 
                     default:
                         return false;
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                DiagLog.Write($"[SetParam] 例外 param='{param.Definition?.Name}' storage={param.StorageType} value='{value}': {ex.Message}");
                 return false;
             }
+        }
+
+        /// <summary>
+        /// ElementId 型パラメータ（部屋の上部/下部レベル等）を設定する。
+        /// エクスポートは要素名（例: レベル名 "1FL(2FL)"）で書き出すため、
+        /// 数値ID・名前検索・SetValueString の順に解決する。
+        /// </summary>
+        private static bool SetElementIdParameter(Parameter param, string value, Document doc)
+        {
+            // 1) 数値ならそのまま ElementId として設定
+            if (int.TryParse(value, out int idVal))
+                return param.Set(new ElementId(idVal));
+
+            // 2) 名前から要素を検索して設定（レベル名など）
+            var targetId = ResolveElementIdByName(param, value, doc);
+            if (targetId != null && targetId != ElementId.InvalidElementId)
+            {
+                bool ok = param.Set(targetId);
+                DiagLog.Write($"[SetParam] ElementId 名前解決 '{value}' -> {targetId} set={ok} ({param.Definition?.Name})");
+                return ok;
+            }
+
+            // 3) 最後に SetValueString を試す
+            try
+            {
+                if (param.SetValueString(value))
+                    return true;
+            }
+            catch { }
+
+            DiagLog.Write($"[SetParam] ElementId 名前解決失敗 '{value}'（該当要素が見つからない） ({param.Definition?.Name})");
+            return false;
+        }
+
+        /// <summary>
+        /// 名前から要素の ElementId を検索する。まず現在値の要素と同じクラスに絞り込み、
+        /// 見つからなければ Level（部屋の上部/下部レベルで最頻出）を探す。
+        /// </summary>
+        private static ElementId ResolveElementIdByName(Parameter param, string name, Document doc)
+        {
+            if (doc == null || string.IsNullOrEmpty(name))
+                return ElementId.InvalidElementId;
+
+            // 現在値の要素クラスに絞って名前一致を探す（上部レベルなら Level クラス）
+            try
+            {
+                var currentId = param.AsElementId();
+                if (currentId != null && currentId != ElementId.InvalidElementId)
+                {
+                    var cur = doc.GetElement(currentId);
+                    if (cur != null)
+                    {
+                        var byClass = new FilteredElementCollector(doc)
+                            .OfClass(cur.GetType())
+                            .FirstOrDefault(e => SafeName(e) == name);
+                        if (byClass != null)
+                            return byClass.Id;
+                    }
+                }
+            }
+            catch { }
+
+            // レベルは最頻出（現在値が未設定でも対応）
+            try
+            {
+                var level = new FilteredElementCollector(doc)
+                    .OfClass(typeof(Level))
+                    .FirstOrDefault(e => SafeName(e) == name);
+                if (level != null)
+                    return level.Id;
+            }
+            catch { }
+
+            return ElementId.InvalidElementId;
+        }
+
+        /// <summary>Element.Name は一部要素で例外を投げるため安全に取得する</summary>
+        private static string SafeName(Element e)
+        {
+            try { return e?.Name; }
+            catch { return null; }
         }
 
         /// <summary>

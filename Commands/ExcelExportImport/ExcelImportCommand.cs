@@ -5,6 +5,7 @@ using System.Text;
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using Tools28;
 using Tools28.Commands.ExcelExportImport.Services;
 using Tools28.Commands.ExcelExportImport.Views;
 using Tools28.Localization;
@@ -44,6 +45,11 @@ namespace Tools28.Commands.ExcelExportImport
 
                 if (previewRows != null)
                 {
+                    int changeCount = 0;
+                    foreach (var r in previewRows)
+                        if (r.HasChange && !r.IsReadOnly) changeCount++;
+                    DiagLog.Write($"[ImportCmd] 開始 変更対象={changeCount}件 / プレビュー総数={previewRows.Count}");
+
                     const int maxPasses = 5;
                     for (int pass = 0; pass < maxPasses; pass++)
                     {
@@ -64,10 +70,14 @@ namespace Tools28.Commands.ExcelExportImport
                             {
                                 trans.RollBack();
                                 committed = false;
+                                DiagLog.Write($"[ImportCmd] pass={pass} 変更なし→ロールバック（除外={failingIds.Count}）");
                                 break;
                             }
 
                             var status = trans.Commit(); // ここで失敗プリプロセッサが走る
+                            DiagLog.Write($"[ImportCmd] pass={pass} commit={status} success={importResult.SuccessCount} " +
+                                $"fail={importResult.FailCount} 制約エラー要素={preproc.FailingElementIds.Count} 既除外={failingIds.Count}");
+
                             if (status == TransactionStatus.Committed)
                             {
                                 committed = true;
@@ -79,9 +89,15 @@ namespace Tools28.Commands.ExcelExportImport
                             foreach (var id in preproc.FailingElementIds)
                                 failingIds.Add(id);
                             if (failingIds.Count == before)
+                            {
+                                DiagLog.Write($"[ImportCmd] pass={pass} 除外対象が増えず収束せずに終了");
                                 break; // これ以上除外できる要素が無い（収束せず）
+                            }
                         }
                     }
+
+                    DiagLog.Write($"[ImportCmd] 終了 committed={committed} 成功={importResult.SuccessCount} " +
+                        $"制約スキップ要素={failingIds.Count}");
                 }
 
                 // 制約により反映できなかった（除外した）要素を結果に反映

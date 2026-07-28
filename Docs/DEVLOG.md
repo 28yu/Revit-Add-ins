@@ -1306,3 +1306,24 @@ v2.1.x のパッチではバージョン番号 + 修正点追記がメインな�
 
 ### 単位変換のフォールバック強化（同時対応）
 - Double パラメータ設定を「単位変換 Set →（不可なら）SetValueString →（不可なら）生値 Set」の順に整理。生値 Set（内部単位扱い）を最後の手段に下げ、単位付き数値が誤変換されないようにした。
+
+## ExcelExportImport: ElementId型（部屋の上部レベル等）の名前設定に対応＋インポート診断ログ追加（2026-07-28）
+
+### 症状
+部屋の「上部レベル」をExcelで変更してインポートすると「パラメータ 'I-上部レベル' の値設定に失敗（値: '1FL(2FL)'）」となる。
+
+### 原因
+`ParameterService.SetParameterValue` の `StorageType.ElementId` 処理が「`SetValueString` か 数値ID」のみ対応で、**レベル名（"1FL(2FL)" 等）から Level 要素を検索して設定する処理が無かった**。エクスポートは ElementId 参照を要素名（`AsValueString`）で書き出すため、名前解決が必須。
+
+### 修正
+- `SetParameterValue(param, value, doc)` に `Document` を追加（要素検索に必要）。呼び出し側（`ExcelImportService`）も更新。
+- `SetElementIdParameter`：数値ID → 名前検索 → `SetValueString` の順に解決。
+- `ResolveElementIdByName`：現在値の要素クラス（上部レベルなら `Level`）に絞って名前一致を検索し、無ければ `Level` を検索。`Element.Name` の例外は `SafeName` で吸収。
+- これで「上部レベル＝レベル名」のインポートが反映される（設定後に高さ制約エラーになる部屋は、既存の失敗プリプロセッサでスキップ）。
+
+### 診断ログの追加
+ユーザー環境での原因切り分けのため、`DiagLog`（`C:\temp\Tools28_debug.txt`）へ詳細を出力。
+- `ExcelImportCommand`：変更対象件数、各パスの `commit` 状態・成功/失敗数・制約エラー要素数、最終結果。
+- `ExcelImportService.ImportFromPreview`：各セルの `elem/param/storage/current/new` と設定結果。
+- `ParameterService`：ElementId 名前解決の成否、例外内容。
+- 問題再現時はこのログを送ってもらえば失敗理由（名前不一致・制約エラー等）を特定できる。
