@@ -1417,3 +1417,6 @@ param='I-イメージ' storage=ElementId shared=False readonly=False bip=ALL_MOD
 
 ## ExcelExportImport: 文字設定不可の列はデータ値もグレー文字に（2026-07-28）
 - 灰色ヘッダー（画像参照/要素参照/変更不可）の列について、2行目以降のデータ値の文字色もグレー（150,150,150）にして目立たなくし、編集可能な列と視覚的に区別できるようにした（`ApplyNonEditableColumnStyle`）。分割/統合の両出力に適用。
+
+## ExcelExportImport: ヘッダーのマーカー文字を8ptに（2026-07-28）
+- 灰色ヘッダーのマーカー（`(*変更不可)`/`(*画像参照…)`/`(*要素参照…)`、（）含む）だけをフォントサイズ8にして控えめに。パラメータ名は通常サイズのまま。ClosedXML のリッチテキスト（`GetRichText().AddText(...).SetFontSize(8)`）でセル内の一部だけ小さくした。

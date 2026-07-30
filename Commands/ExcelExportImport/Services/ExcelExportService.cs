@@ -394,15 +394,24 @@ namespace Tools28.Commands.ExcelExportImport.Services
             headerRange.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
             headerRange.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
 
-            // 文字値を入れられない列は灰色＋斜体で強調（書き出した時点で一目で分かる）
+            // 文字値を入れられない列は灰色＋斜体で強調（書き出した時点で一目で分かる）。
+            // マーカー部分（（）含む）だけをフォントサイズ8にして、パラメータ名より控えめにする。
             for (int i = 0; i < headerParams.Count; i++)
             {
-                if (ParameterHeaderMarker.IsNonTextEditable(headerParams[i]))
-                {
-                    var cell = worksheet.Cell(1, i + 3);
-                    cell.Style.Fill.BackgroundColor = XLColor.FromArgb(128, 128, 128);
-                    cell.Style.Font.Italic = true;
-                }
+                var p = headerParams[i];
+                string marker = ParameterHeaderMarker.MarkerFor(p);
+                if (string.IsNullOrEmpty(marker))
+                    continue;
+
+                var cell = worksheet.Cell(1, i + 3);
+                cell.Style.Fill.BackgroundColor = XLColor.FromArgb(128, 128, 128);
+                cell.Style.Font.Italic = true;
+
+                // リッチテキストでパラメータ名は通常サイズ、マーカーのみ 8pt にする
+                var rt = cell.GetRichText();
+                rt.ClearText();
+                rt.AddText(p.DisplayName);
+                rt.AddText(marker).SetFontSize(8);
             }
 
             worksheet.Row(1).Height = 25;
