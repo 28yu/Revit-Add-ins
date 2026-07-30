@@ -144,3 +144,5 @@ ParameterCleanup（パラメータ整理）機能（動作確認完了・改善�
 <!-- rebuild trigger: Excelインポート単位変換・制約エラー対応の再ビルド -->
 
 <!-- rebuild trigger: 書き出し時マーカー/失敗メッセージ改善の再デプロイ -->
+
+<!-- rebuild trigger: 文字設定不可列のグレー化 再デプロイ -->
