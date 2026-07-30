@@ -359,6 +359,7 @@ _buttonTipKeys["FeatureName"] = "Ribbon.FeatureName.Button.Tip";
 | FormworkCalculator（型枠数量算出） | `Commands/FormworkCalculator/` | `Docs/DEVLOG.md#FormworkCalculator` |
 | ParameterCleanup（パラメータ整理/未使用削除） | `Commands/ParameterCleanup/` | `Docs/DEVLOG.md#ParameterCleanup` |
 | LanguageSwitch / Localization（多言語UI） | `Commands/LanguageSwitch/` + `Localization/` | `Docs/DEVLOG.md#LocSystem` |
+| AutoBackup（自動バックアップ/定期ローカル保存・クラウド同期） | `Commands/AutoBackup/` | `Docs/Features/AutoBackup.md` |
 
 ### リボンパネル構成（左から順）
 1. **通り芯・レベル** — 符号表示切替（両方/左/右）
@@ -368,7 +369,7 @@ _buttonTipKeys["FeatureName"] = "Ribbon.FeatureName.Button.Tip";
 5. **構造** — 梁下端色分け、梁天端色分け、耐火被覆色分け、型枠数量算出
 6. **データ** — EXCELエクスポート、EXCELインポート
 7. **パラメータ** — パラメータ整理（同名特定・値の有無確認・未使用削除）
-8. **設定** — 言語切替（JP/US/CN）、バージョン情報、マニュアル
+8. **設定** — 自動バックアップ（定期ローカル保存・ワークシェア/クラウド中央同期）、言語切替（JP/US/CN）、バージョン情報、マニュアル
 
 実装: `Application.cs` の `CreateGridLevelPanel()` 等、パネル別メソッドで構築
 
