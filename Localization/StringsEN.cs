@@ -634,6 +634,11 @@ namespace Tools28.Localization
             { "AutoBackup.Status.Linked", "Skipped because it is a linked model" },
             { "AutoBackup.Status.NotSaved", "Skipped because the model has never been saved" },
             { "AutoBackup.Status.Failed", "Failed: {0}" },
+            { "AutoBackup.SyncWorkshared", "Synchronize workshared models with central (cloud supported)" },
+            { "AutoBackup.SyncWorkshared.Note", "Cloud central models (BIM 360 / ACC) cannot be file-copied, so this synchronizes to central and relies on the cloud version history as the backup." },
+            { "AutoBackup.Sync.Comment", "Synchronized by auto backup" },
+            { "AutoBackup.Status.Synced", "Synchronized with central" },
+            { "AutoBackup.Status.CloudNeedsSync", "This is a cloud model. Please enable \"Synchronize workshared models with central\"." },
         };
     }
 }

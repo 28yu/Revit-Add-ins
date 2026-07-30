@@ -30,6 +30,14 @@ namespace Tools28.Commands.AutoBackup.Models
         /// </summary>
         public bool SaveBeforeBackup { get; set; } = true;
 
+        /// <summary>
+        /// ワークシェアリング（共同作業）モデルの場合、ファイルコピーではなく
+        /// Synchronize with Central（中央モデルへの同期）を実行する。
+        /// クラウド中央モデル（BIM 360 / ACC）はファイルコピーできないため、この方式が必要。
+        /// 同期は重く他メンバーと競合しうるため既定オフ（オプトイン）。
+        /// </summary>
+        public bool SyncWorksharedToCentral { get; set; } = false;
+
         public AutoBackupSettings Clone()
         {
             return new AutoBackupSettings
@@ -40,6 +48,7 @@ namespace Tools28.Commands.AutoBackup.Models
                 BackupFolder = BackupFolder,
                 MaxGenerations = MaxGenerations,
                 SaveBeforeBackup = SaveBeforeBackup,
+                SyncWorksharedToCentral = SyncWorksharedToCentral,
             };
         }
     }

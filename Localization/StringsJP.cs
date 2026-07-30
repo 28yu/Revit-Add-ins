@@ -634,6 +634,11 @@ namespace Tools28.Localization
             { "AutoBackup.Status.Linked", "リンクモデルのため対象外です" },
             { "AutoBackup.Status.NotSaved", "モデルが一度も保存されていないため対象外です" },
             { "AutoBackup.Status.Failed", "失敗: {0}" },
+            { "AutoBackup.SyncWorkshared", "ワークシェアモデルは中央モデルに自動同期する（クラウド対応）" },
+            { "AutoBackup.SyncWorkshared.Note", "クラウド中央モデル（BIM 360 / ACC）はファイルコピーできないため、この方式で同期し、クラウドのバージョン履歴をバックアップとして利用します。" },
+            { "AutoBackup.Sync.Comment", "自動バックアップによる同期" },
+            { "AutoBackup.Status.Synced", "中央モデルに同期しました" },
+            { "AutoBackup.Status.CloudNeedsSync", "クラウドモデルです。「中央モデルに自動同期する」を有効にしてください" },
         };
     }
 }

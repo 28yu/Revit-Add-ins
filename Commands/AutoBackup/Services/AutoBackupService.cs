@@ -147,6 +147,23 @@ namespace Tools28.Commands.AutoBackup.Services
                     return;
                 }
 
+                // ワークシェアモデルで「中央モデルへ自動同期」が有効な場合は、
+                // ファイルコピーではなく Synchronize with Central を実行する。
+                // クラウド中央モデル（BIM 360 / ACC）はファイルコピーできないため、この経路が必須。
+                if (doc.IsWorkshared && _settings.SyncWorksharedToCentral)
+                {
+                    SyncWithCentral(doc);
+                    return;
+                }
+
+                // クラウドモデルはローカルにコピー可能な実ファイルを持たない。
+                // 自動同期が無効のままではバックアップできないため、明示的に案内する。
+                if (doc.IsModelInCloud)
+                {
+                    SetStatus(false, Loc.S("AutoBackup.Status.CloudNeedsSync"), updateTime: false);
+                    return;
+                }
+
                 string sourcePath = doc.PathName;
                 if (string.IsNullOrEmpty(sourcePath) || !File.Exists(sourcePath))
                 {
@@ -185,6 +202,26 @@ namespace Tools28.Commands.AutoBackup.Services
             {
                 lock (_sync) { _isBackingUp = false; }
             }
+        }
+
+        /// <summary>
+        /// ワークシェア中央モデルへ同期する。クラウド中央モデルの場合、
+        /// これにより ACC / BIM 360 側にバージョン履歴（＝バックアップ）が蓄積される。
+        /// 継続作業を妨げないよう権利の返却（Relinquish）は行わない。
+        /// </summary>
+        private void SyncWithCentral(Document doc)
+        {
+            var transactOptions = new TransactWithCentralOptions();
+            var syncOptions = new SynchronizeWithCentralOptions();
+            // 権利を返却しない（ユーザーが編集中の要素の所有権を保持したまま同期）。
+            syncOptions.SetRelinquishOptions(new RelinquishOptions(false));
+            syncOptions.Comment = Loc.S("AutoBackup.Sync.Comment");
+            syncOptions.Compact = false;
+
+            doc.SynchronizeWithCentral(transactOptions, syncOptions);
+
+            SetStatus(true, Loc.S("AutoBackup.Status.Synced"), updateTime: true);
+            DiagLog.Write($"AutoBackup 中央同期 成功: {doc.Title}");
         }
 
         private string ResolveBackupFolder(string sourcePath)

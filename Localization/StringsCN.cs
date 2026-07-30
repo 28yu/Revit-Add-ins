@@ -634,6 +634,11 @@ namespace Tools28.Localization
             { "AutoBackup.Status.Linked", "链接模型，已跳过" },
             { "AutoBackup.Status.NotSaved", "模型从未保存，已跳过" },
             { "AutoBackup.Status.Failed", "失败: {0}" },
+            { "AutoBackup.SyncWorkshared", "工作共享模型自动同步到中心模型（支持云端）" },
+            { "AutoBackup.SyncWorkshared.Note", "云端中心模型（BIM 360 / ACC）无法通过复制文件备份，因此采用同步方式，并以云端的版本历史作为备份。" },
+            { "AutoBackup.Sync.Comment", "自动备份同步" },
+            { "AutoBackup.Status.Synced", "已同步到中心模型" },
+            { "AutoBackup.Status.CloudNeedsSync", "这是云端模型。请启用“自动同步到中心模型”。" },
         };
     }
 }

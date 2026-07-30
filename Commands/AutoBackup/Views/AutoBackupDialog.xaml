@@ -64,6 +64,11 @@
                 <CheckBox x:Name="ChkSaveBeforeBackup" IsChecked="True" Margin="0,6,0,0">
                     <TextBlock x:Name="txtSaveBeforeBackup" Text="未保存の変更も保存してからバックアップする" TextWrapping="Wrap"/>
                 </CheckBox>
+                <CheckBox x:Name="ChkSyncWorkshared" Margin="0,6,0,0">
+                    <TextBlock x:Name="txtSyncWorkshared" Text="ワークシェアモデルは中央モデルに自動同期する（クラウド対応）" TextWrapping="Wrap"/>
+                </CheckBox>
+                <TextBlock x:Name="txtSyncNote" Foreground="#888" FontSize="11" TextWrapping="Wrap" Margin="20,2,0,0"
+                           Text="クラウド中央モデル（BIM 360 / ACC）はファイルコピーできないため、この方式で同期し、クラウドのバージョン履歴をバックアップとして利用します。"/>
             </StackPanel>
         </GroupBox>
 

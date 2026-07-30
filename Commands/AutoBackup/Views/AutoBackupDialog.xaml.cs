@@ -35,6 +35,8 @@ namespace Tools28.Commands.AutoBackup.Views
             grpAdvanced.Header = Loc.S("AutoBackup.Advanced.Header");
             txtGenerations.Text = Loc.S("AutoBackup.Generations");
             txtSaveBeforeBackup.Text = Loc.S("AutoBackup.SaveBeforeBackup");
+            txtSyncWorkshared.Text = Loc.S("AutoBackup.SyncWorkshared");
+            txtSyncNote.Text = Loc.S("AutoBackup.SyncWorkshared.Note");
             BtnBackupNow.Content = Loc.S("AutoBackup.BackupNow");
             BtnOK.Content = Loc.S("Common.OK");
             BtnCancel.Content = Loc.S("Common.Cancel");
@@ -49,6 +51,7 @@ namespace Tools28.Commands.AutoBackup.Views
             TxtFolder.Text = s.BackupFolder ?? string.Empty;
             TxtGenerations.Text = s.MaxGenerations.ToString();
             ChkSaveBeforeBackup.IsChecked = s.SaveBeforeBackup;
+            ChkSyncWorkshared.IsChecked = s.SyncWorksharedToCentral;
         }
 
         /// <summary>UI から設定を構築する。検証エラー時は null を返す。</summary>
@@ -82,6 +85,7 @@ namespace Tools28.Commands.AutoBackup.Views
                 BackupFolder = folder,
                 MaxGenerations = generations,
                 SaveBeforeBackup = ChkSaveBeforeBackup.IsChecked == true,
+                SyncWorksharedToCentral = ChkSyncWorkshared.IsChecked == true,
             };
         }
 
