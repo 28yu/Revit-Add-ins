@@ -132,6 +132,9 @@ namespace Tools28.Commands.ExcelExportImport.Services
 
                 ApplyColumnWidths(worksheet, colWidths);
 
+                // 文字を入れられない列（画像参照/要素参照/変更不可）のデータ値はグレー文字にして目立たなくする
+                ApplyNonEditableColumnStyle(worksheet, categoryParams, row - 1);
+
                 // オートフィルタを設定（全走査を避けるため既知の範囲を直接指定）
                 if (row > 2)
                 {
@@ -238,10 +241,32 @@ namespace Tools28.Commands.ExcelExportImport.Services
 
             ApplyColumnWidths(worksheet, colWidths);
 
+            // 文字を入れられない列（画像参照/要素参照/変更不可）のデータ値はグレー文字にして目立たなくする
+            ApplyNonEditableColumnStyle(worksheet, allParams, row - 1);
+
             // オートフィルタを設定（全走査を避けるため既知の範囲を直接指定）
             if (row > 2)
             {
                 worksheet.Range(1, 1, row - 1, totalCols).SetAutoFilter();
+            }
+        }
+
+        /// <summary>
+        /// 文字を直接入れられない列（画像参照/要素参照/変更不可）のデータ行の文字色を
+        /// グレーにして目立たなくし、編集可能な列と視覚的に区別する。
+        /// </summary>
+        private static void ApplyNonEditableColumnStyle(
+            IXLWorksheet worksheet, List<ParameterInfo> headerParams, int lastRow)
+        {
+            if (lastRow < 2) return; // データ行が無ければ何もしない
+
+            for (int i = 0; i < headerParams.Count; i++)
+            {
+                if (!ParameterHeaderMarker.IsNonTextEditable(headerParams[i]))
+                    continue;
+
+                int col = i + 3; // 1=要素ID, 2=カテゴリ, 3以降=パラメータ
+                worksheet.Range(2, col, lastRow, col).Style.Font.FontColor = XLColor.FromArgb(150, 150, 150);
             }
         }
 
