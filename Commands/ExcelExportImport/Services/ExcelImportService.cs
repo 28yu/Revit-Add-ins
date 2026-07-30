@@ -531,13 +531,11 @@ namespace Tools28.Commands.ExcelExportImport.Services
         }
 
         /// <summary>
-        /// ヘッダー名から(*変更不可)サフィックスを除去
+        /// ヘッダー名から編集可否マーカー（変更不可/画像参照/要素参照）を除去する
         /// </summary>
         private static string StripReadOnlySuffix(string headerName)
         {
-            if (headerName != null && headerName.EndsWith("(*変更不可)"))
-                return headerName.Substring(0, headerName.Length - "(*変更不可)".Length);
-            return headerName;
+            return ParameterHeaderMarker.Strip(headerName);
         }
 
         /// <summary>

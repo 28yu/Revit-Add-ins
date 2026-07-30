@@ -22,6 +22,12 @@ namespace Tools28.Commands.ExcelExportImport.Models
         /// <summary>読み取り専用の場合true</summary>
         public bool IsReadOnly { get; set; }
 
+        /// <summary>要素参照型（StorageType.ElementId）＝文字値ではなく既存要素名が必要</summary>
+        public bool IsElementReference { get; set; }
+
+        /// <summary>画像参照パラメータ（ALL_MODEL_IMAGE 等）＝文字値は設定不可</summary>
+        public bool IsImage { get; set; }
+
         /// <summary>所属カテゴリ名</summary>
         public string CategoryName { get; set; }
 

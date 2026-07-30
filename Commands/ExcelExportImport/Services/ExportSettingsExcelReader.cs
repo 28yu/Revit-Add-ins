@@ -22,8 +22,6 @@ namespace Tools28.Commands.ExcelExportImport.Services
     /// </remarks>
     public static class ExportSettingsExcelReader
     {
-        private const string ReadOnlySuffix = "(*変更不可)";
-
         // ExcelExportService が出力する固定ヘッダー名（1列目・2列目）。
         // 列位置ではなくこの見出しで列を特定するため、列を入れ替えても読める。
         private const string ElementIdHeader = "要素ID";
@@ -171,9 +169,8 @@ namespace Tools28.Commands.ExcelExportImport.Services
         {
             if (string.IsNullOrWhiteSpace(header)) return null;
 
-            string name = header;
-            if (name.EndsWith(ReadOnlySuffix))
-                name = name.Substring(0, name.Length - ReadOnlySuffix.Length);
+            // 編集可否マーカー（変更不可/画像参照/要素参照）を除去
+            string name = ParameterHeaderMarker.Strip(header);
 
             if (name.StartsWith("T-"))
                 return new ParsedHeader { RawName = name.Substring(2), IsType = true };

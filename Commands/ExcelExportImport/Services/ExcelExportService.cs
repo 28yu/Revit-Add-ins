@@ -82,32 +82,8 @@ namespace Tools28.Commands.ExcelExportImport.Services
                 // シート全体のフォントをＭＳ 明朝に設定
                 worksheet.Style.Font.FontName = "ＭＳ 明朝";
 
-                // ヘッダー行を作成
-                worksheet.Cell(1, 1).Value = "要素ID";
-                worksheet.Cell(1, 2).Value = "カテゴリ";
-                for (int i = 0; i < categoryParams.Count; i++)
-                {
-                    var p = categoryParams[i];
-                    string headerName = p.DisplayName;
-                    if (p.IsReadOnly && p.RawName != "タイプ")
-                    {
-                        headerName += "(*変更不可)";
-                    }
-                    worksheet.Cell(1, i + 3).Value = headerName;
-                }
-
-                // ヘッダー行のスタイル設定
-                var headerRange = worksheet.Range(1, 1, 1, categoryParams.Count + 2);
-                headerRange.Style.Fill.BackgroundColor = XLColor.FromArgb(155, 187, 89);
-                headerRange.Style.Font.FontColor = XLColor.White;
-                headerRange.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
-                headerRange.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
-
-                // 1行目の高さを25に設定
-                worksheet.Row(1).Height = 25;
-
-                // ヘッダー行（1行目）を固定してスクロール時も常に表示
-                worksheet.SheetView.FreezeRows(1);
+                // ヘッダー行を作成（文字値を入れられない列はマーカー＋灰色で明示）
+                WriteHeaderRow(worksheet, categoryParams);
 
                 // データ行を作成
                 var elements = RevitCategoryHelper.GetElementsByCategory(
@@ -191,31 +167,8 @@ namespace Tools28.Commands.ExcelExportImport.Services
             var worksheet = workbook.Worksheets.Add("データ");
             worksheet.Style.Font.FontName = "ＭＳ 明朝";
 
-            // ヘッダー行を作成
-            worksheet.Cell(1, 1).Value = "要素ID";
-            worksheet.Cell(1, 2).Value = "カテゴリ";
-            for (int i = 0; i < allParams.Count; i++)
-            {
-                var p = allParams[i];
-                string headerName = p.DisplayName;
-                if (p.IsReadOnly && p.RawName != "タイプ")
-                {
-                    headerName += "(*変更不可)";
-                }
-                worksheet.Cell(1, i + 3).Value = headerName;
-            }
-
-            // ヘッダー行のスタイル設定
-            var headerRange = worksheet.Range(1, 1, 1, allParams.Count + 2);
-            headerRange.Style.Fill.BackgroundColor = XLColor.FromArgb(155, 187, 89);
-            headerRange.Style.Font.FontColor = XLColor.White;
-            headerRange.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
-            headerRange.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
-
-            worksheet.Row(1).Height = 25;
-
-            // ヘッダー行（1行目）を固定してスクロール時も常に表示
-            worksheet.SheetView.FreezeRows(1);
+            // ヘッダー行を作成（文字値を入れられない列はマーカー＋灰色で明示）
+            WriteHeaderRow(worksheet, allParams);
 
             // 列幅計算用（ヘッダー幅で初期化）
             int totalCols = allParams.Count + 2;
@@ -392,6 +345,45 @@ namespace Tools28.Commands.ExcelExportImport.Services
                     width += 1.0;
             }
             return width;
+        }
+
+        /// <summary>
+        /// 1行目のヘッダー（要素ID・カテゴリ・各パラメータ）を書き込み、スタイルを設定する。
+        /// 文字値を直接入れられない列（画像参照/要素参照/変更不可）は、見出しにマーカーを付け、
+        /// さらにセルを灰色にして「ここは文字を入れても取り込めない」と一目で分かるようにする。
+        /// </summary>
+        private static void WriteHeaderRow(IXLWorksheet worksheet, List<ParameterInfo> headerParams)
+        {
+            worksheet.Cell(1, 1).Value = "要素ID";
+            worksheet.Cell(1, 2).Value = "カテゴリ";
+            for (int i = 0; i < headerParams.Count; i++)
+            {
+                var p = headerParams[i];
+                worksheet.Cell(1, i + 3).Value = p.DisplayName + ParameterHeaderMarker.MarkerFor(p);
+            }
+
+            int totalCols = headerParams.Count + 2;
+            var headerRange = worksheet.Range(1, 1, 1, totalCols);
+            headerRange.Style.Fill.BackgroundColor = XLColor.FromArgb(155, 187, 89);
+            headerRange.Style.Font.FontColor = XLColor.White;
+            headerRange.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            headerRange.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+
+            // 文字値を入れられない列は灰色＋斜体で強調（書き出した時点で一目で分かる）
+            for (int i = 0; i < headerParams.Count; i++)
+            {
+                if (ParameterHeaderMarker.IsNonTextEditable(headerParams[i]))
+                {
+                    var cell = worksheet.Cell(1, i + 3);
+                    cell.Style.Fill.BackgroundColor = XLColor.FromArgb(128, 128, 128);
+                    cell.Style.Font.Italic = true;
+                }
+            }
+
+            worksheet.Row(1).Height = 25;
+
+            // ヘッダー行（1行目）を固定してスクロール時も常に表示
+            worksheet.SheetView.FreezeRows(1);
         }
 
         /// <summary>

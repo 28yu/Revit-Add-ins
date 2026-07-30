@@ -94,11 +94,19 @@ namespace Tools28.Commands.ExcelExportImport.Services
                 if (param?.Definition == null || string.IsNullOrEmpty(param.Definition.Name))
                     continue;
 
+                var bip = GetBuiltInParameter(param);
                 bucket.Add(new ParameterInfo(
                     param.Definition.Name,
                     isTypeParameter,
                     param.IsReadOnly,
-                    categoryName));
+                    categoryName)
+                {
+                    // 要素参照型（レベル/材料/タイプ/画像等）＝文字値ではなく既存要素名が必要
+                    IsElementReference = param.StorageType == StorageType.ElementId,
+                    // 画像参照は文字値を一切設定できない（画像ピッカー専用）
+                    IsImage = bip == BuiltInParameter.ALL_MODEL_IMAGE
+                              || bip == BuiltInParameter.ALL_MODEL_TYPE_IMAGE
+                });
             }
         }
 

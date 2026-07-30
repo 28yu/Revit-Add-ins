@@ -201,8 +201,8 @@ namespace Tools28.Commands.ExcelExportImport.Services
 
                             for (int i = 0; i < paramHeaders.Count; i++)
                             {
-                                if (paramHeaders[i] != null && paramHeaders[i].EndsWith("(*変更不可)"))
-                                    paramHeaders[i] = paramHeaders[i].Substring(0, paramHeaders[i].Length - "(*変更不可)".Length);
+                                // 編集可否マーカー（変更不可/画像参照/要素参照）を除去して素の名前に合わせる
+                                paramHeaders[i] = ParameterHeaderMarker.Strip(paramHeaders[i]);
                             }
 
                             // データ行を走査（メモリ上で判定し、色付けが必要な行だけCOM操作）
