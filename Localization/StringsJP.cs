@@ -608,6 +608,32 @@ namespace Tools28.Localization
             { "ParamCleanup.Result.Title", "削除結果" },
             { "ParamCleanup.Result.Msg", "削除: {0} 件 / 失敗: {1} 件" },
             { "ParamCleanup.Result.Error", "削除中にエラーが発生しました：\n{0}" },
+
+            // === AutoBackup（自動バックアップ） ===
+            { "Ribbon.AutoBackup", "自動\nバックアップ" },
+            { "Ribbon.AutoBackup.Tip", "作業中のモデルを一定間隔（既定15分）で自動的にローカルへバックアップします。Revitが空いた瞬間に保存するため作業を中断しません。保存先・間隔・世代数を設定できます。" },
+            { "AutoBackup.Title", "自動バックアップ設定" },
+            { "AutoBackup.Enable", "自動バックアップを有効にする" },
+            { "AutoBackup.Interval.Header", "バックアップ間隔" },
+            { "AutoBackup.Interval.Unit", "分ごと" },
+            { "AutoBackup.Folder.Header", "バックアップ先" },
+            { "AutoBackup.Folder.Model", "モデルと同じ場所（Tools28_Backups フォルダ）" },
+            { "AutoBackup.Folder.Custom", "指定フォルダ" },
+            { "AutoBackup.Advanced.Header", "詳細" },
+            { "AutoBackup.Generations", "保存する世代数" },
+            { "AutoBackup.SaveBeforeBackup", "未保存の変更も保存してからバックアップする" },
+            { "AutoBackup.BackupNow", "今すぐバックアップ" },
+            { "AutoBackup.Last", "最終バックアップ: {0}（{1}）" },
+            { "AutoBackup.Last.Never", "最終バックアップ: まだ実行されていません" },
+            { "AutoBackup.Last.NeverShort", "未実行" },
+            { "AutoBackup.Error.Interval", "バックアップ間隔には1以上の整数（分）を入力してください。" },
+            { "AutoBackup.Error.Generations", "世代数には1以上の整数を入力してください。" },
+            { "AutoBackup.Error.Folder", "バックアップ先フォルダを指定してください。" },
+            { "AutoBackup.Status.Success", "成功" },
+            { "AutoBackup.Status.NoDoc", "対象のドキュメントが開かれていません" },
+            { "AutoBackup.Status.Linked", "リンクモデルのため対象外です" },
+            { "AutoBackup.Status.NotSaved", "モデルが一度も保存されていないため対象外です" },
+            { "AutoBackup.Status.Failed", "失敗: {0}" },
         };
     }
 }

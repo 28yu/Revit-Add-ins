@@ -608,6 +608,32 @@ namespace Tools28.Localization
             { "ParamCleanup.Result.Title", "Deletion Result" },
             { "ParamCleanup.Result.Msg", "Deleted: {0} / Failed: {1}" },
             { "ParamCleanup.Result.Error", "An error occurred during deletion:\n{0}" },
+
+            // === AutoBackup ===
+            { "Ribbon.AutoBackup", "Auto\nBackup" },
+            { "Ribbon.AutoBackup.Tip", "Automatically backs up the current model to a local folder at a fixed interval (15 min by default). It saves when Revit is idle so your work is not interrupted. The location, interval, and number of generations are configurable." },
+            { "AutoBackup.Title", "Auto Backup Settings" },
+            { "AutoBackup.Enable", "Enable auto backup" },
+            { "AutoBackup.Interval.Header", "Backup interval" },
+            { "AutoBackup.Interval.Unit", "minutes" },
+            { "AutoBackup.Folder.Header", "Backup location" },
+            { "AutoBackup.Folder.Model", "Same as model (Tools28_Backups folder)" },
+            { "AutoBackup.Folder.Custom", "Custom folder" },
+            { "AutoBackup.Advanced.Header", "Advanced" },
+            { "AutoBackup.Generations", "Generations to keep" },
+            { "AutoBackup.SaveBeforeBackup", "Save unsaved changes before backing up" },
+            { "AutoBackup.BackupNow", "Back up now" },
+            { "AutoBackup.Last", "Last backup: {0} ({1})" },
+            { "AutoBackup.Last.Never", "Last backup: not run yet" },
+            { "AutoBackup.Last.NeverShort", "not run" },
+            { "AutoBackup.Error.Interval", "Enter an integer of 1 or more (minutes) for the backup interval." },
+            { "AutoBackup.Error.Generations", "Enter an integer of 1 or more for the number of generations." },
+            { "AutoBackup.Error.Folder", "Please specify a backup folder." },
+            { "AutoBackup.Status.Success", "Success" },
+            { "AutoBackup.Status.NoDoc", "No target document is open" },
+            { "AutoBackup.Status.Linked", "Skipped because it is a linked model" },
+            { "AutoBackup.Status.NotSaved", "Skipped because the model has never been saved" },
+            { "AutoBackup.Status.Failed", "Failed: {0}" },
         };
     }
 }

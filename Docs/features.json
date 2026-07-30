@@ -204,6 +204,18 @@
         "en": "Language Switch (JP / US / CN)",
         "zh": "语言切换（JP / US / CN）"
       }
+    },
+    {
+      "id": "AutoBackup",
+      "category": "settings",
+      "icon": "icons/features/auto_backup.png",
+      "manual": "Features/AutoBackup.md",
+      "added_in": "2.4",
+      "names": {
+        "ja": "自動バックアップ（定期ローカル保存）",
+        "en": "Auto Backup (Periodic Local Save)",
+        "zh": "自动备份（定期本地保存）"
+      }
     }
   ]
 }

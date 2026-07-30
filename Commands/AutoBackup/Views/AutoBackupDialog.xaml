@@ -1,0 +1,87 @@
+<Window x:Class="Tools28.Commands.AutoBackup.Views.AutoBackupDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="自動バックアップ設定"
+        SizeToContent="Height"
+        Width="480"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="NoResize">
+    <Grid Margin="15">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="10"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="10"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="10"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="12"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="15"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- 有効化 -->
+        <CheckBox x:Name="ChkEnabled" Grid.Row="0" FontWeight="Bold">
+            <TextBlock x:Name="txtEnabled" Text="自動バックアップを有効にする"/>
+        </CheckBox>
+
+        <!-- 間隔 -->
+        <GroupBox x:Name="grpInterval" Grid.Row="2" Header="バックアップ間隔" Padding="10">
+            <StackPanel Orientation="Horizontal">
+                <TextBox x:Name="TxtInterval" Width="60" Text="15" VerticalContentAlignment="Center"/>
+                <TextBlock x:Name="txtIntervalUnit" Text="分ごと" VerticalAlignment="Center" Margin="8,0,0,0"/>
+            </StackPanel>
+        </GroupBox>
+
+        <!-- 保存先 -->
+        <GroupBox x:Name="grpFolder" Grid.Row="4" Header="バックアップ先" Padding="10">
+            <StackPanel>
+                <RadioButton x:Name="RadioModelFolder" IsChecked="True" Margin="0,3">
+                    <TextBlock x:Name="txtModelFolder" Text="モデルと同じ場所（Tools28_Backups フォルダ）"/>
+                </RadioButton>
+                <RadioButton x:Name="RadioCustomFolder" Margin="0,3">
+                    <TextBlock x:Name="txtCustomFolder" Text="指定フォルダ"/>
+                </RadioButton>
+                <Grid Margin="20,3,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBox x:Name="TxtFolder" Grid.Column="0" VerticalContentAlignment="Center"/>
+                    <Button x:Name="BtnBrowse" Grid.Column="1" Content="..." Width="32" Margin="6,0,0,0" Click="OnBrowse"/>
+                </Grid>
+            </StackPanel>
+        </GroupBox>
+
+        <!-- 詳細 -->
+        <GroupBox x:Name="grpAdvanced" Grid.Row="6" Header="詳細" Padding="10">
+            <StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,3">
+                    <TextBlock x:Name="txtGenerations" Text="保存する世代数" VerticalAlignment="Center"/>
+                    <TextBox x:Name="TxtGenerations" Width="50" Text="10" Margin="8,0,0,0" VerticalContentAlignment="Center"/>
+                </StackPanel>
+                <CheckBox x:Name="ChkSaveBeforeBackup" IsChecked="True" Margin="0,6,0,0">
+                    <TextBlock x:Name="txtSaveBeforeBackup" Text="未保存の変更も保存してからバックアップする" TextWrapping="Wrap"/>
+                </CheckBox>
+            </StackPanel>
+        </GroupBox>
+
+        <!-- 最終バックアップ状態 -->
+        <TextBlock x:Name="txtLastBackup" Grid.Row="8" Foreground="#555" TextWrapping="Wrap"
+                   Text="最終バックアップ: まだ実行されていません"/>
+
+        <!-- ボタン -->
+        <Grid Grid.Row="10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <Button x:Name="BtnBackupNow" Grid.Column="0" Content="今すぐバックアップ" Padding="12,4" Click="OnBackupNow"/>
+            <Button x:Name="BtnOK" Grid.Column="2" Content="OK" Width="90" Margin="0,0,8,0" IsDefault="True" Click="OnOK"/>
+            <Button x:Name="BtnCancel" Grid.Column="3" Content="キャンセル" Width="90" IsCancel="True"/>
+        </Grid>
+    </Grid>
+</Window>

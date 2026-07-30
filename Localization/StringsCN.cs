@@ -608,6 +608,32 @@ namespace Tools28.Localization
             { "ParamCleanup.Result.Title", "删除结果" },
             { "ParamCleanup.Result.Msg", "已删除: {0} 项 / 失败: {1} 项" },
             { "ParamCleanup.Result.Error", "删除时发生错误：\n{0}" },
+
+            // === AutoBackup（自动备份） ===
+            { "Ribbon.AutoBackup", "自动\n备份" },
+            { "Ribbon.AutoBackup.Tip", "按固定间隔（默认15分钟）自动将当前模型备份到本地文件夹。在Revit空闲时保存，不会中断您的操作。可设置保存位置、间隔和保留代数。" },
+            { "AutoBackup.Title", "自动备份设置" },
+            { "AutoBackup.Enable", "启用自动备份" },
+            { "AutoBackup.Interval.Header", "备份间隔" },
+            { "AutoBackup.Interval.Unit", "分钟" },
+            { "AutoBackup.Folder.Header", "备份位置" },
+            { "AutoBackup.Folder.Model", "与模型相同位置（Tools28_Backups 文件夹）" },
+            { "AutoBackup.Folder.Custom", "指定文件夹" },
+            { "AutoBackup.Advanced.Header", "高级" },
+            { "AutoBackup.Generations", "保留代数" },
+            { "AutoBackup.SaveBeforeBackup", "备份前先保存未保存的更改" },
+            { "AutoBackup.BackupNow", "立即备份" },
+            { "AutoBackup.Last", "最近备份: {0}（{1}）" },
+            { "AutoBackup.Last.Never", "最近备份: 尚未执行" },
+            { "AutoBackup.Last.NeverShort", "未执行" },
+            { "AutoBackup.Error.Interval", "备份间隔请输入1以上的整数（分钟）。" },
+            { "AutoBackup.Error.Generations", "保留代数请输入1以上的整数。" },
+            { "AutoBackup.Error.Folder", "请指定备份文件夹。" },
+            { "AutoBackup.Status.Success", "成功" },
+            { "AutoBackup.Status.NoDoc", "未打开目标文档" },
+            { "AutoBackup.Status.Linked", "链接模型，已跳过" },
+            { "AutoBackup.Status.NotSaved", "模型从未保存，已跳过" },
+            { "AutoBackup.Status.Failed", "失败: {0}" },
         };
     }
 }

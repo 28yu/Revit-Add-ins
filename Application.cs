@@ -47,6 +47,7 @@ namespace Tools28
             { "ExcelExport", "Ribbon.Excel.Export" },
             { "ExcelImport", "Ribbon.Excel.Import" },
             { "ParameterCleanup", "Ribbon.ParamCleanup" },
+            { "AutoBackup", "Ribbon.AutoBackup" },
             { "About", "Ribbon.Settings.About" },
             { "Manual", "Ribbon.Settings.Manual" },
         };
@@ -76,6 +77,7 @@ namespace Tools28
             { "ExcelExport", "Ribbon.Excel.Export.Tip" },
             { "ExcelImport", "Ribbon.Excel.Import.Tip" },
             { "ParameterCleanup", "Ribbon.ParamCleanup.Tip" },
+            { "AutoBackup", "Ribbon.AutoBackup.Tip" },
             { "About", "Ribbon.Settings.About.Tip" },
             { "Manual", "Ribbon.Settings.Manual.Tip" },
         };
@@ -138,6 +140,8 @@ namespace Tools28
 
                 Loc.LanguageChanged += UpdateRibbonLanguage;
                 UpdateRibbonLanguage();
+
+                Tools28.Commands.AutoBackup.Services.AutoBackupService.Instance.Initialize();
                 Log("OnStartup 完了");
 
                 if (ExpiryManager.ShouldShowWarning)
@@ -161,6 +165,7 @@ namespace Tools28
 
         public Result OnShutdown(UIControlledApplication application)
         {
+            Tools28.Commands.AutoBackup.Services.AutoBackupService.Instance.Shutdown();
             Loc.LanguageChanged -= UpdateRibbonLanguage;
             AppDomain.CurrentDomain.AssemblyResolve -= OnAssemblyResolve;
             return Result.Succeeded;
@@ -454,6 +459,12 @@ namespace Tools28
         {
             RibbonPanel panel = application.CreateRibbonPanel(tabName, Loc.S("Ribbon.Panel.Settings"));
             _panels.Add(panel);
+
+            var backupData = new PushButtonData("AutoBackup", Loc.S("Ribbon.AutoBackup"), assemblyPath, "Tools28.Commands.AutoBackup.AutoBackupCommand");
+            backupData.ToolTip = Loc.S("Ribbon.AutoBackup.Tip");
+            backupData.Image = LoadImage("auto_backup_16.png");
+            backupData.LargeImage = LoadImage("auto_backup.png");
+            AddButton(panel, backupData);
 
             string currentLang = Loc.CurrentLang;
             string flagIcon = $"flag_{currentLang.ToLower()}_16.png";
