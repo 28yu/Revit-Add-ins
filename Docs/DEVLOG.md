@@ -1367,3 +1367,20 @@ v2.1.x のパッチではバージョン番号 + 修正点追記がメインな�
 ### 内容
 - `ImportFromPreview` の診断ログに **StorageType / IsShared / IsReadOnly / BuiltInParameter / 現在値 / 新値** を追加（`C:\temp\Tools28_debug.txt`）。これで失敗パラメータの正体（組込みか共有か、ElementId/String 等）を確定できる。
 - `Send-Tools28Log.ps1` を追加。`C:\temp\Tools28_debug.txt` を `.diag\` にコピーして git push し、Claude が実ログを直接読めるようにする（Formwork の仕組みに倣う）。
+
+## ExcelExportImport: 「イメージ」(ALL_MODEL_IMAGE) 等 ElementId参照の名前解決を拡張（2026-07-28）
+
+### 根拠（実ログ C:\temp\Tools28_debug.txt）
+```
+param='I-イメージ' storage=ElementId shared=False readonly=False bip=ALL_MODEL_IMAGE current='' new='仕上表非表示'
+[SetParam] ElementId 名前解決失敗 '仕上表非表示'（該当要素が見つからない）
+```
+→ `I-イメージ` は組込み `ALL_MODEL_IMAGE`（ラスター画像 `ImageType` への参照）。前回の名前解決は `Level` しか探しておらず、画像名 `仕上表非表示` に対応する `ImageType` を引き当てられず失敗していた（憶測ではなくログで確定）。
+
+### 修正
+- `ResolveElementIdByName` を対象クラス優先リスト方式に拡張:
+  1. 現在値の要素クラス（値の入れ替えで最も確実）
+  2. パラメータ種別からの推定：`ALL_MODEL_IMAGE`/`ALL_MODEL_TYPE_IMAGE` → `ImageType`
+  3. 汎用頻出クラス：`Level` / `Material`
+- `GetBuiltInParameter`（`InternalDefinition.BuiltInParameter`）で画像パラメータを判定。
+- これで「イメージ＝画像名」のインポートが、該当 `ImageType` が存在すれば反映される。存在しない場合は従来どおり失敗として報告（＝データ側の問題を切り分けられる）。

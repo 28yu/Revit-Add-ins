@@ -231,15 +231,18 @@ namespace Tools28.Commands.ExcelExportImport.Services
         }
 
         /// <summary>
-        /// 名前から要素の ElementId を検索する。まず現在値の要素と同じクラスに絞り込み、
-        /// 見つからなければ Level（部屋の上部/下部レベルで最頻出）を探す。
+        /// 名前から要素の ElementId を検索する。対象クラスを優先順に試す:
+        /// 現在値の要素クラス → パラメータ種別から推定（イメージ=ImageType 等）→ Level/Material。
+        /// エクスポートは ElementId 参照を要素名で書き出すため、その名前から実要素を引き当てる。
         /// </summary>
         private static ElementId ResolveElementIdByName(Parameter param, string name, Document doc)
         {
             if (doc == null || string.IsNullOrEmpty(name))
                 return ElementId.InvalidElementId;
 
-            // 現在値の要素クラスに絞って名前一致を探す（上部レベルなら Level クラス）
+            var candidateClasses = new List<Type>();
+
+            // 1) 現在値の要素と同じクラス（値の入れ替えで最も確実）
             try
             {
                 var currentId = param.AsElementId();
@@ -247,29 +250,46 @@ namespace Tools28.Commands.ExcelExportImport.Services
                 {
                     var cur = doc.GetElement(currentId);
                     if (cur != null)
-                    {
-                        var byClass = new FilteredElementCollector(doc)
-                            .OfClass(cur.GetType())
-                            .FirstOrDefault(e => SafeName(e) == name);
-                        if (byClass != null)
-                            return byClass.Id;
-                    }
+                        candidateClasses.Add(cur.GetType());
                 }
             }
             catch { }
 
-            // レベルは最頻出（現在値が未設定でも対応）
-            try
+            // 2) パラメータ種別から対象クラスを推定
+            var bip = GetBuiltInParameter(param);
+            if (bip == BuiltInParameter.ALL_MODEL_IMAGE || bip == BuiltInParameter.ALL_MODEL_TYPE_IMAGE)
+                candidateClasses.Add(typeof(ImageType)); // 「イメージ」= ラスター画像への参照
+
+            // 3) 汎用の頻出クラス（現在値が未設定でも対応）
+            candidateClasses.Add(typeof(Level));
+            candidateClasses.Add(typeof(Material));
+
+            foreach (var cls in candidateClasses.Distinct())
             {
-                var level = new FilteredElementCollector(doc)
-                    .OfClass(typeof(Level))
-                    .FirstOrDefault(e => SafeName(e) == name);
-                if (level != null)
-                    return level.Id;
+                try
+                {
+                    var hit = new FilteredElementCollector(doc)
+                        .OfClass(cls)
+                        .FirstOrDefault(e => SafeName(e) == name);
+                    if (hit != null)
+                        return hit.Id;
+                }
+                catch { }
             }
-            catch { }
 
             return ElementId.InvalidElementId;
+        }
+
+        /// <summary>パラメータの BuiltInParameter を安全に取得（共有/カスタムは INVALID）</summary>
+        private static BuiltInParameter GetBuiltInParameter(Parameter param)
+        {
+            try
+            {
+                if (param?.Definition is InternalDefinition intDef)
+                    return intDef.BuiltInParameter;
+            }
+            catch { }
+            return BuiltInParameter.INVALID;
         }
 
         /// <summary>Element.Name は一部要素で例外を投げるため安全に取得する</summary>
