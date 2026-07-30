@@ -1358,3 +1358,12 @@ v2.1.x のパッチではバージョン番号 + 修正点追記がメインな�
 - `WorksetId.IntegerValue` は 2026 でも維持されている（`ElementId.IntegerValue` のみが `Value` に変更）ため、`ELEM_PARTITION_PARAM.Set(worksetId.IntegerValue)` はバージョン分岐不要。
 
 - 2026-07-28: Room3DColor を Revit 2022 / 2024 でオートビルド確認（DisplayStyle / ClosedShell のAPI名修正後）。
+
+## ExcelExportImport: インポート診断ログの強化＋ログ送信スクリプト追加（2026-07-28）
+
+### 目的
+`I-イメージ`（値 '仕上表非表示'）のインポート失敗など、原因を憶測でなく実ログで特定するため。
+
+### 内容
+- `ImportFromPreview` の診断ログに **StorageType / IsShared / IsReadOnly / BuiltInParameter / 現在値 / 新値** を追加（`C:\temp\Tools28_debug.txt`）。これで失敗パラメータの正体（組込みか共有か、ElementId/String 等）を確定できる。
+- `Send-Tools28Log.ps1` を追加。`C:\temp\Tools28_debug.txt` を `.diag\` にコピーして git push し、Claude が実ログを直接読めるようにする（Formwork の仕組みに倣う）。

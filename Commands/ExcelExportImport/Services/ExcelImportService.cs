@@ -407,7 +407,11 @@ namespace Tools28.Commands.ExcelExportImport.Services
                     continue;
                 }
 
+                string bip = "";
+                try { bip = param.Definition is InternalDefinition intDef ? intDef.BuiltInParameter.ToString() : "(shared/custom)"; }
+                catch { }
                 DiagLog.Write($"[Import] elem={pr.ElementId} param='{headerName}' storage={param.StorageType} " +
+                    $"shared={param.IsShared} readonly={param.IsReadOnly} bip={bip} " +
                     $"isType={ParameterService.IsTypeChangeParameter(param)} current='{currentValue}' new='{pr.NewValue}'");
 
                 bool success = ParameterService.IsTypeChangeParameter(param)
