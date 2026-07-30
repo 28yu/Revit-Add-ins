@@ -638,6 +638,7 @@ namespace Tools28.Localization
             { "AutoBackup.SyncWorkshared.Note", "Cloud central models (BIM 360 / ACC) cannot be file-copied, so this synchronizes to central and relies on the cloud version history as the backup." },
             { "AutoBackup.Sync.Comment", "Synchronized by auto backup" },
             { "AutoBackup.Status.Synced", "Synchronized with central" },
+            { "AutoBackup.Status.SyncSkipped", "Sync skipped (central is locked or temporarily unavailable)" },
             { "AutoBackup.Status.CloudNeedsSync", "This is a cloud model. Please enable \"Synchronize workshared models with central\"." },
         };
     }

@@ -4,6 +4,7 @@ using System.Linq;
 using System.Timers;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using Autodesk.Revit.UI.Events;
 using Tools28.Commands.AutoBackup.Models;
 using Tools28.Localization;
 
@@ -28,6 +29,10 @@ namespace Tools28.Commands.AutoBackup.Services
         private bool _isBackingUp;
         private readonly object _sync = new object();
 
+        private UIControlledApplication _uiCtrlApp;
+        // 中央同期の実行中だけ true。この間に出るクリック要求ダイアログを自動処理する。
+        private volatile bool _isSyncing;
+
         private AutoBackupSettings _settings = new AutoBackupSettings();
 
         /// <summary>最終バックアップ日時（未実行なら null）。</summary>
@@ -44,14 +49,24 @@ namespace Tools28.Commands.AutoBackup.Services
         /// OnStartup から呼ぶ。ExternalEvent を生成（メインスレッド必須）し、設定を読み込んで
         /// 有効ならタイマーを開始する。
         /// </summary>
-        public void Initialize()
+        public void Initialize(UIControlledApplication uiCtrlApp)
         {
             try
             {
+                _uiCtrlApp = uiCtrlApp;
                 _externalEvent = ExternalEvent.Create(new BackupExternalEventHandler());
                 _settings = AutoBackupSettingsService.Load();
                 _timer = new Timer { AutoReset = true };
                 _timer.Elapsed += OnTimerElapsed;
+
+                if (_uiCtrlApp != null)
+                {
+                    // 同期中に出るダイアログを自動処理して手を止めさせないため監視する。
+                    _uiCtrlApp.DialogBoxShowing += OnDialogBoxShowing;
+                    // モデルを開いた直後にバックアップが走らないよう、カウントをリセットする。
+                    _uiCtrlApp.ControlledApplication.DocumentOpened += OnDocumentOpened;
+                }
+
                 ApplyTimerState();
                 DiagLog.Write($"AutoBackup 初期化完了 (有効={_settings.Enabled}, 間隔={_settings.IntervalMinutes}分)");
             }
@@ -66,11 +81,42 @@ namespace Tools28.Commands.AutoBackup.Services
         {
             try
             {
+                if (_uiCtrlApp != null)
+                {
+                    try { _uiCtrlApp.DialogBoxShowing -= OnDialogBoxShowing; } catch { }
+                    try { _uiCtrlApp.ControlledApplication.DocumentOpened -= OnDocumentOpened; } catch { }
+                    _uiCtrlApp = null;
+                }
                 _timer?.Stop();
                 _timer?.Dispose();
                 _timer = null;
                 _externalEvent?.Dispose();
                 _externalEvent = null;
+            }
+            catch { }
+        }
+
+        /// <summary>
+        /// モデルを開いた直後にバックアップ/同期が走らないよう、間隔カウントをリセットする。
+        /// これにより「開いた瞬間に同期が始まる」現象を防ぎ、開いてから1間隔ぶんは作業に集中できる。
+        /// </summary>
+        private void OnDocumentOpened(object sender, Autodesk.Revit.DB.Events.DocumentOpenedEventArgs e)
+        {
+            try { ApplyTimerState(); } catch { }
+        }
+
+        /// <summary>
+        /// 中央同期の実行中に出るクリック要求ダイアログを自動的に処理（既定=継続）して、
+        /// ユーザーの応答待ちで固まらないようにする。同期中以外は何もしない。
+        /// ※ 同期の進捗バー自体はダイアログではないため抑制できず、その間は編集不可（Revit 仕様）。
+        /// </summary>
+        private void OnDialogBoxShowing(object sender, DialogBoxShowingEventArgs e)
+        {
+            if (!_isSyncing) return;
+            try
+            {
+                DiagLog.Write($"AutoBackup 同期中ダイアログを自動処理: {e.DialogId}");
+                e.OverrideResult((int)TaskDialogResult.Ok);
             }
             catch { }
         }
@@ -201,6 +247,8 @@ namespace Tools28.Commands.AutoBackup.Services
             finally
             {
                 lock (_sync) { _isBackingUp = false; }
+                // 次回は「今回の完了時点」から1間隔ぶん空ける（連続発火を防ぐ）。
+                try { ApplyTimerState(); } catch { }
             }
         }
 
@@ -212,16 +260,43 @@ namespace Tools28.Commands.AutoBackup.Services
         private void SyncWithCentral(Document doc)
         {
             var transactOptions = new TransactWithCentralOptions();
+            // 中央がロック中（他ユーザーが同期中など）の場合は待たずにスキップし、
+            // 待機ダイアログで手が止まらないようにする。
+            transactOptions.SetLockCallback(new SkipIfLockedCallback());
+
             var syncOptions = new SynchronizeWithCentralOptions();
             // 権利を返却しない（ユーザーが編集中の要素の所有権を保持したまま同期）。
             syncOptions.SetRelinquishOptions(new RelinquishOptions(false));
             syncOptions.Comment = Loc.S("AutoBackup.Sync.Comment");
             syncOptions.Compact = false;
 
-            doc.SynchronizeWithCentral(transactOptions, syncOptions);
+            _isSyncing = true;
+            try
+            {
+                doc.SynchronizeWithCentral(transactOptions, syncOptions);
+                SetStatus(true, Loc.S("AutoBackup.Status.Synced"), updateTime: true);
+                DiagLog.Write($"AutoBackup 中央同期 成功: {doc.Title}");
+            }
+            catch (Exception ex)
+            {
+                // ロック未取得や一時的な状態は「失敗」ではなくスキップ扱いにして次回に委ねる。
+                // （自動バックアップが赤いエラーを出し続けないようにするため）
+                SetStatus(false, Loc.S("AutoBackup.Status.SyncSkipped"), updateTime: false);
+                DiagLog.Write($"AutoBackup 中央同期 スキップ/失敗: {ex.Message}");
+            }
+            finally
+            {
+                _isSyncing = false;
+            }
+        }
 
-            SetStatus(true, Loc.S("AutoBackup.Status.Synced"), updateTime: true);
-            DiagLog.Write($"AutoBackup 中央同期 成功: {doc.Title}");
+        /// <summary>
+        /// 中央モデルがロックされている場合、待たずに即スキップさせるコールバック。
+        /// これにより他メンバーの同期中でも待機ダイアログで固まらない。
+        /// </summary>
+        private sealed class SkipIfLockedCallback : ICentralLockedCallback
+        {
+            public bool ShouldWaitForLockAvailability() => false;
         }
 
         private string ResolveBackupFolder(string sourcePath)

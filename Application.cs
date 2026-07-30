@@ -141,7 +141,7 @@ namespace Tools28
                 Loc.LanguageChanged += UpdateRibbonLanguage;
                 UpdateRibbonLanguage();
 
-                Tools28.Commands.AutoBackup.Services.AutoBackupService.Instance.Initialize();
+                Tools28.Commands.AutoBackup.Services.AutoBackupService.Instance.Initialize(application);
                 Log("OnStartup 完了");
 
                 if (ExpiryManager.ShouldShowWarning)

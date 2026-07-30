@@ -638,6 +638,7 @@ namespace Tools28.Localization
             { "AutoBackup.SyncWorkshared.Note", "クラウド中央モデル（BIM 360 / ACC）はファイルコピーできないため、この方式で同期し、クラウドのバージョン履歴をバックアップとして利用します。" },
             { "AutoBackup.Sync.Comment", "自動バックアップによる同期" },
             { "AutoBackup.Status.Synced", "中央モデルに同期しました" },
+            { "AutoBackup.Status.SyncSkipped", "同期をスキップしました（中央がロック中、または一時的な状態）" },
             { "AutoBackup.Status.CloudNeedsSync", "クラウドモデルです。「中央モデルに自動同期する」を有効にしてください" },
         };
     }
