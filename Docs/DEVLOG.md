@@ -1384,3 +1384,15 @@ param='I-イメージ' storage=ElementId shared=False readonly=False bip=ALL_MOD
   3. 汎用頻出クラス：`Level` / `Material`
 - `GetBuiltInParameter`（`InternalDefinition.BuiltInParameter`）で画像パラメータを判定。
 - これで「イメージ＝画像名」のインポートが、該当 `ImageType` が存在すれば反映される。存在しない場合は従来どおり失敗として報告（＝データ側の問題を切り分けられる）。
+
+## ExcelExportImport: 要素参照型（イメージ等）の失敗メッセージを明確化（2026-07-28）
+
+### 背景
+`イメージ`（`ALL_MODEL_IMAGE`）は**画像参照（ElementId型）**で、文字値は設定できない（Revitの仕様。UIでも画像ピッカーのみ）。ユーザーが文字 '仕上非表示' を入れようとして「値設定に失敗」とだけ出て理由が分かりづらかった。
+
+### 修正
+- `BuildSetFailureMessage` を追加し、失敗理由を型に応じて明示:
+  - 画像参照（`ALL_MODEL_IMAGE`/`ALL_MODEL_TYPE_IMAGE`）→「画像参照型のため文字値は設定できません。その名前の画像が必要です」
+  - その他 ElementId 参照 →「要素参照型のため文字値は設定できません。その名前の要素が見つかりません」
+  - それ以外 → 従来メッセージ
+- 文字フラグを持たせたい場合はテキスト型の共有/プロジェクトパラメータを使う、という運用切り分けが可能に。

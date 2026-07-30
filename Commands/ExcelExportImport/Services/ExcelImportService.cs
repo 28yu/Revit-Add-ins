@@ -428,9 +428,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
                 {
                     result.FailCount++;
                     result.FailedCells.Add(pr.ElementId.ToString() + "|" + headerName);
-                    result.Errors.Add(ParameterService.IsTypeChangeParameter(param)
-                        ? $"タイプ変更に失敗（要素 {pr.ElementId}, 値: '{pr.NewValue}'）— 一致するタイプが見つかりません"
-                        : $"パラメータ '{headerName}' の値設定に失敗（要素 {pr.ElementId}, 値: '{pr.NewValue}'）");
+                    result.Errors.Add(BuildSetFailureMessage(param, headerName, pr.ElementId, pr.NewValue));
                 }
             }
 
@@ -499,6 +497,37 @@ namespace Tools28.Commands.ExcelExportImport.Services
 #else
             return id.IntValue();
 #endif
+        }
+
+        /// <summary>
+        /// 値設定に失敗した理由を、パラメータ型に応じて分かりやすいメッセージにする。
+        /// 特に ElementId（要素参照）型は文字値を直接設定できないことを明示する。
+        /// </summary>
+        private static string BuildSetFailureMessage(Parameter param, string headerName, int elementId, string value)
+        {
+            if (ParameterService.IsTypeChangeParameter(param))
+                return $"タイプ変更に失敗（要素 {elementId}, 値: '{value}'）— 一致するタイプが見つかりません";
+
+            if (param.StorageType == StorageType.ElementId)
+            {
+                bool isImage = false;
+                try
+                {
+                    isImage = param.Definition is InternalDefinition idf
+                        && (idf.BuiltInParameter == BuiltInParameter.ALL_MODEL_IMAGE
+                            || idf.BuiltInParameter == BuiltInParameter.ALL_MODEL_TYPE_IMAGE);
+                }
+                catch { }
+
+                if (isImage)
+                    return $"パラメータ '{headerName}' は画像参照（イメージ）型のため文字値 '{value}' は設定できません" +
+                           $"（要素 {elementId}）。設定するにはその名前の画像がプロジェクトに存在する必要があります。";
+
+                return $"パラメータ '{headerName}' は要素参照型のため文字値 '{value}' は設定できません" +
+                       $"（要素 {elementId}）。'{value}' という名前の要素が見つかりません。";
+            }
+
+            return $"パラメータ '{headerName}' の値設定に失敗（要素 {elementId}, 値: '{value}'）";
         }
 
         /// <summary>
