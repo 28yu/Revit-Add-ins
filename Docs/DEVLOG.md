@@ -1420,3 +1420,25 @@ param='I-イメージ' storage=ElementId shared=False readonly=False bip=ALL_MOD
 
 ## ExcelExportImport: ヘッダーのマーカー文字を8ptに（2026-07-28）
 - 灰色ヘッダーのマーカー（`(*変更不可)`/`(*画像参照…)`/`(*要素参照…)`、（）含む）だけをフォントサイズ8にして控えめに。パラメータ名は通常サイズのまま。ClosedXML のリッチテキスト（`GetRichText().AddText(...).SetFontSize(8)`）でセル内の一部だけ小さくした。
+
+## ExcelExportImport: 同名パラメータ（例: エリアの「用途」×2）が1つしか出ない不具合を修正（2026-08-03）
+
+### 症状
+カテゴリ「エリア」には同名の「用途」パラメータが2つ存在するのに、エクスポートダイアログのパラメータ欄には「用途」が1つしか表示されなかった。
+
+### 原因
+パラメータを **名前だけをキーにして重複排除** していた（実体が別物でも名前が同じだと片方が捨てられていた）。名前ベースの排除が2箇所に存在:
+1. 収集: `ParameterService.GetParametersForCategory` の `HashSet<ParameterInfo>`。`ParameterInfo.Equals/GetHashCode` が `DisplayName`(=I-/T-＋名前)＋`CategoryName` ベース → 同名の2つが同一視され2つ目が破棄。
+2. 表示: `ExportDialog.GetBaseParameters` の `GroupBy(DisplayName + "|" + CategoryName)`。
+   さらに書き出し(`ExcelExportService.ExportSingleSheet`)・設定復元・Excel設定読込・インポート照合(`LookupParameter` は最初の1件のみ)まで、全体が名前を識別子にしていた。
+
+### 対応（A案: 安定した識別子で一貫して区別）
+- `ParameterInfo` に **`ParamId`（Parameter.Id を long 化した安定 ID）** と **`Kind`（組み込み/共有/プロジェクト）** を追加。等価判定を `ParamId`＋種別(I-/T-)＋カテゴリに変更 → 同名でも別物なら両方残る。
+- 同カテゴリ・同名グループには **曖昧性解消接尾辞** を付与（`ParameterKindHelper.BuildSuffix`）。例: `I-用途【組み込み】` / `I-用途【共有】`。同一種別で複数ある場合は ParamId 昇順で `#連番`。`DisplayName` は `Prefix + RawName + DisambigSuffix` の算出プロパティにし、ダイアログ表示・Excelヘッダー・重複排除の単一情報源に統一。
+- **エクスポート**は `ParamId` で該当パラメータを厳密解決（`ParameterService.FindByIdentity`）。タイプ値キャッシュキーにも `ParamId` を追加。
+- **インポート**は Excel に残るヘッダー文字列から種別・連番を解析（`ParameterService.ParseDisplayName` → `ParameterKindHelper.TryExtractSuffix`）し、種別で候補を絞って解決（`FindParameter` の種別対応オーバーロード）。接尾辞が無い通常列は従来どおり `LookupParameter`（＝旧 Excel と後方互換）。
+- **種別ラベルは言語非依存で往復**: 表示は `Loc.S("Export.ParamKind.*")`（JP=組み込み/共有/プロジェクト、EN=Built-in/Shared/Project、CN=内置/共享/项目）。`ParameterKindHelper` は全言語の逆引き表を持ち、書き出し言語と取り込み言語が違っても解析可能。
+- **設定保存/復元**: `ExportParameterEntry` に `DisplayName` を追加し、復元は DisplayName 一致を優先（旧設定＝DisplayName 無しは RawName にフォールバック）。Excel設定読込(`ExportSettingsExcelReader`)も DisplayName で重複排除。
+
+### 効果
+同名パラメータが全て列挙・書き出し・取り込みでき、値が一方に偏る不整合が解消。接尾辞は重複時のみ付くため、重複が無い通常パラメータのヘッダー／既存 Excel との互換は維持。

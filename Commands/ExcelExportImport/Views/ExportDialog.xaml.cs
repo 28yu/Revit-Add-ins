@@ -582,24 +582,38 @@ namespace Tools28.Commands.ExcelExportImport.Views
             // パラメータ一覧を更新（Revitからのパラメータ取得はここで1回だけ実行）
             UpdateParameterList();
 
-            // 出力パラメータの照合用に辞書を構築（線形探索の繰り返しを回避）
-            var paramLookup = new Dictionary<string, ParameterInfo>();
+            // 出力パラメータの照合用に辞書を構築（線形探索の繰り返しを回避）。
+            // 同名パラメータ（例: エリアの「用途」×2）を区別するため、まず DisplayName で照合し、
+            // 旧設定ファイル（DisplayName 無し）は RawName で照合する。
+            var byDisplay = new Dictionary<string, ParameterInfo>();
+            var byRaw = new Dictionary<string, ParameterInfo>();
             foreach (var p in _allParameters)
             {
-                string key = p.RawName + "|" + p.IsTypeParameter + "|" + p.CategoryName;
-                if (!paramLookup.ContainsKey(key))
-                    paramLookup[key] = p;
+                string dk = p.DisplayName + "|" + p.CategoryName;
+                if (!byDisplay.ContainsKey(dk))
+                    byDisplay[dk] = p;
+                string rk = p.RawName + "|" + p.IsTypeParameter + "|" + p.CategoryName;
+                if (!byRaw.ContainsKey(rk))
+                    byRaw[rk] = p;
             }
 
             // 出力パラメータを復元
             _outputParameters.Clear();
             foreach (var entry in settings.OutputParameters)
             {
-                string key = entry.RawName + "|" + entry.IsTypeParameter + "|" + entry.CategoryName;
-                if (paramLookup.TryGetValue(key, out var match))
+                ParameterInfo match = null;
+                if (!string.IsNullOrEmpty(entry.DisplayName)
+                    && byDisplay.TryGetValue(entry.DisplayName + "|" + entry.CategoryName, out var m1))
                 {
-                    _outputParameters.Add(match);
+                    match = m1;
                 }
+                else if (byRaw.TryGetValue(entry.RawName + "|" + entry.IsTypeParameter + "|" + entry.CategoryName, out var m2))
+                {
+                    match = m2;
+                }
+
+                if (match != null && !_outputParameters.Contains(match))
+                    _outputParameters.Add(match);
             }
 
             RefreshOutputList();

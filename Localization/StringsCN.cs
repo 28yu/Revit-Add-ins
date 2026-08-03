@@ -356,6 +356,10 @@ namespace Tools28.Localization
             { "Export.SelectParams", "请选择要输出的参数。" },
             { "Export.SelectCategory", "请选择类别。" },
             { "Export.ParamPrefixLegend", "I- : 实例（图元）参数\nT- : 类型参数" },
+            // 用于区分同名参数的种别标签（也会写入 Excel 表头；修改翻译时请同步更新 ParameterKindHelper 的反查表）
+            { "Export.ParamKind.BuiltIn", "内置" },
+            { "Export.ParamKind.Shared", "共享" },
+            { "Export.ParamKind.Project", "项目" },
             { "Common.SelectAll", "全选" },
             { "Common.SelectNone", "取消选择" },
             { "Export.ClearOutput", "清空" },

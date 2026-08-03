@@ -356,6 +356,10 @@ namespace Tools28.Localization
             { "Export.SelectParams", "出力するパラメータを選択してください。" },
             { "Export.SelectCategory", "カテゴリを選択してください。" },
             { "Export.ParamPrefixLegend", "I- : インスタンス（要素）パラメータ\nT- : タイプパラメータ" },
+            // 同名パラメータ区別用の種別ラベル（Excelヘッダーにも使用。翻訳変更時は ParameterKindHelper の逆引き表も更新）
+            { "Export.ParamKind.BuiltIn", "組み込み" },
+            { "Export.ParamKind.Shared", "共有" },
+            { "Export.ParamKind.Project", "プロジェクト" },
             { "Common.SelectAll", "全選択" },
             { "Common.SelectNone", "選択解除" },
             { "Export.ClearOutput", "クリア" },

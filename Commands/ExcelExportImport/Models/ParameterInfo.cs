@@ -10,8 +10,30 @@ namespace Tools28.Commands.ExcelExportImport.Models
     {
         private bool _isChecked;
 
-        /// <summary>パラメータ名（T-/I-プレフィックス付き）</summary>
-        public string DisplayName { get; set; }
+        /// <summary>
+        /// 表示名（T-/I-プレフィックス＋名前＋曖昧性解消接尾辞）。
+        /// 同名パラメータがある場合のみ末尾に種別接尾辞（例: 【組み込み】）が付く。
+        /// ダイアログ表示・Excelヘッダー・重複排除キーの単一の情報源。
+        /// </summary>
+        public string DisplayName => Prefix + RawName + DisambigSuffix;
+
+        /// <summary>プレフィックス（タイプ="T-" / インスタンス="I-"）</summary>
+        public string Prefix => IsTypeParameter ? "T-" : "I-";
+
+        /// <summary>
+        /// 同名パラメータを区別するための接尾辞（例: 「【組み込み】」）。
+        /// 重複が無いパラメータでは空文字（＝従来どおりのヘッダー名）。
+        /// </summary>
+        public string DisambigSuffix { get; set; } = "";
+
+        /// <summary>パラメータ種別（組み込み/共有/プロジェクト）。同名区別に使用。</summary>
+        public ParameterKind Kind { get; set; } = ParameterKind.Project;
+
+        /// <summary>
+        /// パラメータの安定 ID（Parameter.Id を long 化）。ドキュメント内で一意なので、
+        /// 同名パラメータの厳密な重複排除・照合の識別子として使う。
+        /// </summary>
+        public long ParamId { get; set; }
 
         /// <summary>パラメータの元の名前</summary>
         public string RawName { get; set; }
@@ -59,7 +81,6 @@ namespace Tools28.Commands.ExcelExportImport.Models
             IsTypeParameter = isTypeParameter;
             IsReadOnly = isReadOnly;
             CategoryName = categoryName;
-            DisplayName = (isTypeParameter ? "T-" : "I-") + rawName;
             IsChecked = false;
         }
 
@@ -72,14 +93,25 @@ namespace Tools28.Commands.ExcelExportImport.Models
         {
             if (obj is ParameterInfo other)
             {
-                return DisplayName == other.DisplayName && CategoryName == other.CategoryName;
+                // 同名でも別物のパラメータ（例: エリアの「用途」×2）を区別するため、
+                // 表示名ではなく安定 ID（ParamId）＋種別（インスタンス/タイプ）＋カテゴリで同一判定する。
+                return ParamId == other.ParamId
+                    && IsTypeParameter == other.IsTypeParameter
+                    && CategoryName == other.CategoryName;
             }
             return false;
         }
 
         public override int GetHashCode()
         {
-            return (DisplayName + CategoryName).GetHashCode();
+            unchecked
+            {
+                int hash = 17;
+                hash = hash * 31 + ParamId.GetHashCode();
+                hash = hash * 31 + IsTypeParameter.GetHashCode();
+                hash = hash * 31 + (CategoryName?.GetHashCode() ?? 0);
+                return hash;
+            }
         }
     }
 }

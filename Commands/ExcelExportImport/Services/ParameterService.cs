@@ -78,7 +78,41 @@ namespace Tools28.Commands.ExcelExportImport.Services
                     CollectParameters(anyInstance, false, categoryName, parameters);
             }
 
-            return parameters.OrderBy(p => p.DisplayName).ToList();
+            var list = parameters.ToList();
+
+            // 同名パラメータ（例: エリアの「用途」×2）は名前だけでは区別できないため、
+            // 同カテゴリ・同種別(I-/T-)・同名のグループに種別ベースの曖昧性解消接尾辞を付ける。
+            AssignDisambiguationSuffixes(list);
+
+            return list.OrderBy(p => p.DisplayName).ToList();
+        }
+
+        /// <summary>
+        /// 同カテゴリ・同種別(インスタンス/タイプ)・同名で複数存在するパラメータに、
+        /// 種別（組み込み/共有/プロジェクト）ラベルの接尾辞を付けて区別できるようにする。
+        /// 同一種別でさらに複数ある場合は ParamId 昇順で「#連番」を付与する。
+        /// 重複が無いパラメータは接尾辞なし（＝従来どおりの表示名/ヘッダー）。
+        /// </summary>
+        private static void AssignDisambiguationSuffixes(List<ParameterInfo> list)
+        {
+            foreach (var group in list.GroupBy(p => (p.IsTypeParameter ? "T" : "I") + "|" + p.RawName))
+            {
+                var members = group.ToList();
+                if (members.Count <= 1)
+                    continue; // 重複なし → 接尾辞不要
+
+                foreach (var kindGroup in members.GroupBy(m => m.Kind))
+                {
+                    var ordered = kindGroup.OrderBy(m => m.ParamId).ToList();
+                    bool sameKindCollision = ordered.Count > 1;
+                    for (int i = 0; i < ordered.Count; i++)
+                    {
+                        int index = sameKindCollision ? (i + 1) : 0;
+                        ordered[i].DisambigSuffix =
+                            ParameterKindHelper.BuildSuffix(ordered[i].Kind, index);
+                    }
+                }
+            }
         }
 
         private static void CollectParameters(
@@ -105,7 +139,10 @@ namespace Tools28.Commands.ExcelExportImport.Services
                     IsElementReference = param.StorageType == StorageType.ElementId,
                     // 画像参照は文字値を一切設定できない（画像ピッカー専用）
                     IsImage = bip == BuiltInParameter.ALL_MODEL_IMAGE
-                              || bip == BuiltInParameter.ALL_MODEL_TYPE_IMAGE
+                              || bip == BuiltInParameter.ALL_MODEL_TYPE_IMAGE,
+                    // 同名パラメータの区別用（識別子＝安定 ID、種別＝組み込み/共有/プロジェクト）
+                    ParamId = ParamIdToLong(param.Id),
+                    Kind = ParameterKindHelper.Determine(param)
                 });
             }
         }
@@ -288,6 +325,17 @@ namespace Tools28.Commands.ExcelExportImport.Services
             return ElementId.InvalidElementId;
         }
 
+        /// <summary>Parameter.Id を long 化（バージョン差異を吸収）。同名パラメータの識別子に使う。</summary>
+        public static long ParamIdToLong(ElementId id)
+        {
+            if (id == null) return 0;
+#if REVIT2026
+            return id.Value;
+#else
+            return id.IntValue();
+#endif
+        }
+
         /// <summary>パラメータの BuiltInParameter を安全に取得（共有/カスタムは INVALID）</summary>
         private static BuiltInParameter GetBuiltInParameter(Parameter param)
         {
@@ -312,23 +360,111 @@ namespace Tools28.Commands.ExcelExportImport.Services
         /// </summary>
         public static Parameter FindParameter(Element elem, string paramName, bool isTypeParameter, Document doc)
         {
-            if (isTypeParameter)
-            {
-                var typeId = elem.GetTypeId();
-                if (typeId != null && typeId != ElementId.InvalidElementId)
-                {
-                    var elemType = doc.GetElement(typeId);
-                    if (elemType != null)
-                    {
-                        return FindParameterByName(elemType, paramName);
-                    }
-                }
+            return FindParameter(elem, paramName, isTypeParameter, null, 0, doc);
+        }
+
+        /// <summary>
+        /// 要素からパラメータを検索する（種別対応版）。
+        /// kind が null（曖昧性解消接尾辞が無いヘッダー）の場合は従来どおり名前引き。
+        /// kind 指定時は同名候補の中から種別で絞り込み、同種別で複数ある場合は
+        /// ParamId 昇順の index（1始まり）で特定する。エクスポート時の連番付与と対応する。
+        /// </summary>
+        public static Parameter FindParameter(
+            Element elem, string paramName, bool isTypeParameter,
+            Models.ParameterKind? kind, int index, Document doc)
+        {
+            var container = GetParameterContainer(elem, isTypeParameter, doc);
+            if (container == null)
                 return null;
-            }
-            else
+
+            // 種別指定なし → 従来の高速な名前引き（同名が無い通常ケース・旧Excel互換）
+            if (kind == null)
+                return FindParameterByName(container, paramName);
+
+            // 種別指定あり → 同名候補を種別で絞り込む
+            var matches = new List<Parameter>();
+            foreach (Parameter p in container.Parameters)
             {
-                return FindParameterByName(elem, paramName);
+                if (p?.Definition == null || p.Definition.Name != paramName)
+                    continue;
+                if (ParameterKindHelper.Determine(p) == kind.Value)
+                    matches.Add(p);
             }
+
+            if (matches.Count == 0)
+                return FindParameterByName(container, paramName); // 種別一致なし → 名前引きにフォールバック
+            if (matches.Count == 1)
+                return matches[0];
+
+            matches.Sort((a, b) => ParamIdToLong(a.Id).CompareTo(ParamIdToLong(b.Id)));
+            int i = index - 1;
+            return (i >= 0 && i < matches.Count) ? matches[i] : matches[0];
+        }
+
+        /// <summary>
+        /// エクスポート用: ParameterInfo が保持する安定 ID で、要素上の該当パラメータを厳密に特定する。
+        /// 同名パラメータがあっても正しい方の値を書き出せる。ID 不一致時は同名の先頭にフォールバック。
+        /// </summary>
+        public static Parameter FindByIdentity(Element container, string rawName, long paramId)
+        {
+            if (container == null) return null;
+
+            Parameter fallback = null;
+            foreach (Parameter p in container.Parameters)
+            {
+                if (p?.Definition == null || p.Definition.Name != rawName)
+                    continue;
+                if (ParamIdToLong(p.Id) == paramId)
+                    return p;
+                if (fallback == null)
+                    fallback = p;
+            }
+            return fallback;
+        }
+
+        /// <summary>インスタンス/タイプに応じたパラメータの入れ物（要素本体 or タイプ要素）を返す。</summary>
+        private static Element GetParameterContainer(Element elem, bool isTypeParameter, Document doc)
+        {
+            if (!isTypeParameter)
+                return elem;
+
+            var typeId = elem?.GetTypeId();
+            if (typeId == null || typeId == ElementId.InvalidElementId)
+                return null;
+            return doc.GetElement(typeId);
+        }
+
+        /// <summary>
+        /// Excel ヘッダー由来の表示名（マーカー除去済み）を、生パラメータ名・種別・連番へ分解する。
+        /// 例: <c>I-用途【共有】</c> → RawName="用途", IsType=false, Kind=Shared。
+        /// </summary>
+        public struct ParsedParamName
+        {
+            public string RawName;
+            public bool IsTypeParameter;
+            public Models.ParameterKind? Kind;
+            public int Index;
+        }
+
+        /// <summary>表示名（マーカー除去済み）を分解する。曖昧性解消接尾辞が無ければ Kind=null。</summary>
+        public static ParsedParamName ParseDisplayName(string displayNameNoMarker)
+        {
+            var result = new ParsedParamName { RawName = displayNameNoMarker ?? "", Index = 0 };
+            string s = result.RawName;
+
+            result.IsTypeParameter = s.StartsWith("T-");
+            if (s.StartsWith("T-") || s.StartsWith("I-"))
+                s = s.Substring(2);
+
+            if (ParameterKindHelper.TryExtractSuffix(s, out string baseName, out var kind, out int index))
+            {
+                s = baseName;
+                result.Kind = kind;
+                result.Index = index;
+            }
+
+            result.RawName = s;
+            return result;
         }
 
         /// <summary>

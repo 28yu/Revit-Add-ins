@@ -305,7 +305,8 @@ namespace Tools28.Commands.ExcelExportImport.Services
                     return "";
 
                 long tid = ElementIdToLong(typeId);
-                string cacheKey = tid + "|" + paramInfo.RawName;
+                // 同名パラメータを区別するため、キャッシュキーには ParamId も含める
+                string cacheKey = tid + "|" + paramInfo.RawName + "|" + paramInfo.ParamId;
                 if (typeValueCache.TryGetValue(cacheKey, out string cached))
                     return cached;
 
@@ -318,7 +319,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
                 string value = "";
                 if (typeElem != null)
                 {
-                    var p = typeElem.LookupParameter(paramInfo.RawName);
+                    var p = ResolveLiveParameter(typeElem, paramInfo);
                     value = ParameterService.GetParameterValueAsString(p);
                 }
 
@@ -327,9 +328,21 @@ namespace Tools28.Commands.ExcelExportImport.Services
             }
             else
             {
-                var p = elem.LookupParameter(paramInfo.RawName);
+                var p = ResolveLiveParameter(elem, paramInfo);
                 return ParameterService.GetParameterValueAsString(p);
             }
+        }
+
+        /// <summary>
+        /// 入れ物要素（インスタンス本体 or タイプ要素）から該当パラメータを取得する。
+        /// 同名区別の接尾辞が付いている場合のみ ParamId で厳密に特定し、
+        /// それ以外は従来どおり高速な名前引き（LookupParameter）を使う。
+        /// </summary>
+        private static Parameter ResolveLiveParameter(Element container, ParameterInfo paramInfo)
+        {
+            if (string.IsNullOrEmpty(paramInfo.DisambigSuffix))
+                return container.LookupParameter(paramInfo.RawName);
+            return ParameterService.FindByIdentity(container, paramInfo.RawName, paramInfo.ParamId);
         }
 
         /// <summary>

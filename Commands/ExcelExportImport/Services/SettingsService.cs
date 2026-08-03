@@ -67,7 +67,8 @@ namespace Tools28.Commands.ExcelExportImport.Services
                 {
                     RawName = p.RawName,
                     IsTypeParameter = p.IsTypeParameter,
-                    CategoryName = p.CategoryName
+                    CategoryName = p.CategoryName,
+                    DisplayName = p.DisplayName
                 })
                 .ToList();
 

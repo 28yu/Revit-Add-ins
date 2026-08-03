@@ -137,10 +137,10 @@ namespace Tools28.Commands.ExcelExportImport.Services
                             string headerName = paramHeaders[i];
                             string newValue = GetCellValueAsString(worksheet.Cell(row, i + 3));
 
-                            bool isTypeParam = headerName.StartsWith("T-");
-                            string rawName = headerName.StartsWith("T-") || headerName.StartsWith("I-")
-                                ? headerName.Substring(2)
-                                : headerName;
+                            // 同名パラメータ区別の接尾辞（【組み込み】等）も含めて解析する
+                            var parsed = ParameterService.ParseDisplayName(headerName);
+                            bool isTypeParam = parsed.IsTypeParameter;
+                            string rawName = parsed.RawName;
 
                             // 空セルの扱い:
                             //  - パラメータが要素に存在しない → N/A（シート統合モードの他カテゴリ列など）→ スキップ
@@ -148,7 +148,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
                             //    （数値・ElementId 型は Revit 上で空にできないためスキップ）
                             if (string.IsNullOrEmpty(newValue))
                             {
-                                var clearParam = ParameterService.FindParameter(elem, rawName, isTypeParam, doc);
+                                var clearParam = ParameterService.FindParameter(elem, rawName, isTypeParam, parsed.Kind, parsed.Index, doc);
                                 if (clearParam == null || clearParam.StorageType != StorageType.String)
                                     continue;
 
@@ -173,11 +173,11 @@ namespace Tools28.Commands.ExcelExportImport.Services
                             bool isReadOnly;
                             if (isTypeParam)
                             {
-                                // タイプパラメータ: (タイプID|名前) でキャッシュ
-                                string tkey = ElementIdToLong(elem.GetTypeId()) + "|" + rawName;
+                                // タイプパラメータ: (タイプID|表示名) でキャッシュ（同名区別のため表示名を使う）
+                                string tkey = ElementIdToLong(elem.GetTypeId()) + "|" + headerName;
                                 if (!typeCurrentCache.TryGetValue(tkey, out currentValue))
                                 {
-                                    var tp = ParameterService.FindParameter(elem, rawName, true, doc);
+                                    var tp = ParameterService.FindParameter(elem, rawName, true, parsed.Kind, parsed.Index, doc);
                                     currentValue = ParameterService.GetParameterValueAsString(tp);
                                     isReadOnly = tp == null
                                         || (tp.IsReadOnly && !ParameterService.IsTypeChangeParameter(tp));
@@ -191,7 +191,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
                             }
                             else
                             {
-                                var param = ParameterService.FindParameter(elem, rawName, false, doc);
+                                var param = ParameterService.FindParameter(elem, rawName, false, parsed.Kind, parsed.Index, doc);
                                 currentValue = ParameterService.GetParameterValueAsString(param);
                                 // タイプ変更パラメータはIsReadOnlyでもChangeTypeIdで変更可能
                                 isReadOnly = param == null
@@ -281,12 +281,11 @@ namespace Tools28.Commands.ExcelExportImport.Services
                                 continue;
                             }
 
-                            bool isTypeParam = headerName.StartsWith("T-");
-                            string rawName = headerName.StartsWith("T-") || headerName.StartsWith("I-")
-                                ? headerName.Substring(2)
-                                : headerName;
+                            var parsed = ParameterService.ParseDisplayName(headerName);
+                            bool isTypeParam = parsed.IsTypeParameter;
+                            string rawName = parsed.RawName;
 
-                            var param = ParameterService.FindParameter(elem, rawName, isTypeParam, doc);
+                            var param = ParameterService.FindParameter(elem, rawName, isTypeParam, parsed.Kind, parsed.Index, doc);
 
                             if (param == null)
                             {
@@ -379,12 +378,11 @@ namespace Tools28.Commands.ExcelExportImport.Services
                 }
 
                 string headerName = pr.ParameterName;
-                bool isTypeParam = headerName.StartsWith("T-");
-                string rawName = headerName.StartsWith("T-") || headerName.StartsWith("I-")
-                    ? headerName.Substring(2)
-                    : headerName;
+                var parsed = ParameterService.ParseDisplayName(headerName);
+                bool isTypeParam = parsed.IsTypeParameter;
+                string rawName = parsed.RawName;
 
-                var param = ParameterService.FindParameter(elem, rawName, isTypeParam, doc);
+                var param = ParameterService.FindParameter(elem, rawName, isTypeParam, parsed.Kind, parsed.Index, doc);
                 if (param == null)
                 {
                     result.Warnings.Add($"パラメータ '{headerName}' が見つかりません（要素 {pr.ElementId}）");

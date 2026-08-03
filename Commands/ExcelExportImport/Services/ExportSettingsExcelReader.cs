@@ -46,15 +46,17 @@ namespace Tools28.Commands.ExcelExportImport.Services
                     categoryOrder.Add(cat);
             }
 
-            void AddEntry(string cat, string rawName, bool isType)
+            void AddEntry(string cat, string rawName, bool isType, string displayName)
             {
-                string key = rawName + "|" + isType + "|" + cat;
+                // 同名パラメータを区別するため、キーには表示名（接尾辞込み）を使う
+                string key = displayName + "|" + cat;
                 if (!entryKeys.Add(key)) return;
                 settings.OutputParameters.Add(new ExportParameterEntry
                 {
                     RawName = rawName,
                     IsTypeParameter = isType,
-                    CategoryName = cat
+                    CategoryName = cat,
+                    DisplayName = displayName
                 });
             }
 
@@ -103,7 +105,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
                             cat = worksheet.Name; // カテゴリ列なし/データ行なし → シート名で代用
                         RegisterCategory(cat);
                         foreach (var h in headerParams)
-                            AddEntry(cat, h.RawName, h.IsType);
+                            AddEntry(cat, h.RawName, h.IsType, h.DisplayName);
                     }
                     else
                     {
@@ -128,7 +130,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
             List<ParsedHeader> headerParams,
             int categoryCol,
             System.Action<string> registerCategory,
-            System.Action<string, string, bool> addEntry)
+            System.Action<string, string, bool, string> addEntry)
         {
             var lastRow = worksheet.LastRowUsed();
             int rowCount = lastRow?.RowNumber() ?? 1;
@@ -160,7 +162,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
                 registerCategory(cat);
                 foreach (var h in headerParams)
                     if (nonEmpty.Contains(cat + "|" + h.Column))
-                        addEntry(cat, h.RawName, h.IsType);
+                        addEntry(cat, h.RawName, h.IsType, h.DisplayName);
             }
         }
 
@@ -169,16 +171,21 @@ namespace Tools28.Commands.ExcelExportImport.Services
         {
             if (string.IsNullOrWhiteSpace(header)) return null;
 
-            // 編集可否マーカー（変更不可/画像参照/要素参照）を除去
-            string name = ParameterHeaderMarker.Strip(header);
-
-            if (name.StartsWith("T-"))
-                return new ParsedHeader { RawName = name.Substring(2), IsType = true };
-            if (name.StartsWith("I-"))
-                return new ParsedHeader { RawName = name.Substring(2), IsType = false };
+            // 編集可否マーカー（変更不可/画像参照/要素参照）を除去 → 表示名（接尾辞込み）
+            string displayName = ParameterHeaderMarker.Strip(header);
 
             // プレフィックスが無い列（要素ID/カテゴリ等）はパラメータ列ではない
-            return null;
+            if (!displayName.StartsWith("T-") && !displayName.StartsWith("I-"))
+                return null;
+
+            // 同名区別の接尾辞（【組み込み】等）を分離して生パラメータ名・種別を得る
+            var parsed = ParameterService.ParseDisplayName(displayName);
+            return new ParsedHeader
+            {
+                RawName = parsed.RawName,
+                IsType = parsed.IsTypeParameter,
+                DisplayName = displayName
+            };
         }
 
         private class ParsedHeader
@@ -186,6 +193,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
             public string RawName;
             public bool IsType;
             public int Column;
+            public string DisplayName;
         }
     }
 }

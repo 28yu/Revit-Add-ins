@@ -356,6 +356,11 @@ namespace Tools28.Localization
             { "Export.SelectParams", "Please select parameters to export." },
             { "Export.SelectCategory", "Please select a category." },
             { "Export.ParamPrefixLegend", "I- : Instance (element) parameter\nT- : Type parameter" },
+            // Kind labels used to disambiguate same-named parameters (also embedded in Excel headers;
+            // if you change these, update the reverse-lookup table in ParameterKindHelper too)
+            { "Export.ParamKind.BuiltIn", "Built-in" },
+            { "Export.ParamKind.Shared", "Shared" },
+            { "Export.ParamKind.Project", "Project" },
             { "Common.SelectAll", "Select All" },
             { "Common.SelectNone", "Clear" },
             { "Export.ClearOutput", "Clear" },
