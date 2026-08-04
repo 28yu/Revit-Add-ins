@@ -437,6 +437,8 @@ namespace Tools28.Commands.ParameterCleanup.Views
             // Task.Delay は Background 優先度で復帰するため、その間に「中止」ボタンの
             // クリック（Input 優先度）が確実に処理される。
             var sw = System.Diagnostics.Stopwatch.StartNew();
+            // 確認中は Revit 本体の操作を無効化する（finally で必ず復帰）
+            var revitBlock = this.BlockRevitInput();
             try
             {
                 foreach (var row in targets)
@@ -489,6 +491,9 @@ namespace Tools28.Commands.ParameterCleanup.Views
 
                 _view?.Refresh();
                 UpdateCount();
+
+                revitBlock.Dispose();      // Revit 本体の操作を復帰
+                this.BringToFrontDeferred();   // Revit 背面に隠れるのを防ぐ
             }
         }
 
@@ -504,6 +509,7 @@ namespace Tools28.Commands.ParameterCleanup.Views
             if (!_valuesChecked)
             {
                 TaskDialog.Show(Loc.S("ParamCleanup.Title"), Loc.S("ParamCleanup.NotChecked.Msg"));
+                this.BringToFrontDeferred();
                 return;
             }
 
@@ -543,6 +549,7 @@ namespace Tools28.Commands.ParameterCleanup.Views
             if (selected.Count == 0)
             {
                 TaskDialog.Show(Loc.S("ParamCleanup.Title"), Loc.S("ParamCleanup.NoSelection.Msg"));
+                this.BringToFrontDeferred();
                 return;
             }
 
@@ -604,11 +611,16 @@ namespace Tools28.Commands.ParameterCleanup.Views
             {
                 TaskDialog.Show(Loc.S("Common.Error"),
                     string.Format(Loc.S("ParamCleanup.Result.Error"), ex.Message));
+                this.BringToFrontDeferred();
                 return;
             }
 
             TaskDialog.Show(Loc.S("ParamCleanup.Result.Title"),
                 string.Format(Loc.S("ParamCleanup.Result.Msg"), ok, fail));
+
+            // 結果ダイアログで Revit が前面化するため、まずダイアログを前面へ戻す。
+            // 続く再確認スキャン中は RunValueCheckAsync 内で Revit の操作を無効化する。
+            this.BringToFrontDeferred();
 
             LoadRows();          // 一覧を再構築
             txtStatus.Text = "";
