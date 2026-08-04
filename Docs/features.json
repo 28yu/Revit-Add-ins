@@ -206,6 +206,18 @@
       }
     },
     {
+      "id": "ViewTemplateManagement",
+      "category": "view",
+      "icon": "icons/features/view_template.png",
+      "manual": "Features/ViewTemplateManagement.md",
+      "added_in": "2.5",
+      "names": {
+        "ja": "テンプレート整理（使用ビュー確認・名前変更・削除）",
+        "en": "View Template Cleanup (Check Usage, Rename, Delete)",
+        "zh": "视图样板整理（查看使用视图・重命名・删除）"
+      }
+    },
+    {
       "id": "LanguageSwitch",
       "category": "settings",
       "icon": "icons/features/flag_jp_32.png",

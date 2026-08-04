@@ -1,0 +1,288 @@
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Linq;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Data;
+using Autodesk.Revit.DB;
+using Autodesk.Revit.UI;
+using Tools28.Commands.ViewTemplateManagement.Models;
+using Tools28.Commands.ViewTemplateManagement.Services;
+using Tools28.Localization;
+
+namespace Tools28.Commands.ViewTemplateManagement.Views
+{
+    public partial class ViewTemplateManagementDialog : Window
+    {
+        private readonly Document _doc;
+        private readonly TemplateScanner _scanner = new TemplateScanner();
+
+        private List<TemplateRow> _rows = new List<TemplateRow>();
+        private ICollectionView _view;
+        private bool _ready;   // 初期化完了フラグ（InitializeComponent 中のイベント発火を無視）
+
+        public ViewTemplateManagementDialog(Document doc)
+        {
+            _doc = doc;
+            InitializeComponent();
+            ApplyLocalization();
+            LoadRows();
+            _ready = true;
+        }
+
+        private void ApplyLocalization()
+        {
+            Title = Loc.S("TemplateMgmt.Title");
+            txtDescription.Text = Loc.S("TemplateMgmt.Description");
+            lblSearch.Text = Loc.S("TemplateMgmt.Search");
+            chkUnusedOnly.Content = Loc.S("TemplateMgmt.UnusedOnly");
+
+            TemplateGrid.Columns[0].Header = Loc.S("TemplateMgmt.Col.Select");
+            colName.Header = Loc.S("TemplateMgmt.Col.Name");
+            colViewType.Header = Loc.S("TemplateMgmt.Col.ViewType");
+            colViewCount.Header = Loc.S("TemplateMgmt.Col.ViewCount");
+            colUsage.Header = Loc.S("TemplateMgmt.Col.Usage");
+
+            btnSelectUnused.Content = Loc.S("TemplateMgmt.SelectUnused");
+            btnSelectAllVisible.Content = Loc.S("TemplateMgmt.SelectAll");
+            btnDeselectAllVisible.Content = Loc.S("TemplateMgmt.DeselectAll");
+            btnReload.Content = Loc.S("TemplateMgmt.Btn.Reload");
+            btnDelete.Content = Loc.S("TemplateMgmt.Btn.Delete");
+            btnClose.Content = Loc.S("TemplateMgmt.Btn.Close");
+        }
+
+        private void LoadRows()
+        {
+            _rows = _scanner.EnumerateTemplates(_doc);
+            _view = CollectionViewSource.GetDefaultView(_rows);
+            _view.Filter = RowFilter;
+            TemplateGrid.ItemsSource = _view;
+            UpdateCount();
+        }
+
+        private bool RowFilter(object o)
+        {
+            if (!(o is TemplateRow r)) return false;
+
+            string q = SearchBox?.Text?.Trim();
+            if (!string.IsNullOrEmpty(q) &&
+                (r.Name == null || r.Name.IndexOf(q, StringComparison.CurrentCultureIgnoreCase) < 0))
+                return false;
+
+            if (chkUnusedOnly?.IsChecked == true && r.IsUsed)
+                return false;
+
+            return true;
+        }
+
+        private void Filter_Changed(object sender, RoutedEventArgs e)
+        {
+            if (!_ready) return;   // 初期化中のイベントは無視
+            _view?.Refresh();
+            UpdateCount();
+        }
+
+        private void UpdateCount()
+        {
+            int total = _rows.Count;
+            int shown = _view?.Cast<object>().Count() ?? total;
+            int unused = _rows.Count(r => !r.IsUsed);
+            int selected = _rows.Count(r => r.IsSelected);
+            txtCount.Text = string.Format(Loc.S("TemplateMgmt.Count.Summary"), total, shown, unused, selected);
+        }
+
+        // ===== 名前のインライン変更 =====
+        // セル編集確定のイベント内で Revit トランザクションや TaskDialog を実行すると
+        // DataGrid の編集状態と再入し不安定になるため、実際のリネームは編集確定後に
+        // Dispatcher（Background 優先度）で遅延実行する。
+        private void TemplateGrid_CellEditEnding(object sender, DataGridCellEditEndingEventArgs e)
+        {
+            if (e.EditAction != DataGridEditAction.Commit) return;
+            if (e.Column != colName) return;
+            if (!(e.Row.Item is TemplateRow row)) return;
+            if (!(e.EditingElement is System.Windows.Controls.TextBox tb)) return;
+
+            string oldName = row.Name;              // 変更前の確定名（バインドはまだ未反映）
+            string newName = tb.Text?.Trim() ?? "";
+            if (newName == oldName) return;
+
+            Dispatcher.BeginInvoke(
+                new Action(() => TryRename(row, oldName, newName)),
+                System.Windows.Threading.DispatcherPriority.Background);
+        }
+
+        /// <summary>1件のテンプレート名変更を検証してトランザクションで適用する（失敗時は元へ戻す）。</summary>
+        private void TryRename(TemplateRow row, string oldName, string newName)
+        {
+            if (string.IsNullOrEmpty(newName))
+            {
+                TaskDialog.Show(Loc.S("TemplateMgmt.Title"), Loc.S("TemplateMgmt.Rename.Empty"));
+                row.Name = oldName;
+                return;
+            }
+
+            if (_rows.Any(r => r != row &&
+                               string.Equals(r.Name, newName, StringComparison.CurrentCultureIgnoreCase)))
+            {
+                TaskDialog.Show(Loc.S("TemplateMgmt.Title"),
+                    string.Format(Loc.S("TemplateMgmt.Rename.Duplicate"), newName));
+                row.Name = oldName;
+                return;
+            }
+
+            var el = _doc.GetElement(row.Id);
+            if (el == null) { row.Name = oldName; return; }
+
+            try
+            {
+                using (var t = new Transaction(_doc, Loc.S("TemplateMgmt.Txn.Rename")))
+                {
+                    t.Start();
+                    el.Name = newName;
+                    t.Commit();
+                }
+                row.Name = newName;   // 念のため確定
+                UpdateCount();
+            }
+            catch (Exception ex)
+            {
+                TaskDialog.Show(Loc.S("Common.Error"),
+                    string.Format(Loc.S("TemplateMgmt.Rename.Error"), ex.Message));
+                row.Name = oldName;   // 元の名前へ戻す
+            }
+        }
+
+        // ===== 選択操作 =====
+        private void SelectUnused_Click(object sender, RoutedEventArgs e)
+        {
+            foreach (var r in _rows)
+                r.IsSelected = !r.IsUsed;
+            _view?.Refresh();
+            UpdateCount();
+        }
+
+        private void SelectAllVisible_Click(object sender, RoutedEventArgs e) => SetSelectionForVisible(true);
+        private void DeselectAllVisible_Click(object sender, RoutedEventArgs e) => SetSelectionForVisible(false);
+
+        private void SetSelectionForVisible(bool selected)
+        {
+            if (_view == null) return;
+            foreach (var o in _view.Cast<object>())
+                if (o is TemplateRow r) r.IsSelected = selected;
+            UpdateCount();
+        }
+
+        // ===== 削除 =====
+        private void Delete_Click(object sender, RoutedEventArgs e)
+        {
+            CommitPendingEdit();
+
+            var selected = _rows.Where(r => r.IsSelected).ToList();
+            if (selected.Count == 0)
+            {
+                TaskDialog.Show(Loc.S("TemplateMgmt.Title"), Loc.S("TemplateMgmt.NoSelection.Msg"));
+                return;
+            }
+
+            int usedCount = selected.Count(r => r.IsUsed);
+            var confirm = new TaskDialog(Loc.S("TemplateMgmt.Confirm.Title"))
+            {
+                MainInstruction = string.Format(Loc.S("TemplateMgmt.Confirm.Main"), selected.Count),
+                MainContent = usedCount > 0
+                    ? string.Format(Loc.S("TemplateMgmt.Confirm.ContentUsed"), usedCount)
+                    : Loc.S("TemplateMgmt.Confirm.Content"),
+                CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No,
+                DefaultButton = TaskDialogResult.No
+            };
+            if (confirm.Show() != TaskDialogResult.Yes)
+                return;
+
+            var ids = selected.Select(r => r.Id)
+                              .Where(id => id != null && id != ElementId.InvalidElementId)
+                              .ToList();
+            int ok = 0, fail = 0;
+
+            try
+            {
+                using (var t = new Transaction(_doc, Loc.S("TemplateMgmt.Txn.Delete")))
+                {
+                    t.Start();
+
+                    // 削除に伴う Revit の警告ダイアログを自動で閉じる
+                    var fho = t.GetFailureHandlingOptions();
+                    fho = fho.SetForcedModalHandling(false);
+                    fho = fho.SetClearAfterRollback(true);
+                    fho = fho.SetFailuresPreprocessor(new WarningSwallower());
+                    t.SetFailureHandlingOptions(fho);
+
+                    ICollection<ElementId> deleted;
+                    try
+                    {
+                        deleted = _doc.Delete(ids);
+                    }
+                    catch
+                    {
+                        // 一括削除に失敗した場合は個別に試行
+                        deleted = new List<ElementId>();
+                        foreach (var id in ids)
+                        {
+                            try
+                            {
+                                var r = _doc.Delete(id);
+                                if (r != null)
+                                    foreach (var did in r) deleted.Add(did);
+                            }
+                            catch { }
+                        }
+                    }
+                    t.Commit();
+
+                    var deletedSet = new HashSet<ElementId>(deleted ?? new List<ElementId>());
+                    ok = ids.Count(id => deletedSet.Contains(id));
+                    fail = ids.Count - ok;
+                }
+            }
+            catch (Exception ex)
+            {
+                TaskDialog.Show(Loc.S("Common.Error"),
+                    string.Format(Loc.S("TemplateMgmt.Result.Error"), ex.Message));
+                return;
+            }
+
+            TaskDialog.Show(Loc.S("TemplateMgmt.Result.Title"),
+                string.Format(Loc.S("TemplateMgmt.Result.Msg"), ok, fail));
+
+            LoadRows();   // 一覧を再構築
+        }
+
+        private void Reload_Click(object sender, RoutedEventArgs e)
+        {
+            CommitPendingEdit();
+            LoadRows();
+        }
+
+        private void Close_Click(object sender, RoutedEventArgs e) => Close();
+
+        /// <summary>編集中のセルがあれば確定させる（ボタン操作前に呼ぶ）。</summary>
+        private void CommitPendingEdit()
+        {
+            try
+            {
+                TemplateGrid.CommitEdit(DataGridEditingUnit.Cell, true);
+                TemplateGrid.CommitEdit(DataGridEditingUnit.Row, true);
+            }
+            catch { }
+        }
+
+        /// <summary>削除トランザクション中の警告を自動的に無視（ダイアログを出さない）。</summary>
+        private class WarningSwallower : IFailuresPreprocessor
+        {
+            public FailureProcessingResult PreprocessFailures(FailuresAccessor a)
+            {
+                a.DeleteAllWarnings();
+                return FailureProcessingResult.Continue;
+            }
+        }
+    }
+}

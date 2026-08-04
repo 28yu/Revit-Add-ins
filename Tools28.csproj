@@ -88,6 +88,8 @@
     <Resource Include="Resources\Icons\auto_backup_16.png" />
     <Resource Include="Resources\Icons\filter_management.png" />
     <Resource Include="Resources\Icons\filter_management_16.png" />
+    <Resource Include="Resources\Icons\view_template.png" />
+    <Resource Include="Resources\Icons\view_template_16.png" />
   </ItemGroup>
 
 

@@ -48,6 +48,7 @@ namespace Tools28
             { "ExcelImport", "Ribbon.Excel.Import" },
             { "ParameterCleanup", "Ribbon.ParamCleanup" },
             { "FilterManagement", "Ribbon.FilterMgmt" },
+            { "ViewTemplateManagement", "Ribbon.TemplateMgmt" },
             { "AutoBackup", "Ribbon.AutoBackup" },
             { "About", "Ribbon.Settings.About" },
             { "Manual", "Ribbon.Settings.Manual" },
@@ -79,6 +80,7 @@ namespace Tools28
             { "ExcelImport", "Ribbon.Excel.Import.Tip" },
             { "ParameterCleanup", "Ribbon.ParamCleanup.Tip" },
             { "FilterManagement", "Ribbon.FilterMgmt.Tip" },
+            { "ViewTemplateManagement", "Ribbon.TemplateMgmt.Tip" },
             { "AutoBackup", "Ribbon.AutoBackup.Tip" },
             { "About", "Ribbon.Settings.About.Tip" },
             { "Manual", "Ribbon.Settings.Manual.Tip" },
@@ -345,6 +347,12 @@ namespace Tools28
             filterMgmtData.Image = LoadImage("filter_management_16.png");
             filterMgmtData.LargeImage = LoadImage("filter_management.png");
             AddButton(panel, filterMgmtData);
+
+            var templateMgmtData = new PushButtonData("ViewTemplateManagement", Loc.S("Ribbon.TemplateMgmt"), assemblyPath, "Tools28.Commands.ViewTemplateManagement.ViewTemplateManagementCommand");
+            templateMgmtData.ToolTip = Loc.S("Ribbon.TemplateMgmt.Tip");
+            templateMgmtData.Image = LoadImage("view_template_16.png");
+            templateMgmtData.LargeImage = LoadImage("view_template.png");
+            AddButton(panel, templateMgmtData);
         }
 
         private void CreateThreeDViewPanel(UIControlledApplication application, string tabName, string assemblyPath)
