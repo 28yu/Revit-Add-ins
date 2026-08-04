@@ -109,7 +109,7 @@ namespace Tools28.Commands.FilterManagement.Views
             if (e.EditAction != DataGridEditAction.Commit) return;
             if (e.Column != colName) return;
             if (!(e.Row.Item is FilterRow row)) return;
-            if (!(e.EditingElement is TextBox tb)) return;
+            if (!(e.EditingElement is System.Windows.Controls.TextBox tb)) return;
 
             string oldName = row.Name;              // 変更前の確定名（バインドはまだ未反映）
             string newName = tb.Text?.Trim() ?? "";
