@@ -194,6 +194,18 @@
       }
     },
     {
+      "id": "FilterManagement",
+      "category": "view",
+      "icon": "icons/features/filter_management.png",
+      "manual": "Features/FilterManagement.md",
+      "added_in": "2.5",
+      "names": {
+        "ja": "フィルタ整理（使用ビュー確認・名前変更・削除）",
+        "en": "Filter Cleanup (Check Usage, Rename, Delete)",
+        "zh": "过滤器整理（查看使用视图・重命名・删除）"
+      }
+    },
+    {
       "id": "LanguageSwitch",
       "category": "settings",
       "icon": "icons/features/flag_jp_32.png",

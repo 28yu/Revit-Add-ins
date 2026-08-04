@@ -47,6 +47,7 @@ namespace Tools28
             { "ExcelExport", "Ribbon.Excel.Export" },
             { "ExcelImport", "Ribbon.Excel.Import" },
             { "ParameterCleanup", "Ribbon.ParamCleanup" },
+            { "FilterManagement", "Ribbon.FilterMgmt" },
             { "AutoBackup", "Ribbon.AutoBackup" },
             { "About", "Ribbon.Settings.About" },
             { "Manual", "Ribbon.Settings.Manual" },
@@ -77,6 +78,7 @@ namespace Tools28
             { "ExcelExport", "Ribbon.Excel.Export.Tip" },
             { "ExcelImport", "Ribbon.Excel.Import.Tip" },
             { "ParameterCleanup", "Ribbon.ParamCleanup.Tip" },
+            { "FilterManagement", "Ribbon.FilterMgmt.Tip" },
             { "AutoBackup", "Ribbon.AutoBackup.Tip" },
             { "About", "Ribbon.Settings.About.Tip" },
             { "Manual", "Ribbon.Settings.Manual.Tip" },
@@ -335,6 +337,14 @@ namespace Tools28
             cbPasteData.ToolTip = Loc.S("Ribbon.CropBox.Paste.Tip");
             cbPasteData.LargeImage = LoadImage("cropbox_paste.png");
             AddButton(panel, cbPasteData);
+
+            panel.AddSeparator();
+
+            var filterMgmtData = new PushButtonData("FilterManagement", Loc.S("Ribbon.FilterMgmt"), assemblyPath, "Tools28.Commands.FilterManagement.FilterManagementCommand");
+            filterMgmtData.ToolTip = Loc.S("Ribbon.FilterMgmt.Tip");
+            filterMgmtData.Image = LoadImage("filter_management_16.png");
+            filterMgmtData.LargeImage = LoadImage("filter_management.png");
+            AddButton(panel, filterMgmtData);
         }
 
         private void CreateThreeDViewPanel(UIControlledApplication application, string tabName, string assemblyPath)

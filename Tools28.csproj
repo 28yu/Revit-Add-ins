@@ -86,6 +86,8 @@
     <Resource Include="Resources\Icons\parameter_cleanup_16.png" />
     <Resource Include="Resources\Icons\auto_backup.png" />
     <Resource Include="Resources\Icons\auto_backup_16.png" />
+    <Resource Include="Resources\Icons\filter_management.png" />
+    <Resource Include="Resources\Icons\filter_management_16.png" />
   </ItemGroup>
 
 
