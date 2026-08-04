@@ -27,13 +27,13 @@ namespace Tools28.Localization
             // === Ribbon: Sheet/View ===
             { "Ribbon.Sheet.Create", "批量\n创建" },
             { "Ribbon.Sheet.Create.Tip", "指定标题栏批量创建图纸" },
-            { "Ribbon.Viewport.Copy", "视口\n复制位置" },
+            { "Ribbon.Viewport.Copy", "复制位置" },
             { "Ribbon.Viewport.Copy.Tip", "复制图纸上的视口位置" },
-            { "Ribbon.Viewport.Paste", "视口\n粘贴位置" },
+            { "Ribbon.Viewport.Paste", "粘贴位置" },
             { "Ribbon.Viewport.Paste.Tip", "将复制的视口位置粘贴到其他图纸" },
-            { "Ribbon.CropBox.Copy", "裁剪\n区域复制" },
+            { "Ribbon.CropBox.Copy", "区域复制" },
             { "Ribbon.CropBox.Copy.Tip", "复制视图的裁剪区域" },
-            { "Ribbon.CropBox.Paste", "裁剪\n区域粘贴" },
+            { "Ribbon.CropBox.Paste", "区域粘贴" },
             { "Ribbon.CropBox.Paste.Tip", "将复制的裁剪区域粘贴到其他视图" },
 
             // === Ribbon: 3D View ===
