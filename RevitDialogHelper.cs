@@ -36,6 +36,34 @@ namespace Tools28
             };
         }
 
+        /// <summary>
+        /// 削除トランザクションや Revit の TaskDialog 表示後に、WPF ダイアログが
+        /// Revit 本体ウィンドウの背面へ隠れるのを防ぐため、前面へ復帰させる。
+        /// Revit 側のウィンドウアクティブ化が処理された後に実行されるよう、
+        /// Background 優先度で遅延実行する。
+        /// </summary>
+        public static void BringToFrontDeferred(this Window dialog)
+        {
+            if (dialog == null) return;
+            dialog.Dispatcher.BeginInvoke(new Action(() =>
+            {
+                try
+                {
+                    if (!dialog.IsVisible) return;
+                    if (dialog.WindowState == WindowState.Minimized)
+                        dialog.WindowState = WindowState.Normal;
+                    dialog.Activate();
+                    // 一瞬だけ最前面に上げて Revit 本体より前へ出し、すぐ通常へ戻す
+                    dialog.Topmost = true;
+                    dialog.Topmost = false;
+                }
+                catch (Exception ex)
+                {
+                    DiagLog.Write($"BringToFrontDeferred 例外: {ex.Message}");
+                }
+            }), System.Windows.Threading.DispatcherPriority.Background);
+        }
+
         public static IntPtr GetRevitMainHandle(ExternalCommandData commandData)
         {
             try

@@ -119,6 +119,7 @@ namespace Tools28.Commands.ViewTemplateManagement.Views
             {
                 TaskDialog.Show(Loc.S("TemplateMgmt.Title"), Loc.S("TemplateMgmt.Rename.Empty"));
                 row.Name = oldName;
+                this.BringToFrontDeferred();
                 return;
             }
 
@@ -128,6 +129,7 @@ namespace Tools28.Commands.ViewTemplateManagement.Views
                 TaskDialog.Show(Loc.S("TemplateMgmt.Title"),
                     string.Format(Loc.S("TemplateMgmt.Rename.Duplicate"), newName));
                 row.Name = oldName;
+                this.BringToFrontDeferred();
                 return;
             }
 
@@ -150,6 +152,7 @@ namespace Tools28.Commands.ViewTemplateManagement.Views
                 TaskDialog.Show(Loc.S("Common.Error"),
                     string.Format(Loc.S("TemplateMgmt.Rename.Error"), ex.Message));
                 row.Name = oldName;   // 元の名前へ戻す
+                this.BringToFrontDeferred();
             }
         }
 
@@ -182,6 +185,7 @@ namespace Tools28.Commands.ViewTemplateManagement.Views
             if (selected.Count == 0)
             {
                 TaskDialog.Show(Loc.S("TemplateMgmt.Title"), Loc.S("TemplateMgmt.NoSelection.Msg"));
+                this.BringToFrontDeferred();
                 return;
             }
 
@@ -247,6 +251,7 @@ namespace Tools28.Commands.ViewTemplateManagement.Views
             {
                 TaskDialog.Show(Loc.S("Common.Error"),
                     string.Format(Loc.S("TemplateMgmt.Result.Error"), ex.Message));
+                this.BringToFrontDeferred();
                 return;
             }
 
@@ -254,6 +259,7 @@ namespace Tools28.Commands.ViewTemplateManagement.Views
                 string.Format(Loc.S("TemplateMgmt.Result.Msg"), ok, fail));
 
             LoadRows();   // 一覧を再構築
+            this.BringToFrontDeferred();   // Revit 本体の背面に隠れるのを防ぐ
         }
 
         private void Reload_Click(object sender, RoutedEventArgs e)

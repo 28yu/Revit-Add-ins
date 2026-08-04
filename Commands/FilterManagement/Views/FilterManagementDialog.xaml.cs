@@ -128,6 +128,7 @@ namespace Tools28.Commands.FilterManagement.Views
             {
                 TaskDialog.Show(Loc.S("FilterMgmt.Title"), Loc.S("FilterMgmt.Rename.Empty"));
                 row.Name = oldName;
+                this.BringToFrontDeferred();
                 return;
             }
 
@@ -138,6 +139,7 @@ namespace Tools28.Commands.FilterManagement.Views
                 TaskDialog.Show(Loc.S("FilterMgmt.Title"),
                     string.Format(Loc.S("FilterMgmt.Rename.Duplicate"), newName));
                 row.Name = oldName;
+                this.BringToFrontDeferred();
                 return;
             }
 
@@ -160,6 +162,7 @@ namespace Tools28.Commands.FilterManagement.Views
                 TaskDialog.Show(Loc.S("Common.Error"),
                     string.Format(Loc.S("FilterMgmt.Rename.Error"), ex.Message));
                 row.Name = oldName;   // 元の名前へ戻す
+                this.BringToFrontDeferred();
             }
         }
 
@@ -192,6 +195,7 @@ namespace Tools28.Commands.FilterManagement.Views
             if (selected.Count == 0)
             {
                 TaskDialog.Show(Loc.S("FilterMgmt.Title"), Loc.S("FilterMgmt.NoSelection.Msg"));
+                this.BringToFrontDeferred();
                 return;
             }
 
@@ -257,6 +261,7 @@ namespace Tools28.Commands.FilterManagement.Views
             {
                 TaskDialog.Show(Loc.S("Common.Error"),
                     string.Format(Loc.S("FilterMgmt.Result.Error"), ex.Message));
+                this.BringToFrontDeferred();
                 return;
             }
 
@@ -264,6 +269,7 @@ namespace Tools28.Commands.FilterManagement.Views
                 string.Format(Loc.S("FilterMgmt.Result.Msg"), ok, fail));
 
             LoadRows();   // 一覧を再構築
+            this.BringToFrontDeferred();   // Revit 本体の背面に隠れるのを防ぐ
         }
 
         private void Reload_Click(object sender, RoutedEventArgs e)
