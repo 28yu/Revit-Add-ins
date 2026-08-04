@@ -27,13 +27,13 @@ namespace Tools28.Localization
             // === Ribbon: Sheet/View ===
             { "Ribbon.Sheet.Create", "Batch\nCreate" },
             { "Ribbon.Sheet.Create.Tip", "Create multiple sheets with a specified title block" },
-            { "Ribbon.Viewport.Copy", "Viewport\nCopy Pos" },
+            { "Ribbon.Viewport.Copy", "Viewport Copy Pos" },
             { "Ribbon.Viewport.Copy.Tip", "Copy viewport position on a sheet" },
-            { "Ribbon.Viewport.Paste", "Viewport\nPaste Pos" },
+            { "Ribbon.Viewport.Paste", "Viewport Paste Pos" },
             { "Ribbon.Viewport.Paste.Tip", "Paste copied viewport position to another sheet" },
-            { "Ribbon.CropBox.Copy", "Crop\nRegion Copy" },
+            { "Ribbon.CropBox.Copy", "Crop Region Copy" },
             { "Ribbon.CropBox.Copy.Tip", "Copy the crop region of a view" },
-            { "Ribbon.CropBox.Paste", "Crop\nRegion Paste" },
+            { "Ribbon.CropBox.Paste", "Crop Region Paste" },
             { "Ribbon.CropBox.Paste.Tip", "Paste copied crop region to another view" },
 
             // === Ribbon: 3D View ===

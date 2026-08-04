@@ -27,13 +27,13 @@ namespace Tools28.Localization
             // === Ribbon: Sheet/View ===
             { "Ribbon.Sheet.Create", "一括作成" },
             { "Ribbon.Sheet.Create.Tip", "図枠を指定して複数のシートを一括作成します" },
-            { "Ribbon.Viewport.Copy", "ビューポート\n位置コピー" },
+            { "Ribbon.Viewport.Copy", "ビューポート位置コピー" },
             { "Ribbon.Viewport.Copy.Tip", "シート上のビューポート位置をコピーします" },
-            { "Ribbon.Viewport.Paste", "ビューポート\n位置ペースト" },
+            { "Ribbon.Viewport.Paste", "ビューポート位置ペースト" },
             { "Ribbon.Viewport.Paste.Tip", "コピーしたビューポート位置を他のシートに適用します" },
-            { "Ribbon.CropBox.Copy", "トリミング\n領域コピー" },
+            { "Ribbon.CropBox.Copy", "トリミング領域コピー" },
             { "Ribbon.CropBox.Copy.Tip", "ビューのトリミング領域をコピーします" },
-            { "Ribbon.CropBox.Paste", "トリミング\n領域ペースト" },
+            { "Ribbon.CropBox.Paste", "トリミング領域ペースト" },
             { "Ribbon.CropBox.Paste.Tip", "コピーしたトリミング領域を他のビューに適用します" },
 
             // === Ribbon: 3D View ===

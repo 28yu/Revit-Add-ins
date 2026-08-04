@@ -318,27 +318,37 @@ namespace Tools28
 
             panel.AddSeparator();
 
+            // ビューポート位置のコピー／ペーストは縦並び（スタック）で横幅を節約
             var vpCopyData = new PushButtonData("ViewportPositionCopy", Loc.S("Ribbon.Viewport.Copy"), assemblyPath, "Tools28.Commands.ViewportPosition.ExecuteViewportPositionCopyCommand");
             vpCopyData.ToolTip = Loc.S("Ribbon.Viewport.Copy.Tip");
+            vpCopyData.Image = LoadImage("viewport_copy_16.png");
             vpCopyData.LargeImage = LoadImage("viewport_copy.png");
-            AddButton(panel, vpCopyData);
 
             var vpPasteData = new PushButtonData("ViewportPositionPaste", Loc.S("Ribbon.Viewport.Paste"), assemblyPath, "Tools28.Commands.ViewportPosition.ExecuteViewportPositionPasteCommand");
             vpPasteData.ToolTip = Loc.S("Ribbon.Viewport.Paste.Tip");
+            vpPasteData.Image = LoadImage("viewport_paste_16.png");
             vpPasteData.LargeImage = LoadImage("viewport_paste.png");
-            AddButton(panel, vpPasteData);
+
+            var vpStacked = panel.AddStackedItems(vpCopyData, vpPasteData);
+            _buttons["ViewportPositionCopy"] = vpStacked[0] as RibbonItem;
+            _buttons["ViewportPositionPaste"] = vpStacked[1] as RibbonItem;
 
             panel.AddSeparator();
 
+            // トリミング領域のコピー／ペーストも縦並び（スタック）
             var cbCopyData = new PushButtonData("CropBoxCopy", Loc.S("Ribbon.CropBox.Copy"), assemblyPath, "Tools28.Commands.CropBoxCopy.ExecuteCropBoxCopyCommand");
             cbCopyData.ToolTip = Loc.S("Ribbon.CropBox.Copy.Tip");
+            cbCopyData.Image = LoadImage("cropbox_copy_16.png");
             cbCopyData.LargeImage = LoadImage("cropbox_copy.png");
-            AddButton(panel, cbCopyData);
 
             var cbPasteData = new PushButtonData("CropBoxPaste", Loc.S("Ribbon.CropBox.Paste"), assemblyPath, "Tools28.Commands.CropBoxCopy.ExecuteCropBoxPasteCommand");
             cbPasteData.ToolTip = Loc.S("Ribbon.CropBox.Paste.Tip");
+            cbPasteData.Image = LoadImage("cropbox_paste_16.png");
             cbPasteData.LargeImage = LoadImage("cropbox_paste.png");
-            AddButton(panel, cbPasteData);
+
+            var cbStacked = panel.AddStackedItems(cbCopyData, cbPasteData);
+            _buttons["CropBoxCopy"] = cbStacked[0] as RibbonItem;
+            _buttons["CropBoxPaste"] = cbStacked[1] as RibbonItem;
 
             panel.AddSeparator();
 
