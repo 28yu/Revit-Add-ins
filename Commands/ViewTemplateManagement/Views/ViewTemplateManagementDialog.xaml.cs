@@ -54,11 +54,15 @@ namespace Tools28.Commands.ViewTemplateManagement.Views
 
         private void LoadRows()
         {
-            _rows = _scanner.EnumerateTemplates(_doc);
-            _view = CollectionViewSource.GetDefaultView(_rows);
-            _view.Filter = RowFilter;
-            TemplateGrid.ItemsSource = _view;
-            UpdateCount();
+            // 全ビュー走査中は Revit 本体の操作を無効化する（using を抜けると必ず復帰）
+            using (this.BlockRevitInput())
+            {
+                _rows = _scanner.EnumerateTemplates(_doc);
+                _view = CollectionViewSource.GetDefaultView(_rows);
+                _view.Filter = RowFilter;
+                TemplateGrid.ItemsSource = _view;
+                UpdateCount();
+            }
         }
 
         private bool RowFilter(object o)
