@@ -2,10 +2,10 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="DWGレイヤ表示設定の移行"
-        Width="960"
-        Height="700"
-        MinWidth="820"
-        MinHeight="560"
+        Width="1040"
+        Height="740"
+        MinWidth="900"
+        MinHeight="600"
         WindowStartupLocation="CenterScreen"
         Background="#F5F5F5">
 
@@ -50,15 +50,15 @@
         </Style>
 
         <Style x:Key="SecondaryButtonStyle" TargetType="Button">
-            <Setter Property="MinWidth" Value="90"/>
-            <Setter Property="Height" Value="30"/>
+            <Setter Property="MinWidth" Value="80"/>
+            <Setter Property="Height" Value="26"/>
             <Setter Property="Padding" Value="8,0"/>
             <Setter Property="Margin" Value="4,0,0,0"/>
             <Setter Property="Background" Value="White"/>
             <Setter Property="Foreground" Value="{StaticResource RevitDarkGray}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="BorderBrush" Value="#CCCCCC"/>
-            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontSize" Value="11"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -82,31 +82,65 @@
             </Style.Triggers>
         </Style>
 
-        <Style x:Key="GridCellText" TargetType="TextBlock">
-            <Setter Property="VerticalAlignment" Value="Center"/>
-            <Setter Property="Margin" Value="4,0"/>
-            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        <!-- セクション見出し -->
+        <Style x:Key="SectionHeader" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Padding" Value="8,5"/>
         </Style>
+
+        <!-- リスト内の小見出し -->
+        <Style x:Key="ListCaption" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="#555555"/>
+            <Setter Property="Margin" Value="0,0,0,3"/>
+        </Style>
+
+        <Style x:Key="SearchBoxStyle" TargetType="TextBox">
+            <Setter Property="Height" Value="24"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="BorderBrush" Value="#CCCCCC"/>
+            <Setter Property="Margin" Value="0,0,0,4"/>
+        </Style>
+
+        <!-- DWG 一覧の行（名前＋種別＋詳細） -->
+        <DataTemplate x:Key="DwgItemTemplate">
+            <Grid Margin="2,3">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                    <TextBlock Text="{Binding Name}" FontSize="12" TextTrimming="CharacterEllipsis"
+                               ToolTip="{Binding Name}"/>
+                    <TextBlock Text="{Binding KindLabel}" FontSize="10" Foreground="#888888"
+                               Margin="6,1,0,0" VerticalAlignment="Center"/>
+                </StackPanel>
+                <TextBlock Grid.Column="1" Text="{Binding DetailText}" FontSize="10"
+                           Foreground="#0066CC" Margin="8,1,2,0" VerticalAlignment="Center"/>
+            </Grid>
+        </DataTemplate>
     </Window.Resources>
 
     <Grid Margin="10">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <!-- 説明 -->
         <TextBlock x:Name="txtDescription" Grid.Row="0"
-                   Text="開いている別のモデルから、DWG レイヤの表示設定（表示/非表示・線の色・線幅・線種・ハーフトーン）をこのモデルへ移行します。"
+                   Text="開いている別のモデルから、DWG レイヤの表示設定をこのモデルへ移行します。"
                    TextWrapping="Wrap" FontSize="12" Foreground="#333333" Margin="0,0,0,8"/>
 
-        <!-- 移行元モデル・対象モード -->
+        <!-- ===== 上部: 移行元モデル・移行先モデル・移行の単位 ===== -->
         <Border Grid.Row="1" Background="White" BorderBrush="#DDDDDD" BorderThickness="1"
-                CornerRadius="2" Padding="10,8" Margin="0,0,0,8">
+                CornerRadius="2" Padding="10,8" Margin="0,0,0,10">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
@@ -137,153 +171,191 @@
                                  VerticalAlignment="Center" FontSize="12" Margin="0,0,16,0" Checked="Mode_Changed"/>
                     <RadioButton x:Name="rbView" Content="ビュー" GroupName="Mode"
                                  VerticalAlignment="Center" FontSize="12" Checked="Mode_Changed"/>
-                    <TextBlock x:Name="lblModeHint" Text="※ 同名のもの同士を自動で対応付けます"
+                    <TextBlock x:Name="lblModeHint" Text="※ 同名のものを自動で選択します"
                                VerticalAlignment="Center" FontSize="11" Foreground="#777777" Margin="16,0,0,0"/>
                 </StackPanel>
             </Grid>
         </Border>
 
-        <!-- DWG 対応表 -->
-        <Grid Grid.Row="2" Margin="0,0,0,8">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-            </Grid.RowDefinitions>
-
-            <TextBlock x:Name="lblDwgMap" Grid.Row="0" Text="DWG の対応（名前が違う場合は移行先を選び直してください）"
-                       FontSize="12" FontWeight="SemiBold" Foreground="#333333" Margin="0,0,0,4"/>
-
-            <DataGrid x:Name="DwgGrid" Grid.Row="1" MaxHeight="130"
-                      AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
-                      HeadersVisibility="Column" GridLinesVisibility="Horizontal"
-                      HorizontalGridLinesBrush="#ECECEC" RowHeaderWidth="0"
-                      BorderBrush="#CCCCCC" BorderThickness="1" FontSize="12" IsReadOnly="False">
-                <DataGrid.Columns>
-                    <DataGridTextColumn x:Name="colDwgSource" Header="移行元 DWG" Binding="{Binding SourceLabel}"
-                                        Width="2*" IsReadOnly="True" ElementStyle="{StaticResource GridCellText}"/>
-                    <DataGridTemplateColumn x:Name="colDwgTarget" Header="移行先 DWG" Width="2*">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <ComboBox ItemsSource="{Binding Candidates}"
-                                          SelectedItem="{Binding SelectedTarget, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                          FontSize="12" Margin="2" BorderBrush="#CCCCCC"/>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-                    <DataGridTextColumn x:Name="colDwgStatus" Header="レイヤ照合" Binding="{Binding StatusText}"
-                                        Width="1.4*" IsReadOnly="True" ElementStyle="{StaticResource GridCellText}"/>
-                </DataGrid.Columns>
-            </DataGrid>
-        </Grid>
-
-        <!-- ビュー対応表 -->
-        <Grid Grid.Row="3">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
-            </Grid.RowDefinitions>
-
-            <TextBlock x:Name="lblViewMap" Grid.Row="0" Text="移行するビューの対応"
-                       FontSize="12" FontWeight="SemiBold" Foreground="#333333" Margin="0,0,0,4"/>
-
-            <DataGrid x:Name="ViewGrid" Grid.Row="1"
-                      AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
-                      HeadersVisibility="Column" GridLinesVisibility="Horizontal"
-                      HorizontalGridLinesBrush="#ECECEC" RowHeaderWidth="0"
-                      BorderBrush="#CCCCCC" BorderThickness="1" FontSize="12" IsReadOnly="False"
-                      EnableRowVirtualization="True" EnableColumnVirtualization="True"
-                      VirtualizingPanel.IsVirtualizing="True"
-                      VirtualizingPanel.VirtualizationMode="Recycling">
-                <DataGrid.Columns>
-                    <DataGridTemplateColumn x:Name="colViewSelect" Header="選択" Width="46" CanUserSort="False">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <CheckBox IsChecked="{Binding IsSelected, UpdateSourceTrigger=PropertyChanged}"
-                                          IsEnabled="{Binding IsApplicable}"
-                                          HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-
-                    <DataGridTextColumn x:Name="colViewSource" Header="移行元" Binding="{Binding SourceName}"
-                                        Width="2.2*" IsReadOnly="True">
-                        <DataGridTextColumn.ElementStyle>
-                            <Style TargetType="TextBlock" BasedOn="{StaticResource GridCellText}">
-                                <Setter Property="ToolTip" Value="{Binding SourceName}"/>
-                            </Style>
-                        </DataGridTextColumn.ElementStyle>
-                    </DataGridTextColumn>
-
-                    <DataGridTextColumn x:Name="colViewCount" Header="設定数" Binding="{Binding SettingCount}"
-                                        Width="Auto" MinWidth="64" IsReadOnly="True">
-                        <DataGridTextColumn.ElementStyle>
-                            <Style TargetType="TextBlock" BasedOn="{StaticResource GridCellText}">
-                                <Setter Property="HorizontalAlignment" Value="Center"/>
-                            </Style>
-                        </DataGridTextColumn.ElementStyle>
-                    </DataGridTextColumn>
-
-                    <DataGridTemplateColumn x:Name="colViewTarget" Header="移行先" Width="2.2*">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <ComboBox ItemsSource="{Binding Candidates}"
-                                          SelectedItem="{Binding SelectedTarget, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                          FontSize="12" Margin="2" BorderBrush="#CCCCCC"/>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-
-                    <DataGridTextColumn x:Name="colViewStatus" Header="状態" Binding="{Binding StatusText}"
-                                        Width="1.8*" IsReadOnly="True">
-                        <DataGridTextColumn.ElementStyle>
-                            <Style TargetType="TextBlock" BasedOn="{StaticResource GridCellText}">
-                                <Setter Property="ToolTip" Value="{Binding StatusText}"/>
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsApplicable}" Value="False">
-                                        <Setter Property="Foreground" Value="#C0392B"/>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </DataGridTextColumn.ElementStyle>
-                    </DataGridTextColumn>
-                </DataGrid.Columns>
-            </DataGrid>
-        </Grid>
-
-        <!-- 選択操作・件数 -->
-        <Grid Grid.Row="4" Margin="0,8,0,0">
+        <!-- ===== 中段: 左＝移行元データ情報 / 右＝移行先データ情報 ===== -->
+        <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
-            <StackPanel Grid.Column="0" Orientation="Horizontal">
-                <Button x:Name="btnSelectWithSettings" Content="設定があるものを選択"
-                        Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,4,0"
-                        ToolTip="DWG レイヤの設定が1件以上あり、移行先が決まっている行を選択します"
-                        Click="SelectWithSettings_Click"/>
-                <Button x:Name="btnSelectAll" Content="全選択"
-                        Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,4,0" Click="SelectAll_Click"/>
-                <Button x:Name="btnDeselectAll" Content="選択解除"
-                        Style="{StaticResource SecondaryButtonStyle}" Click="DeselectAll_Click"/>
-            </StackPanel>
-            <TextBlock x:Name="txtCount" Grid.Column="1" Text="" FontSize="11" Foreground="#555555"
-                       VerticalAlignment="Center"/>
+
+            <!-- 左: 移行元モデル データ情報 -->
+            <Border Grid.Column="0" BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="2"
+                    Background="White">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <Border Grid.Row="0" Background="#0066CC">
+                        <TextBlock x:Name="lblSourceSection" Text="移行元モデル データ情報"
+                                   Style="{StaticResource SectionHeader}"/>
+                    </Border>
+
+                    <Grid Grid.Row="1" Margin="8">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="1.1*"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock x:Name="lblSrcViewCaption" Grid.Row="0" Text="① ビューを選択"
+                                   Style="{StaticResource ListCaption}"/>
+                        <TextBox x:Name="SrcViewSearch" Grid.Row="1" Style="{StaticResource SearchBoxStyle}"
+                                 TextChanged="SrcViewSearch_Changed"/>
+                        <ListBox x:Name="SrcViewList" Grid.Row="2" FontSize="12"
+                                 BorderBrush="#DDDDDD" BorderThickness="1"
+                                 DisplayMemberPath="Name" SelectionMode="Single"
+                                 SelectionChanged="SrcView_Changed"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                 VirtualizingPanel.IsVirtualizing="True"
+                                 VirtualizingPanel.VirtualizationMode="Recycling"/>
+
+                        <TextBlock x:Name="lblSrcDwgCaption" Grid.Row="3" Text="② このビューにある DWG を選択"
+                                   Style="{StaticResource ListCaption}" Margin="0,8,0,3"/>
+                        <ListBox x:Name="SrcDwgList" Grid.Row="4" FontSize="12"
+                                 BorderBrush="#DDDDDD" BorderThickness="1"
+                                 ItemTemplate="{StaticResource DwgItemTemplate}"
+                                 HorizontalContentAlignment="Stretch" SelectionMode="Single"
+                                 SelectionChanged="SrcDwg_Changed"/>
+                    </Grid>
+                </Grid>
+            </Border>
+
+            <!-- 中央の矢印 -->
+            <TextBlock Grid.Column="1" Text="&#x25B6;" FontSize="20" Foreground="#0066CC"
+                       VerticalAlignment="Center" Margin="10,0"/>
+
+            <!-- 右: 移行先モデル データ情報 -->
+            <Border Grid.Column="2" BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="2"
+                    Background="White">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <Border Grid.Row="0" Background="#5B9BD5">
+                        <TextBlock x:Name="lblTargetSection" Text="移行先モデル データ情報"
+                                   Style="{StaticResource SectionHeader}"/>
+                    </Border>
+
+                    <Grid Grid.Row="1" Margin="8">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="1.1*"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock x:Name="lblTgtViewCaption" Grid.Row="0" Text="③ 反映するビューを選択（複数可）"
+                                   Style="{StaticResource ListCaption}"/>
+                        <TextBox x:Name="TgtViewSearch" Grid.Row="1" Style="{StaticResource SearchBoxStyle}"
+                                 TextChanged="TgtViewSearch_Changed"/>
+
+                        <DataGrid x:Name="TgtViewGrid" Grid.Row="2"
+                                  AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
+                                  HeadersVisibility="Column" GridLinesVisibility="Horizontal"
+                                  HorizontalGridLinesBrush="#F0F0F0" RowHeaderWidth="0"
+                                  BorderBrush="#DDDDDD" BorderThickness="1" FontSize="12"
+                                  EnableRowVirtualization="True"
+                                  VirtualizingPanel.IsVirtualizing="True"
+                                  VirtualizingPanel.VirtualizationMode="Recycling">
+                            <DataGrid.Columns>
+                                <DataGridTemplateColumn x:Name="colTgtSelect" Header="" Width="34" CanUserSort="False">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <CheckBox IsChecked="{Binding IsSelected, UpdateSourceTrigger=PropertyChanged}"
+                                                      IsEnabled="{Binding IsApplicable}"
+                                                      HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+
+                                <DataGridTextColumn x:Name="colTgtName" Header="名前" Binding="{Binding Name}"
+                                                    Width="*" IsReadOnly="True">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="VerticalAlignment" Value="Center"/>
+                                            <Setter Property="Margin" Value="4,0"/>
+                                            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                                            <Setter Property="ToolTip" Value="{Binding Name}"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsApplicable}" Value="False">
+                                                    <Setter Property="Foreground" Value="#AAAAAA"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+
+                                <DataGridTextColumn x:Name="colTgtStatus" Header="状態" Binding="{Binding StatusText}"
+                                                    Width="1.1*" IsReadOnly="True">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="VerticalAlignment" Value="Center"/>
+                                            <Setter Property="Margin" Value="4,0"/>
+                                            <Setter Property="FontSize" Value="10"/>
+                                            <Setter Property="Foreground" Value="#C0392B"/>
+                                            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                                            <Setter Property="ToolTip" Value="{Binding StatusText}"/>
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
+
+                        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,4,0,0">
+                            <Button x:Name="btnTgtSelectAll" Content="全選択"
+                                    Style="{StaticResource SecondaryButtonStyle}" Click="TgtSelectAll_Click"/>
+                            <Button x:Name="btnTgtDeselectAll" Content="選択解除"
+                                    Style="{StaticResource SecondaryButtonStyle}" Click="TgtDeselectAll_Click"/>
+                        </StackPanel>
+
+                        <TextBlock x:Name="lblTgtDwgCaption" Grid.Row="4" Text="④ 反映先の DWG を選択"
+                                   Style="{StaticResource ListCaption}" Margin="0,8,0,3"/>
+                        <ListBox x:Name="TgtDwgList" Grid.Row="5" FontSize="12"
+                                 BorderBrush="#DDDDDD" BorderThickness="1"
+                                 ItemTemplate="{StaticResource DwgItemTemplate}"
+                                 HorizontalContentAlignment="Stretch" SelectionMode="Single"
+                                 SelectionChanged="TgtDwg_Changed"/>
+                    </Grid>
+                </Grid>
+            </Border>
         </Grid>
 
-        <!-- ボタン行 -->
-        <Grid Grid.Row="5" Margin="0,8,0,0">
+        <!-- ===== 下部: サマリとボタン ===== -->
+        <Grid Grid.Row="3" Margin="0,10,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
+
             <Button x:Name="btnReload" Grid.Column="0" Content="再読み込み"
-                    Style="{StaticResource SecondaryButtonStyle}" Click="Reload_Click"/>
+                    Style="{StaticResource SecondaryButtonStyle}" Height="30" MinWidth="90"
+                    Margin="0" Click="Reload_Click"/>
+
+            <TextBlock x:Name="txtSummary" Grid.Column="1" Text="" FontSize="11" Foreground="#555555"
+                       VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="12,0"/>
+
             <StackPanel Grid.Column="2" Orientation="Horizontal">
                 <Button x:Name="btnApply" Content="設定を移行"
                         Style="{StaticResource PrimaryButtonStyle}" MinWidth="150" Click="Apply_Click"/>
                 <Button x:Name="btnClose" Content="閉じる"
-                        Style="{StaticResource SecondaryButtonStyle}" Click="Close_Click"/>
+                        Style="{StaticResource SecondaryButtonStyle}" Height="30" MinWidth="90"
+                        Click="Close_Click"/>
             </StackPanel>
         </Grid>
     </Grid>

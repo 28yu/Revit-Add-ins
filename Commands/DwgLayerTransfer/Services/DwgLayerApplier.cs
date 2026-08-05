@@ -16,21 +16,18 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
         /// <summary>書き込んだレイヤ設定の延べ件数</summary>
         public int LayerCount { get; set; }
 
-        /// <summary>移行先に見つからなかったレイヤ（"DWG名 / レイヤ名"）</summary>
+        /// <summary>移行先の DWG に見つからなかったレイヤ名</summary>
         public List<string> MissingLayers { get; } = new List<string>();
 
         /// <summary>移行先に存在しなかった線種名</summary>
         public List<string> MissingLinePatterns { get; } = new List<string>();
-
-        /// <summary>書き込みに失敗したビュー（"ビュー名: 理由"）</summary>
-        public List<string> FailedViews { get; } = new List<string>();
     }
 
     /// <summary>
     /// 読み取った DWG レイヤ表示設定を、移行先モデルのビュー／ビューテンプレートへ書き込むサービス。
     ///
     /// ElementId はモデル間で通用しないため、
-    ///   - DWG      : ダイアログで解決したカテゴリ名の対応表
+    ///   - DWG      : ダイアログで選んだ移行先 DWG
     ///   - レイヤ    : サブカテゴリ名の一致
     ///   - 線種      : LinePatternElement の名前一致
     /// で移行先の ID へ解決し直す。解決できなかったものはレポートに残す。
@@ -40,29 +37,24 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
         private Dictionary<string, ElementId> _linePatterns;
 
         /// <summary>
-        /// 設定を移行先ドキュメントへ適用する（呼び出し側でトランザクションを張らずに済むよう内部で開始する）。
+        /// 移行元 1 DWG 分のレイヤ設定を、移行先の 1 DWG × 複数ビューへ適用する。
+        /// トランザクションは内部で開始・コミットする。
         /// </summary>
         /// <param name="targetDoc">移行先ドキュメント</param>
-        /// <param name="viewPairs">適用対象のビュー対応行（適用可能なものだけを渡すこと）</param>
-        /// <param name="targetViewsByName">移行先のビュー名 -&gt; ビュー情報</param>
-        /// <param name="dwgMap">移行元 DWG 名 -&gt; 移行先 DWG 名</param>
-        /// <param name="targetDwgs">移行先の DWG 定義</param>
+        /// <param name="sourceLayers">移行元のレイヤ名 -&gt; 設定（"" は DWG 本体）</param>
+        /// <param name="targetViews">適用先のビュー（適用可能なものだけを渡すこと）</param>
+        /// <param name="targetDwg">適用先の DWG</param>
         public TransferResult Apply(
             Document targetDoc,
-            IList<ViewPairRow> viewPairs,
-            IDictionary<string, ViewEntry> targetViewsByName,
-            IDictionary<string, string> dwgMap,
-            IList<DwgDefinition> targetDwgs)
+            IDictionary<string, LayerGraphicSetting> sourceLayers,
+            IList<ViewEntry> targetViews,
+            DwgDefinition targetDwg)
         {
             var result = new TransferResult();
-            if (targetDoc == null || viewPairs == null || viewPairs.Count == 0) return result;
+            if (targetDoc == null || sourceLayers == null || sourceLayers.Count == 0) return result;
+            if (targetViews == null || targetViews.Count == 0 || targetDwg == null) return result;
 
             _linePatterns = BuildLinePatternMap(targetDoc);
-
-            var targetDwgByName = new Dictionary<string, DwgDefinition>(
-                StringComparer.CurrentCultureIgnoreCase);
-            foreach (var d in targetDwgs ?? new List<DwgDefinition>())
-                targetDwgByName[d.Name] = d;
 
             var missingLayers = new HashSet<string>(StringComparer.CurrentCultureIgnoreCase);
             var missingPatterns = new HashSet<string>(StringComparer.CurrentCultureIgnoreCase);
@@ -71,41 +63,33 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
             {
                 t.Start();
 
-                foreach (var pair in viewPairs)
+                foreach (var entry in targetViews)
                 {
-                    if (pair?.Snapshot == null || !pair.IsApplicable) continue;
-                    if (!targetViewsByName.TryGetValue(pair.SelectedTarget, out var targetEntry)) continue;
-                    if (!(targetDoc.GetElement(targetEntry.Id) is View targetView)) continue;
+                    if (entry == null) continue;
+                    if (!(targetDoc.GetElement(entry.Id) is View targetView)) continue;
 
                     int appliedInView = 0;
 
-                    foreach (var kv in pair.Snapshot.ByDwg)
+                    foreach (var kv in sourceLayers)
                     {
-                        string srcDwgName = kv.Key;
-                        if (!dwgMap.TryGetValue(srcDwgName, out string tgtDwgName)) continue;
-                        if (string.IsNullOrEmpty(tgtDwgName)) continue;
-                        if (!targetDwgByName.TryGetValue(tgtDwgName, out var tgtDwg)) continue;
+                        string layerName = kv.Key;
+                        LayerGraphicSetting setting = kv.Value;
+                        if (setting == null) continue;
 
-                        foreach (var layerKv in kv.Value)
+                        // レイヤ名 "" は DWG 本体（親カテゴリ）
+                        ElementId targetCatId;
+                        if (layerName.Length == 0)
                         {
-                            string layerName = layerKv.Key;
-                            LayerGraphicSetting setting = layerKv.Value;
-
-                            // レイヤ名 "" は DWG 本体（親カテゴリ）
-                            ElementId targetCatId;
-                            if (layerName.Length == 0)
-                            {
-                                targetCatId = tgtDwg.CategoryId;
-                            }
-                            else if (!tgtDwg.Layers.TryGetValue(layerName, out targetCatId))
-                            {
-                                missingLayers.Add($"{tgtDwgName} / {layerName}");
-                                continue;
-                            }
-
-                            if (ApplyOne(targetView, targetCatId, setting, missingPatterns))
-                                appliedInView++;
+                            targetCatId = targetDwg.CategoryId;
                         }
+                        else if (!targetDwg.Layers.TryGetValue(layerName, out targetCatId))
+                        {
+                            missingLayers.Add(layerName);
+                            continue;
+                        }
+
+                        if (ApplyOne(targetView, targetCatId, setting, missingPatterns))
+                            appliedInView++;
                     }
 
                     if (appliedInView > 0)

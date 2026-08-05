@@ -27,17 +27,32 @@ namespace Tools28.Commands.DwgLayerTransfer.Models
         public Dictionary<string, ElementId> Layers { get; }
             = new Dictionary<string, ElementId>(StringComparer.CurrentCultureIgnoreCase);
 
-        /// <summary>一覧表示用のラベル（リンク/読み込みの別とレイヤ数を添える）</summary>
-        public string DisplayLabel
+        /// <summary>
+        /// モデル全体に配置された ImportInstance を持つか（＝どのビューにも現れうる）。
+        /// ImportInstance が1つも見つからなかった場合も、取りこぼしを防ぐため true にする。
+        /// </summary>
+        public bool AppearsEverywhere { get; set; }
+
+        /// <summary>
+        /// ビュー固有に貼り付けられた ImportInstance の所有ビュー ID。
+        /// 「特定のビューにだけ貼り付けた DWG」がここに入る。
+        /// </summary>
+        public HashSet<ElementId> OwnerViewIds { get; } = new HashSet<ElementId>();
+
+        /// <summary>この DWG が指定ビューに現れるか。</summary>
+        public bool AppearsInView(ElementId viewId)
+            => AppearsEverywhere || (viewId != null && OwnerViewIds.Contains(viewId));
+
+        /// <summary>リンク／読み込み／ビュー固有の別を表す短いラベル</summary>
+        public string KindLabel
         {
             get
             {
-                string kind = IsLinked == true ? Loc.S("DwgVg.Kind.Link")
-                            : IsLinked == false ? Loc.S("DwgVg.Kind.Import")
-                            : "";
-                return string.IsNullOrEmpty(kind)
-                    ? $"{Name} ({Layers.Count})"
-                    : $"{Name} [{kind}] ({Layers.Count})";
+                if (!AppearsEverywhere && OwnerViewIds.Count > 0)
+                    return Loc.S("DwgVg.Kind.ViewSpecific");
+                if (IsLinked == true) return Loc.S("DwgVg.Kind.Link");
+                if (IsLinked == false) return Loc.S("DwgVg.Kind.Import");
+                return "";
             }
         }
     }
@@ -58,26 +73,4 @@ namespace Tools28.Commands.DwgLayerTransfer.Models
         public bool IsBlocked => BlockReason != null;
     }
 
-    /// <summary>1ビュー分の DWG レイヤ設定スナップショット。</summary>
-    public sealed class ViewSettingSnapshot
-    {
-        public ViewEntry View { get; set; }
-
-        /// <summary>DWG 名 -&gt; (レイヤ名 -&gt; 設定)。レイヤ名 "" は DWG 本体。</summary>
-        public Dictionary<string, Dictionary<string, LayerGraphicSetting>> ByDwg { get; }
-            = new Dictionary<string, Dictionary<string, LayerGraphicSetting>>(StringComparer.CurrentCultureIgnoreCase);
-
-        /// <summary>既定から変化している設定の件数（一覧表示用）</summary>
-        public int SettingCount
-        {
-            get
-            {
-                int n = 0;
-                foreach (var layers in ByDwg.Values)
-                    foreach (var s in layers.Values)
-                        if (s.HasAnySetting) n++;
-                return n;
-            }
-        }
-    }
 }

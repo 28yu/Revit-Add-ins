@@ -28,8 +28,8 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
             var result = new List<DwgDefinition>();
             if (doc == null) return result;
 
-            // リンク/読み込みの別を先に集める（表示用の補足情報）
-            var linkedFlags = CollectImportKinds(doc);
+            // ImportInstance の配置情報（リンク/読み込みの別・どのビューにあるか）を先に集める
+            var placements = CollectImportPlacements(doc);
 
             Categories cats;
             try { cats = doc.Settings.Categories; }
@@ -55,8 +55,17 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
                 if (string.IsNullOrEmpty(name)) continue;
 
                 var def = new DwgDefinition { Name = name, CategoryId = cat.Id };
-                if (linkedFlags.TryGetValue(idValue, out bool isLinked))
-                    def.IsLinked = isLinked;
+                if (placements.TryGetValue(idValue, out var placement))
+                {
+                    def.IsLinked = placement.IsLinked;
+                    def.AppearsEverywhere = placement.HasModelWide;
+                    foreach (var vid in placement.OwnerViews) def.OwnerViewIds.Add(vid);
+                }
+
+                // ImportInstance が1つも見つからなかった DWG は、どのビューでも選べるようにしておく
+                // （インスタンスを消してもカテゴリは残るため、取りこぼすと設定を移せなくなる）
+                if (!def.AppearsEverywhere && def.OwnerViewIds.Count == 0)
+                    def.AppearsEverywhere = true;
 
                 try
                 {
@@ -79,10 +88,25 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
                 .ToList();
         }
 
-        /// <summary>ImportInstance を走査して カテゴリID -&gt; リンクかどうか のマップを作る。</summary>
-        private static Dictionary<int, bool> CollectImportKinds(Document doc)
+        /// <summary>ImportInstance 1カテゴリ分の配置情報。</summary>
+        private sealed class ImportPlacement
         {
-            var map = new Dictionary<int, bool>();
+            public bool? IsLinked;
+            /// <summary>モデル全体に配置されたインスタンスがあるか（OwnerViewId が無効）</summary>
+            public bool HasModelWide;
+            /// <summary>ビュー固有に貼り付けられたインスタンスの所有ビュー</summary>
+            public readonly HashSet<ElementId> OwnerViews = new HashSet<ElementId>();
+        }
+
+        /// <summary>
+        /// ImportInstance を走査して カテゴリID -&gt; 配置情報 のマップを作る。
+        ///
+        /// OwnerViewId が無効なインスタンスは「モデルに読み込み／リンクされた DWG」で全ビューに現れうる。
+        /// 有効なインスタンスは「そのビューにだけ貼り付けた DWG」で、当該ビューにしか現れない。
+        /// </summary>
+        private static Dictionary<int, ImportPlacement> CollectImportPlacements(Document doc)
+        {
+            var map = new Dictionary<int, ImportPlacement>();
             try
             {
                 var instances = new FilteredElementCollector(doc)
@@ -96,12 +120,47 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
                     try { cat = inst.Category; } catch { continue; }
                     if (cat == null) continue;
 
-                    try { map[cat.Id.IntValue()] = inst.IsLinked; }
-                    catch { }
+                    int key;
+                    try { key = cat.Id.IntValue(); }
+                    catch { continue; }
+
+                    if (!map.TryGetValue(key, out var placement))
+                    {
+                        placement = new ImportPlacement();
+                        map[key] = placement;
+                    }
+
+                    try { placement.IsLinked = inst.IsLinked; } catch { }
+
+                    try
+                    {
+                        ElementId owner = inst.OwnerViewId;
+                        if (owner == null || owner == ElementId.InvalidElementId)
+                            placement.HasModelWide = true;
+                        else
+                            placement.OwnerViews.Add(owner);
+                    }
+                    catch
+                    {
+                        // 判定できない場合は全ビューに現れる扱いにする（取りこぼし防止）
+                        placement.HasModelWide = true;
+                    }
                 }
             }
             catch { }
             return map;
+        }
+
+        /// <summary>
+        /// 指定ビューに現れる DWG だけに絞り込む。
+        /// ビューテンプレートはジオメトリを持たず全 DWG のカテゴリを制御するため、絞り込まない。
+        /// </summary>
+        public static List<DwgDefinition> FilterForView(
+            IEnumerable<DwgDefinition> dwgs, ElementId viewId, bool isTemplate)
+        {
+            if (dwgs == null) return new List<DwgDefinition>();
+            if (isTemplate) return dwgs.ToList();
+            return dwgs.Where(d => d.AppearsInView(viewId)).ToList();
         }
 
         // ===== ビューの列挙 =====
@@ -221,45 +280,33 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
         // ===== 設定値の読み取り =====
 
         /// <summary>
-        /// 指定ビュー群について、全 DWG レイヤの表示設定スナップショットを作る。
+        /// 1ビュー・1 DWG 分のレイヤ表示設定を読み取る。
+        /// 戻り値のキーはレイヤ名で、"" は DWG 本体（親カテゴリ）を表す。
         /// </summary>
-        public List<ViewSettingSnapshot> ReadSettings(
-            Document doc, IEnumerable<ViewEntry> views, IEnumerable<DwgDefinition> dwgs)
+        public Dictionary<string, LayerGraphicSetting> ReadSettings(
+            Document doc, ElementId viewId, DwgDefinition dwg)
         {
-            var snapshots = new List<ViewSettingSnapshot>();
-            if (doc == null || views == null || dwgs == null) return snapshots;
+            var layers = new Dictionary<string, LayerGraphicSetting>(
+                StringComparer.CurrentCultureIgnoreCase);
 
-            var dwgList = dwgs.ToList();
+            if (doc == null || dwg == null) return layers;
+            if (!(doc.GetElement(viewId) is View view)) return layers;
 
-            foreach (var entry in views)
+            var root = ReadOne(doc, view, dwg.CategoryId, "");
+            if (root != null) layers[""] = root;
+
+            foreach (var kv in dwg.Layers)
             {
-                if (!(doc.GetElement(entry.Id) is View view)) continue;
-
-                var snap = new ViewSettingSnapshot { View = entry };
-
-                foreach (var dwg in dwgList)
-                {
-                    var layers = new Dictionary<string, LayerGraphicSetting>(
-                        StringComparer.CurrentCultureIgnoreCase);
-
-                    // DWG 本体（親カテゴリ）はレイヤ名 "" で保持する
-                    var root = ReadOne(doc, view, dwg.CategoryId, "");
-                    if (root != null) layers[""] = root;
-
-                    foreach (var kv in dwg.Layers)
-                    {
-                        var s = ReadOne(doc, view, kv.Value, kv.Key);
-                        if (s != null) layers[kv.Key] = s;
-                    }
-
-                    if (layers.Count > 0) snap.ByDwg[dwg.Name] = layers;
-                }
-
-                snapshots.Add(snap);
+                var s = ReadOne(doc, view, kv.Value, kv.Key);
+                if (s != null) layers[kv.Key] = s;
             }
 
-            return snapshots;
+            return layers;
         }
+
+        /// <summary>既定から変化している設定の件数を数える（一覧の「設定数」表示用）。</summary>
+        public static int CountConfigured(IEnumerable<LayerGraphicSetting> settings)
+            => settings?.Count(s => s != null && s.HasAnySetting) ?? 0;
 
         /// <summary>1カテゴリ（DWG本体またはレイヤ）分の設定を読む。読めない場合は null。</summary>
         private static LayerGraphicSetting ReadOne(

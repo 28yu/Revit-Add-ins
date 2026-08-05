@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
+using System.Windows.Data;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using Tools28.Commands.DwgLayerTransfer.Models;
@@ -13,6 +14,11 @@ namespace Tools28.Commands.DwgLayerTransfer.Views
     /// <summary>
     /// 開いている別モデルから DWG レイヤの表示設定を取り込むダイアログ。
     /// 移行先は常にアクティブなモデル（このダイアログを開いたモデル）。
+    ///
+    /// 画面構成:
+    ///   上部  … 移行元モデル / 移行先モデル / 移行の単位
+    ///   左    … 移行元モデル データ情報（① ビュー → ② そのビューにある DWG）
+    ///   右    … 移行先モデル データ情報（③ 反映するビュー（複数可） → ④ 反映先 DWG）
     /// </summary>
     public partial class DwgLayerTransferDialog : Window
     {
@@ -20,13 +26,22 @@ namespace Tools28.Commands.DwgLayerTransfer.Views
         private readonly List<Document> _sourceDocs;
         private readonly DwgLayerScanner _scanner = new DwgLayerScanner();
 
-        private List<DwgDefinition> _targetDwgs = new List<DwgDefinition>();
-        private List<DwgPairRow> _dwgRows = new List<DwgPairRow>();
-        private List<ViewPairRow> _viewRows = new List<ViewPairRow>();
+        // --- 移行元 ---
+        private Document _sourceDoc;
+        private List<DwgDefinition> _sourceDwgs = new List<DwgDefinition>();
+        private List<ViewEntry> _sourceViews = new List<ViewEntry>();
+        private List<DwgItem> _sourceDwgItems = new List<DwgItem>();
+        private ICollectionView _sourceViewsView;
 
-        /// <summary>移行先のビュー名 -&gt; ビュー情報（現在のモードで列挙したもの）</summary>
-        private Dictionary<string, ViewEntry> _targetViewsByName
-            = new Dictionary<string, ViewEntry>(StringComparer.CurrentCultureIgnoreCase);
+        /// <summary>選択中の移行元ビュー×DWG のレイヤ設定（レイヤ名 -&gt; 設定、"" は DWG 本体）</summary>
+        private Dictionary<string, LayerGraphicSetting> _sourceLayers
+            = new Dictionary<string, LayerGraphicSetting>();
+
+        // --- 移行先 ---
+        private List<DwgDefinition> _targetDwgs = new List<DwgDefinition>();
+        private List<TargetViewRow> _targetViewRows = new List<TargetViewRow>();
+        private List<DwgItem> _targetDwgItems = new List<DwgItem>();
+        private ICollectionView _targetViewsView;
 
         private bool _ready;   // 初期化完了フラグ（InitializeComponent 中のイベント発火を無視）
 
@@ -45,7 +60,7 @@ namespace Tools28.Commands.DwgLayerTransfer.Views
             if (cmbSource.Items.Count > 0) cmbSource.SelectedIndex = 0;
 
             _ready = true;
-            Rebuild();
+            ReloadAll();
         }
 
         private void ApplyLocalization()
@@ -59,25 +74,30 @@ namespace Tools28.Commands.DwgLayerTransfer.Views
             rbView.Content = Loc.S("DwgVg.Mode.View");
             lblModeHint.Text = Loc.S("DwgVg.Mode.Hint");
 
-            lblDwgMap.Text = Loc.S("DwgVg.DwgMap");
-            colDwgSource.Header = Loc.S("DwgVg.Col.DwgSource");
-            colDwgTarget.Header = Loc.S("DwgVg.Col.DwgTarget");
-            colDwgStatus.Header = Loc.S("DwgVg.Col.DwgStatus");
+            lblSourceSection.Text = Loc.S("DwgVg.Section.Source");
+            lblTargetSection.Text = Loc.S("DwgVg.Section.Target");
 
-            lblViewMap.Text = Loc.S("DwgVg.ViewMap");
-            colViewSelect.Header = Loc.S("DwgVg.Col.Select");
-            colViewSource.Header = Loc.S("DwgVg.Col.ViewSource");
-            colViewCount.Header = Loc.S("DwgVg.Col.SettingCount");
-            colViewTarget.Header = Loc.S("DwgVg.Col.ViewTarget");
-            colViewStatus.Header = Loc.S("DwgVg.Col.Status");
+            lblSrcDwgCaption.Text = Loc.S("DwgVg.Step2");
+            lblTgtViewCaption.Text = Loc.S("DwgVg.Step3");
+            lblTgtDwgCaption.Text = Loc.S("DwgVg.Step4");
 
-            btnSelectWithSettings.Content = Loc.S("DwgVg.SelectWithSettings");
-            btnSelectWithSettings.ToolTip = Loc.S("DwgVg.SelectWithSettings.Tip");
-            btnSelectAll.Content = Loc.S("DwgVg.SelectAll");
-            btnDeselectAll.Content = Loc.S("DwgVg.DeselectAll");
+            colTgtName.Header = Loc.S("DwgVg.Col.Name");
+            colTgtStatus.Header = Loc.S("DwgVg.Col.Status");
+
+            btnTgtSelectAll.Content = Loc.S("DwgVg.SelectAll");
+            btnTgtDeselectAll.Content = Loc.S("DwgVg.DeselectAll");
             btnReload.Content = Loc.S("DwgVg.Btn.Reload");
             btnApply.Content = Loc.S("DwgVg.Btn.Apply");
             btnClose.Content = Loc.S("DwgVg.Btn.Close");
+
+            UpdateModeDependentLabels();
+        }
+
+        /// <summary>「ビュー」「ビューテンプレート」で表記が変わるラベルを更新する。</summary>
+        private void UpdateModeDependentLabels()
+        {
+            lblSrcViewCaption.Text = TemplateMode ? Loc.S("DwgVg.Step1.Template") : Loc.S("DwgVg.Step1.View");
+            lblSrcDwgCaption.Text = TemplateMode ? Loc.S("DwgVg.Step2.Template") : Loc.S("DwgVg.Step2");
         }
 
         private static string SafeTitle(Document d)
@@ -86,256 +106,283 @@ namespace Tools28.Commands.DwgLayerTransfer.Views
             catch { return ""; }
         }
 
-        private Document SelectedSourceDoc
-        {
-            get
-            {
-                int i = cmbSource.SelectedIndex;
-                return (i >= 0 && i < _sourceDocs.Count) ? _sourceDocs[i] : null;
-            }
-        }
-
         /// <summary>ビューテンプレート単位か（false ならビュー単位）</summary>
         private bool TemplateMode => rbTemplate.IsChecked == true;
 
         // ===== 一覧の構築 =====
 
-        private void Rebuild()
+        /// <summary>移行元モデル・移行の単位が変わったときに全体を組み直す。</summary>
+        private void ReloadAll()
         {
             if (!_ready) return;
 
-            var src = SelectedSourceDoc;
-            if (src == null)
+            int i = cmbSource.SelectedIndex;
+            _sourceDoc = (i >= 0 && i < _sourceDocs.Count) ? _sourceDocs[i] : null;
+
+            UpdateModeDependentLabels();
+
+            if (_sourceDoc == null)
             {
-                _dwgRows = new List<DwgPairRow>();
-                _viewRows = new List<ViewPairRow>();
-                DwgGrid.ItemsSource = null;
-                ViewGrid.ItemsSource = null;
-                btnApply.IsEnabled = false;
-                UpdateCount();
+                ClearAll();
                 return;
             }
 
             // 走査中は Revit 本体の操作を無効化する（using を抜けると必ず復帰）
             using (this.BlockRevitInput())
             {
+                bool templates = TemplateMode;
+
+                _sourceDwgs = _scanner.EnumerateDwgs(_sourceDoc);
                 _targetDwgs = _scanner.EnumerateDwgs(_targetDoc);
-                var sourceDwgs = _scanner.EnumerateDwgs(src);
 
-                BuildDwgRows(sourceDwgs);
-                BuildViewRows(src, sourceDwgs);
+                _sourceViews = _scanner.EnumerateViews(_sourceDoc, templates, checkTemplateControl: false);
+                var targetViews = _scanner.EnumerateViews(_targetDoc, templates, checkTemplateControl: true);
+
+                // --- 左: ビュー一覧 ---
+                _sourceViewsView = CollectionViewSource.GetDefaultView(_sourceViews);
+                _sourceViewsView.Filter = o =>
+                    o is ViewEntry v && MatchesSearch(v.Name, SrcViewSearch?.Text);
+                SrcViewList.ItemsSource = _sourceViewsView;
+
+                // --- 右: ビュー一覧 ---
+                _targetViewRows = targetViews.Select(v => new TargetViewRow { Entry = v }).ToList();
+                foreach (var r in _targetViewRows) r.PropertyChanged += TargetViewRow_PropertyChanged;
+
+                _targetViewsView = CollectionViewSource.GetDefaultView(_targetViewRows);
+                _targetViewsView.Filter = o =>
+                    o is TargetViewRow r && MatchesSearch(r.Name, TgtViewSearch?.Text);
+                TgtViewGrid.ItemsSource = _targetViewsView;
+
+                // --- 右: DWG 一覧（移行先は全 DWG を出す。絞り込むと選べなくなるため）---
+                _targetDwgItems = _targetDwgs.Select(d => new DwgItem { Dwg = d }).ToList();
+                TgtDwgList.ItemsSource = _targetDwgItems;
+
+                // 左のビューは先頭を自動選択（→ 連鎖して DWG 一覧まで埋まる）
+                SrcViewList.SelectedIndex = _sourceViews.Count > 0 ? 0 : -1;
+                if (SrcViewList.SelectedIndex < 0) OnSourceViewChanged();
             }
 
-            btnApply.IsEnabled = _viewRows.Any(r => r.IsApplicable);
-            UpdateCount();
+            UpdateSummary();
         }
 
-        private void BuildDwgRows(List<DwgDefinition> sourceDwgs)
+        private void ClearAll()
         {
-            var candidates = new List<string> { DwgPairRow.NoMatch };
-            candidates.AddRange(_targetDwgs.Select(d => d.Name));
+            _sourceDwgs = new List<DwgDefinition>();
+            _sourceViews = new List<ViewEntry>();
+            _sourceDwgItems = new List<DwgItem>();
+            _targetDwgs = new List<DwgDefinition>();
+            _targetViewRows = new List<TargetViewRow>();
+            _targetDwgItems = new List<DwgItem>();
+            _sourceLayers = new Dictionary<string, LayerGraphicSetting>();
 
-            _dwgRows = new List<DwgPairRow>();
-            foreach (var s in sourceDwgs)
+            SrcViewList.ItemsSource = null;
+            SrcDwgList.ItemsSource = null;
+            TgtViewGrid.ItemsSource = null;
+            TgtDwgList.ItemsSource = null;
+            UpdateSummary();
+        }
+
+        private static bool MatchesSearch(string name, string query)
+        {
+            string q = query?.Trim();
+            if (string.IsNullOrEmpty(q)) return true;
+            return name != null && name.IndexOf(q, StringComparison.CurrentCultureIgnoreCase) >= 0;
+        }
+
+        /// <summary>
+        /// ① 移行元ビューが変わったとき: そのビューにある DWG の一覧を作り直す。
+        /// 設定件数もここで数えるが、対象は「選択中の1ビュー × その DWG」だけなので軽い。
+        /// </summary>
+        private void OnSourceViewChanged()
+        {
+            var entry = SrcViewList.SelectedItem as ViewEntry;
+
+            if (entry == null || _sourceDoc == null)
             {
-                var row = new DwgPairRow
-                {
-                    Source = s,
-                    Candidates = candidates
-                };
-
-                // 同名の DWG を自動で対応付ける
-                var match = _targetDwgs.FirstOrDefault(
-                    d => string.Equals(d.Name, s.Name, StringComparison.CurrentCultureIgnoreCase));
-                row.SelectedTarget = match?.Name ?? DwgPairRow.NoMatch;
-
-                UpdateMatchedLayerCount(row);
-                row.PropertyChanged += DwgRow_PropertyChanged;
-                _dwgRows.Add(row);
+                _sourceDwgItems = new List<DwgItem>();
+                SrcDwgList.ItemsSource = null;
+                _sourceLayers = new Dictionary<string, LayerGraphicSetting>();
+                SyncTargetViewSelection(null);
+                UpdateSummary();
+                return;
             }
 
-            DwgGrid.ItemsSource = _dwgRows;
-        }
+            var visible = DwgLayerScanner.FilterForView(_sourceDwgs, entry.Id, entry.IsTemplate);
 
-        private void DwgRow_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
-        {
-            if (e.PropertyName != nameof(DwgPairRow.SelectedTarget)) return;
-            if (!(sender is DwgPairRow row)) return;
-
-            UpdateMatchedLayerCount(row);
-            // StatusText は MatchedLayerCount を参照するため、更新後に再通知させる。
-            // ComboBox の選択確定中に Items.Refresh() を呼ぶと DataGrid の編集トランザクションと
-            // 衝突して例外になるため、Background 優先度で遅延実行する。
-            RefreshGridDeferred(DwgGrid);
-        }
-
-        /// <summary>DataGrid の再描画を編集確定後まで遅らせる。</summary>
-        private void RefreshGridDeferred(System.Windows.Controls.DataGrid grid)
-        {
-            Dispatcher.BeginInvoke(new Action(() =>
+            _sourceDwgItems = new List<DwgItem>();
+            foreach (var d in visible)
             {
-                try
+                var settings = _scanner.ReadSettings(_sourceDoc, entry.Id, d);
+                _sourceDwgItems.Add(new DwgItem
                 {
-                    grid.CommitEdit(System.Windows.Controls.DataGridEditingUnit.Cell, true);
-                    grid.CommitEdit(System.Windows.Controls.DataGridEditingUnit.Row, true);
-                    grid.Items.Refresh();
-                }
-                catch { }
-            }), System.Windows.Threading.DispatcherPriority.Background);
-        }
-
-        /// <summary>移行元レイヤ名のうち、選択中の移行先 DWG に同名が存在する件数を数える。</summary>
-        private void UpdateMatchedLayerCount(DwgPairRow row)
-        {
-            if (!row.IsResolved) { row.MatchedLayerCount = 0; return; }
-
-            var target = _targetDwgs.FirstOrDefault(
-                d => string.Equals(d.Name, row.SelectedTarget, StringComparison.CurrentCultureIgnoreCase));
-            if (target == null) { row.MatchedLayerCount = 0; return; }
-
-            row.MatchedLayerCount = row.Source.Layers.Keys.Count(target.Layers.ContainsKey);
-        }
-
-        private void BuildViewRows(Document src, List<DwgDefinition> sourceDwgs)
-        {
-            bool templates = TemplateMode;
-
-            // 移行先はテンプレート制御の有無を判定する（ビュー単位＝テンプレートに奪われていないか、
-            // テンプレート単位＝そのテンプレートが読み込みカテゴリを制御しているか）
-            var targetViews = _scanner.EnumerateViews(_targetDoc, templates, checkTemplateControl: true);
-
-            _targetViewsByName = new Dictionary<string, ViewEntry>(StringComparer.CurrentCultureIgnoreCase);
-            foreach (var v in targetViews) _targetViewsByName[v.Name] = v;
-
-            var candidates = new List<string> { ViewPairRow.NoMatch };
-            candidates.AddRange(targetViews.Select(v => v.Name));
-
-            var sourceViews = _scanner.EnumerateViews(src, templates, checkTemplateControl: false);
-            var snapshots = _scanner.ReadSettings(src, sourceViews, sourceDwgs);
-
-            _viewRows = new List<ViewPairRow>();
-            foreach (var snap in snapshots)
-            {
-                var row = new ViewPairRow
-                {
-                    Snapshot = snap,
-                    Candidates = candidates
-                };
-
-                if (_targetViewsByName.TryGetValue(snap.View.Name, out var match))
-                {
-                    row.BlockReason = match.BlockReason;
-                    row.SelectedTarget = match.Name;
-                }
-                else
-                {
-                    row.SelectedTarget = ViewPairRow.NoMatch;
-                }
-
-                // 設定が1件以上あり、そのまま適用できる行を既定でチェック
-                row.IsSelected = row.IsApplicable && row.SettingCount > 0;
-
-                row.PropertyChanged += ViewRow_PropertyChanged;
-                _viewRows.Add(row);
+                    Dwg = d,
+                    SettingCount = DwgLayerScanner.CountConfigured(settings.Values)
+                });
             }
 
-            // 設定があるものを上に、その中は名前昇順
-            _viewRows = _viewRows
-                .OrderByDescending(r => r.SettingCount > 0)
-                .ThenBy(r => r.SourceName, StringComparer.CurrentCultureIgnoreCase)
+            // 設定があるものを上に出して見つけやすくする
+            _sourceDwgItems = _sourceDwgItems
+                .OrderByDescending(x => x.SettingCount > 0)
+                .ThenBy(x => x.Name, StringComparer.CurrentCultureIgnoreCase)
                 .ToList();
 
-            ViewGrid.ItemsSource = _viewRows;
+            SrcDwgList.ItemsSource = _sourceDwgItems;
+
+            // 同名の移行先ビューを自動でチェック
+            SyncTargetViewSelection(entry.Name);
+
+            // DWG は設定があるものを優先して自動選択
+            SrcDwgList.SelectedItem = _sourceDwgItems.FirstOrDefault(x => x.SettingCount > 0)
+                                      ?? _sourceDwgItems.FirstOrDefault();
+            if (SrcDwgList.SelectedItem == null) OnSourceDwgChanged();
         }
 
-        private void ViewRow_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
+        /// <summary>② 移行元 DWG が変わったとき: レイヤ設定を読み、移行先 DWG の照合を更新する。</summary>
+        private void OnSourceDwgChanged()
         {
-            if (!(sender is ViewPairRow row)) return;
+            var item = SrcDwgList.SelectedItem as DwgItem;
+            var entry = SrcViewList.SelectedItem as ViewEntry;
 
-            if (e.PropertyName == nameof(ViewPairRow.SelectedTarget))
+            if (item?.Dwg == null || entry == null || _sourceDoc == null)
             {
-                // 対応先を変えたらテンプレート制御の判定も付け替える
-                string reason = null;
-                if (row.IsResolved && _targetViewsByName.TryGetValue(row.SelectedTarget, out var entry))
-                    reason = entry.BlockReason;
-                row.BlockReason = reason;
-
-                RefreshGridDeferred(ViewGrid);
+                _sourceLayers = new Dictionary<string, LayerGraphicSetting>();
+                foreach (var t in _targetDwgItems) t.MatchedLayerCount = -1;
+                UpdateSummary();
+                return;
             }
 
-            if (e.PropertyName == nameof(ViewPairRow.SelectedTarget) ||
-                e.PropertyName == nameof(ViewPairRow.IsSelected))
-            {
-                UpdateCount();
-            }
+            _sourceLayers = _scanner.ReadSettings(_sourceDoc, entry.Id, item.Dwg);
+
+            // 移行先 DWG それぞれについて、レイヤ名がいくつ一致するかを出す
+            foreach (var t in _targetDwgItems)
+                t.MatchedLayerCount = t.Dwg == null
+                    ? 0
+                    : item.Dwg.Layers.Keys.Count(t.Dwg.Layers.ContainsKey);
+
+            // 同名の移行先 DWG を自動選択、無ければ一致レイヤが最も多いもの
+            var same = _targetDwgItems.FirstOrDefault(
+                t => string.Equals(t.Name, item.Name, StringComparison.CurrentCultureIgnoreCase));
+            TgtDwgList.SelectedItem = same
+                ?? _targetDwgItems.OrderByDescending(t => t.MatchedLayerCount).FirstOrDefault(t => t.MatchedLayerCount > 0);
+
+            UpdateSummary();
         }
 
-        private void UpdateCount()
+        /// <summary>③ 移行元ビューと同名の移行先ビューだけをチェック状態にする。</summary>
+        private void SyncTargetViewSelection(string sourceViewName)
         {
-            int total = _viewRows.Count;
-            int selected = _viewRows.Count(r => r.IsSelected);
-            int withSettings = _viewRows.Count(r => r.SettingCount > 0);
-            txtCount.Text = string.Format(Loc.S("DwgVg.Count.Summary"), total, selected, withSettings);
+            foreach (var r in _targetViewRows)
+                r.IsSelected = sourceViewName != null
+                            && string.Equals(r.Name, sourceViewName, StringComparison.CurrentCultureIgnoreCase);
+
+            try { TgtViewGrid.Items.Refresh(); } catch { }
+        }
+
+        private void UpdateSummary()
+        {
+            var srcView = SrcViewList.SelectedItem as ViewEntry;
+            var srcDwg = SrcDwgList.SelectedItem as DwgItem;
+            var tgtDwg = TgtDwgList.SelectedItem as DwgItem;
+            int tgtViewCount = _targetViewRows.Count(r => r.IsSelected);
+
+            int configured = DwgLayerScanner.CountConfigured(_sourceLayers.Values);
+
+            txtSummary.Text = string.Format(
+                Loc.S("DwgVg.Summary"),
+                srcView?.Name ?? "-",
+                srcDwg?.Name ?? "-",
+                configured,
+                tgtViewCount,
+                tgtDwg?.Name ?? "-");
+
+            btnApply.IsEnabled = srcView != null && srcDwg != null && tgtDwg != null
+                                 && tgtViewCount > 0 && _sourceLayers.Count > 0;
         }
 
         // ===== イベント =====
 
-        private void Source_Changed(object sender, RoutedEventArgs e) => Rebuild();
+        private void Source_Changed(object sender, RoutedEventArgs e) => ReloadAll();
 
-        private void Mode_Changed(object sender, RoutedEventArgs e) => Rebuild();
+        private void Mode_Changed(object sender, RoutedEventArgs e) => ReloadAll();
 
-        private void Reload_Click(object sender, RoutedEventArgs e) => Rebuild();
+        private void Reload_Click(object sender, RoutedEventArgs e) => ReloadAll();
 
         private void Close_Click(object sender, RoutedEventArgs e) => Close();
 
-        private void SelectWithSettings_Click(object sender, RoutedEventArgs e)
+        private void SrcViewSearch_Changed(object sender, RoutedEventArgs e)
         {
-            foreach (var r in _viewRows) r.IsSelected = r.IsApplicable && r.SettingCount > 0;
-            ViewGrid.Items.Refresh();
-            UpdateCount();
+            if (!_ready) return;
+            try { _sourceViewsView?.Refresh(); } catch { }
         }
 
-        private void SelectAll_Click(object sender, RoutedEventArgs e)
+        private void TgtViewSearch_Changed(object sender, RoutedEventArgs e)
         {
-            foreach (var r in _viewRows) r.IsSelected = r.IsApplicable;
-            ViewGrid.Items.Refresh();
-            UpdateCount();
+            if (!_ready) return;
+            try { _targetViewsView?.Refresh(); } catch { }
         }
 
-        private void DeselectAll_Click(object sender, RoutedEventArgs e)
+        private void SrcView_Changed(object sender, RoutedEventArgs e)
         {
-            foreach (var r in _viewRows) r.IsSelected = false;
-            ViewGrid.Items.Refresh();
-            UpdateCount();
+            if (!_ready) return;
+            OnSourceViewChanged();
+        }
+
+        private void SrcDwg_Changed(object sender, RoutedEventArgs e)
+        {
+            if (!_ready) return;
+            OnSourceDwgChanged();
+        }
+
+        private void TgtDwg_Changed(object sender, RoutedEventArgs e)
+        {
+            if (!_ready) return;
+            UpdateSummary();
+        }
+
+        private void TargetViewRow_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(TargetViewRow.IsSelected)) UpdateSummary();
+        }
+
+        private void TgtSelectAll_Click(object sender, RoutedEventArgs e) => SetTargetSelection(true);
+
+        private void TgtDeselectAll_Click(object sender, RoutedEventArgs e) => SetTargetSelection(false);
+
+        /// <summary>検索で表示中の行だけを対象にチェックを付け外しする。</summary>
+        private void SetTargetSelection(bool selected)
+        {
+            if (_targetViewsView == null) return;
+            foreach (var o in _targetViewsView.Cast<object>())
+                if (o is TargetViewRow r) r.IsSelected = selected;
+
+            try { TgtViewGrid.Items.Refresh(); } catch { }
+            UpdateSummary();
         }
 
         // ===== 適用 =====
 
         private void Apply_Click(object sender, RoutedEventArgs e)
         {
-            var targets = _viewRows.Where(r => r.IsSelected && r.IsApplicable).ToList();
-            if (targets.Count == 0)
-            {
-                TaskDialog.Show(Loc.S("DwgVg.Title"), Loc.S("DwgVg.NoSelection"));
-                this.BringToFrontDeferred();
-                return;
-            }
+            var srcView = SrcViewList.SelectedItem as ViewEntry;
+            var srcDwg = SrcDwgList.SelectedItem as DwgItem;
+            var tgtDwg = TgtDwgList.SelectedItem as DwgItem;
 
-            // 同名の DWG カテゴリが複数存在しうるため ToDictionary は使わず、後勝ちで詰める
-            var dwgMap = new Dictionary<string, string>(StringComparer.CurrentCultureIgnoreCase);
-            foreach (var r in _dwgRows.Where(r => r.IsResolved))
-                dwgMap[r.Source.Name] = r.SelectedTarget;
+            if (srcView == null) { Warn("DwgVg.Warn.NoSourceView"); return; }
+            if (srcDwg?.Dwg == null) { Warn("DwgVg.Warn.NoSourceDwg"); return; }
+            if (tgtDwg?.Dwg == null) { Warn("DwgVg.Warn.NoTargetDwg"); return; }
 
-            if (dwgMap.Count == 0)
-            {
-                TaskDialog.Show(Loc.S("DwgVg.Title"), Loc.S("DwgVg.NoDwgMapping"));
-                this.BringToFrontDeferred();
-                return;
-            }
+            var targetViews = _targetViewRows
+                .Where(r => r.IsSelected && r.IsApplicable)
+                .Select(r => r.Entry)
+                .ToList();
+            if (targetViews.Count == 0) { Warn("DwgVg.Warn.NoTargetView"); return; }
+
+            if (_sourceLayers.Count == 0) { Warn("DwgVg.Warn.NoLayers"); return; }
 
             var confirm = new TaskDialog(Loc.S("DwgVg.Confirm.Title"))
             {
-                MainInstruction = string.Format(Loc.S("DwgVg.Confirm.Main"), targets.Count, dwgMap.Count),
+                MainInstruction = string.Format(Loc.S("DwgVg.Confirm.Main"),
+                    srcView.Name, srcDwg.Name, targetViews.Count, tgtDwg.Name),
                 MainContent = Loc.S("DwgVg.Confirm.Content"),
                 CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No,
                 DefaultButton = TaskDialogResult.No
@@ -352,7 +399,7 @@ namespace Tools28.Commands.DwgLayerTransfer.Views
                 using (this.BlockRevitInput())
                 {
                     result = new DwgLayerApplier().Apply(
-                        _targetDoc, targets, _targetViewsByName, dwgMap, _targetDwgs);
+                        _targetDoc, _sourceLayers, targetViews, tgtDwg.Dwg);
                 }
             }
             catch (Exception ex)
@@ -364,6 +411,12 @@ namespace Tools28.Commands.DwgLayerTransfer.Views
             }
 
             ShowResult(result);
+            this.BringToFrontDeferred();
+        }
+
+        private void Warn(string key)
+        {
+            TaskDialog.Show(Loc.S("DwgVg.Title"), Loc.S(key));
             this.BringToFrontDeferred();
         }
 
