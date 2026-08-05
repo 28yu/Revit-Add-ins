@@ -73,9 +73,11 @@ namespace Tools28.Commands.DwgLayerTransfer.Models
         public bool IsBlocked => BlockReason != null;
 
         /// <summary>
-        /// このビューの「読み込みカテゴリ」V/G を制御しているビューテンプレート（無ければ未設定）。
-        /// 制御下のビューは Revit の仕様でビュー側から直接変更できないため、
-        /// 書き込み先をこのテンプレートへ振り替える。
+        /// このビューの「読み込みカテゴリ」V/G を制御しているとみられるビューテンプレート（無ければ未設定）。
+        ///
+        /// 一覧の状態表示と、確認ダイアログに出す見込み件数にだけ使う。
+        /// 実際にテンプレートへ振り替えるかどうかは、適用時にビューへの書き込みが
+        /// 効いたかどうかで決める（この事前判定に依存させない）。
         /// </summary>
         public ElementId TemplateId { get; set; }
 
@@ -86,12 +88,6 @@ namespace Tools28.Commands.DwgLayerTransfer.Models
 
         /// <summary>ブロックではない補足（テンプレートへ振り替える旨など）。</summary>
         public string Note { get; set; }
-
-        /// <summary>実際に設定を書き込む要素の ID。</summary>
-        public ElementId WriteTargetId => ViaTemplate ? TemplateId : Id;
-
-        /// <summary>実際に設定を書き込む要素の名前。</summary>
-        public string WriteTargetName => ViaTemplate ? TemplateName : Name;
     }
 
 }

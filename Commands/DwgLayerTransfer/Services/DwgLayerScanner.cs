@@ -252,17 +252,31 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
         /// </summary>
         public static View GetControllingTemplate(Document doc, View v)
         {
+            var tpl = GetAssignedTemplate(doc, v);
+            if (tpl == null) return null;
+
+            try { return TemplateControlsImportVg(tpl) ? tpl : null; }
+            catch { return null; }
+        }
+
+        /// <summary>
+        /// ビューに割り当てられているビューテンプレートを返す（無ければ null）。
+        /// 「読み込みカテゴリを制御しているか」は問わない。
+        /// 適用時にビューへ直接書けなかった場合の振り替え先を探すのに使う。
+        /// </summary>
+        public static View GetAssignedTemplate(Document doc, View v)
+        {
             try
             {
+                if (doc == null || v == null) return null;
+
                 ElementId tid = v.ViewTemplateId;
                 if (tid == null || tid == ElementId.InvalidElementId) return null;
 
-                if (!(doc.GetElement(tid) is View tpl)) return null;
-                return TemplateControlsImportVg(tpl) ? tpl : null;
+                return doc.GetElement(tid) as View;
             }
             catch
             {
-                // 判定できない場合は制御されていない扱いにし、適用時の例外で個別に処理する
                 return null;
             }
         }

@@ -262,6 +262,10 @@ namespace Tools28.Commands.DwgLayerTransfer.Views
 
             _sourceLayers = _scanner.ReadSettings(_sourceDoc, entry.Id, item.Dwg);
 
+            DiagLog.Write($"[DwgVg] 移行元読取 ビュー='{entry.Name}' DWG='{item.Name}' " +
+                          $"レイヤ={item.Dwg.Layers.Count} 読取={_sourceLayers.Count} " +
+                          $"既定以外={DwgLayerScanner.CountConfigured(_sourceLayers.Values)}");
+
             // 移行先 DWG それぞれについて、レイヤ名がいくつ一致するかを出す
             foreach (var t in _targetDwgItems)
                 t.MatchedLayerCount = t.Dwg == null
@@ -388,8 +392,8 @@ namespace Tools28.Commands.DwgLayerTransfer.Views
 
             if (_sourceLayers.Count == 0) { Warn("DwgVg.Warn.NoLayers"); return; }
 
-            // テンプレート制御下のビューは、そのテンプレートへ書き込み先を振り替える
-            var targetViews = ResolveWriteTargets(selectedViews, out int viaTemplateViews, out int templateCount);
+            // 事前の見込み（実際の振り替えは適用時に「効いたか」で判定する）
+            CountTemplateRedirects(selectedViews, out int viaTemplateViews, out int templateCount);
 
             var content = new System.Text.StringBuilder();
             if (viaTemplateViews > 0)
@@ -420,7 +424,7 @@ namespace Tools28.Commands.DwgLayerTransfer.Views
                 using (this.BlockRevitInput())
                 {
                     result = new DwgLayerApplier().Apply(
-                        _targetDoc, _sourceLayers, targetViews, tgtDwg.Dwg);
+                        _targetDoc, _sourceLayers, selectedViews, tgtDwg.Dwg);
                 }
             }
             catch (Exception ex)
@@ -431,43 +435,28 @@ namespace Tools28.Commands.DwgLayerTransfer.Views
                 return;
             }
 
-            ShowResult(result, viaTemplateViews, templateCount);
+            ShowResult(result);
             this.BringToFrontDeferred();
         }
 
         /// <summary>
-        /// チェックされたビューを、実際に書き込む要素の一覧へ解決する。
-        ///
-        /// ビューテンプレートが「読み込みカテゴリ」の V/G を制御しているビューは
-        /// ビュー側から変更できないため、そのテンプレートへ振り替える。
-        /// 同じテンプレートを使うビューが複数選ばれていても書き込みは 1 回で済むよう重複を排除する。
+        /// 確認ダイアログ用に、テンプレートへ振り替わる見込みのビュー数とテンプレート数を数える。
+        /// 実際にどちらへ書くかは、適用時に書き込みが効いたかどうかで決まる。
         /// </summary>
-        /// <param name="viaTemplateViews">テンプレートへ振り替えたビューの数</param>
-        /// <param name="templateCount">実際に書き込むビューテンプレートの数</param>
-        private static List<ViewEntry> ResolveWriteTargets(
+        private static void CountTemplateRedirects(
             List<ViewEntry> selected, out int viaTemplateViews, out int templateCount)
         {
             viaTemplateViews = 0;
-
             var templates = new HashSet<ElementId>();
-            var seen = new HashSet<ElementId>();
-            var result = new List<ViewEntry>();
 
             foreach (var e in selected)
             {
-                if (e == null) continue;
-
-                if (e.ViaTemplate)
-                {
-                    viaTemplateViews++;
-                    templates.Add(e.TemplateId);
-                }
-
-                if (seen.Add(e.WriteTargetId)) result.Add(e);
+                if (e == null || !e.ViaTemplate) continue;
+                viaTemplateViews++;
+                templates.Add(e.TemplateId);
             }
 
             templateCount = templates.Count;
-            return result;
         }
 
         private void Warn(string key)
@@ -476,14 +465,29 @@ namespace Tools28.Commands.DwgLayerTransfer.Views
             this.BringToFrontDeferred();
         }
 
-        private static void ShowResult(TransferResult r, int viaTemplateViews, int templateCount)
+        private static void ShowResult(TransferResult r)
         {
             var content = new System.Text.StringBuilder();
 
-            if (viaTemplateViews > 0)
+            // 移行元に既定以外の設定が無いと、正常に完了しても見た目は変わらない。
+            // 「動かない」と誤解されやすいので最初に伝える
+            if (r.SourceSettingCount == 0)
+            {
+                content.AppendLine(Loc.S("DwgVg.Result.SourceEmpty"));
+                content.AppendLine();
+            }
+
+            if (r.TemplateFallbackViews > 0)
             {
                 content.AppendLine(string.Format(
-                    Loc.S("DwgVg.Result.ViaTemplate"), viaTemplateViews, templateCount));
+                    Loc.S("DwgVg.Result.ViaTemplate"), r.TemplateFallbackViews, r.TemplateFallbackCount));
+                content.AppendLine();
+            }
+
+            if (r.Failures.Count > 0)
+            {
+                content.AppendLine(string.Format(Loc.S("DwgVg.Result.Failures"), r.Failures.Count));
+                content.AppendLine(BuildPreview(r.Failures));
                 content.AppendLine();
             }
 
@@ -502,8 +506,11 @@ namespace Tools28.Commands.DwgLayerTransfer.Views
 
             var dlg = new TaskDialog(Loc.S("DwgVg.Result.Title"))
             {
-                MainInstruction = string.Format(Loc.S("DwgVg.Result.Msg"), r.ViewCount, r.LayerCount),
-                MainContent = content.ToString().TrimEnd()
+                MainInstruction = r.ViewCount > 0
+                    ? string.Format(Loc.S("DwgVg.Result.Msg"), r.ViewCount, r.LayerCount)
+                    : Loc.S("DwgVg.Result.None"),
+                MainContent = content.ToString().TrimEnd(),
+                FooterText = Loc.S("DwgVg.Result.LogHint")
             };
             dlg.Show();
         }
