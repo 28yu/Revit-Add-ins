@@ -1442,3 +1442,64 @@ param='I-イメージ' storage=ElementId shared=False readonly=False bip=ALL_MOD
 
 ### 効果
 同名パラメータが全て列挙・書き出し・取り込みでき、値が一方に偏る不整合が解消。接尾辞は重複時のみ付くため、重複が無い通常パラメータのヘッダー／既存 Excel との互換は維持。
+
+## DwgLayerTransfer: DWGレイヤ表示設定をモデル間で直接移行（2026-08-05）
+
+### 背景
+リンク/読み込みした DWG のレイヤ表示設定は、**表示/グラフィックスの上書き（V/G）の「読み込みカテゴリ」タブ**で行う。
+これは**ビュー単位**の設定のため、Revit 標準の「プロジェクト標準の転送」では移せない
+（転送で移せるのは**オブジェクトスタイル＞読み込まれたオブジェクト**＝モデル全体の方だけ）。
+同じ DWG を使う別モデルやモデル分割時に、レイヤ表示設定を手作業でやり直す手間が発生していた。
+
+### 方針
+- **Excel などの中間ファイルを使わず**、開いている 2 つのドキュメント間で直接受け渡す
+  （ユーザー要望: 手数最小化・無駄なデータ書き出しの削減）。
+- 移行先は常にアクティブなドキュメント。移行元は `Application.Documents` から
+  リンク・ファミリを除いた他の開いているモデルを選ぶ。
+
+### DWG カテゴリとレイヤの取り方
+- 読み込み DWG は「DWGファイル名」のカテゴリとして登録され、**各レイヤがサブカテゴリ**になる。
+- 列挙は `Document.Settings.Categories` のうち **`Parent == null` かつ ID が正**のものを採る。
+  組み込みカテゴリの ID は負なので、この 2 条件だけで読み込み DWG のカテゴリを抽出できる。
+  （`ImportInstance` 経由でも取れるが、インスタンスが無いケースを取りこぼす）
+- リンク/読み込みの別は `ImportInstance.IsLinked` から補足（表示用のみ）。
+- `ElementId` の int 化は既存の `RevitCompatibility.IntValue()` を使用（2026 で `IntegerValue` 廃止）。
+
+### 設定の読み書き
+- 読み: `View.GetCategoryHidden(id)` / `View.GetCategoryOverrides(id)`
+- 書き: `View.SetCategoryHidden(id, bool)`（`CanCategoryBeHidden` で事前確認）/ `View.SetCategoryOverrides(id, ogs)`
+- 保持する項目は **V/G「読み込みカテゴリ」タブで実際に編集できるものだけ**に絞った:
+  表示/非表示・投影線（色/線幅/線種）・切断線（色/線幅/線種）・ハーフトーン。
+  **サーフェスパターン・透明度は DWG のジオメトリに効かない**ため意図的に対象外
+  （移行先の設定を無用にリセットしないため）。
+
+### ElementId はモデル間で通用しない → すべて名前で照合
+| 対象 | 照合方法 |
+|--|--|
+| DWG | カテゴリ名（= ファイル名）。同名を自動対応、UI で手動変更可 |
+| レイヤ | サブカテゴリ名の一致 |
+| ビュー/テンプレート | 名前の一致。UI で手動変更可 |
+| 線種 | `LinePatternElement.Name` の一致。実線は `LinePatternElement.GetSolidPatternId()` を予約名 `<solid>` で表現 |
+
+未解決（移行先に無いレイヤ・線種）は結果ダイアログに一覧表示する。黙って落とさない。
+
+### ⚠️ ビューテンプレートによる V/G 制御の判定（ハマりどころ）
+`View.GetNonControlledTemplateParameterIds()` は「テンプレートが**制御していない**項目」を返す。
+`BuiltInParameter.VIS_GRAPHICS_IMPORT` が**含まれていなければ制御下**、という反転した判定になる。
+
+2 方向のチェックが必要で、両方とも実装している:
+1. **ビュー単位で移行するとき** — 移行先ビューがテンプレート制御下だと `SetCategoryOverrides` が効かない
+   → 該当ビューは状態列に理由を出しチェック不可にする（テンプレート単位への切替を促す）
+2. **テンプレート単位で移行するとき** — 移行先テンプレートが読み込みカテゴリを制御していないと
+   書き込んでもビューに反映されない → 同様に警告する
+
+どちらも黙って no-op になるのが最悪なので、事前に UI へ出す設計にした。
+
+### その他の実装メモ
+- `AreGraphicsOverridesAllowed()` は**ビューテンプレートには使えない**ため、テンプレートの除外は
+  `ViewSchedule` / `ViewSheet` の型判定で行う。
+- DataGrid の `CellTemplate` 内 ComboBox の選択変更中に `Items.Refresh()` を呼ぶと編集トランザクションと
+  衝突して例外になる → `RefreshGridDeferred()` で `CommitEdit` 後に Background 優先度で遅延実行。
+  （FilterManagement のセル編集と同じ考え方）
+- 同名の DWG カテゴリが複数存在しうるため、対応表の辞書化に `ToDictionary` は使わない（後勝ちで詰める）。
+- 適用は移行先ドキュメントの**単一トランザクション**。実行後は Ctrl+Z で丸ごと戻せる。

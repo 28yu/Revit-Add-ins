@@ -218,6 +218,18 @@
       }
     },
     {
+      "id": "DwgLayerTransfer",
+      "category": "view",
+      "icon": "icons/features/dwg_layer_transfer.png",
+      "manual": "Features/DwgLayerTransfer.md",
+      "added_in": "2.5",
+      "names": {
+        "ja": "DWGレイヤ表示設定の移行",
+        "en": "Transfer DWG Layer Display Settings",
+        "zh": "DWG图层显示设置迁移"
+      }
+    },
+    {
       "id": "LanguageSwitch",
       "category": "settings",
       "icon": "icons/features/flag_jp_32.png",

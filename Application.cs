@@ -49,6 +49,7 @@ namespace Tools28
             { "ParameterCleanup", "Ribbon.ParamCleanup" },
             { "FilterManagement", "Ribbon.FilterMgmt" },
             { "ViewTemplateManagement", "Ribbon.TemplateMgmt" },
+            { "DwgLayerTransfer", "Ribbon.DwgVg" },
             { "AutoBackup", "Ribbon.AutoBackup" },
             { "About", "Ribbon.Settings.About" },
             { "Manual", "Ribbon.Settings.Manual" },
@@ -81,6 +82,7 @@ namespace Tools28
             { "ParameterCleanup", "Ribbon.ParamCleanup.Tip" },
             { "FilterManagement", "Ribbon.FilterMgmt.Tip" },
             { "ViewTemplateManagement", "Ribbon.TemplateMgmt.Tip" },
+            { "DwgLayerTransfer", "Ribbon.DwgVg.Tip" },
             { "AutoBackup", "Ribbon.AutoBackup.Tip" },
             { "About", "Ribbon.Settings.About.Tip" },
             { "Manual", "Ribbon.Settings.Manual.Tip" },
@@ -363,6 +365,12 @@ namespace Tools28
             templateMgmtData.Image = LoadImage("view_template_16.png");
             templateMgmtData.LargeImage = LoadImage("view_template.png");
             AddButton(panel, templateMgmtData);
+
+            var dwgVgData = new PushButtonData("DwgLayerTransfer", Loc.S("Ribbon.DwgVg"), assemblyPath, "Tools28.Commands.DwgLayerTransfer.DwgLayerTransferCommand");
+            dwgVgData.ToolTip = Loc.S("Ribbon.DwgVg.Tip");
+            dwgVgData.Image = LoadImage("dwg_layer_transfer_16.png");
+            dwgVgData.LargeImage = LoadImage("dwg_layer_transfer.png");
+            AddButton(panel, dwgVgData);
         }
 
         private void CreateThreeDViewPanel(UIControlledApplication application, string tabName, string assemblyPath)

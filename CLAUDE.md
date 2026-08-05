@@ -360,13 +360,14 @@ _buttonTipKeys["FeatureName"] = "Ribbon.FeatureName.Button.Tip";
 | ParameterCleanup（パラメータ整理/未使用削除） | `Commands/ParameterCleanup/` | `Docs/DEVLOG.md#ParameterCleanup` |
 | FilterManagement（フィルタ整理/使用ビュー確認・名前変更・削除） | `Commands/FilterManagement/` | `Docs/Features/FilterManagement.md` |
 | ViewTemplateManagement（テンプレート整理/使用ビュー確認・名前変更・削除） | `Commands/ViewTemplateManagement/` | `Docs/Features/ViewTemplateManagement.md` |
+| DwgLayerTransfer（DWGレイヤ表示設定の移行/モデル間直接コピー） | `Commands/DwgLayerTransfer/` | `Docs/Features/DwgLayerTransfer.md` |
 | LanguageSwitch / Localization（多言語UI） | `Commands/LanguageSwitch/` + `Localization/` | `Docs/DEVLOG.md#LocSystem` |
 | AutoBackup（自動バックアップ/定期ローカル保存・クラウド同期） | `Commands/AutoBackup/` | `Docs/Features/AutoBackup.md` |
 
 ### リボンパネル構成（左から順）
 1. **通り芯・レベル** — 符号表示切替（両方/左/右）
 2. **シート** — シート一括作成
-3. **ビュー** — ビューポート位置/トリミング領域のコピー・ペースト（各ペアは縦並びスタックで配置）、3Dビュー/セクションボックスのコピー、フィルタ整理（使用ビュー確認・名前変更・削除）、テンプレート整理（使用ビュー確認・名前変更・削除）
+3. **ビュー** — ビューポート位置/トリミング領域のコピー・ペースト（各ペアは縦並びスタックで配置）、3Dビュー/セクションボックスのコピー、フィルタ整理（使用ビュー確認・名前変更・削除）、テンプレート整理（使用ビュー確認・名前変更・削除）、DWGレイヤ表示設定の移行（モデル間直接コピー）
 4. **注釈・詳細** — 部屋タグ自動配置、部屋3D色分け、塗潰し領域 分割・統合、塗潰しパターン入出力
 5. **構造** — 梁下端色分け、梁天端色分け、耐火被覆色分け、型枠数量算出
 6. **データ** — EXCELエクスポート、EXCELインポート
