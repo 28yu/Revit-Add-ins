@@ -37,6 +37,9 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
         /// <summary>オブジェクトスタイルを書き換えたレイヤ数（モデル全体に効く）</summary>
         public int ObjectStyleCount { get; set; }
 
+        /// <summary>実際に設定を書き込んだ要素の名前（ビュー／ビューテンプレート）</summary>
+        public List<string> WrittenTargets { get; } = new List<string>();
+
         /// <summary>反映できなかったビューとその理由</summary>
         public List<string> Failures { get; } = new List<string>();
     }
@@ -64,7 +67,9 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
         private const int DetailLogLimit = 5;
 
         private Dictionary<string, ElementId> _linePatterns;
+        private Dictionary<string, ElementId> _linePatternsExact;
         private Dictionary<string, ElementId> _fillPatterns;
+        private Dictionary<string, ElementId> _fillPatternsExact;
         private int _detailBudget;
 
         /// <summary>1要素（ビュー／テンプレート）への書き込み結果。</summary>
@@ -116,8 +121,10 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
             if (targetViews == null || targetViews.Count == 0) return result;
             if (targetDwgs == null || targetDwgs.Count == 0) return result;
 
-            _linePatterns = BuildLinePatternMap(targetDoc);
-            _fillPatterns = BuildFillPatternMap(targetDoc);
+            _linePatterns = BuildPatternMap(targetDoc, typeof(LinePatternElement), StringComparer.CurrentCultureIgnoreCase);
+            _linePatternsExact = BuildPatternMap(targetDoc, typeof(LinePatternElement), StringComparer.Ordinal);
+            _fillPatterns = BuildPatternMap(targetDoc, typeof(FillPatternElement), StringComparer.CurrentCultureIgnoreCase);
+            _fillPatternsExact = BuildPatternMap(targetDoc, typeof(FillPatternElement), StringComparer.Ordinal);
             result.SourceSettingCount = DwgLayerScanner.CountConfigured(sourceLayers.Values);
 
             DiagLog.Write($"[DwgVg] ===== 適用開始 ビュー={targetViews.Count} DWG={targetDwgs.Count} " +
@@ -165,6 +172,7 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
                     {
                         result.ViewCount++;
                         result.LayerCount += w.Applied;
+                        if (!result.WrittenTargets.Contains(entry.Name)) result.WrittenTargets.Add(entry.Name);
                         continue;
                     }
 
@@ -266,6 +274,7 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
                             result.TemplateFallbackCount++;
                             result.ViewCount++;
                             result.LayerCount += wt.Applied;
+                            if (!result.WrittenTargets.Contains(targetName)) result.WrittenTargets.Add(targetName);
                             return;
                         }
 
@@ -625,23 +634,29 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
         private ElementId ResolveFillPattern(string name, HashSet<string> missingPatterns)
         {
             if (name == null) return null;
+            if (_fillPatternsExact.TryGetValue(name, out var exact)) return exact;
             if (_fillPatterns.TryGetValue(name, out var id)) return id;
 
             missingPatterns.Add(name);
             return null;
         }
 
-        private static Dictionary<string, ElementId> BuildFillPatternMap(Document doc)
+        /// <summary>
+        /// 名前 -&gt; ElementId のパターン表を作る。
+        /// 比較方法を変えて呼び分け、完全一致用と大文字小文字無視用の2本を持つ。
+        /// </summary>
+        private static Dictionary<string, ElementId> BuildPatternMap(
+            Document doc, Type patternType, StringComparer comparer)
         {
-            var map = new Dictionary<string, ElementId>(StringComparer.CurrentCultureIgnoreCase);
+            var map = new Dictionary<string, ElementId>(comparer);
             try
             {
-                foreach (var e in new FilteredElementCollector(doc)
-                             .OfClass(typeof(FillPatternElement))
-                             .ToElements())
+                foreach (var e in new FilteredElementCollector(doc).OfClass(patternType).ToElements())
                 {
-                    if (e is FillPatternElement fpe && !string.IsNullOrEmpty(fpe.Name))
-                        map[fpe.Name] = fpe.Id;
+                    if (e == null) continue;
+                    string name;
+                    try { name = e.Name; } catch { continue; }
+                    if (!string.IsNullOrEmpty(name)) map[name] = e.Id;
                 }
             }
             catch { }
@@ -727,7 +742,8 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
                 try { wanted = LinePatternElement.GetSolidPatternId(); }
                 catch { return true; }
             }
-            else if (!_linePatterns.TryGetValue(wantedName, out wanted))
+            else if (!_linePatternsExact.TryGetValue(wantedName, out wanted)
+                  && !_linePatterns.TryGetValue(wantedName, out wanted))
             {
                 return true;   // 移行先に存在しない線種
             }
@@ -739,7 +755,8 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
         private bool SameFill(ElementId current, string wantedName)
         {
             if (wantedName == null) return true;
-            if (!_fillPatterns.TryGetValue(wantedName, out var wanted)) return true;
+            if (!_fillPatternsExact.TryGetValue(wantedName, out var wanted)
+             && !_fillPatterns.TryGetValue(wantedName, out wanted)) return true;
             return current != null && current == wanted;
         }
 
@@ -770,27 +787,14 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
                 catch { return null; }
             }
 
+            // 大文字小文字だけ違う別パターン（例: 2_Hidden2 / 2_HIDDEN2）は
+            // 破線ピッチが異なりうるため、完全一致を優先する
+            if (_linePatternsExact.TryGetValue(name, out var exact)) return exact;
             if (_linePatterns.TryGetValue(name, out var id)) return id;
 
             missingPatterns.Add(name);
             return null;
         }
 
-        private static Dictionary<string, ElementId> BuildLinePatternMap(Document doc)
-        {
-            var map = new Dictionary<string, ElementId>(StringComparer.CurrentCultureIgnoreCase);
-            try
-            {
-                foreach (var e in new FilteredElementCollector(doc)
-                             .OfClass(typeof(LinePatternElement))
-                             .ToElements())
-                {
-                    if (e is LinePatternElement lpe && !string.IsNullOrEmpty(lpe.Name))
-                        map[lpe.Name] = lpe.Id;
-                }
-            }
-            catch { }
-            return map;
-        }
     }
 }

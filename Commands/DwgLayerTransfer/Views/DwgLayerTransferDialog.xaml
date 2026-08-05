@@ -219,7 +219,7 @@
                 <!-- V/G はオブジェクトスタイルへの差分でしかないため、基準値も揃えないと表示は一致しない -->
                 <TextBlock x:Name="lblObjStyleHint" Grid.Row="3" Grid.Column="0" Text="基準値:"
                            VerticalAlignment="Center" FontSize="12" Margin="0,6,8,0"/>
-                <CheckBox x:Name="chkObjectStyles" Grid.Row="3" Grid.Column="1" IsChecked="True"
+                <CheckBox x:Name="chkObjectStyles" Grid.Row="3" Grid.Column="1" IsChecked="False"
                           Content="オブジェクトスタイル（線の色・太さ・線種）も揃える"
                           FontSize="12" Margin="0,6,0,0" VerticalAlignment="Center"/>
             </Grid>

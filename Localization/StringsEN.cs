@@ -782,7 +782,7 @@ namespace Tools28.Localization
             { "DwgVg.Dwg.TargetDetail", "{0} layers / {1} matched" },
             { "DwgVg.Dwg.PlainDetail", "{0} layers" },
 
-            { "DwgVg.Status.ViaTemplate", "Writes to view template \"{0}\"" },
+            { "DwgVg.Status.ViaTemplate", "View template \"{0}\" assigned (the settings will be written there)" },
             { "DwgVg.Status.TemplateNotControlling", "This template does not control imported categories (enable V/G overrides in the template)" },
 
             { "DwgVg.Summary", "From: {0} / {1} ({2} set)  ->  To: {3} view(s) / {4} DWG(s)" },
@@ -798,11 +798,13 @@ namespace Tools28.Localization
             { "DwgVg.Confirm.Title", "Transfer settings" },
             { "DwgVg.Confirm.Main", "Layer display settings of DWG \"{1}\" in \"{0}\" will be applied to DWG \"{3}\" in {2} view(s)." },
             { "DwgVg.Confirm.ViaTemplate", "{0} of them have a view template controlling the V/G of the Imported categories, so the settings are written to {1} view template(s) instead.\n* Other views using the same template are affected as well." },
+            { "DwgVg.Confirm.ObjectStyles", "WARNING: \"Also match object styles\" is enabled. This rewrites the DWG line color, weight and pattern for the WHOLE MODEL, not just the selected views. Other views will change too." },
             { "DwgVg.Confirm.Content", "Existing settings in the target views will be overwritten. You can undo this with Ctrl+Z.\nContinue?" },
             { "DwgVg.Txn.Apply", "Transfer DWG layer display settings" },
             { "DwgVg.Result.Title", "Transfer result" },
             { "DwgVg.Result.Msg", "Applied display settings for {1} DWG layer(s) across {0} view(s)." },
             { "DwgVg.Result.ViaTemplate", "{0} of the views could not be written directly, so the settings were written to {1} view template(s)." },
+            { "DwgVg.Result.WrittenTo", "Written to: {0}" },
             { "DwgVg.Result.None", "No settings could be applied." },
             { "DwgVg.Result.SourceEmpty", "* The selected source view / DWG has no settings that differ from the defaults. Pick a DWG whose \"Set N\" count is 1 or more in the source list." },
             { "DwgVg.Result.Failures", "Views that could not be updated: {0}" },

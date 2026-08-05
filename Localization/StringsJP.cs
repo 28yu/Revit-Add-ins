@@ -781,7 +781,7 @@ namespace Tools28.Localization
             { "DwgVg.Dwg.TargetDetail", "{0}レイヤ / 一致 {1}" },
             { "DwgVg.Dwg.PlainDetail", "{0}レイヤ" },
 
-            { "DwgVg.Status.ViaTemplate", "ビューテンプレート「{0}」へ書き込みます" },
+            { "DwgVg.Status.ViaTemplate", "テンプレート「{0}」が割当済み（書き込み先はこちらになります）" },
             { "DwgVg.Status.TemplateNotControlling", "このテンプレートは読み込みカテゴリを制御していません（テンプレート側でV/Gを有効にしてください）" },
 
             { "DwgVg.Summary", "移行元: {0} ／ {1}（設定 {2} 件）　→　移行先: {3} 件のビュー ／ {4} 件の DWG" },
@@ -797,11 +797,13 @@ namespace Tools28.Localization
             { "DwgVg.Confirm.Title", "設定の移行" },
             { "DwgVg.Confirm.Main", "「{0}」の DWG「{1}」のレイヤ表示設定を、{2} 件のビューの DWG「{3}」へ反映します。" },
             { "DwgVg.Confirm.ViaTemplate", "うち {0} 件のビューは、ビューテンプレートが「読み込み」カテゴリの V/G を制御しているため、ビューテンプレート {1} 件へ書き込みます。\n※ 同じテンプレートを使う他のビューにも反映されます。" },
+            { "DwgVg.Confirm.ObjectStyles", "⚠️ 「オブジェクトスタイルも揃える」が有効です。これは選んだビューだけでなく【モデル全体】の DWG の線の色・太さ・線種を書き換えます。他のビューの見た目も変わります。" },
             { "DwgVg.Confirm.Content", "反映先の現在の設定は上書きされます。実行後は Ctrl+Z で元に戻せます。\n続行しますか？" },
             { "DwgVg.Txn.Apply", "DWGレイヤ表示設定の移行" },
             { "DwgVg.Result.Title", "移行結果" },
             { "DwgVg.Result.Msg", "{0} 件のビューに、DWG レイヤ {1} 件分の表示設定を反映しました。" },
             { "DwgVg.Result.ViaTemplate", "うち {0} 件のビューはビューへ直接書き込めなかったため、ビューテンプレート {1} 件へ書き込みました。" },
+            { "DwgVg.Result.WrittenTo", "書き込み先: {0}" },
             { "DwgVg.Result.None", "設定を反映できませんでした。" },
             { "DwgVg.Result.SourceEmpty", "※ 移行元の「このビュー × この DWG」には、既定から変更された設定がありませんでした。移行元の DWG 一覧で「設定 ◯」が 1 以上のものを選んでください。" },
             { "DwgVg.Result.Failures", "反映できなかったビュー: {0} 件" },

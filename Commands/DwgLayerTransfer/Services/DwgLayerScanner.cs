@@ -222,9 +222,11 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
                     }
                     else
                     {
-                        // テンプレートに制御されているビューは、ビュー側から直接変更できない。
-                        // 使えないものとして弾かず、書き込み先をそのテンプレートへ振り替える
-                        var tpl = GetControllingTemplate(doc, v);
+                        // テンプレートが割り当てられているビューは、V/G がそちらに支配されていると
+                        // ビュー側から変更できず、書き込み先がテンプレートへ振り替わる。
+                        // どこへ書かれるのかを実行前に必ず見せるため、
+                        // 「制御しているか」の判定に関わらずテンプレート名を表示する
+                        var tpl = GetAssignedTemplate(doc, v);
                         if (tpl != null)
                         {
                             string tplName;

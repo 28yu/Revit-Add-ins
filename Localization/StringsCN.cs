@@ -781,7 +781,7 @@ namespace Tools28.Localization
             { "DwgVg.Dwg.TargetDetail", "{0}个图层 / 匹配 {1}" },
             { "DwgVg.Dwg.PlainDetail", "{0}个图层" },
 
-            { "DwgVg.Status.ViaTemplate", "将写入视图样板“{0}”" },
+            { "DwgVg.Status.ViaTemplate", "已指定样板“{0}”（设置将写入该样板）" },
             { "DwgVg.Status.TemplateNotControlling", "此样板未控制导入类别（请在样板中启用 V/G 设置）" },
 
             { "DwgVg.Summary", "源: {0} / {1}（已设置 {2} 项）  →  目标: {3} 个视图 / {4} 个 DWG" },
@@ -797,11 +797,13 @@ namespace Tools28.Localization
             { "DwgVg.Confirm.Title", "迁移设置" },
             { "DwgVg.Confirm.Main", "将“{0}”中 DWG“{1}”的图层显示设置，应用到 {2} 个视图的 DWG“{3}”。" },
             { "DwgVg.Confirm.ViaTemplate", "其中 {0} 个视图由视图样板控制“导入”类别的 V/G，因此将写入 {1} 个视图样板。\n※ 使用同一样板的其他视图也会受到影响。" },
+            { "DwgVg.Confirm.ObjectStyles", "⚠️ 已启用“同时统一对象样式”。这将改写【整个模型】的 DWG 线颜色、线宽和线型，而不仅是所选视图。其他视图的外观也会随之改变。" },
             { "DwgVg.Confirm.Content", "目标视图的现有设置将被覆盖。执行后可用 Ctrl+Z 撤销。\n是否继续？" },
             { "DwgVg.Txn.Apply", "DWG图层显示设置迁移" },
             { "DwgVg.Result.Title", "迁移结果" },
             { "DwgVg.Result.Msg", "已在 {0} 个视图中应用 {1} 个 DWG 图层的显示设置。" },
             { "DwgVg.Result.ViaTemplate", "其中 {0} 个视图无法直接写入，已改为写入 {1} 个视图样板。" },
+            { "DwgVg.Result.WrittenTo", "写入目标: {0}" },
             { "DwgVg.Result.None", "未能应用任何设置。" },
             { "DwgVg.Result.SourceEmpty", "※ 所选的源视图 × DWG 中没有与默认值不同的设置。请在源 DWG 列表中选择“设置 ◯”为 1 以上的项目。" },
             { "DwgVg.Result.Failures", "未能应用的视图: {0} 个" },

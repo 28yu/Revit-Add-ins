@@ -405,6 +405,14 @@ namespace Tools28.Commands.DwgLayerTransfer.Views
             CountTemplateRedirects(selectedViews, out int viaTemplateViews, out int templateCount);
 
             var content = new System.Text.StringBuilder();
+
+            // モデル全体に効く変更なので、実行前に必ず知らせる
+            if (chkObjectStyles.IsChecked == true)
+            {
+                content.AppendLine(Loc.S("DwgVg.Confirm.ObjectStyles"));
+                content.AppendLine();
+            }
+
             if (viaTemplateViews > 0)
             {
                 content.AppendLine(string.Format(
@@ -550,6 +558,13 @@ namespace Tools28.Commands.DwgLayerTransfer.Views
             if (r.SourceSettingCount == 0)
             {
                 content.AppendLine(Loc.S("DwgVg.Result.SourceEmpty"));
+                content.AppendLine();
+            }
+
+            if (r.WrittenTargets.Count > 0)
+            {
+                content.AppendLine(string.Format(
+                    Loc.S("DwgVg.Result.WrittenTo"), string.Join("、", r.WrittenTargets)));
                 content.AppendLine();
             }
 
