@@ -380,19 +380,31 @@ namespace Tools28.Commands.DwgLayerTransfer.Views
             if (srcDwg?.Dwg == null) { Warn("DwgVg.Warn.NoSourceDwg"); return; }
             if (tgtDwg?.Dwg == null) { Warn("DwgVg.Warn.NoTargetDwg"); return; }
 
-            var targetViews = _targetViewRows
+            var selectedViews = _targetViewRows
                 .Where(r => r.IsSelected && r.IsApplicable)
                 .Select(r => r.Entry)
                 .ToList();
-            if (targetViews.Count == 0) { Warn("DwgVg.Warn.NoTargetView"); return; }
+            if (selectedViews.Count == 0) { Warn("DwgVg.Warn.NoTargetView"); return; }
 
             if (_sourceLayers.Count == 0) { Warn("DwgVg.Warn.NoLayers"); return; }
+
+            // テンプレート制御下のビューは、そのテンプレートへ書き込み先を振り替える
+            var targetViews = ResolveWriteTargets(selectedViews, out int viaTemplateViews, out int templateCount);
+
+            var content = new System.Text.StringBuilder();
+            if (viaTemplateViews > 0)
+            {
+                content.AppendLine(string.Format(
+                    Loc.S("DwgVg.Confirm.ViaTemplate"), viaTemplateViews, templateCount));
+                content.AppendLine();
+            }
+            content.Append(Loc.S("DwgVg.Confirm.Content"));
 
             var confirm = new TaskDialog(Loc.S("DwgVg.Confirm.Title"))
             {
                 MainInstruction = string.Format(Loc.S("DwgVg.Confirm.Main"),
-                    srcView.Name, srcDwg.Name, targetViews.Count, tgtDwg.Name),
-                MainContent = Loc.S("DwgVg.Confirm.Content"),
+                    srcView.Name, srcDwg.Name, selectedViews.Count, tgtDwg.Name),
+                MainContent = content.ToString(),
                 CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No,
                 DefaultButton = TaskDialogResult.No
             };
@@ -419,8 +431,43 @@ namespace Tools28.Commands.DwgLayerTransfer.Views
                 return;
             }
 
-            ShowResult(result);
+            ShowResult(result, viaTemplateViews, templateCount);
             this.BringToFrontDeferred();
+        }
+
+        /// <summary>
+        /// チェックされたビューを、実際に書き込む要素の一覧へ解決する。
+        ///
+        /// ビューテンプレートが「読み込みカテゴリ」の V/G を制御しているビューは
+        /// ビュー側から変更できないため、そのテンプレートへ振り替える。
+        /// 同じテンプレートを使うビューが複数選ばれていても書き込みは 1 回で済むよう重複を排除する。
+        /// </summary>
+        /// <param name="viaTemplateViews">テンプレートへ振り替えたビューの数</param>
+        /// <param name="templateCount">実際に書き込むビューテンプレートの数</param>
+        private static List<ViewEntry> ResolveWriteTargets(
+            List<ViewEntry> selected, out int viaTemplateViews, out int templateCount)
+        {
+            viaTemplateViews = 0;
+
+            var templates = new HashSet<ElementId>();
+            var seen = new HashSet<ElementId>();
+            var result = new List<ViewEntry>();
+
+            foreach (var e in selected)
+            {
+                if (e == null) continue;
+
+                if (e.ViaTemplate)
+                {
+                    viaTemplateViews++;
+                    templates.Add(e.TemplateId);
+                }
+
+                if (seen.Add(e.WriteTargetId)) result.Add(e);
+            }
+
+            templateCount = templates.Count;
+            return result;
         }
 
         private void Warn(string key)
@@ -429,9 +476,16 @@ namespace Tools28.Commands.DwgLayerTransfer.Views
             this.BringToFrontDeferred();
         }
 
-        private static void ShowResult(TransferResult r)
+        private static void ShowResult(TransferResult r, int viaTemplateViews, int templateCount)
         {
             var content = new System.Text.StringBuilder();
+
+            if (viaTemplateViews > 0)
+            {
+                content.AppendLine(string.Format(
+                    Loc.S("DwgVg.Result.ViaTemplate"), viaTemplateViews, templateCount));
+                content.AppendLine();
+            }
 
             if (r.MissingLayers.Count > 0)
             {

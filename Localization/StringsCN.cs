@@ -777,7 +777,7 @@ namespace Tools28.Localization
             { "DwgVg.Dwg.TargetDetail", "{0}个图层 / 匹配 {1}" },
             { "DwgVg.Dwg.PlainDetail", "{0}个图层" },
 
-            { "DwgVg.Status.TemplateControlled", "受视图样板控制（请改用视图样板为单位迁移）" },
+            { "DwgVg.Status.ViaTemplate", "将写入视图样板“{0}”" },
             { "DwgVg.Status.TemplateNotControlling", "此样板未控制导入类别（请在样板中启用 V/G 设置）" },
 
             { "DwgVg.Summary", "源: {0} / {1}（已设置 {2} 项）  →  目标: {3} 个视图 / {4}" },
@@ -792,10 +792,12 @@ namespace Tools28.Localization
 
             { "DwgVg.Confirm.Title", "迁移设置" },
             { "DwgVg.Confirm.Main", "将“{0}”中 DWG“{1}”的图层显示设置，应用到 {2} 个视图的 DWG“{3}”。" },
+            { "DwgVg.Confirm.ViaTemplate", "其中 {0} 个视图由视图样板控制“导入”类别的 V/G，因此将写入 {1} 个视图样板。\n※ 使用同一样板的其他视图也会受到影响。" },
             { "DwgVg.Confirm.Content", "目标视图的现有设置将被覆盖。执行后可用 Ctrl+Z 撤销。\n是否继续？" },
             { "DwgVg.Txn.Apply", "DWG图层显示设置迁移" },
             { "DwgVg.Result.Title", "迁移结果" },
             { "DwgVg.Result.Msg", "已在 {0} 个视图中应用 {1} 个 DWG 图层的显示设置。" },
+            { "DwgVg.Result.ViaTemplate", "其中 {0} 个视图是通过写入 {1} 个视图样板完成的。" },
             { "DwgVg.Result.MissingLayers", "目标 DWG 中未找到的图层: {0} 项" },
             { "DwgVg.Result.MissingPatterns", "目标模型中不存在的线型（保持默认）: {0} 项" },
             { "DwgVg.Result.More", "其余 {0} 项" },

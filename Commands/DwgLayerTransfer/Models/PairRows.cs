@@ -71,7 +71,11 @@ namespace Tools28.Commands.DwgLayerTransfer.Models
 
         public bool IsApplicable => BlockReason == null;
 
-        public string StatusText => BlockReason ?? "";
+        /// <summary>適用できない行か（状態列を警告色にするかの判定に使う）</summary>
+        public bool IsBlocked => !IsApplicable;
+
+        /// <summary>ブロック理由、無ければ補足（テンプレートへ振り替える旨など）</summary>
+        public string StatusText => BlockReason ?? Entry?.Note ?? "";
 
         private bool _isSelected;
         public bool IsSelected

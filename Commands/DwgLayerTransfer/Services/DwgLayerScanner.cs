@@ -220,9 +220,20 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
                         if (!TemplateControlsImportVg(v))
                             entry.BlockReason = Loc.S("DwgVg.Status.TemplateNotControlling");
                     }
-                    else if (IsImportVgControlledByTemplate(doc, v))
+                    else
                     {
-                        entry.BlockReason = Loc.S("DwgVg.Status.TemplateControlled");
+                        // テンプレートに制御されているビューは、ビュー側から直接変更できない。
+                        // 使えないものとして弾かず、書き込み先をそのテンプレートへ振り替える
+                        var tpl = GetControllingTemplate(doc, v);
+                        if (tpl != null)
+                        {
+                            string tplName;
+                            try { tplName = tpl.Name ?? ""; } catch { tplName = ""; }
+
+                            entry.TemplateId = tpl.Id;
+                            entry.TemplateName = tplName;
+                            entry.Note = string.Format(Loc.S("DwgVg.Status.ViaTemplate"), tplName);
+                        }
                     }
                 }
 
@@ -235,23 +246,24 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
         }
 
         /// <summary>
-        /// ビューに割り当てられたビューテンプレートが「読み込みカテゴリの V/G」を制御しているか。
-        /// 制御されている場合、ビュー側へ SetCategoryOverrides しても反映されない。
+        /// ビューの「読み込みカテゴリの V/G」を制御しているビューテンプレートを返す（無ければ null）。
+        /// 制御されている場合、ビュー側へ SetCategoryOverrides しても反映されないため、
+        /// 呼び出し側は書き込み先をこのテンプレートへ振り替える。
         /// </summary>
-        public static bool IsImportVgControlledByTemplate(Document doc, View v)
+        public static View GetControllingTemplate(Document doc, View v)
         {
             try
             {
                 ElementId tid = v.ViewTemplateId;
-                if (tid == null || tid == ElementId.InvalidElementId) return false;
+                if (tid == null || tid == ElementId.InvalidElementId) return null;
 
-                if (!(doc.GetElement(tid) is View tpl)) return false;
-                return TemplateControlsImportVg(tpl);
+                if (!(doc.GetElement(tid) is View tpl)) return null;
+                return TemplateControlsImportVg(tpl) ? tpl : null;
             }
             catch
             {
                 // 判定できない場合は制御されていない扱いにし、適用時の例外で個別に処理する
-                return false;
+                return null;
             }
         }
 

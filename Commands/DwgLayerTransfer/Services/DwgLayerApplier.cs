@@ -42,7 +42,10 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
         /// </summary>
         /// <param name="targetDoc">移行先ドキュメント</param>
         /// <param name="sourceLayers">移行元のレイヤ名 -&gt; 設定（"" は DWG 本体）</param>
-        /// <param name="targetViews">適用先のビュー（適用可能なものだけを渡すこと）</param>
+        /// <param name="targetViews">
+        /// 適用先のビュー。適用可能なものだけを、書き込み先（<see cref="ViewEntry.WriteTargetId"/>）で
+        /// 重複排除した状態で渡すこと。テンプレート制御下のビューはそのテンプレートへ書き込まれる。
+        /// </param>
         /// <param name="targetDwg">適用先の DWG</param>
         public TransferResult Apply(
             Document targetDoc,
@@ -66,7 +69,8 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
                 foreach (var entry in targetViews)
                 {
                     if (entry == null) continue;
-                    if (!(targetDoc.GetElement(entry.Id) is View targetView)) continue;
+                    // テンプレートに制御されているビューは、そのテンプレートが書き込み先になる
+                    if (!(targetDoc.GetElement(entry.WriteTargetId) is View targetView)) continue;
 
                     int appliedInView = 0;
 

@@ -329,13 +329,20 @@
                                 <DataGridTextColumn x:Name="colTgtStatus" Header="状態" Binding="{Binding StatusText}"
                                                     Width="1.1*" IsReadOnly="True">
                                     <DataGridTextColumn.ElementStyle>
+                                        <!-- 補足（テンプレートへ振り替え）は控えめな色、
+                                             適用不可の行だけ警告色にする -->
                                         <Style TargetType="TextBlock">
                                             <Setter Property="VerticalAlignment" Value="Center"/>
                                             <Setter Property="Margin" Value="4,0"/>
                                             <Setter Property="FontSize" Value="10"/>
-                                            <Setter Property="Foreground" Value="#C0392B"/>
+                                            <Setter Property="Foreground" Value="{StaticResource TargetAccent}"/>
                                             <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
                                             <Setter Property="ToolTip" Value="{Binding StatusText}"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsBlocked}" Value="True">
+                                                    <Setter Property="Foreground" Value="#C0392B"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
                                         </Style>
                                     </DataGridTextColumn.ElementStyle>
                                 </DataGridTextColumn>
