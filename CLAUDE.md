@@ -118,8 +118,11 @@ msbuild Tools28.csproj /p:Configuration=Release /p:RevitVersion=2024
 3. **`Packages/{VERSION}/install.bat`** (全6バージョン)
    - ヘッダーのバージョン番号を更新
 
-4. **`.github/workflows/build-and-release.yml`**
-   - Release body の「機能一覧」セクションに新機能を追加
+4. **`Docs/features.json`**（Release body は**自動生成**）
+   - Release body の「⭐新機能」「全機能一覧」は `scripts/generate-release-body.py` が
+     `Docs/features.json` から生成する。**workflow ファイルを手で編集する必要はない**
+   - 新機能のエントリに `added_in` をそのリリースバージョンで入れておくこと（詳細は「6. features.json に追加」）
+   - 確認: `python3 scripts/generate-release-body.py --version 2.5 --features Docs/features.json`
 
 5. **`Application.cs`**
    - リボンに新しいボタンを登録
