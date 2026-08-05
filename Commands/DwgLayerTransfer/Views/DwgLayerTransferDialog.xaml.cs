@@ -497,6 +497,12 @@ namespace Tools28.Commands.DwgLayerTransfer.Views
                 content.AppendLine();
             }
 
+            if (r.HiddenBlocked > 0)
+            {
+                content.AppendLine(string.Format(Loc.S("DwgVg.Result.HiddenBlocked"), r.HiddenBlocked));
+                content.AppendLine();
+            }
+
             if (r.MissingLayers.Count > 0)
             {
                 content.AppendLine(string.Format(Loc.S("DwgVg.Result.MissingLayers"), r.MissingLayers.Count));

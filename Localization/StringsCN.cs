@@ -807,6 +807,7 @@ namespace Tools28.Localization
             { "DwgVg.Fail.NotApplied", "{0}: 写入后数值未发生变化 {1}" },
             { "DwgVg.Fail.NoEffect", "{0}: 已写入“{1}”，但未反映到该视图。视图样板的 V/G 设置中可能未包含“导入”（请编辑样板并勾选 V/G 的“导入”）" },
             { "DwgVg.Fail.TemplateNotApplied", "{0}: 写入视图样板“{1}”同样没有生效 {2}" },
+            { "DwgVg.Result.HiddenBlocked", "无法再现显示/隐藏的图层: {0} 个（Revit 不允许在该视图中隐藏）" },
             { "DwgVg.Result.MissingLayers", "目标 DWG 中未找到的图层: {0} 项" },
             { "DwgVg.Result.MissingPatterns", "目标模型中不存在的线型（保持默认）: {0} 项" },
             { "DwgVg.Result.More", "其余 {0} 项" },

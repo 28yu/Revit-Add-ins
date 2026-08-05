@@ -807,6 +807,7 @@ namespace Tools28.Localization
             { "DwgVg.Fail.NotApplied", "{0}: 書き込んでも値が変わりませんでした {1}" },
             { "DwgVg.Fail.NoEffect", "{0}: 「{1}」へは書き込めましたが、このビューには反映されませんでした。ビューテンプレートの V/G 設定で「読み込み」が含まれていない可能性があります（テンプレートを編集し、V/G の「読み込み」にチェックを入れてください）" },
             { "DwgVg.Fail.TemplateNotApplied", "{0}: ビューテンプレート「{1}」への書き込みも反映されませんでした {2}" },
+            { "DwgVg.Result.HiddenBlocked", "表示/非表示を再現できなかったレイヤ: {0} 件（Revit がこのビューでの非表示を許可していません）" },
             { "DwgVg.Result.MissingLayers", "移行先の DWG に見つからなかったレイヤ: {0} 件" },
             { "DwgVg.Result.MissingPatterns", "移行先に存在しない線種（既定のまま）: {0} 件" },
             { "DwgVg.Result.More", "ほか {0} 件" },

@@ -31,6 +31,9 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
         /// <summary>移行先に存在しなかった線種名</summary>
         public List<string> MissingLinePatterns { get; } = new List<string>();
 
+        /// <summary>Revit が非表示化を許可せず、表示/非表示を再現できなかった件数</summary>
+        public int HiddenBlocked { get; set; }
+
         /// <summary>反映できなかったビューとその理由</summary>
         public List<string> Failures { get; } = new List<string>();
     }
@@ -69,6 +72,8 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
             public int Ineffective;
             /// <summary>例外で書き込めなかった件数</summary>
             public int Failed;
+            /// <summary>表示/非表示を書き込めなかった件数</summary>
+            public int HiddenBlocked;
             /// <summary>最初に起きたエラーの内容（診断用）</summary>
             public string FirstError;
 
@@ -79,6 +84,7 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
                 Applied += other.Applied;
                 Ineffective += other.Ineffective;
                 Failed += other.Failed;
+                HiddenBlocked += other.HiddenBlocked;
                 if (FirstError == null) FirstError = other.FirstError;
             }
         }
@@ -113,6 +119,7 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
                           $"移行先線種={_linePatterns.Count}");
             foreach (var d in targetDwgs)
                 DiagLog.Write($"[DwgVg]   移行先DWG '{d?.Name}' レイヤ数={d?.Layers.Count} catId={d?.CategoryId}");
+            DiagLog.Write("[DwgVg]   " + DescribeSource(sourceLayers));
 
             var missingLayers = new HashSet<string>(StringComparer.CurrentCultureIgnoreCase);
             var missingPatterns = new HashSet<string>(StringComparer.CurrentCultureIgnoreCase);
@@ -137,6 +144,8 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
                     var w = WriteAll(view, entry.Name, sourceLayers, targetDwgs, missingLayers, missingPatterns);
                     DiagLog.Write($"[DwgVg]   '{entry.Name}' 直接: 反映={w.Applied} 未反映={w.Ineffective} " +
                                   $"失敗={w.Failed} {w.FirstError}");
+
+                    result.HiddenBlocked += w.HiddenBlocked;
 
                     if (w.Applied > 0)
                     {
@@ -165,7 +174,8 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
 
             DiagLog.Write($"[DwgVg] ===== 適用終了 反映ビュー={result.ViewCount} 反映レイヤ={result.LayerCount} " +
                           $"テンプレート振替={result.TemplateFallbackViews}ビュー/{result.TemplateFallbackCount}件 " +
-                          $"未一致レイヤ={result.MissingLayers.Count} 失敗={result.Failures.Count}");
+                          $"未一致レイヤ={result.MissingLayers.Count} 未解決線種={result.MissingLinePatterns.Count} " +
+                          $"非表示不可={result.HiddenBlocked} 失敗={result.Failures.Count}");
             return result;
         }
 
@@ -301,7 +311,7 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
         /// 振り替え先へ書いた内容がそのビューへ伝わったかの判定に使う。
         /// </summary>
         /// <param name="configuredCount">移行元で既定から変更されていた設定の件数（判定の母数）</param>
-        private static int CountEffectiveOnView(
+        private int CountEffectiveOnView(
             View view, IDictionary<string, LayerGraphicSetting> sourceLayers,
             IList<DwgDefinition> targetDwgs, out int configuredCount)
         {
@@ -395,14 +405,17 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
                 return;
             }
 
-            // 表示/非表示は別 API
+            // 表示/非表示は別 API。
+            // CanCategoryBeHidden で事前に諦めると「非表示にできていない」ことに気付けないため、
+            // 実際に書いて例外を拾い、書けなかった件数を残す
             try
             {
-                if (view.CanCategoryBeHidden(categoryId) && view.GetCategoryHidden(categoryId) != s.Hidden)
+                if (view.GetCategoryHidden(categoryId) != s.Hidden)
                     view.SetCategoryHidden(categoryId, s.Hidden);
             }
             catch (Exception ex)
             {
+                if (s.Hidden) st.HiddenBlocked++;
                 if (st.FirstError == null) st.FirstError = ex.Message;
             }
 
@@ -424,25 +437,63 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
             try
             {
                 var cur = view.GetCategoryOverrides(categoryId);
-                bool hidden = false;
-                try { hidden = view.GetCategoryHidden(categoryId); } catch { }
+                string hidden;
+                try { hidden = view.GetCategoryHidden(categoryId).ToString(); }
+                catch (Exception ex) { hidden = "取得不可(" + ex.Message + ")"; }
 
                 actual = cur == null
                     ? "上書き取得不可"
                     : $"線色={ColorText(cur.ProjectionLineColor)} 線幅={cur.ProjectionLineWeight} " +
+                      $"線種={PatternText(view.Document, cur.ProjectionLinePatternId)} " +
                       $"HT={cur.Halftone} 非表示={hidden}";
             }
             catch (Exception ex) { actual = "読戻し例外: " + ex.Message; }
 
             DiagLog.Write($"[DwgVg]       [{verdict}] cat={categoryId} layer='{layerName}' " +
                           $"書込(線色={ColorText(s.ProjectionLineColor)} 線幅={s.ProjectionLineWeight} " +
-                          $"HT={s.Halftone} 非表示={s.Hidden}) 実際({actual})");
+                          $"線種={s.ProjectionLinePattern ?? "-"} HT={s.Halftone} 非表示={s.Hidden}) " +
+                          $"実際({actual})");
         }
 
         private static string ColorText(Color c)
         {
             try { return (c != null && c.IsValid) ? $"{c.Red},{c.Green},{c.Blue}" : "-"; }
             catch { return "?"; }
+        }
+
+        private static string PatternText(Document doc, ElementId id)
+        {
+            try
+            {
+                if (id == null || id == ElementId.InvalidElementId) return "-";
+                if (id == LinePatternElement.GetSolidPatternId()) return LayerGraphicSetting.SolidPatternMarker;
+                return (doc?.GetElement(id) as LinePatternElement)?.Name ?? id.ToString();
+            }
+            catch { return "?"; }
+        }
+
+        /// <summary>
+        /// 移行元がどんな種類の設定を持っているかを1行にまとめる。
+        /// 「移行しても見た目が変わらない」ときに、何が来ているはずなのかを特定するために使う。
+        /// </summary>
+        private static string DescribeSource(IDictionary<string, LayerGraphicSetting> sourceLayers)
+        {
+            int hidden = 0, color = 0, weight = 0, pattern = 0, halftone = 0, cut = 0;
+
+            foreach (var s in sourceLayers.Values)
+            {
+                if (s == null) continue;
+                if (s.Hidden) hidden++;
+                if (s.ProjectionLineColor != null && s.ProjectionLineColor.IsValid) color++;
+                if (s.ProjectionLineWeight > 0) weight++;
+                if (s.ProjectionLinePattern != null) pattern++;
+                if (s.Halftone) halftone++;
+                if ((s.CutLineColor != null && s.CutLineColor.IsValid)
+                    || s.CutLineWeight > 0 || s.CutLinePattern != null) cut++;
+            }
+
+            return $"移行元内訳: 非表示={hidden} 線色={color} 線幅={weight} 線種={pattern} " +
+                   $"ハーフトーン={halftone} 切断線={cut}";
         }
 
         /// <summary>移行元の設定から、書き込む OverrideGraphicSettings を組み立てる。</summary>
@@ -477,12 +528,20 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
         /// テンプレート側の値を返すため、書いた値と食い違えば「効いていない」と分かる。
         /// 線種は移行先に同名が無いと書き込まない（別途レポートする）ため比較対象から外す。
         /// </summary>
-        private static bool IsEffective(View view, ElementId categoryId, LayerGraphicSetting s)
+        private bool IsEffective(View view, ElementId categoryId, LayerGraphicSetting s)
         {
             try
             {
-                if (view.CanCategoryBeHidden(categoryId) && view.GetCategoryHidden(categoryId) != s.Hidden)
-                    return false;
+                // 表示/非表示は CanCategoryBeHidden で判定を省かない。
+                // 省くと「非表示にできていない」まま成功と報告してしまう
+                try
+                {
+                    if (view.GetCategoryHidden(categoryId) != s.Hidden) return false;
+                }
+                catch
+                {
+                    if (s.Hidden) return false;   // 非表示にしたいのに状態が読めない＝再現できていない
+                }
 
                 var cur = view.GetCategoryOverrides(categoryId);
                 if (cur == null) return false;
@@ -497,12 +556,38 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
                 if (cur.CutLineWeight != (s.CutLineWeight > 0 ? s.CutLineWeight : -1))
                     return false;
 
+                // 線種は移行先に同名が無ければ書き込んでいないので、解決できたものだけ照合する
+                if (!SamePattern(cur.ProjectionLinePatternId, s.ProjectionLinePattern)) return false;
+                if (!SamePattern(cur.CutLinePatternId, s.CutLinePattern)) return false;
+
                 return true;
             }
             catch
             {
                 return false;
             }
+        }
+
+        /// <summary>
+        /// 線種の一致判定。移行先で解決できなかった線種は書き込んでいないため、一致とみなす
+        /// （未解決分は MissingLinePatterns で別途報告する）。
+        /// </summary>
+        private bool SamePattern(ElementId current, string wantedName)
+        {
+            if (wantedName == null) return true;   // 上書きなし（元の値を消したかどうかは他項目で判定）
+
+            ElementId wanted;
+            if (wantedName == LayerGraphicSetting.SolidPatternMarker)
+            {
+                try { wanted = LinePatternElement.GetSolidPatternId(); }
+                catch { return true; }
+            }
+            else if (!_linePatterns.TryGetValue(wantedName, out wanted))
+            {
+                return true;   // 移行先に存在しない線種
+            }
+
+            return current != null && current == wanted;
         }
 
         /// <summary>色の一致判定。どちらも未設定なら一致とみなす。</summary>
