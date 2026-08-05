@@ -78,8 +78,10 @@ namespace Tools28.Commands.DwgLayerTransfer.Views
             lblSourceSection.Text = Loc.S("DwgVg.Section.Source");
             lblTargetSection.Text = Loc.S("DwgVg.Section.Target");
 
+            // 移行元は常にビュー単位なので、①②の文言は固定
+            lblSrcViewCaption.Text = Loc.S("DwgVg.Step1.View");
+            lblSrcViewHint.Text = Loc.S("DwgVg.Step1.Hint");
             lblSrcDwgCaption.Text = Loc.S("DwgVg.Step2");
-            lblTgtViewCaption.Text = Loc.S("DwgVg.Step3");
             lblTgtDwgCaption.Text = Loc.S("DwgVg.Step4");
 
             colTgtName.Header = Loc.S("DwgVg.Col.Name");
@@ -94,11 +96,12 @@ namespace Tools28.Commands.DwgLayerTransfer.Views
             UpdateModeDependentLabels();
         }
 
-        /// <summary>「ビュー」「ビューテンプレート」で表記が変わるラベルを更新する。</summary>
+        /// <summary>反映先の単位（ビュー/ビューテンプレート）で表記が変わるラベルを更新する。</summary>
         private void UpdateModeDependentLabels()
         {
-            lblSrcViewCaption.Text = TemplateMode ? Loc.S("DwgVg.Step1.Template") : Loc.S("DwgVg.Step1.View");
-            lblSrcDwgCaption.Text = TemplateMode ? Loc.S("DwgVg.Step2.Template") : Loc.S("DwgVg.Step2");
+            lblTgtViewCaption.Text = TargetTemplateMode
+                ? Loc.S("DwgVg.Step3.Template")
+                : Loc.S("DwgVg.Step3");
         }
 
         private static string SafeTitle(Document d)
@@ -107,8 +110,13 @@ namespace Tools28.Commands.DwgLayerTransfer.Views
             catch { return ""; }
         }
 
-        /// <summary>ビューテンプレート単位か（false ならビュー単位）</summary>
-        private bool TemplateMode => rbTemplate.IsChecked == true;
+        /// <summary>
+        /// 反映先をビューテンプレート単位にするか（false ならビュー単位）。
+        /// 移行元は常にビュー単位で読み取るため、この選択は移行先にだけ効く。
+        /// ビューから読むことで、ビューテンプレート由来の設定と
+        /// ビュー個別に設定された V/G のどちらでも「今そのビューで効いている値」を取得できる。
+        /// </summary>
+        private bool TargetTemplateMode => rbTemplate.IsChecked == true;
 
         // ===== 一覧の構築 =====
 
@@ -131,13 +139,13 @@ namespace Tools28.Commands.DwgLayerTransfer.Views
             // 走査中は Revit 本体の操作を無効化する（using を抜けると必ず復帰）
             using (this.BlockRevitInput())
             {
-                bool templates = TemplateMode;
-
                 _sourceDwgs = _scanner.EnumerateDwgs(_sourceDoc);
                 _targetDwgs = _scanner.EnumerateDwgs(_targetDoc);
 
-                _sourceViews = _scanner.EnumerateViews(_sourceDoc, templates, checkTemplateControl: false);
-                var targetViews = _scanner.EnumerateViews(_targetDoc, templates, checkTemplateControl: true);
+                // 移行元は常に「ビュー」。テンプレート側の V/G で「読み込み」が
+                // 含められていない場合でも、ビューから読めば実際に効いている値が取れる
+                _sourceViews = _scanner.EnumerateViews(_sourceDoc, templates: false, checkTemplateControl: false);
+                var targetViews = _scanner.EnumerateViews(_targetDoc, TargetTemplateMode, checkTemplateControl: true);
 
                 // --- 左: ビュー一覧 ---
                 _sourceViewsView = CollectionViewSource.GetDefaultView(_sourceViews);

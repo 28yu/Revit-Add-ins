@@ -14,6 +14,15 @@
         <SolidColorBrush x:Key="RevitHoverBlue" Color="#0052A3"/>
         <SolidColorBrush x:Key="RevitDarkGray" Color="#333333"/>
 
+        <!-- 移行元＝淡いティール系 / 移行先＝淡いアンバー系。
+             左右をひと目で区別できるよう、あえて色相の離れた淡色を割り当てている -->
+        <SolidColorBrush x:Key="SourceTint"   Color="#E6F2F1"/>
+        <SolidColorBrush x:Key="SourceAccent" Color="#1F6E68"/>
+        <SolidColorBrush x:Key="SourceLine"   Color="#BFDCD9"/>
+        <SolidColorBrush x:Key="TargetTint"   Color="#FBF0DE"/>
+        <SolidColorBrush x:Key="TargetAccent" Color="#8A5A12"/>
+        <SolidColorBrush x:Key="TargetLine"   Color="#EBD8B6"/>
+
         <Style x:Key="PrimaryButtonStyle" TargetType="Button">
             <Setter Property="MinWidth" Value="120"/>
             <Setter Property="Height" Value="30"/>
@@ -82,12 +91,19 @@
             </Style.Triggers>
         </Style>
 
-        <!-- セクション見出し -->
+        <!-- セクション見出し（文字色は移行元/移行先それぞれで指定する） -->
         <Style x:Key="SectionHeader" TargetType="TextBlock">
             <Setter Property="FontSize" Value="12"/>
             <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Foreground" Value="White"/>
             <Setter Property="Padding" Value="8,5"/>
+        </Style>
+
+        <!-- 補足の注記 -->
+        <Style x:Key="HintText" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="Foreground" Value="#7A7A7A"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Margin" Value="0,0,0,4"/>
         </Style>
 
         <!-- リスト内の小見出し -->
@@ -120,7 +136,7 @@
                                Margin="6,1,0,0" VerticalAlignment="Center"/>
                 </StackPanel>
                 <TextBlock Grid.Column="1" Text="{Binding DetailText}" FontSize="10"
-                           Foreground="#0066CC" Margin="8,1,2,0" VerticalAlignment="Center"/>
+                           Foreground="#5F7A8A" Margin="8,1,2,0" VerticalAlignment="Center"/>
             </Grid>
         </DataTemplate>
     </Window.Resources>
@@ -162,14 +178,16 @@
                            VerticalAlignment="Center" FontSize="12" Margin="0,0,8,4"/>
                 <TextBlock x:Name="txtTarget" Grid.Row="1" Grid.Column="1" Text=""
                            VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold"
-                           Foreground="#0066CC" TextTrimming="CharacterEllipsis" Margin="0,0,0,4"/>
+                           Foreground="{StaticResource TargetAccent}"
+                           TextTrimming="CharacterEllipsis" Margin="0,0,0,4"/>
 
-                <TextBlock x:Name="lblMode" Grid.Row="2" Grid.Column="0" Text="移行の単位:"
+                <!-- 単位の選択は「反映先」だけに効く。移行元は常にビュー単位で読み取る -->
+                <TextBlock x:Name="lblMode" Grid.Row="2" Grid.Column="0" Text="反映先の単位:"
                            VerticalAlignment="Center" FontSize="12" Margin="0,4,8,0"/>
                 <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Margin="0,4,0,0">
-                    <RadioButton x:Name="rbTemplate" Content="ビューテンプレート" GroupName="Mode" IsChecked="True"
+                    <RadioButton x:Name="rbView" Content="ビュー" GroupName="Mode" IsChecked="True"
                                  VerticalAlignment="Center" FontSize="12" Margin="0,0,16,0" Checked="Mode_Changed"/>
-                    <RadioButton x:Name="rbView" Content="ビュー" GroupName="Mode"
+                    <RadioButton x:Name="rbTemplate" Content="ビューテンプレート" GroupName="Mode"
                                  VerticalAlignment="Center" FontSize="12" Checked="Mode_Changed"/>
                     <TextBlock x:Name="lblModeHint" Text="※ 同名のものを自動で選択します"
                                VerticalAlignment="Center" FontSize="11" Foreground="#777777" Margin="16,0,0,0"/>
@@ -186,16 +204,18 @@
             </Grid.ColumnDefinitions>
 
             <!-- 左: 移行元モデル データ情報 -->
-            <Border Grid.Column="0" BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="2"
-                    Background="White">
+            <Border Grid.Column="0" BorderBrush="{StaticResource SourceLine}" BorderThickness="1"
+                    CornerRadius="2" Background="White">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
-                    <Border Grid.Row="0" Background="#0066CC">
+                    <Border Grid.Row="0" Background="{StaticResource SourceTint}"
+                            BorderBrush="{StaticResource SourceLine}" BorderThickness="0,0,0,1">
                         <TextBlock x:Name="lblSourceSection" Text="移行元モデル データ情報"
+                                   Foreground="{StaticResource SourceAccent}"
                                    Style="{StaticResource SectionHeader}"/>
                     </Border>
 
@@ -203,16 +223,20 @@
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="1.1*"/>
                         </Grid.RowDefinitions>
 
-                        <TextBlock x:Name="lblSrcViewCaption" Grid.Row="0" Text="① ビューを選択"
+                        <TextBlock x:Name="lblSrcViewCaption" Grid.Row="0" Text="① 読み取り元のビューを選択"
                                    Style="{StaticResource ListCaption}"/>
-                        <TextBox x:Name="SrcViewSearch" Grid.Row="1" Style="{StaticResource SearchBoxStyle}"
+                        <TextBlock x:Name="lblSrcViewHint" Grid.Row="1"
+                                   Text="※ そのビューで実際に効いている設定を読み取ります（ビューテンプレート由来／ビュー個別のどちらでも）"
+                                   Style="{StaticResource HintText}"/>
+                        <TextBox x:Name="SrcViewSearch" Grid.Row="2" Style="{StaticResource SearchBoxStyle}"
                                  TextChanged="SrcViewSearch_Changed"/>
-                        <ListBox x:Name="SrcViewList" Grid.Row="2" FontSize="12"
+                        <ListBox x:Name="SrcViewList" Grid.Row="3" FontSize="12"
                                  BorderBrush="#DDDDDD" BorderThickness="1"
                                  DisplayMemberPath="Name" SelectionMode="Single"
                                  SelectionChanged="SrcView_Changed"
@@ -220,9 +244,9 @@
                                  VirtualizingPanel.IsVirtualizing="True"
                                  VirtualizingPanel.VirtualizationMode="Recycling"/>
 
-                        <TextBlock x:Name="lblSrcDwgCaption" Grid.Row="3" Text="② このビューにある DWG を選択"
+                        <TextBlock x:Name="lblSrcDwgCaption" Grid.Row="4" Text="② このビューにある DWG を選択"
                                    Style="{StaticResource ListCaption}" Margin="0,8,0,3"/>
-                        <ListBox x:Name="SrcDwgList" Grid.Row="4" FontSize="12"
+                        <ListBox x:Name="SrcDwgList" Grid.Row="5" FontSize="12"
                                  BorderBrush="#DDDDDD" BorderThickness="1"
                                  ItemTemplate="{StaticResource DwgItemTemplate}"
                                  HorizontalContentAlignment="Stretch" SelectionMode="Single"
@@ -232,20 +256,22 @@
             </Border>
 
             <!-- 中央の矢印 -->
-            <TextBlock Grid.Column="1" Text="&#x25B6;" FontSize="20" Foreground="#0066CC"
+            <TextBlock Grid.Column="1" Text="&#x25B6;" FontSize="20" Foreground="#A6AEB5"
                        VerticalAlignment="Center" Margin="10,0"/>
 
             <!-- 右: 移行先モデル データ情報 -->
-            <Border Grid.Column="2" BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="2"
-                    Background="White">
+            <Border Grid.Column="2" BorderBrush="{StaticResource TargetLine}" BorderThickness="1"
+                    CornerRadius="2" Background="White">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
-                    <Border Grid.Row="0" Background="#5B9BD5">
+                    <Border Grid.Row="0" Background="{StaticResource TargetTint}"
+                            BorderBrush="{StaticResource TargetLine}" BorderThickness="0,0,0,1">
                         <TextBlock x:Name="lblTargetSection" Text="移行先モデル データ情報"
+                                   Foreground="{StaticResource TargetAccent}"
                                    Style="{StaticResource SectionHeader}"/>
                     </Border>
 

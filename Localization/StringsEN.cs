@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 namespace Tools28.Localization
 {
@@ -746,21 +746,21 @@ namespace Tools28.Localization
             { "Ribbon.DwgVg.Tip", "Transfers the display settings of imported/linked DWG layers (visibility, line color, line weight, line pattern, halftone) from another open model into this one. Pick the source view and DWG, then the target views (multiple allowed) and DWG. No intermediate file such as Excel is used." },
 
             { "DwgVg.Title", "Transfer DWG Layer Display Settings" },
-            { "DwgVg.Description", "Transfers DWG layer display settings (visibility, line color, line weight, line pattern, halftone) from another open model into this one. Pick the source view and DWG on the left, then the target views and DWG on the right." },
+            { "DwgVg.Description", "Transfers DWG layer display settings (visibility, line color, line weight, line pattern, halftone) from another open model into this one. Pick the view and DWG to read from on the left, then the target views and DWG on the right." },
             { "DwgVg.Source", "Source model:" },
             { "DwgVg.Target", "Target model:" },
-            { "DwgVg.Mode", "Transfer by:" },
+            { "DwgVg.Mode", "Target unit:" },
             { "DwgVg.Mode.Template", "View template" },
             { "DwgVg.Mode.View", "View" },
-            { "DwgVg.Mode.Hint", "* Items with matching names are selected automatically" },
+            { "DwgVg.Mode.Hint", "* Items whose name matches the source are selected automatically" },
 
             { "DwgVg.Section.Source", "Source model data" },
             { "DwgVg.Section.Target", "Target model data" },
-            { "DwgVg.Step1.View", "1. Select a view" },
-            { "DwgVg.Step1.Template", "1. Select a view template" },
+            { "DwgVg.Step1.View", "1. Select the view to read from" },
+            { "DwgVg.Step1.Hint", "* Reads the settings actually in effect in that view (whether they come from a view template or are set on the view itself)" },
             { "DwgVg.Step2", "2. Select a DWG present in this view" },
-            { "DwgVg.Step2.Template", "2. Select a DWG" },
             { "DwgVg.Step3", "3. Select target views (multiple allowed)" },
+            { "DwgVg.Step3.Template", "3. Select target view templates (multiple allowed)" },
             { "DwgVg.Step4", "4. Select the target DWG" },
 
             { "DwgVg.Col.Name", "Name" },
@@ -785,7 +785,7 @@ namespace Tools28.Localization
             { "DwgVg.NoDoc", "No model is open." },
             { "DwgVg.NoSourceDoc", "No model is available as a transfer source.\n\nOpen the model you want to copy the settings from, then run this command again." },
 
-            { "DwgVg.Warn.NoSourceView", "Select a source view." },
+            { "DwgVg.Warn.NoSourceView", "Select the view to read from." },
             { "DwgVg.Warn.NoSourceDwg", "Select a source DWG.\n\nIf the selected view contains no DWG, choose a different view." },
             { "DwgVg.Warn.NoTargetView", "Select at least one target view." },
             { "DwgVg.Warn.NoTargetDwg", "Select a target DWG.\n\nImport or link the same DWG into the target model, then run this command again." },

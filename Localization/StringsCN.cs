@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 namespace Tools28.Localization
 {
@@ -745,21 +745,21 @@ namespace Tools28.Localization
             { "Ribbon.DwgVg.Tip", "将已打开的另一个模型中，导入／链接的 DWG 图层显示设置（显示/隐藏、线颜色、线宽、线型、半色调）迁移到当前模型。选择源视图和 DWG，再选择目标视图（可多选）和 DWG 即可。不使用 Excel 等中间文件。" },
 
             { "DwgVg.Title", "DWG图层显示设置迁移" },
-            { "DwgVg.Description", "将已打开的另一个模型中的 DWG 图层显示设置（显示/隐藏、线颜色、线宽、线型、半色调）迁移到当前模型。请在左侧选择源视图和 DWG，在右侧选择目标视图和 DWG。" },
+            { "DwgVg.Description", "将已打开的另一个模型中的 DWG 图层显示设置（显示/隐藏、线颜色、线宽、线型、半色调）迁移到当前模型。请在左侧选择读取源视图和 DWG，在右侧选择目标视图和 DWG。" },
             { "DwgVg.Source", "源模型:" },
             { "DwgVg.Target", "目标模型:" },
-            { "DwgVg.Mode", "迁移单位:" },
+            { "DwgVg.Mode", "目标单位:" },
             { "DwgVg.Mode.Template", "视图样板" },
             { "DwgVg.Mode.View", "视图" },
-            { "DwgVg.Mode.Hint", "※ 同名项目将自动选中" },
+            { "DwgVg.Mode.Hint", "※ 与源同名的项目将自动选中" },
 
             { "DwgVg.Section.Source", "源模型 数据信息" },
             { "DwgVg.Section.Target", "目标模型 数据信息" },
-            { "DwgVg.Step1.View", "① 选择视图" },
-            { "DwgVg.Step1.Template", "① 选择视图样板" },
+            { "DwgVg.Step1.View", "① 选择读取源视图" },
+            { "DwgVg.Step1.Hint", "※ 读取该视图中实际生效的设置（无论来自视图样板还是视图单独设置）" },
             { "DwgVg.Step2", "② 选择该视图中的 DWG" },
-            { "DwgVg.Step2.Template", "② 选择 DWG" },
             { "DwgVg.Step3", "③ 选择目标视图（可多选）" },
+            { "DwgVg.Step3.Template", "③ 选择目标视图样板（可多选）" },
             { "DwgVg.Step4", "④ 选择目标 DWG" },
 
             { "DwgVg.Col.Name", "名称" },
@@ -784,7 +784,7 @@ namespace Tools28.Localization
             { "DwgVg.NoDoc", "未打开任何模型。" },
             { "DwgVg.NoSourceDoc", "未找到可作为源的模型。\n\n请同时打开作为设置来源的模型后再执行。" },
 
-            { "DwgVg.Warn.NoSourceView", "请选择源视图。" },
+            { "DwgVg.Warn.NoSourceView", "请选择读取源视图。" },
             { "DwgVg.Warn.NoSourceDwg", "请选择源 DWG。\n\n若所选视图中没有 DWG，请选择其他视图。" },
             { "DwgVg.Warn.NoTargetView", "请至少选择一个目标视图。" },
             { "DwgVg.Warn.NoTargetDwg", "请选择目标 DWG。\n\n请先在目标模型中导入／链接相同的 DWG 后再执行。" },

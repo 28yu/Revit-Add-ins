@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 namespace Tools28.Localization
 {
@@ -745,21 +745,21 @@ namespace Tools28.Localization
             { "Ribbon.DwgVg.Tip", "開いている別のモデルから、読み込み／リンクした DWG のレイヤ表示設定（表示/非表示・線の色・線幅・線種・ハーフトーン）をこのモデルへ移行します。参照元のビューと DWG を選び、反映先のビュー（複数可）と DWG を選ぶだけで移せます。Excel などの中間ファイルは使いません。" },
 
             { "DwgVg.Title", "DWGレイヤ表示設定の移行" },
-            { "DwgVg.Description", "開いている別のモデルから、DWG レイヤの表示設定（表示/非表示・線の色・線幅・線種・ハーフトーン）をこのモデルへ移行します。左で参照元のビューと DWG を選び、右で反映先のビューと DWG を選んでください。" },
+            { "DwgVg.Description", "開いている別のモデルから、DWG レイヤの表示設定（表示/非表示・線の色・線幅・線種・ハーフトーン）をこのモデルへ移行します。左で読み取り元のビューと DWG を選び、右で反映先のビューと DWG を選んでください。" },
             { "DwgVg.Source", "移行元モデル:" },
             { "DwgVg.Target", "移行先モデル:" },
-            { "DwgVg.Mode", "移行の単位:" },
+            { "DwgVg.Mode", "反映先の単位:" },
             { "DwgVg.Mode.Template", "ビューテンプレート" },
             { "DwgVg.Mode.View", "ビュー" },
-            { "DwgVg.Mode.Hint", "※ 同名のものを自動で選択します" },
+            { "DwgVg.Mode.Hint", "※ 移行元と同名のものを自動で選択します" },
 
             { "DwgVg.Section.Source", "移行元モデル データ情報" },
             { "DwgVg.Section.Target", "移行先モデル データ情報" },
-            { "DwgVg.Step1.View", "① ビューを選択" },
-            { "DwgVg.Step1.Template", "① ビューテンプレートを選択" },
+            { "DwgVg.Step1.View", "① 読み取り元のビューを選択" },
+            { "DwgVg.Step1.Hint", "※ そのビューで実際に効いている設定を読み取ります（ビューテンプレート由来／ビュー個別のどちらでも）" },
             { "DwgVg.Step2", "② このビューにある DWG を選択" },
-            { "DwgVg.Step2.Template", "② DWG を選択" },
             { "DwgVg.Step3", "③ 反映するビューを選択（複数可）" },
+            { "DwgVg.Step3.Template", "③ 反映するビューテンプレートを選択（複数可）" },
             { "DwgVg.Step4", "④ 反映先の DWG を選択" },
 
             { "DwgVg.Col.Name", "名前" },
@@ -784,7 +784,7 @@ namespace Tools28.Localization
             { "DwgVg.NoDoc", "モデルが開かれていません。" },
             { "DwgVg.NoSourceDoc", "移行元にできるモデルが見つかりません。\n\n設定のコピー元となるモデルも Revit で開いてから、もう一度実行してください。" },
 
-            { "DwgVg.Warn.NoSourceView", "移行元のビューを選択してください。" },
+            { "DwgVg.Warn.NoSourceView", "読み取り元のビューを選択してください。" },
             { "DwgVg.Warn.NoSourceDwg", "移行元の DWG を選択してください。\n\n選択中のビューに DWG が無い場合は、別のビューを選んでください。" },
             { "DwgVg.Warn.NoTargetView", "反映先のビューを1つ以上選択してください。" },
             { "DwgVg.Warn.NoTargetDwg", "反映先の DWG を選択してください。\n\n移行先モデルにも同じ DWG を読み込み／リンクしてから実行してください。" },
