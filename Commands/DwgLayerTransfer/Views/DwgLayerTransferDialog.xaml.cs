@@ -483,7 +483,7 @@ namespace Tools28.Commands.DwgLayerTransfer.Views
                 content.AppendLine();
             }
 
-            if (r.TemplateFallbackViews > 0)
+            if (r.TemplateFallbackCount > 0)
             {
                 content.AppendLine(string.Format(
                     Loc.S("DwgVg.Result.ViaTemplate"), r.TemplateFallbackViews, r.TemplateFallbackCount));

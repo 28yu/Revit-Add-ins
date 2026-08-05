@@ -44,11 +44,13 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
     ///   - 線種      : LinePatternElement の名前一致
     /// で移行先の ID へ解決し直す。解決できなかったものはレポートに残す。
     ///
-    /// ⚠️ 書き込みは「書けたか」ではなく「効いたか」で判定する。
-    /// ビューテンプレートに制御されているビューへの SetCategoryOverrides は
-    /// 例外を投げずに黙って無視されることがあり、書きっぱなしでは成功と区別できない。
-    /// そのため 1 カテゴリごとに読み戻して検証し、効いていなければ
-    /// そのビューのビューテンプレートへ書き込み先を振り替える。
+    /// ⚠️ 書き込みは「書けたか」ではなく「ユーザーが見るビューで効いたか」で判定する。
+    /// ビューの V/G が従属ビューやビューテンプレートに支配されていると、
+    /// ビュー自身への SetCategoryOverrides は例外になるか黙って無視される。
+    /// その場合は主ビュー／テンプレートへ振り替えるが、
+    /// 振り替え先へ書けたことは元のビューに反映されたことを意味しない
+    /// （テンプレートの V/G に「読み込み」が含まれていなければ伝わらない）。
+    /// そのため検証は常に元のビューで行い、伝わらなければ書き込みを破棄する。
     /// </summary>
     public class DwgLayerApplier
     {
@@ -115,8 +117,8 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
             var missingLayers = new HashSet<string>(StringComparer.CurrentCultureIgnoreCase);
             var missingPatterns = new HashSet<string>(StringComparer.CurrentCultureIgnoreCase);
 
-            // 同じテンプレートを共有するビューが複数あっても、書き込みは1回で済ませる
-            var writtenTemplates = new HashSet<ElementId>();
+            // 同じ振り替え先を共有するビューが複数あっても、書き込みは1回で済ませる
+            var writtenTargets = new HashSet<ElementId>();
 
             using (var t = new Transaction(targetDoc, Loc.S("DwgVg.Txn.Apply")))
             {
@@ -150,9 +152,9 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
                         continue;
                     }
 
-                    // ビュー側では効かなかった。テンプレートに制御されているとみなして振り替える
-                    ApplyViaTemplate(targetDoc, entry, view, sourceLayers, targetDwgs,
-                                     missingLayers, missingPatterns, writtenTemplates, w, result);
+                    // ビュー側では効かなかった。主ビュー／ビューテンプレートへ振り替える
+                    ApplyViaFallback(targetDoc, entry, view, sourceLayers, targetDwgs,
+                                     missingLayers, missingPatterns, writtenTargets, w, result);
                 }
 
                 t.Commit();
@@ -168,14 +170,24 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
         }
 
         /// <summary>
-        /// ビューへ直接書けなかった場合に、そのビューのビューテンプレートへ書き込む。
-        /// テンプレートが無い／テンプレートでも効かない場合は失敗として記録する。
+        /// ビューへ直接書けなかった場合の振り替え先へ順に書き込む。
+        ///
+        /// ビューの「読み込みカテゴリ」V/G は、次のいずれかに支配されていることがあり、
+        /// その場合ビュー自身への SetCategoryOverrides は例外になる。
+        ///   1. 従属ビュー  … 主ビューの V/G を継承する
+        ///   2. ビューテンプレート … テンプレートが「読み込み」を含めて制御している
+        ///
+        /// ⚠️ 振り替え先に書けたことは、元のビューに反映されたことを意味しない。
+        /// 例えばテンプレートの V/G に「読み込み」が含まれていなければ、
+        /// テンプレートへの書き込みは成功してもビューには一切伝わらない。
+        /// そのため検証は必ず「元のビュー」で行い、伝わらなかった書き込みは
+        /// サブトランザクションごと破棄してモデルを汚さない。
         /// </summary>
-        private void ApplyViaTemplate(
+        private void ApplyViaFallback(
             Document targetDoc, ViewEntry entry, View view,
             IDictionary<string, LayerGraphicSetting> sourceLayers, IList<DwgDefinition> targetDwgs,
             HashSet<string> missingLayers, HashSet<string> missingPatterns,
-            HashSet<ElementId> writtenTemplates, WriteStats direct, TransferResult result)
+            HashSet<ElementId> writtenTargets, WriteStats direct, TransferResult result)
         {
             // ビューテンプレート自身に書いて効かなかった場合は、振り替え先が無い
             if (entry.IsTemplate)
@@ -185,8 +197,8 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
                 return;
             }
 
-            var tpl = DwgLayerScanner.GetAssignedTemplate(targetDoc, view);
-            if (tpl == null)
+            var chain = BuildFallbackChain(targetDoc, view);
+            if (chain.Count == 0)
             {
                 result.Failures.Add(string.Format(
                     Loc.S("DwgVg.Fail.NotApplied"), entry.Name, direct.FirstError ?? ""));
@@ -194,28 +206,128 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
             }
 
             result.TemplateFallbackViews++;
+            string lastTarget = "";
 
-            // 同じテンプレートには一度だけ書けばよい（2件目以降も反映済みとして扱う）
-            if (!writtenTemplates.Add(tpl.Id)) return;
+            DiagLog.Write($"[DwgVg]   '{entry.Name}' の振替先候補: " +
+                          string.Join(" → ", chain.Select(SafeViewName)));
 
-            string tplName;
-            try { tplName = tpl.Name ?? ""; } catch { tplName = ""; }
-
-            var wt = WriteAll(tpl, tplName, sourceLayers, targetDwgs, missingLayers, missingPatterns);
-            DiagLog.Write($"[DwgVg]   → テンプレート '{tplName}' へ振替: 反映={wt.Applied} " +
-                          $"未反映={wt.Ineffective} 失敗={wt.Failed} {wt.FirstError}");
-
-            if (wt.Applied > 0)
+            foreach (var target in chain)
             {
-                result.TemplateFallbackCount++;
-                result.ViewCount++;
-                result.LayerCount += wt.Applied;
+                string targetName;
+                try { targetName = target.Name ?? ""; } catch { targetName = ""; }
+                lastTarget = targetName;
+
+                // 同じ振り替え先には一度だけ書けばよい。
+                // 2件目以降のビューは、書き込み済みの状態で伝播だけ確認する
+                if (!writtenTargets.Contains(target.Id))
+                {
+                    using (var sub = new SubTransaction(targetDoc))
+                    {
+                        sub.Start();
+
+                        var wt = WriteAll(target, targetName, sourceLayers, targetDwgs,
+                                          missingLayers, missingPatterns);
+                        try { targetDoc.Regenerate(); } catch { }
+
+                        int ok = CountEffectiveOnView(view, sourceLayers, targetDwgs, out int configured);
+                        DiagLog.Write($"[DwgVg]   → '{targetName}' へ振替: 反映={wt.Applied} " +
+                                      $"未反映={wt.Ineffective} 失敗={wt.Failed} / " +
+                                      $"ビュー '{entry.Name}' への伝播={ok}/{configured} {wt.FirstError}");
+
+                        if (wt.Applied > 0 && (configured == 0 || ok > 0))
+                        {
+                            sub.Commit();
+                            writtenTargets.Add(target.Id);
+                            result.TemplateFallbackCount++;
+                            result.ViewCount++;
+                            result.LayerCount += wt.Applied;
+                            return;
+                        }
+
+                        // 伝わらなかった書き込みは残さない
+                        sub.RollBack();
+                    }
+                    continue;
+                }
+
+                int ok2 = CountEffectiveOnView(view, sourceLayers, targetDwgs, out int configured2);
+                DiagLog.Write($"[DwgVg]   → '{targetName}' は書込済み。" +
+                              $"ビュー '{entry.Name}' への伝播={ok2}/{configured2}");
+                if (configured2 == 0 || ok2 > 0)
+                {
+                    result.ViewCount++;
+                    return;
+                }
             }
-            else
+
+            result.Failures.Add(string.Format(
+                Loc.S("DwgVg.Fail.NoEffect"), entry.Name, lastTarget));
+        }
+
+        private static string SafeViewName(View v)
+        {
+            try { return v?.Name ?? ""; } catch { return "?"; }
+        }
+
+        /// <summary>
+        /// ビューへ直接書けないときに試す書き込み先を、優先順に並べる。
+        /// 従属ビューなら主ビュー、次に（主ビューまたは自身の）ビューテンプレート。
+        /// </summary>
+        private static List<View> BuildFallbackChain(Document doc, View view)
+        {
+            var chain = new List<View>();
+
+            View basis = view;
+            try
             {
-                result.Failures.Add(string.Format(
-                    Loc.S("DwgVg.Fail.TemplateNotApplied"), entry.Name, tplName, wt.FirstError ?? ""));
+                ElementId primaryId = view.GetPrimaryViewId();
+                if (primaryId != null && primaryId != ElementId.InvalidElementId
+                    && doc.GetElement(primaryId) is View primary)
+                {
+                    chain.Add(primary);
+                    basis = primary;
+                }
             }
+            catch { }
+
+            var tpl = DwgLayerScanner.GetAssignedTemplate(doc, basis);
+            if (tpl != null) chain.Add(tpl);
+
+            return chain;
+        }
+
+        /// <summary>
+        /// 指定ビューで、移行元の設定が実際に効いている件数を数える。
+        /// 振り替え先へ書いた内容がそのビューへ伝わったかの判定に使う。
+        /// </summary>
+        /// <param name="configuredCount">移行元で既定から変更されていた設定の件数（判定の母数）</param>
+        private static int CountEffectiveOnView(
+            View view, IDictionary<string, LayerGraphicSetting> sourceLayers,
+            IList<DwgDefinition> targetDwgs, out int configuredCount)
+        {
+            int ok = 0;
+            configuredCount = 0;
+
+            foreach (var dwg in targetDwgs)
+            {
+                if (dwg == null) continue;
+
+                foreach (var kv in sourceLayers)
+                {
+                    var s = kv.Value;
+                    // 既定のままの設定は「伝わったか」の判定に使えない（元から一致するため）
+                    if (s == null || !s.HasAnySetting) continue;
+
+                    ElementId catId;
+                    if (kv.Key.Length == 0) catId = dwg.CategoryId;
+                    else if (!dwg.Layers.TryGetValue(kv.Key, out catId)) continue;
+
+                    configuredCount++;
+                    if (IsEffective(view, catId, s)) ok++;
+                }
+            }
+
+            return ok;
         }
 
         /// <summary>1要素へ、選択された全 DWG 分の設定を書き込む。</summary>

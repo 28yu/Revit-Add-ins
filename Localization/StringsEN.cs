@@ -806,6 +806,7 @@ namespace Tools28.Localization
             { "DwgVg.Fail.ViewNotFound", "{0}: view not found" },
             { "DwgVg.Fail.NoLayerMatch", "{0}: no matching layer in the target DWG" },
             { "DwgVg.Fail.NotApplied", "{0}: the value did not change after writing {1}" },
+            { "DwgVg.Fail.NoEffect", "{0}: the settings were written to \"{1}\" but did not reach this view. The view template most likely does not include \"Imported\" in its V/G settings (edit the template and tick Imported under V/G)" },
             { "DwgVg.Fail.TemplateNotApplied", "{0}: writing to view template \"{1}\" had no effect either {2}" },
             { "DwgVg.Result.MissingLayers", "Layers not found in the target DWG: {0}" },
             { "DwgVg.Result.MissingPatterns", "Line patterns missing in the target model (left at default): {0}" },
