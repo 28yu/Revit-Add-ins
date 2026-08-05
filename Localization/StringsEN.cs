@@ -761,7 +761,7 @@ namespace Tools28.Localization
             { "DwgVg.Step2", "2. Select a DWG present in this view" },
             { "DwgVg.Step3", "3. Select target views (multiple allowed)" },
             { "DwgVg.Step3.Template", "3. Select target view templates (multiple allowed)" },
-            { "DwgVg.Step4", "4. Select the target DWG" },
+            { "DwgVg.Step4", "4. Select target DWGs (multiple allowed)" },
 
             { "DwgVg.Col.Name", "Name" },
             { "DwgVg.Col.Status", "Status" },
@@ -781,14 +781,14 @@ namespace Tools28.Localization
             { "DwgVg.Status.ViaTemplate", "Writes to view template \"{0}\"" },
             { "DwgVg.Status.TemplateNotControlling", "This template does not control imported categories (enable V/G overrides in the template)" },
 
-            { "DwgVg.Summary", "From: {0} / {1} ({2} set)  ->  To: {3} view(s) / {4}" },
+            { "DwgVg.Summary", "From: {0} / {1} ({2} set)  ->  To: {3} view(s) / {4} DWG(s)" },
             { "DwgVg.NoDoc", "No model is open." },
             { "DwgVg.NoSourceDoc", "No model is available as a transfer source.\n\nOpen the model you want to copy the settings from, then run this command again." },
 
             { "DwgVg.Warn.NoSourceView", "Select the view to read from." },
             { "DwgVg.Warn.NoSourceDwg", "Select a source DWG.\n\nIf the selected view contains no DWG, choose a different view." },
             { "DwgVg.Warn.NoTargetView", "Select at least one target view." },
-            { "DwgVg.Warn.NoTargetDwg", "Select a target DWG.\n\nImport or link the same DWG into the target model, then run this command again." },
+            { "DwgVg.Warn.NoTargetDwg", "Check at least one target DWG.\n\nImport or link the same DWG into the target model, then run this command again." },
             { "DwgVg.Warn.NoLayers", "There are no layer settings to transfer." },
 
             { "DwgVg.Confirm.Title", "Transfer settings" },

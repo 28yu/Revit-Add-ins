@@ -39,7 +39,7 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
     /// 読み取った DWG レイヤ表示設定を、移行先モデルのビュー／ビューテンプレートへ書き込むサービス。
     ///
     /// ElementId はモデル間で通用しないため、
-    ///   - DWG      : ダイアログで選んだ移行先 DWG
+    ///   - DWG      : ダイアログで選んだ移行先 DWG（複数可）
     ///   - レイヤ    : サブカテゴリ名の一致
     ///   - 線種      : LinePatternElement の名前一致
     /// で移行先の ID へ解決し直す。解決できなかったものはレポートに残す。
@@ -52,7 +52,11 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
     /// </summary>
     public class DwgLayerApplier
     {
+        /// <summary>1要素あたり、診断ログに詳細を残すカテゴリ数の上限</summary>
+        private const int DetailLogLimit = 5;
+
         private Dictionary<string, ElementId> _linePatterns;
+        private int _detailBudget;
 
         /// <summary>1要素（ビュー／テンプレート）への書き込み結果。</summary>
         private sealed class WriteStats
@@ -67,10 +71,18 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
             public string FirstError;
 
             public int Attempted => Applied + Ineffective + Failed;
+
+            public void Add(WriteStats other)
+            {
+                Applied += other.Applied;
+                Ineffective += other.Ineffective;
+                Failed += other.Failed;
+                if (FirstError == null) FirstError = other.FirstError;
+            }
         }
 
         /// <summary>
-        /// 移行元 1 DWG 分のレイヤ設定を、移行先の 1 DWG × 複数ビューへ適用する。
+        /// 移行元 1 DWG 分のレイヤ設定を、移行先の複数ビュー × 複数 DWG へ適用する。
         /// トランザクションは内部で開始・コミットする。
         /// </summary>
         /// <param name="targetDoc">移行先ドキュメント</param>
@@ -79,23 +91,26 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
         /// 適用先のビュー。チェックされたものをそのまま渡してよい（重複排除は不要）。
         /// 直接書けないビューは、このメソッドがビューテンプレートへ振り替える。
         /// </param>
-        /// <param name="targetDwg">適用先の DWG</param>
+        /// <param name="targetDwgs">適用先の DWG（複数可）</param>
         public TransferResult Apply(
             Document targetDoc,
             IDictionary<string, LayerGraphicSetting> sourceLayers,
             IList<ViewEntry> targetViews,
-            DwgDefinition targetDwg)
+            IList<DwgDefinition> targetDwgs)
         {
             var result = new TransferResult();
             if (targetDoc == null || sourceLayers == null || sourceLayers.Count == 0) return result;
-            if (targetViews == null || targetViews.Count == 0 || targetDwg == null) return result;
+            if (targetViews == null || targetViews.Count == 0) return result;
+            if (targetDwgs == null || targetDwgs.Count == 0) return result;
 
             _linePatterns = BuildLinePatternMap(targetDoc);
             result.SourceSettingCount = DwgLayerScanner.CountConfigured(sourceLayers.Values);
 
-            DiagLog.Write($"[DwgVg] 適用開始 ビュー={targetViews.Count} レイヤ設定={sourceLayers.Count} " +
-                          $"(既定以外={result.SourceSettingCount}) 移行先DWG='{targetDwg.Name}' " +
-                          $"レイヤ数={targetDwg.Layers.Count} 線種={_linePatterns.Count}");
+            DiagLog.Write($"[DwgVg] ===== 適用開始 ビュー={targetViews.Count} DWG={targetDwgs.Count} " +
+                          $"レイヤ設定={sourceLayers.Count} (既定以外={result.SourceSettingCount}) " +
+                          $"移行先線種={_linePatterns.Count}");
+            foreach (var d in targetDwgs)
+                DiagLog.Write($"[DwgVg]   移行先DWG '{d?.Name}' レイヤ数={d?.Layers.Count} catId={d?.CategoryId}");
 
             var missingLayers = new HashSet<string>(StringComparer.CurrentCultureIgnoreCase);
             var missingPatterns = new HashSet<string>(StringComparer.CurrentCultureIgnoreCase);
@@ -117,7 +132,7 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
                         continue;
                     }
 
-                    var w = WriteAll(view, sourceLayers, targetDwg, missingLayers, missingPatterns);
+                    var w = WriteAll(view, entry.Name, sourceLayers, targetDwgs, missingLayers, missingPatterns);
                     DiagLog.Write($"[DwgVg]   '{entry.Name}' 直接: 反映={w.Applied} 未反映={w.Ineffective} " +
                                   $"失敗={w.Failed} {w.FirstError}");
 
@@ -136,7 +151,7 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
                     }
 
                     // ビュー側では効かなかった。テンプレートに制御されているとみなして振り替える
-                    ApplyViaTemplate(targetDoc, entry, view, sourceLayers, targetDwg,
+                    ApplyViaTemplate(targetDoc, entry, view, sourceLayers, targetDwgs,
                                      missingLayers, missingPatterns, writtenTemplates, w, result);
                 }
 
@@ -146,7 +161,7 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
             result.MissingLayers.AddRange(missingLayers.OrderBy(s => s, StringComparer.CurrentCultureIgnoreCase));
             result.MissingLinePatterns.AddRange(missingPatterns.OrderBy(s => s, StringComparer.CurrentCultureIgnoreCase));
 
-            DiagLog.Write($"[DwgVg] 適用終了 反映ビュー={result.ViewCount} 反映レイヤ={result.LayerCount} " +
+            DiagLog.Write($"[DwgVg] ===== 適用終了 反映ビュー={result.ViewCount} 反映レイヤ={result.LayerCount} " +
                           $"テンプレート振替={result.TemplateFallbackViews}ビュー/{result.TemplateFallbackCount}件 " +
                           $"未一致レイヤ={result.MissingLayers.Count} 失敗={result.Failures.Count}");
             return result;
@@ -158,7 +173,7 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
         /// </summary>
         private void ApplyViaTemplate(
             Document targetDoc, ViewEntry entry, View view,
-            IDictionary<string, LayerGraphicSetting> sourceLayers, DwgDefinition targetDwg,
+            IDictionary<string, LayerGraphicSetting> sourceLayers, IList<DwgDefinition> targetDwgs,
             HashSet<string> missingLayers, HashSet<string> missingPatterns,
             HashSet<ElementId> writtenTemplates, WriteStats direct, TransferResult result)
         {
@@ -186,7 +201,7 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
             string tplName;
             try { tplName = tpl.Name ?? ""; } catch { tplName = ""; }
 
-            var wt = WriteAll(tpl, sourceLayers, targetDwg, missingLayers, missingPatterns);
+            var wt = WriteAll(tpl, tplName, sourceLayers, targetDwgs, missingLayers, missingPatterns);
             DiagLog.Write($"[DwgVg]   → テンプレート '{tplName}' へ振替: 反映={wt.Applied} " +
                           $"未反映={wt.Ineffective} 失敗={wt.Failed} {wt.FirstError}");
 
@@ -203,40 +218,55 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
             }
         }
 
-        /// <summary>1要素へ全レイヤ分の設定を書き込む。</summary>
+        /// <summary>1要素へ、選択された全 DWG 分の設定を書き込む。</summary>
         private WriteStats WriteAll(
-            View view, IDictionary<string, LayerGraphicSetting> sourceLayers, DwgDefinition targetDwg,
+            View view, string viewName,
+            IDictionary<string, LayerGraphicSetting> sourceLayers, IList<DwgDefinition> targetDwgs,
             HashSet<string> missingLayers, HashSet<string> missingPatterns)
         {
-            var st = new WriteStats();
+            var total = new WriteStats();
+            _detailBudget = DetailLogLimit;
 
-            foreach (var kv in sourceLayers)
+            foreach (var dwg in targetDwgs)
             {
-                string layerName = kv.Key;
-                LayerGraphicSetting setting = kv.Value;
-                if (setting == null) continue;
+                if (dwg == null) continue;
 
-                // レイヤ名 "" は DWG 本体（親カテゴリ）
-                ElementId targetCatId;
-                if (layerName.Length == 0)
+                var st = new WriteStats();
+                int notFound = 0;
+
+                foreach (var kv in sourceLayers)
                 {
-                    targetCatId = targetDwg.CategoryId;
-                }
-                else if (!targetDwg.Layers.TryGetValue(layerName, out targetCatId))
-                {
-                    missingLayers.Add(layerName);
-                    continue;
+                    string layerName = kv.Key;
+                    LayerGraphicSetting setting = kv.Value;
+                    if (setting == null) continue;
+
+                    // レイヤ名 "" は DWG 本体（親カテゴリ）
+                    ElementId targetCatId;
+                    if (layerName.Length == 0)
+                    {
+                        targetCatId = dwg.CategoryId;
+                    }
+                    else if (!dwg.Layers.TryGetValue(layerName, out targetCatId))
+                    {
+                        missingLayers.Add(layerName);
+                        notFound++;
+                        continue;
+                    }
+
+                    WriteOne(view, targetCatId, layerName, setting, missingPatterns, st);
                 }
 
-                WriteOne(view, targetCatId, setting, missingPatterns, st);
+                DiagLog.Write($"[DwgVg]     '{viewName}' × '{dwg.Name}': 反映={st.Applied} " +
+                              $"未反映={st.Ineffective} 失敗={st.Failed} レイヤ未一致={notFound} {st.FirstError}");
+                total.Add(st);
             }
 
-            return st;
+            return total;
         }
 
         /// <summary>1カテゴリ分の設定を書き込み、実際に効いたかを読み戻して確認する。</summary>
         private void WriteOne(
-            View view, ElementId categoryId, LayerGraphicSetting s,
+            View view, ElementId categoryId, string layerName, LayerGraphicSetting s,
             HashSet<string> missingPatterns, WriteStats st)
         {
             if (categoryId == null || categoryId == ElementId.InvalidElementId) return;
@@ -249,6 +279,7 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
             {
                 st.Failed++;
                 if (st.FirstError == null) st.FirstError = ex.Message;
+                LogDetail(view, categoryId, layerName, s, "SetCategoryOverrides 例外: " + ex.Message);
                 return;
             }
 
@@ -263,8 +294,43 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
                 if (st.FirstError == null) st.FirstError = ex.Message;
             }
 
-            if (IsEffective(view, categoryId, s)) st.Applied++;
+            bool ok = IsEffective(view, categoryId, s);
+            if (ok) st.Applied++;
             else st.Ineffective++;
+
+            // 効かなかったものを優先して詳細を残す（原因の切り分け用）
+            if (!ok || s.HasAnySetting) LogDetail(view, categoryId, layerName, s, ok ? "反映" : "未反映");
+        }
+
+        /// <summary>書き込んだ値と読み戻した値を診断ログに残す（1要素あたり数件まで）。</summary>
+        private void LogDetail(View view, ElementId categoryId, string layerName, LayerGraphicSetting s, string verdict)
+        {
+            if (_detailBudget <= 0) return;
+            _detailBudget--;
+
+            string actual;
+            try
+            {
+                var cur = view.GetCategoryOverrides(categoryId);
+                bool hidden = false;
+                try { hidden = view.GetCategoryHidden(categoryId); } catch { }
+
+                actual = cur == null
+                    ? "上書き取得不可"
+                    : $"線色={ColorText(cur.ProjectionLineColor)} 線幅={cur.ProjectionLineWeight} " +
+                      $"HT={cur.Halftone} 非表示={hidden}";
+            }
+            catch (Exception ex) { actual = "読戻し例外: " + ex.Message; }
+
+            DiagLog.Write($"[DwgVg]       [{verdict}] cat={categoryId} layer='{layerName}' " +
+                          $"書込(線色={ColorText(s.ProjectionLineColor)} 線幅={s.ProjectionLineWeight} " +
+                          $"HT={s.Halftone} 非表示={s.Hidden}) 実際({actual})");
+        }
+
+        private static string ColorText(Color c)
+        {
+            try { return (c != null && c.IsValid) ? $"{c.Red},{c.Green},{c.Blue}" : "-"; }
+            catch { return "?"; }
         }
 
         /// <summary>移行元の設定から、書き込む OverrideGraphicSettings を組み立てる。</summary>

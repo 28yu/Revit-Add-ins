@@ -26,6 +26,14 @@ namespace Tools28.Commands.DwgLayerTransfer.Models
 
         public int LayerCount => Dwg?.Layers.Count ?? 0;
 
+        private bool _isSelected;
+        /// <summary>反映先として選ばれているか（移行先の一覧のみ、チェックボックス用）</summary>
+        public bool IsSelected
+        {
+            get => _isSelected;
+            set { if (_isSelected != value) { _isSelected = value; OnChanged(nameof(IsSelected)); } }
+        }
+
         private int _settingCount = -1;
         /// <summary>
         /// 選択中のビューでこの DWG に付いている設定の件数（移行元のみ）。

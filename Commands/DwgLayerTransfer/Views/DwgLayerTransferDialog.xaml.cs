@@ -164,6 +164,7 @@ namespace Tools28.Commands.DwgLayerTransfer.Views
 
                 // --- 右: DWG 一覧（移行先は全 DWG を出す。絞り込むと選べなくなるため）---
                 _targetDwgItems = _targetDwgs.Select(d => new DwgItem { Dwg = d }).ToList();
+                foreach (var t in _targetDwgItems) t.PropertyChanged += TargetDwgItem_PropertyChanged;
                 TgtDwgList.ItemsSource = _targetDwgItems;
 
                 // 左のビューは先頭を自動選択（→ 連鎖して DWG 一覧まで埋まる）
@@ -272,11 +273,13 @@ namespace Tools28.Commands.DwgLayerTransfer.Views
                     ? 0
                     : item.Dwg.Layers.Keys.Count(t.Dwg.Layers.ContainsKey);
 
-            // 同名の移行先 DWG を自動選択、無ければ一致レイヤが最も多いもの
-            var same = _targetDwgItems.FirstOrDefault(
-                t => string.Equals(t.Name, item.Name, StringComparison.CurrentCultureIgnoreCase));
-            TgtDwgList.SelectedItem = same
-                ?? _targetDwgItems.OrderByDescending(t => t.MatchedLayerCount).FirstOrDefault(t => t.MatchedLayerCount > 0);
+            // 同名の移行先 DWG を自動でチェック。無ければ一致レイヤが最も多いもの
+            var auto = _targetDwgItems.FirstOrDefault(
+                           t => string.Equals(t.Name, item.Name, StringComparison.CurrentCultureIgnoreCase))
+                       ?? _targetDwgItems.OrderByDescending(t => t.MatchedLayerCount)
+                                         .FirstOrDefault(t => t.MatchedLayerCount > 0);
+
+            foreach (var t in _targetDwgItems) t.IsSelected = ReferenceEquals(t, auto);
 
             UpdateSummary();
         }
@@ -295,8 +298,8 @@ namespace Tools28.Commands.DwgLayerTransfer.Views
         {
             var srcView = SrcViewList.SelectedItem as ViewEntry;
             var srcDwg = SrcDwgList.SelectedItem as DwgItem;
-            var tgtDwg = TgtDwgList.SelectedItem as DwgItem;
             int tgtViewCount = _targetViewRows.Count(r => r.IsSelected);
+            int tgtDwgCount = SelectedTargetDwgs().Count;
 
             int configured = DwgLayerScanner.CountConfigured(_sourceLayers.Values);
 
@@ -306,9 +309,9 @@ namespace Tools28.Commands.DwgLayerTransfer.Views
                 srcDwg?.Name ?? "-",
                 configured,
                 tgtViewCount,
-                tgtDwg?.Name ?? "-");
+                tgtDwgCount);
 
-            btnApply.IsEnabled = srcView != null && srcDwg != null && tgtDwg != null
+            btnApply.IsEnabled = srcView != null && srcDwg != null && tgtDwgCount > 0
                                  && tgtViewCount > 0 && _sourceLayers.Count > 0;
         }
 
@@ -346,11 +349,14 @@ namespace Tools28.Commands.DwgLayerTransfer.Views
             OnSourceDwgChanged();
         }
 
-        private void TgtDwg_Changed(object sender, RoutedEventArgs e)
+        private void TargetDwgItem_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
-            if (!_ready) return;
-            UpdateSummary();
+            if (e.PropertyName == nameof(DwgItem.IsSelected)) UpdateSummary();
         }
+
+        /// <summary>チェックされている反映先 DWG。</summary>
+        private List<DwgDefinition> SelectedTargetDwgs()
+            => _targetDwgItems.Where(t => t.IsSelected && t.Dwg != null).Select(t => t.Dwg).ToList();
 
         private void TargetViewRow_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
@@ -378,11 +384,11 @@ namespace Tools28.Commands.DwgLayerTransfer.Views
         {
             var srcView = SrcViewList.SelectedItem as ViewEntry;
             var srcDwg = SrcDwgList.SelectedItem as DwgItem;
-            var tgtDwg = TgtDwgList.SelectedItem as DwgItem;
+            var tgtDwgs = SelectedTargetDwgs();
 
             if (srcView == null) { Warn("DwgVg.Warn.NoSourceView"); return; }
             if (srcDwg?.Dwg == null) { Warn("DwgVg.Warn.NoSourceDwg"); return; }
-            if (tgtDwg?.Dwg == null) { Warn("DwgVg.Warn.NoTargetDwg"); return; }
+            if (tgtDwgs.Count == 0) { Warn("DwgVg.Warn.NoTargetDwg"); return; }
 
             var selectedViews = _targetViewRows
                 .Where(r => r.IsSelected && r.IsApplicable)
@@ -407,7 +413,7 @@ namespace Tools28.Commands.DwgLayerTransfer.Views
             var confirm = new TaskDialog(Loc.S("DwgVg.Confirm.Title"))
             {
                 MainInstruction = string.Format(Loc.S("DwgVg.Confirm.Main"),
-                    srcView.Name, srcDwg.Name, selectedViews.Count, tgtDwg.Name),
+                    srcView.Name, srcDwg.Name, selectedViews.Count, JoinNames(tgtDwgs)),
                 MainContent = content.ToString(),
                 CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No,
                 DefaultButton = TaskDialogResult.No
@@ -424,7 +430,7 @@ namespace Tools28.Commands.DwgLayerTransfer.Views
                 using (this.BlockRevitInput())
                 {
                     result = new DwgLayerApplier().Apply(
-                        _targetDoc, _sourceLayers, selectedViews, tgtDwg.Dwg);
+                        _targetDoc, _sourceLayers, selectedViews, tgtDwgs);
                 }
             }
             catch (Exception ex)
@@ -513,6 +519,18 @@ namespace Tools28.Commands.DwgLayerTransfer.Views
                 FooterText = Loc.S("DwgVg.Result.LogHint")
             };
             dlg.Show();
+        }
+
+        /// <summary>確認ダイアログ用に DWG 名を並べる（多すぎる場合は件数で省略）。</summary>
+        private static string JoinNames(List<DwgDefinition> dwgs)
+        {
+            const int max = 3;
+            var names = dwgs.Where(d => d != null).Select(d => d.Name).ToList();
+            if (names.Count == 0) return "-";
+            if (names.Count <= max) return string.Join("、", names);
+
+            return string.Join("、", names.Take(max))
+                 + " " + string.Format(Loc.S("DwgVg.Result.More"), names.Count - max);
         }
 
         /// <summary>未解決一覧は先頭 10 件までを表示し、残りは件数だけ添える。</summary>

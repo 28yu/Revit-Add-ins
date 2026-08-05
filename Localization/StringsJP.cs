@@ -760,7 +760,7 @@ namespace Tools28.Localization
             { "DwgVg.Step2", "② このビューにある DWG を選択" },
             { "DwgVg.Step3", "③ 反映するビューを選択（複数可）" },
             { "DwgVg.Step3.Template", "③ 反映するビューテンプレートを選択（複数可）" },
-            { "DwgVg.Step4", "④ 反映先の DWG を選択" },
+            { "DwgVg.Step4", "④ 反映先の DWG を選択（複数可）" },
 
             { "DwgVg.Col.Name", "名前" },
             { "DwgVg.Col.Status", "状態" },
@@ -780,14 +780,14 @@ namespace Tools28.Localization
             { "DwgVg.Status.ViaTemplate", "ビューテンプレート「{0}」へ書き込みます" },
             { "DwgVg.Status.TemplateNotControlling", "このテンプレートは読み込みカテゴリを制御していません（テンプレート側でV/Gを有効にしてください）" },
 
-            { "DwgVg.Summary", "移行元: {0} ／ {1}（設定 {2} 件）　→　移行先: {3} 件のビュー ／ {4}" },
+            { "DwgVg.Summary", "移行元: {0} ／ {1}（設定 {2} 件）　→　移行先: {3} 件のビュー ／ {4} 件の DWG" },
             { "DwgVg.NoDoc", "モデルが開かれていません。" },
             { "DwgVg.NoSourceDoc", "移行元にできるモデルが見つかりません。\n\n設定のコピー元となるモデルも Revit で開いてから、もう一度実行してください。" },
 
             { "DwgVg.Warn.NoSourceView", "読み取り元のビューを選択してください。" },
             { "DwgVg.Warn.NoSourceDwg", "移行元の DWG を選択してください。\n\n選択中のビューに DWG が無い場合は、別のビューを選んでください。" },
             { "DwgVg.Warn.NoTargetView", "反映先のビューを1つ以上選択してください。" },
-            { "DwgVg.Warn.NoTargetDwg", "反映先の DWG を選択してください。\n\n移行先モデルにも同じ DWG を読み込み／リンクしてから実行してください。" },
+            { "DwgVg.Warn.NoTargetDwg", "反映先の DWG を1つ以上チェックしてください。\n\n移行先モデルにも同じ DWG を読み込み／リンクしてから実行してください。" },
             { "DwgVg.Warn.NoLayers", "移行できるレイヤ設定がありません。" },
 
             { "DwgVg.Confirm.Title", "設定の移行" },

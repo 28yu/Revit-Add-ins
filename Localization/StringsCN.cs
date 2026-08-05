@@ -760,7 +760,7 @@ namespace Tools28.Localization
             { "DwgVg.Step2", "② 选择该视图中的 DWG" },
             { "DwgVg.Step3", "③ 选择目标视图（可多选）" },
             { "DwgVg.Step3.Template", "③ 选择目标视图样板（可多选）" },
-            { "DwgVg.Step4", "④ 选择目标 DWG" },
+            { "DwgVg.Step4", "④ 选择目标 DWG（可多选）" },
 
             { "DwgVg.Col.Name", "名称" },
             { "DwgVg.Col.Status", "状态" },
@@ -780,14 +780,14 @@ namespace Tools28.Localization
             { "DwgVg.Status.ViaTemplate", "将写入视图样板“{0}”" },
             { "DwgVg.Status.TemplateNotControlling", "此样板未控制导入类别（请在样板中启用 V/G 设置）" },
 
-            { "DwgVg.Summary", "源: {0} / {1}（已设置 {2} 项）  →  目标: {3} 个视图 / {4}" },
+            { "DwgVg.Summary", "源: {0} / {1}（已设置 {2} 项）  →  目标: {3} 个视图 / {4} 个 DWG" },
             { "DwgVg.NoDoc", "未打开任何模型。" },
             { "DwgVg.NoSourceDoc", "未找到可作为源的模型。\n\n请同时打开作为设置来源的模型后再执行。" },
 
             { "DwgVg.Warn.NoSourceView", "请选择读取源视图。" },
             { "DwgVg.Warn.NoSourceDwg", "请选择源 DWG。\n\n若所选视图中没有 DWG，请选择其他视图。" },
             { "DwgVg.Warn.NoTargetView", "请至少选择一个目标视图。" },
-            { "DwgVg.Warn.NoTargetDwg", "请选择目标 DWG。\n\n请先在目标模型中导入／链接相同的 DWG 后再执行。" },
+            { "DwgVg.Warn.NoTargetDwg", "请至少勾选一个目标 DWG。\n\n请先在目标模型中导入／链接相同的 DWG 后再执行。" },
             { "DwgVg.Warn.NoLayers", "没有可迁移的图层设置。" },
 
             { "DwgVg.Confirm.Title", "迁移设置" },

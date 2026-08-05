@@ -139,6 +139,28 @@
                            Foreground="#5F7A8A" Margin="8,1,2,0" VerticalAlignment="Center"/>
             </Grid>
         </DataTemplate>
+
+        <!-- 反映先 DWG の行（チェックボックス付き。複数の DWG へまとめて反映できる） -->
+        <DataTemplate x:Key="DwgCheckItemTemplate">
+            <Grid Margin="2,3">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <CheckBox Grid.Column="0"
+                          IsChecked="{Binding IsSelected, UpdateSourceTrigger=PropertyChanged}"
+                          VerticalAlignment="Center" Margin="0,0,6,0"/>
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <TextBlock Text="{Binding Name}" FontSize="12" TextTrimming="CharacterEllipsis"
+                               ToolTip="{Binding Name}"/>
+                    <TextBlock Text="{Binding KindLabel}" FontSize="10" Foreground="#888888"
+                               Margin="6,1,0,0" VerticalAlignment="Center"/>
+                </StackPanel>
+                <TextBlock Grid.Column="2" Text="{Binding DetailText}" FontSize="10"
+                           Foreground="#5F7A8A" Margin="8,1,2,0" VerticalAlignment="Center"/>
+            </Grid>
+        </DataTemplate>
     </Window.Resources>
 
     <Grid Margin="10">
@@ -356,13 +378,12 @@
                                     Style="{StaticResource SecondaryButtonStyle}" Click="TgtDeselectAll_Click"/>
                         </StackPanel>
 
-                        <TextBlock x:Name="lblTgtDwgCaption" Grid.Row="4" Text="④ 反映先の DWG を選択"
+                        <TextBlock x:Name="lblTgtDwgCaption" Grid.Row="4" Text="④ 反映先の DWG を選択（複数可）"
                                    Style="{StaticResource ListCaption}" Margin="0,8,0,3"/>
                         <ListBox x:Name="TgtDwgList" Grid.Row="5" FontSize="12"
                                  BorderBrush="#DDDDDD" BorderThickness="1"
-                                 ItemTemplate="{StaticResource DwgItemTemplate}"
-                                 HorizontalContentAlignment="Stretch" SelectionMode="Single"
-                                 SelectionChanged="TgtDwg_Changed"/>
+                                 ItemTemplate="{StaticResource DwgCheckItemTemplate}"
+                                 HorizontalContentAlignment="Stretch"/>
                     </Grid>
                 </Grid>
             </Border>
