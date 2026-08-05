@@ -1550,3 +1550,25 @@ DWG名の対応表・スナップショットの入れ子辞書が不要にな�
   同名が無い場合はレイヤ名の一致数が最多のものを選ぶ。
 - DWG一覧の行には「◯レイヤ / 設定 △」（移行元）「◯レイヤ / 一致 △」（移行先）を出して、
   どれを選ぶべきか一覧上で判断できるようにした。
+
+## DwgLayerTransfer: ICollectionView の名前空間を取り違えてビルド失敗（2026-08-05）
+
+### 症状
+```
+error CS0246: 型または名前空間の名前 'ICollectionView' が見つかりませんでした
+  DwgLayerTransferDialog.xaml.cs(34,17) / (44,17)
+```
+
+### 原因
+WPF の一覧フィルタで使う 2 つの型は**名前空間が別**。`using System.Windows.Data;` だけでは足りない。
+
+| 型 | 名前空間 | アセンブリ |
+|--|--|--|
+| `CollectionViewSource` | `System.Windows.Data` | PresentationFramework |
+| **`ICollectionView`** | **`System.ComponentModel`** | WindowsBase |
+
+`CollectionViewSource.GetDefaultView()` の戻り値を受ける変数の型を書くと必ず踏む。
+FilterManagement / ParameterCleanup の各ダイアログは両方の using を持っており、それに倣うのが正解。
+
+### 対策
+検索フィルタ付き一覧を作るときは **`using System.ComponentModel;` と `using System.Windows.Data;` をセットで**書く。
