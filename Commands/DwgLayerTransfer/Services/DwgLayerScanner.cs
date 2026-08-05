@@ -360,11 +360,76 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
                 s.CutLineWeight = ogs.CutLineWeight;
                 s.CutLinePattern = LinePatternName(doc, ogs.CutLinePatternId);
 
+                s.SurfaceFgPattern = FillPatternName(doc, ogs.SurfaceForegroundPatternId);
+                s.SurfaceFgColor = ogs.SurfaceForegroundPatternColor;
+                s.SurfaceFgVisible = ogs.IsSurfaceForegroundPatternVisible;
+
+                s.SurfaceBgPattern = FillPatternName(doc, ogs.SurfaceBackgroundPatternId);
+                s.SurfaceBgColor = ogs.SurfaceBackgroundPatternColor;
+                s.SurfaceBgVisible = ogs.IsSurfaceBackgroundPatternVisible;
+
+                s.CutFgPattern = FillPatternName(doc, ogs.CutForegroundPatternId);
+                s.CutFgColor = ogs.CutForegroundPatternColor;
+                s.CutFgVisible = ogs.IsCutForegroundPatternVisible;
+
+                s.CutBgPattern = FillPatternName(doc, ogs.CutBackgroundPatternId);
+                s.CutBgColor = ogs.CutBackgroundPatternColor;
+                s.CutBgVisible = ogs.IsCutBackgroundPatternVisible;
+
+                s.Transparency = ogs.Transparency;
                 s.Halftone = ogs.Halftone;
+                s.DetailLevel = ogs.DetailLevel;
             }
             catch { }
 
             return s;
+        }
+
+        /// <summary>塗潰しパターン ElementId を移行先で解決できる「名前」に変換する。</summary>
+        private static string FillPatternName(Document doc, ElementId id)
+        {
+            try
+            {
+                if (id == null || id == ElementId.InvalidElementId) return null;
+                return (doc?.GetElement(id) as FillPatternElement)?.Name;
+            }
+            catch { return null; }
+        }
+
+        /// <summary>
+        /// 1カテゴリ分の設定を、Revit が持っている項目すべて 1 行の文字列にする。
+        /// 移行元と移行先を突き合わせて「まだ何が違うのか」を目視で確かめるための診断用。
+        /// </summary>
+        public static string DescribeOverride(Document doc, ElementId viewId, ElementId categoryId)
+        {
+            try
+            {
+                if (!(doc.GetElement(viewId) is View view)) return "ビュー取得不可";
+
+                string hidden;
+                try { hidden = view.GetCategoryHidden(categoryId).ToString(); }
+                catch (Exception ex) { hidden = "?(" + ex.Message + ")"; }
+
+                var o = view.GetCategoryOverrides(categoryId);
+                if (o == null) return $"非表示={hidden} 上書き=なし";
+
+                string C(Color c) => (c != null && c.IsValid) ? $"{c.Red},{c.Green},{c.Blue}" : "-";
+                string F(ElementId id) => FillPatternName(doc, id) ?? "-";
+                string L(ElementId id) => LinePatternName(doc, id) ?? "-";
+
+                return $"非表示={hidden} 投影線(色={C(o.ProjectionLineColor)} 幅={o.ProjectionLineWeight} " +
+                       $"種={L(o.ProjectionLinePatternId)}) 切断線(色={C(o.CutLineColor)} 幅={o.CutLineWeight} " +
+                       $"種={L(o.CutLinePatternId)}) 面前景({F(o.SurfaceForegroundPatternId)} 色={C(o.SurfaceForegroundPatternColor)} " +
+                       $"表示={o.IsSurfaceForegroundPatternVisible}) 面背景({F(o.SurfaceBackgroundPatternId)} " +
+                       $"色={C(o.SurfaceBackgroundPatternColor)} 表示={o.IsSurfaceBackgroundPatternVisible}) " +
+                       $"断前景({F(o.CutForegroundPatternId)} 色={C(o.CutForegroundPatternColor)} 表示={o.IsCutForegroundPatternVisible}) " +
+                       $"断背景({F(o.CutBackgroundPatternId)} 色={C(o.CutBackgroundPatternColor)} 表示={o.IsCutBackgroundPatternVisible}) " +
+                       $"透過={o.Transparency} HT={o.Halftone} 詳細={o.DetailLevel}";
+            }
+            catch (Exception ex)
+            {
+                return "取得失敗: " + ex.Message;
+            }
         }
 
         /// <summary>

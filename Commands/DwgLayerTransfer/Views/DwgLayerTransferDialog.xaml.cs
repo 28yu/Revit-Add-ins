@@ -441,8 +441,64 @@ namespace Tools28.Commands.DwgLayerTransfer.Views
                 return;
             }
 
+            DumpComparison(srcView, srcDwg.Dwg, selectedViews, tgtDwgs);
+
             ShowResult(result);
             this.BringToFrontDeferred();
+        }
+
+        /// <summary>
+        /// 適用後に、移行元ビューと移行先ビューの設定を項目ごと丸ごと診断ログへ書き出す。
+        ///
+        /// 「反映したはずなのに変わらない」ときに、こちらが移していない項目が
+        /// 残っていないかを目視で突き止めるための最後の砦。
+        /// 転送対象の絞り込みに依存せず、Revit が持っている値をそのまま並べる。
+        /// </summary>
+        private void DumpComparison(
+            ViewEntry srcView, DwgDefinition srcDwg, List<ViewEntry> tgtViews, List<DwgDefinition> tgtDwgs)
+        {
+            const int max = 8;
+
+            try
+            {
+                var tgtView = tgtViews.FirstOrDefault();
+                var tgtDwg = tgtDwgs.FirstOrDefault();
+                if (srcView == null || srcDwg == null || tgtView == null || tgtDwg == null) return;
+
+                DiagLog.Write($"[DwgVg] --- 適用後の突き合わせ  移行元 '{srcView.Name}' vs 移行先 '{tgtView.Name}' ---");
+
+                int shown = 0;
+                foreach (var kv in _sourceLayers)
+                {
+                    if (kv.Value == null || !kv.Value.HasAnySetting) continue;
+                    if (shown++ >= max) break;
+
+                    ElementId srcCat, tgtCat;
+                    if (kv.Key.Length == 0)
+                    {
+                        srcCat = srcDwg.CategoryId;
+                        tgtCat = tgtDwg.CategoryId;
+                    }
+                    else
+                    {
+                        if (!srcDwg.Layers.TryGetValue(kv.Key, out srcCat)) continue;
+                        if (!tgtDwg.Layers.TryGetValue(kv.Key, out tgtCat)) continue;
+                    }
+
+                    string a = DwgLayerScanner.DescribeOverride(_sourceDoc, srcView.Id, srcCat);
+                    string b = DwgLayerScanner.DescribeOverride(_targetDoc, tgtView.Id, tgtCat);
+
+                    DiagLog.Write($"[DwgVg]   layer='{kv.Key}' {(a == b ? "一致" : "★相違")}");
+                    DiagLog.Write($"[DwgVg]     元: {a}");
+                    DiagLog.Write($"[DwgVg]     先: {b}");
+                }
+
+                if (shown == 0) DiagLog.Write("[DwgVg]   比較対象の設定がありません");
+            }
+            catch (Exception ex)
+            {
+                DiagLog.Write("[DwgVg] 突き合わせ失敗: " + ex.Message);
+            }
         }
 
         /// <summary>

@@ -61,6 +61,7 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
         private const int DetailLogLimit = 5;
 
         private Dictionary<string, ElementId> _linePatterns;
+        private Dictionary<string, ElementId> _fillPatterns;
         private int _detailBudget;
 
         /// <summary>1要素（ビュー／テンプレート）への書き込み結果。</summary>
@@ -112,11 +113,12 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
             if (targetDwgs == null || targetDwgs.Count == 0) return result;
 
             _linePatterns = BuildLinePatternMap(targetDoc);
+            _fillPatterns = BuildFillPatternMap(targetDoc);
             result.SourceSettingCount = DwgLayerScanner.CountConfigured(sourceLayers.Values);
 
             DiagLog.Write($"[DwgVg] ===== 適用開始 ビュー={targetViews.Count} DWG={targetDwgs.Count} " +
                           $"レイヤ設定={sourceLayers.Count} (既定以外={result.SourceSettingCount}) " +
-                          $"移行先線種={_linePatterns.Count}");
+                          $"移行先線種={_linePatterns.Count} 移行先塗潰し={_fillPatterns.Count}");
             foreach (var d in targetDwgs)
                 DiagLog.Write($"[DwgVg]   移行先DWG '{d?.Name}' レイヤ数={d?.Layers.Count} catId={d?.CategoryId}");
             DiagLog.Write("[DwgVg]   " + DescribeSource(sourceLayers));
@@ -517,8 +519,64 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
             if (cutPattern != null)
                 ogs.SetCutLinePatternId(cutPattern);
 
+            // サーフェス／切断のパターン。以前は「DWG には効かない」と決めつけて除外していたが、
+            // 設定が入っている場合に移行しても見た目が変わらない原因になるため必ず移す
+            var sfg = ResolveFillPattern(s.SurfaceFgPattern, missingPatterns);
+            if (sfg != null) ogs.SetSurfaceForegroundPatternId(sfg);
+            if (s.SurfaceFgColor != null && s.SurfaceFgColor.IsValid)
+                ogs.SetSurfaceForegroundPatternColor(s.SurfaceFgColor);
+            if (!s.SurfaceFgVisible) ogs.SetSurfaceForegroundPatternVisible(false);
+
+            var sbg = ResolveFillPattern(s.SurfaceBgPattern, missingPatterns);
+            if (sbg != null) ogs.SetSurfaceBackgroundPatternId(sbg);
+            if (s.SurfaceBgColor != null && s.SurfaceBgColor.IsValid)
+                ogs.SetSurfaceBackgroundPatternColor(s.SurfaceBgColor);
+            if (!s.SurfaceBgVisible) ogs.SetSurfaceBackgroundPatternVisible(false);
+
+            var cfg = ResolveFillPattern(s.CutFgPattern, missingPatterns);
+            if (cfg != null) ogs.SetCutForegroundPatternId(cfg);
+            if (s.CutFgColor != null && s.CutFgColor.IsValid)
+                ogs.SetCutForegroundPatternColor(s.CutFgColor);
+            if (!s.CutFgVisible) ogs.SetCutForegroundPatternVisible(false);
+
+            var cbg = ResolveFillPattern(s.CutBgPattern, missingPatterns);
+            if (cbg != null) ogs.SetCutBackgroundPatternId(cbg);
+            if (s.CutBgColor != null && s.CutBgColor.IsValid)
+                ogs.SetCutBackgroundPatternColor(s.CutBgColor);
+            if (!s.CutBgVisible) ogs.SetCutBackgroundPatternVisible(false);
+
+            if (s.Transparency > 0) ogs.SetSurfaceTransparency(s.Transparency);
+            if (s.DetailLevel != ViewDetailLevel.Undefined) ogs.SetDetailLevel(s.DetailLevel);
+
             ogs.SetHalftone(s.Halftone);
             return ogs;
+        }
+
+        /// <summary>塗潰しパターン名を移行先の ElementId へ解決する。</summary>
+        private ElementId ResolveFillPattern(string name, HashSet<string> missingPatterns)
+        {
+            if (name == null) return null;
+            if (_fillPatterns.TryGetValue(name, out var id)) return id;
+
+            missingPatterns.Add(name);
+            return null;
+        }
+
+        private static Dictionary<string, ElementId> BuildFillPatternMap(Document doc)
+        {
+            var map = new Dictionary<string, ElementId>(StringComparer.CurrentCultureIgnoreCase);
+            try
+            {
+                foreach (var e in new FilteredElementCollector(doc)
+                             .OfClass(typeof(FillPatternElement))
+                             .ToElements())
+                {
+                    if (e is FillPatternElement fpe && !string.IsNullOrEmpty(fpe.Name))
+                        map[fpe.Name] = fpe.Id;
+                }
+            }
+            catch { }
+            return map;
         }
 
         /// <summary>
@@ -556,9 +614,27 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
                 if (cur.CutLineWeight != (s.CutLineWeight > 0 ? s.CutLineWeight : -1))
                     return false;
 
-                // 線種は移行先に同名が無ければ書き込んでいないので、解決できたものだけ照合する
+                if (cur.Transparency != s.Transparency) return false;
+                if (cur.DetailLevel != s.DetailLevel) return false;
+
+                // 線種・塗潰しは移行先に同名が無ければ書き込んでいないので、解決できたものだけ照合する
                 if (!SamePattern(cur.ProjectionLinePatternId, s.ProjectionLinePattern)) return false;
                 if (!SamePattern(cur.CutLinePatternId, s.CutLinePattern)) return false;
+
+                if (!SameFill(cur.SurfaceForegroundPatternId, s.SurfaceFgPattern)) return false;
+                if (!SameFill(cur.SurfaceBackgroundPatternId, s.SurfaceBgPattern)) return false;
+                if (!SameFill(cur.CutForegroundPatternId, s.CutFgPattern)) return false;
+                if (!SameFill(cur.CutBackgroundPatternId, s.CutBgPattern)) return false;
+
+                if (!SameColor(cur.SurfaceForegroundPatternColor, s.SurfaceFgColor)) return false;
+                if (!SameColor(cur.SurfaceBackgroundPatternColor, s.SurfaceBgColor)) return false;
+                if (!SameColor(cur.CutForegroundPatternColor, s.CutFgColor)) return false;
+                if (!SameColor(cur.CutBackgroundPatternColor, s.CutBgColor)) return false;
+
+                if (cur.IsSurfaceForegroundPatternVisible != s.SurfaceFgVisible) return false;
+                if (cur.IsSurfaceBackgroundPatternVisible != s.SurfaceBgVisible) return false;
+                if (cur.IsCutForegroundPatternVisible != s.CutFgVisible) return false;
+                if (cur.IsCutBackgroundPatternVisible != s.CutBgVisible) return false;
 
                 return true;
             }
@@ -587,6 +663,14 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
                 return true;   // 移行先に存在しない線種
             }
 
+            return current != null && current == wanted;
+        }
+
+        /// <summary>塗潰しパターンの一致判定。移行先に無いものは書き込んでいないため一致とみなす。</summary>
+        private bool SameFill(ElementId current, string wantedName)
+        {
+            if (wantedName == null) return true;
+            if (!_fillPatterns.TryGetValue(wantedName, out var wanted)) return true;
             return current != null && current == wanted;
         }
 
