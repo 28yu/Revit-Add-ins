@@ -385,6 +385,125 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
             return s;
         }
 
+        // ===== オブジェクトスタイル =====
+
+        /// <summary>
+        /// DWG のオブジェクトスタイル（モデル全体の基準値）を読み取る。
+        /// 戻り値のキーはレイヤ名で、"" は DWG 本体（親カテゴリ）。
+        ///
+        /// V/G はここへの差分でしかないため、モデル間で表示を揃えるにはこちらも移す必要がある。
+        /// </summary>
+        public Dictionary<string, DwgObjectStyle> ReadObjectStyles(Document doc, DwgDefinition dwg)
+        {
+            var map = new Dictionary<string, DwgObjectStyle>(StringComparer.CurrentCultureIgnoreCase);
+            if (doc == null || dwg == null) return map;
+
+            var parent = FindCategory(doc, dwg.CategoryId);
+            if (parent == null) return map;
+
+            map[""] = ReadStyle(doc, parent, "");
+
+            try
+            {
+                foreach (Category sub in parent.SubCategories)
+                {
+                    if (sub == null) continue;
+                    string name;
+                    try { name = sub.Name; } catch { continue; }
+                    if (string.IsNullOrEmpty(name)) continue;
+
+                    map[name] = ReadStyle(doc, sub, name);
+                }
+            }
+            catch { }
+
+            return map;
+        }
+
+        /// <summary>
+        /// カテゴリ ID から Category を引く。
+        /// DWG のカテゴリは必ず最上位に現れるため、Settings.Categories の走査で足りる。
+        /// </summary>
+        public static Category FindCategory(Document doc, ElementId categoryId)
+        {
+            try
+            {
+                if (doc == null || categoryId == null) return null;
+
+                foreach (Category c in doc.Settings.Categories)
+                {
+                    if (c == null) continue;
+                    if (c.Id == categoryId) return c;
+                }
+            }
+            catch { }
+            return null;
+        }
+
+        /// <summary>親カテゴリ配下から、名前でサブカテゴリを引く。</summary>
+        public static Category FindSubCategory(Category parent, string layerName)
+        {
+            try
+            {
+                if (parent == null) return null;
+                if (string.IsNullOrEmpty(layerName)) return parent;
+
+                foreach (Category sub in parent.SubCategories)
+                {
+                    if (sub == null) continue;
+                    string n;
+                    try { n = sub.Name; } catch { continue; }
+                    if (string.Equals(n, layerName, StringComparison.CurrentCultureIgnoreCase))
+                        return sub;
+                }
+            }
+            catch { }
+            return null;
+        }
+
+        private static DwgObjectStyle ReadStyle(Document doc, Category cat, string layerName)
+        {
+            var st = new DwgObjectStyle { LayerName = layerName };
+
+            try { st.LineColor = cat.LineColor; } catch { }
+
+            try
+            {
+                int? w = cat.GetLineWeight(GraphicsStyleType.Projection);
+                if (w.HasValue) st.ProjectionLineWeight = w.Value;
+            }
+            catch { }
+
+            try
+            {
+                int? w = cat.GetLineWeight(GraphicsStyleType.Cut);
+                if (w.HasValue) st.CutLineWeight = w.Value;
+            }
+            catch { }
+
+            try { st.ProjectionLinePattern = LinePatternName(doc, cat.GetLinePatternId(GraphicsStyleType.Projection)); }
+            catch { }
+
+            try { st.CutLinePattern = LinePatternName(doc, cat.GetLinePatternId(GraphicsStyleType.Cut)); }
+            catch { }
+
+            return st;
+        }
+
+        /// <summary>診断用に、1レイヤ分のオブジェクトスタイルを1行で表す。</summary>
+        public static string DescribeObjectStyle(Document doc, ElementId categoryId, string layerName)
+        {
+            try
+            {
+                var parent = FindCategory(doc, categoryId);
+                var cat = FindSubCategory(parent, layerName);
+                if (cat == null) return "カテゴリ取得不可";
+
+                return ReadStyle(doc, cat, layerName).Describe();
+            }
+            catch (Exception ex) { return "取得失敗: " + ex.Message; }
+        }
+
         /// <summary>塗潰しパターン ElementId を移行先で解決できる「名前」に変換する。</summary>
         private static string FillPatternName(Document doc, ElementId id)
         {

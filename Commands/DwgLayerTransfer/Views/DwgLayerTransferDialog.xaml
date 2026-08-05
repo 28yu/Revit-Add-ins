@@ -184,6 +184,7 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
@@ -214,6 +215,13 @@
                     <TextBlock x:Name="lblModeHint" Text="※ 同名のものを自動で選択します"
                                VerticalAlignment="Center" FontSize="11" Foreground="#777777" Margin="16,0,0,0"/>
                 </StackPanel>
+
+                <!-- V/G はオブジェクトスタイルへの差分でしかないため、基準値も揃えないと表示は一致しない -->
+                <TextBlock x:Name="lblObjStyleHint" Grid.Row="3" Grid.Column="0" Text="基準値:"
+                           VerticalAlignment="Center" FontSize="12" Margin="0,6,8,0"/>
+                <CheckBox x:Name="chkObjectStyles" Grid.Row="3" Grid.Column="1" IsChecked="True"
+                          Content="オブジェクトスタイル（線の色・太さ・線種）も揃える"
+                          FontSize="12" Margin="0,6,0,0" VerticalAlignment="Center"/>
             </Grid>
         </Border>
 

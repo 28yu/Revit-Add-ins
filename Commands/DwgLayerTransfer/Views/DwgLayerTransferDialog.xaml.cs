@@ -74,6 +74,9 @@ namespace Tools28.Commands.DwgLayerTransfer.Views
             rbTemplate.Content = Loc.S("DwgVg.Mode.Template");
             rbView.Content = Loc.S("DwgVg.Mode.View");
             lblModeHint.Text = Loc.S("DwgVg.Mode.Hint");
+            lblObjStyleHint.Text = Loc.S("DwgVg.ObjectStyles.Label");
+            chkObjectStyles.Content = Loc.S("DwgVg.ObjectStyles");
+            chkObjectStyles.ToolTip = Loc.S("DwgVg.ObjectStyles.Tip");
 
             lblSourceSection.Text = Loc.S("DwgVg.Section.Source");
             lblTargetSection.Text = Loc.S("DwgVg.Section.Target");
@@ -429,8 +432,13 @@ namespace Tools28.Commands.DwgLayerTransfer.Views
             {
                 using (this.BlockRevitInput())
                 {
+                    // V/G はオブジェクトスタイルへの差分でしかないため、基準値も併せて移す
+                    var sourceStyles = chkObjectStyles.IsChecked == true
+                        ? _scanner.ReadObjectStyles(_sourceDoc, srcDwg.Dwg)
+                        : null;
+
                     result = new DwgLayerApplier().Apply(
-                        _targetDoc, _sourceLayers, selectedViews, tgtDwgs);
+                        _targetDoc, _sourceLayers, selectedViews, tgtDwgs, sourceStyles);
                 }
             }
             catch (Exception ex)
@@ -488,9 +496,15 @@ namespace Tools28.Commands.DwgLayerTransfer.Views
                     string a = DwgLayerScanner.DescribeOverride(_sourceDoc, srcView.Id, srcCat);
                     string b = DwgLayerScanner.DescribeOverride(_targetDoc, tgtView.Id, tgtCat);
 
-                    DiagLog.Write($"[DwgVg]   layer='{kv.Key}' {(a == b ? "一致" : "★相違")}");
-                    DiagLog.Write($"[DwgVg]     元: {a}");
-                    DiagLog.Write($"[DwgVg]     先: {b}");
+                    string sa = DwgLayerScanner.DescribeObjectStyle(_sourceDoc, srcDwg.CategoryId, kv.Key);
+                    string sb = DwgLayerScanner.DescribeObjectStyle(_targetDoc, tgtDwg.CategoryId, kv.Key);
+
+                    DiagLog.Write($"[DwgVg]   layer='{kv.Key}' V/G={(a == b ? "一致" : "★相違")} " +
+                                  $"オブジェクトスタイル={(sa == sb ? "一致" : "★相違")}");
+                    DiagLog.Write($"[DwgVg]     V/G 元: {a}");
+                    DiagLog.Write($"[DwgVg]     V/G 先: {b}");
+                    DiagLog.Write($"[DwgVg]     OS  元: {sa}");
+                    DiagLog.Write($"[DwgVg]     OS  先: {sb}");
                 }
 
                 if (shown == 0) DiagLog.Write("[DwgVg]   比較対象の設定がありません");
@@ -550,6 +564,12 @@ namespace Tools28.Commands.DwgLayerTransfer.Views
             {
                 content.AppendLine(string.Format(Loc.S("DwgVg.Result.Failures"), r.Failures.Count));
                 content.AppendLine(BuildPreview(r.Failures));
+                content.AppendLine();
+            }
+
+            if (r.ObjectStyleCount > 0)
+            {
+                content.AppendLine(string.Format(Loc.S("DwgVg.Result.ObjectStyles"), r.ObjectStyleCount));
                 content.AppendLine();
             }
 

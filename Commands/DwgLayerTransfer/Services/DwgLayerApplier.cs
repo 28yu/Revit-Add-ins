@@ -34,6 +34,9 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
         /// <summary>Revit が非表示化を許可せず、表示/非表示を再現できなかった件数</summary>
         public int HiddenBlocked { get; set; }
 
+        /// <summary>オブジェクトスタイルを書き換えたレイヤ数（モデル全体に効く）</summary>
+        public int ObjectStyleCount { get; set; }
+
         /// <summary>反映できなかったビューとその理由</summary>
         public List<string> Failures { get; } = new List<string>();
     }
@@ -105,7 +108,8 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
             Document targetDoc,
             IDictionary<string, LayerGraphicSetting> sourceLayers,
             IList<ViewEntry> targetViews,
-            IList<DwgDefinition> targetDwgs)
+            IList<DwgDefinition> targetDwgs,
+            IDictionary<string, DwgObjectStyle> sourceStyles)
         {
             var result = new TransferResult();
             if (targetDoc == null || sourceLayers == null || sourceLayers.Count == 0) return result;
@@ -132,6 +136,14 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
             using (var t = new Transaction(targetDoc, Loc.S("DwgVg.Txn.Apply")))
             {
                 t.Start();
+
+                // V/G はオブジェクトスタイルへの差分でしかないため、先に基準値を揃える。
+                // これを移さないと、上書きしていないレイヤの見た目がモデル間で揃わない
+                if (sourceStyles != null && sourceStyles.Count > 0)
+                {
+                    foreach (var dwg in targetDwgs)
+                        result.ObjectStyleCount += ApplyObjectStyles(targetDoc, sourceStyles, dwg, missingPatterns);
+                }
 
                 foreach (var entry in targetViews)
                 {
@@ -177,7 +189,8 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
             DiagLog.Write($"[DwgVg] ===== 適用終了 反映ビュー={result.ViewCount} 反映レイヤ={result.LayerCount} " +
                           $"テンプレート振替={result.TemplateFallbackViews}ビュー/{result.TemplateFallbackCount}件 " +
                           $"未一致レイヤ={result.MissingLayers.Count} 未解決線種={result.MissingLinePatterns.Count} " +
-                          $"非表示不可={result.HiddenBlocked} 失敗={result.Failures.Count}");
+                          $"非表示不可={result.HiddenBlocked} オブジェクトスタイル={result.ObjectStyleCount} " +
+                          $"失敗={result.Failures.Count}");
             return result;
         }
 
@@ -340,6 +353,62 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
             }
 
             return ok;
+        }
+
+        /// <summary>
+        /// DWG のオブジェクトスタイル（モデル全体の基準値）を移行先へ書き込む。
+        /// ⚠️ ビュー単位ではなくモデル全体に効く。
+        /// </summary>
+        /// <returns>書き換えたレイヤ数</returns>
+        private int ApplyObjectStyles(
+            Document doc, IDictionary<string, DwgObjectStyle> sourceStyles,
+            DwgDefinition targetDwg, HashSet<string> missingPatterns)
+        {
+            var parent = DwgLayerScanner.FindCategory(doc, targetDwg.CategoryId);
+            if (parent == null)
+            {
+                DiagLog.Write($"[DwgVg]   オブジェクトスタイル: '{targetDwg.Name}' のカテゴリを取得できません");
+                return 0;
+            }
+
+            int applied = 0, failed = 0;
+            string firstError = null;
+
+            foreach (var kv in sourceStyles)
+            {
+                var st = kv.Value;
+                if (st == null) continue;
+
+                var cat = DwgLayerScanner.FindSubCategory(parent, kv.Key);
+                if (cat == null) continue;
+
+                try
+                {
+                    if (st.LineColor != null && st.LineColor.IsValid)
+                        cat.LineColor = st.LineColor;
+
+                    if (st.ProjectionLineWeight > 0)
+                        cat.SetLineWeight(st.ProjectionLineWeight, GraphicsStyleType.Projection);
+                    if (st.CutLineWeight > 0)
+                        cat.SetLineWeight(st.CutLineWeight, GraphicsStyleType.Cut);
+
+                    var proj = ResolveLinePattern(st.ProjectionLinePattern, missingPatterns);
+                    if (proj != null) cat.SetLinePatternId(proj, GraphicsStyleType.Projection);
+
+                    var cut = ResolveLinePattern(st.CutLinePattern, missingPatterns);
+                    if (cut != null) cat.SetLinePatternId(cut, GraphicsStyleType.Cut);
+
+                    applied++;
+                }
+                catch (Exception ex)
+                {
+                    failed++;
+                    if (firstError == null) firstError = ex.Message;
+                }
+            }
+
+            DiagLog.Write($"[DwgVg]   オブジェクトスタイル '{targetDwg.Name}': 書換={applied} 失敗={failed} {firstError}");
+            return applied;
         }
 
         /// <summary>1要素へ、選択された全 DWG 分の設定を書き込む。</summary>

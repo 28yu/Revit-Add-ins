@@ -751,6 +751,10 @@ namespace Tools28.Localization
             { "DwgVg.Mode", "目标单位:" },
             { "DwgVg.Mode.Template", "视图样板" },
             { "DwgVg.Mode.View", "视图" },
+            { "DwgVg.ObjectStyles.Label", "基准值:" },
+            { "DwgVg.ObjectStyles", "同时统一对象样式（线颜色、线宽、线型）" },
+            { "DwgVg.ObjectStyles.Tip", "V/G 替换是相对于“对象样式”的差值。未替换的图层外观由基准值决定，因此不一并迁移则模型之间无法一致。\n※ 该操作影响整个模型，而非仅所选视图。" },
+            { "DwgVg.Result.ObjectStyles", "已统一对象样式的图层: {0} 个（影响整个模型）" },
             { "DwgVg.Mode.Hint", "※ 与源同名的项目将自动选中" },
 
             { "DwgVg.Section.Source", "源模型 数据信息" },

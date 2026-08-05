@@ -751,6 +751,10 @@ namespace Tools28.Localization
             { "DwgVg.Mode", "反映先の単位:" },
             { "DwgVg.Mode.Template", "ビューテンプレート" },
             { "DwgVg.Mode.View", "ビュー" },
+            { "DwgVg.ObjectStyles.Label", "基準値:" },
+            { "DwgVg.ObjectStyles", "オブジェクトスタイル（線の色・太さ・線種）も揃える" },
+            { "DwgVg.ObjectStyles.Tip", "V/G の上書きは「オブジェクトスタイル」への差分です。上書きしていないレイヤの見た目は基準値で決まるため、これを揃えないとモデル間で表示が一致しません。\n※ ビュー単位ではなくモデル全体に効きます。" },
+            { "DwgVg.Result.ObjectStyles", "オブジェクトスタイルを揃えたレイヤ: {0} 件（モデル全体に効きます）" },
             { "DwgVg.Mode.Hint", "※ 移行元と同名のものを自動で選択します" },
 
             { "DwgVg.Section.Source", "移行元モデル データ情報" },

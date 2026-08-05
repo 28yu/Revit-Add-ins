@@ -752,6 +752,10 @@ namespace Tools28.Localization
             { "DwgVg.Mode", "Target unit:" },
             { "DwgVg.Mode.Template", "View template" },
             { "DwgVg.Mode.View", "View" },
+            { "DwgVg.ObjectStyles.Label", "Base values:" },
+            { "DwgVg.ObjectStyles", "Also match object styles (line color, weight, pattern)" },
+            { "DwgVg.ObjectStyles.Tip", "V/G overrides are deltas on top of Object Styles. Layers without an override take their appearance from the base values, so the models will not match unless these are transferred too.\n* This affects the whole model, not just the selected views." },
+            { "DwgVg.Result.ObjectStyles", "Layers whose object styles were matched: {0} (affects the whole model)" },
             { "DwgVg.Mode.Hint", "* Items whose name matches the source are selected automatically" },
 
             { "DwgVg.Section.Source", "Source model data" },
