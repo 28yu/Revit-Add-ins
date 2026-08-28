@@ -146,6 +146,7 @@ namespace Tools28.Commands.ParameterCleanup.Views
             RegisterColumn("Kind", colKind, "ParamCleanup.Col.Kind", "KindText", r => r.KindText ?? "");
             RegisterColumn("Scope", colScope, "ParamCleanup.Col.Scope", "ScopeText", r => r.ScopeText ?? "");
             RegisterColumn("Categories", colCategories, "ParamCleanup.Col.Categories", "CategoriesText", r => r.CategoriesText ?? "");
+            RegisterColumn("Usage", colUsage, "ParamCleanup.Col.Usage", "UsageDisplayText", r => r.UsageDisplayText ?? "");
             RegisterColumn("SchedRef", colSchedRef, "ParamCleanup.Col.ScheduleRef", "ScheduleRefText", r => r.ScheduleRefText ?? "");
             RegisterColumn("Value", colState, "ParamCleanup.Col.Value", "StateText", r => r.StateText ?? "");
         }
@@ -441,6 +442,25 @@ namespace Tools28.Commands.ParameterCleanup.Views
             var revitBlock = this.BlockRevitInput();
             try
             {
+                // --- 第1段階: 使用箇所索引の構築 ---
+                // 「どの要素がどのパラメータを保持しているか」をドキュメント1回走査で索引化する。
+                // これによりバインドされていないパラメータ（ファミリ内部定義の共有パラメータ等）でも
+                // 実際の値を読み取れる。索引は全パラメータで共有するため走査は1回で済む。
+                Progress.IsIndeterminate = true;
+                txtStatus.Text = Loc.S("ParamCleanup.Status.Indexing");
+                foreach (var n in _scanner.BuildIndex(_doc, targets, ct))
+                {
+                    if (sw.ElapsedMilliseconds >= 50)
+                    {
+                        txtStatus.Text = string.Format(Loc.S("ParamCleanup.Status.IndexingCount"), n);
+                        await Task.Delay(1);
+                        sw.Restart();
+                        if (ct.IsCancellationRequested) break;
+                    }
+                }
+                Progress.IsIndeterminate = false;
+
+                // --- 第2段階: パラメータごとの値判定 ---
                 foreach (var row in targets)
                 {
                     if (ct.IsCancellationRequested) break;
@@ -470,6 +490,7 @@ namespace Tools28.Commands.ParameterCleanup.Views
                 foreach (var r in targets)
                     if (r.State == ValueState.Checking) r.State = ValueState.Unchecked;
 
+                Progress.IsIndeterminate = false;
                 _scanner.ClearCache();
                 bool cancelled = ct.IsCancellationRequested;
                 _valuesChecked = !cancelled;
@@ -486,7 +507,8 @@ namespace Tools28.Commands.ParameterCleanup.Views
                 {
                     int hasVal = _rows.Count(r => r.State == ValueState.HasValue);
                     int empty = _rows.Count(r => r.State == ValueState.Empty);
-                    txtStatus.Text = string.Format(Loc.S("ParamCleanup.Status.DoneSummary"), hasVal, empty);
+                    int unused = _rows.Count(r => r.State == ValueState.NotFound);
+                    txtStatus.Text = string.Format(Loc.S("ParamCleanup.Status.DoneSummary"), hasVal, empty, unused);
                 }
 
                 _view?.Refresh();
@@ -502,6 +524,7 @@ namespace Tools28.Commands.ParameterCleanup.Views
             // スキャン中は btnCheck（=中止）と btnClose のみ有効
             btnDelete.IsEnabled = !busy;
             btnSelectEmpty.IsEnabled = !busy;
+            btnSelectNotBound.IsEnabled = !busy;
         }
 
         private void SelectEmpty_Click(object sender, RoutedEventArgs e)
@@ -520,11 +543,20 @@ namespace Tools28.Commands.ParameterCleanup.Views
             UpdateCount();
         }
 
-        // 「バインドなし」（どのカテゴリにもバインドされていない非グローバル）を全選択
+        // 「未使用」（どの要素にも存在しないと確認済み）だけを全選択する。
+        // 以前は「バインドなし」を無条件に全選択していたが、バインドされていなくても
+        // ファミリ内部定義のパラメータとして値を持つことがあるため、値の確認結果に基づく選択に変更した。
         private void SelectNotBound_Click(object sender, RoutedEventArgs e)
         {
+            if (!_valuesChecked)
+            {
+                TaskDialog.Show(Loc.S("ParamCleanup.Title"), Loc.S("ParamCleanup.NotChecked.Msg"));
+                this.BringToFrontDeferred();
+                return;
+            }
+
             foreach (var r in _rows)
-                r.IsSelected = r.State == ValueState.NotApplicable && r.Kind != ParamKind.Global;
+                r.IsSelected = r.State == ValueState.NotFound;
 
             _view?.Refresh();
             UpdateCount();
@@ -553,6 +585,39 @@ namespace Tools28.Commands.ParameterCleanup.Views
                 return;
             }
 
+            // 値が入っている／未確認のパラメータが混ざっていたら、削除前に必ず個別警告を出す。
+            // （バインドなしでもファミリ内部定義のパラメータとして値を持つことがあるため）
+            var risky = selected
+                .Where(r => r.Kind != ParamKind.Global &&
+                            (r.State == ValueState.HasValue ||
+                             r.State == ValueState.Unchecked ||
+                             r.State == ValueState.Checking))
+                .ToList();
+
+            if (risky.Count > 0)
+            {
+                var lines = risky.Take(15).Select(r =>
+                    "・" + r.Name + "  [" + r.StateText + "]" +
+                    (r.State == ValueState.HasValue
+                        ? "  " + string.Format(Loc.S("ParamCleanup.Warn.Count"), r.UsageElementCount)
+                        : "")).ToList();
+                if (risky.Count > lines.Count) lines.Add("…");
+
+                var warn = new TaskDialog(Loc.S("ParamCleanup.Confirm.Title"))
+                {
+                    MainInstruction = string.Format(Loc.S("ParamCleanup.Warn.Main"), risky.Count),
+                    MainContent = Loc.S("ParamCleanup.Warn.Content") + "\n\n" + string.Join("\n", lines),
+                    CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No,
+                    DefaultButton = TaskDialogResult.No
+                };
+                if (warn.Show() != TaskDialogResult.Yes)
+                {
+                    this.BringToFrontDeferred();
+                    return;
+                }
+                this.BringToFrontDeferred();
+            }
+
             var confirm = new TaskDialog(Loc.S("ParamCleanup.Confirm.Title"))
             {
                 MainInstruction = string.Format(Loc.S("ParamCleanup.Confirm.Main"), selected.Count),
@@ -565,6 +630,7 @@ namespace Tools28.Commands.ParameterCleanup.Views
 
             var ids = selected.Select(r => r.Id).Where(id => id != null && id != ElementId.InvalidElementId).ToList();
             int ok = 0, fail = 0;
+            List<string> warnings = null;   // 削除時に Revit が出した警告（モーダル表示せず記録して後で通知）
 
             try
             {
@@ -577,7 +643,9 @@ namespace Tools28.Commands.ParameterCleanup.Views
                     var fho = t.GetFailureHandlingOptions();
                     fho = fho.SetForcedModalHandling(false);
                     fho = fho.SetClearAfterRollback(true);
-                    fho = fho.SetFailuresPreprocessor(new WarningSwallower());
+                    var swallower = new WarningSwallower();
+                    warnings = swallower.Messages;
+                    fho = fho.SetFailuresPreprocessor(swallower);
                     t.SetFailureHandlingOptions(fho);
 
                     ICollection<ElementId> deleted = null;
@@ -615,8 +683,14 @@ namespace Tools28.Commands.ParameterCleanup.Views
                 return;
             }
 
-            TaskDialog.Show(Loc.S("ParamCleanup.Result.Title"),
-                string.Format(Loc.S("ParamCleanup.Result.Msg"), ok, fail));
+            string resultMsg = string.Format(Loc.S("ParamCleanup.Result.Msg"), ok, fail);
+            if (warnings != null && warnings.Count > 0)
+            {
+                resultMsg += "\n\n" + Loc.S("ParamCleanup.Result.Warnings") + "\n"
+                           + string.Join("\n", warnings.Take(10).Select(w => "・" + w));
+                if (warnings.Count > 10) resultMsg += "\n…";
+            }
+            TaskDialog.Show(Loc.S("ParamCleanup.Result.Title"), resultMsg);
 
             // 結果ダイアログで Revit が前面化するため、まずダイアログを前面へ戻す。
             // 続く再確認スキャン中は RunValueCheckAsync 内で Revit の操作を無効化する。
@@ -632,11 +706,28 @@ namespace Tools28.Commands.ParameterCleanup.Views
             Close();
         }
 
-        /// <summary>削除トランザクション中の警告を自動的に無視（ダイアログを出さない）。</summary>
+        /// <summary>
+        /// 削除トランザクション中の警告をモーダル表示せずに処理する。
+        /// ただし警告文は捨てずに記録し、削除後に結果ダイアログでまとめて通知する
+        /// （「要素が削除されます」等の重要な警告を見落とさないため）。
+        /// </summary>
         private class WarningSwallower : IFailuresPreprocessor
         {
+            public List<string> Messages { get; } = new List<string>();
+
             public FailureProcessingResult PreprocessFailures(FailuresAccessor a)
             {
+                try
+                {
+                    foreach (var f in a.GetFailureMessages())
+                    {
+                        var text = f?.GetDescriptionText();
+                        if (!string.IsNullOrWhiteSpace(text) && !Messages.Contains(text))
+                            Messages.Add(text);
+                    }
+                }
+                catch { }
+
                 a.DeleteAllWarnings();
                 return FailureProcessingResult.Continue;
             }

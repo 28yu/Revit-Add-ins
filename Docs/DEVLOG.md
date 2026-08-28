@@ -1105,6 +1105,81 @@ v2.1.x のパッチではバージョン番号 + 修正点追記がメインな�
 - `Color` は `System.Windows.Media.Color` と `Autodesk.Revit.DB.Color` が衝突。使う時は完全修飾。
 - 教訓: Window 派生の WPF コードビハインドで列挙型/コントロール型を動的生成する際は、Revit の using と衝突しやすい名前（Visibility/HorizontalAlignment/VerticalAlignment/TextBox/ComboBox/Color/Point 等）を完全修飾する。
 
+### ParameterCleanup: 「バインドなし」でも値を読む（バインド非依存スキャンへ刷新）
+
+#### 症状 / 事故
+「値」列が **バインドなし** のパラメータを「定義だけ残っているゴミ」とみなして削除したところ、
+**インスタンスパラメータに入力済みの値ごと失われた**。
+
+#### 原因（設計上の誤り）
+- 旧実装は値判定の対象を `ParameterBindings` から得た**バインド先カテゴリの要素**に限定していた
+  （`ParamRow.IsScannable = BoundCategories.Count > 0`）。
+- ところが **ファミリ内部で定義された共有パラメータ**は、ファミリ読み込み時にプロジェクトへ
+  `SharedParameterElement` として登録されるが、**プロジェクトパラメータとしてはバインドされない**。
+  → 走査対象カテゴリが分からない → 判定スキップ → `NotApplicable`（バインドなし）表示。
+- しかし値自体は**要素側に実在する**。API 的にはいつでも読める。読んでいなかっただけ。
+- 追い打ちとして、バインド辞書のキーが**パラメータ名**だったため、同名パラメータがあると
+  バインド済みでも「バインドなし」に化けることがあった。
+
+#### 結論: バインドなしでも値は読める
+- 共有パラメータ: `element.get_Parameter(Guid)`（`SharedParameterElement.GuidValue`）
+- 非共有: `element.get_Parameter(Definition)`（`ParameterElement.GetDefinition()`）
+- 最終手段: `element.Parameters` を列挙して `Parameter.Id == ParameterElement.Id` で照合
+  （`Parameter.Id` はユーザーパラメータならパラメータ要素の Id と一致する）
+
+問題は「読めるか」ではなく「**どの要素を見に行けばよいか**」だった。
+
+#### 対策: ParameterUsageIndex（使用箇所索引）
+`Services/ParameterUsageIndex.cs` を新設。バインドに依存せず、要素側から索引を作る。
+
+1. **フェーズ1**: `WhereElementIsNotElementType().ToElements()` を1回。各要素は `GetTypeId()` /
+   `Category` を読むだけで**タイプId単位にグループ化**（パラメータ列挙はしない＝軽い）。
+   タイプを持たない要素は `カテゴリId + クラス名` で束ねる。`doc.ProjectInformation` は取りこぼし
+   防止のため明示追加。
+2. **フェーズ2**: `WhereElementIsElementType().ToElements()` を1回。`FamilySymbol` は
+   **ファミリId 単位**、システムタイプは `カテゴリId + クラス名` 単位でグループ化。
+3. **フェーズ3**: 各グループの**代表要素1つだけ** `Parameters` を列挙し、
+   `パラメータ要素Id -> グループ` の索引を作る（同一タイプ／同一ファミリの要素はパラメータ構成が
+   同じ、という前提。ここが走査量削減の要）。Id 照合が効かない場合の保険として GUID でも突き合わせる。
+
+値判定は「そのパラメータを保持するグループの要素だけ」を走査し、値が1件見つかれば early-exit。
+索引は**全パラメータで共有**するので、モデル全体の走査はスキャン1回につき1度だけになる
+（旧実装はカテゴリ×パラメータで繰り返し走査していたため、実測でもこちらが有利）。
+
+#### 反復子の中では try-catch を使えない
+`yield return` を含むメソッドは `catch` 付き try の中に置けない。
+`FilteredElementCollector` の列挙を try で包みたい場合は、先に `ToElements()` で
+**materialize してから** foreach + yield する（`GetEnumerator()` の戻り型に依存しないので安全）。
+
+#### バインド辞書のキーは名前ではなく InternalDefinition.Id
+```csharp
+var idef = it.Key as InternalDefinition;   // it.Key は Definition
+if (idef?.Id != null) bindingById[idef.Id.IntValue()] = info;   // = ParameterElement の Id
+```
+名前キーはフォールバックとしてのみ残す。
+
+#### 値の状態を3種類に分離
+| State | 意味 | 削除 |
+|--|--|--|
+| `HasValue` | 値が入った要素が1件以上 | ❌ |
+| `Empty` | パラメータを保持する要素はあるが全て未入力 | ⭕ |
+| `NotFound` | どの要素・タイプも保持していない（定義のみ） | ⭕ |
+
+`NotApplicable` はグローバルパラメータ専用に縮小。
+
+#### 安全装置（事故の再発防止）
+- 「バインドなしを全選択」→ **「未使用を全選択」** に変更。値確認前は動作せず、`NotFound` のみ選択。
+- 削除前、選択に `HasValue` / `Unchecked` が含まれていたら**名前と保持要素数を列挙した警告**を出す
+  （既定「いいえ」）。
+- `WarningSwallower` は `DeleteAllWarnings()` の前に `GetFailureMessages()` の
+  `GetDescriptionText()` を**記録**し、削除結果ダイアログでまとめて通知する
+  （モーダル連打は防ぎつつ、警告内容は見せる）。
+- 「使用箇所」列を追加（要素数＋カテゴリ内訳、ツールチップにファミリ名・要素ID・値の例）。
+
+#### 教訓
+**バインド情報は「プロジェクトパラメータかどうか」しか表さない。パラメータの実在と値の有無は
+必ず要素側から確認すること。** バインドの有無を「使われていない」の根拠にしてはいけない。
+
 ### ParameterCleanup: 削除時の Revit 警告ダイアログ抑制
 - 複数パラメータ削除時、`Transaction.Commit()` で Revit が「これらの要素が削除されます」等の警告を**削除数だけ**モーダル表示する。
 - 対策: 削除トランザクションに失敗ハンドリングを設定する。

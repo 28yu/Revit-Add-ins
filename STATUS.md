@@ -1,4 +1,11 @@
-## 最終セッション: 2026-08-05
+## 最終セッション: 2026-08-28
+**ParameterCleanup（パラメータ整理）** の値判定をバインド非依存に刷新。
+「バインドなし」表示のパラメータ（ファミリ内部定義の共有パラメータ）でも要素側から
+実際の値を読み取るようにし、値が入ったまま削除してしまう事故を防止。
+使用箇所索引（`ParameterUsageIndex`）を新設し、モデル走査は1スキャンにつき1回に集約。
+値の状態を「値あり／空／未使用」の3種に分離し、「使用箇所」列と削除前警告を追加。
+
+## 前回セッション: 2026-08-05
 **DwgLayerTransfer（DWGレイヤ表示設定の移行）** の作り直しと不具合解消。
 左右2ペインの段階選択UIへ変更し、移行元を常にビュー単位に固定。
 「移行しても設定が変わらない」不具合を解消（詳細は `Docs/DEVLOG.md`）。
@@ -18,8 +25,23 @@ OKボタンを「エクスポート実行」に改名、Excelインポートの�
 > このファイルはセッション終了時に更新すること
 
 ## 現在作業中
-DwgLayerTransfer（DWGレイヤ表示設定の移行）— 動作確認完了
-ブランチ: `claude/dwg-layer-display-migration-lbrwy6`
+ParameterCleanup（パラメータ整理）— バインドなしパラメータの値判定を実装。Revit での動作確認待ち
+ブランチ: `claude/parameter-organization-improvement-1eol6q`
+
+### 完了（2026-08-28 ParameterCleanup セッション）
+- [x] `Services/ParameterUsageIndex.cs` 新設。「どの要素・タイプがどのパラメータを保持しているか」を
+      ドキュメント1回走査で索引化（インスタンス＝タイプ単位、タイプ＝ファミリ単位でグループ化し、
+      代表要素1つだけパラメータ列挙）
+- [x] 値判定を `ParameterBindings` 非依存に変更。バインドなしの共有パラメータも
+      `get_Parameter(Guid)` / `get_Parameter(Definition)` / `Parameters` 列挙で値を読み取る
+- [x] バインド辞書のキーを**パラメータ名 → `InternalDefinition.Id`** に変更（同名による誤判定を解消）
+- [x] `ValueState` に `NotFound`（未使用＝どの要素も保持していない）を追加し、`Empty` と区別
+- [x] 「使用箇所」列を追加（保持要素数＋カテゴリ内訳、ツールチップにファミリ名・要素ID・値の例）
+- [x] 「バインドなしを全選択」→「未使用を全選択」に変更（値確認前は不可、`NotFound` のみ選択）
+- [x] 削除前に「値あり／未確認」が含まれる場合の警告ダイアログを追加
+- [x] `WarningSwallower` が Revit の警告文を記録し、削除結果ダイアログで通知するよう変更
+- [x] 3言語（JP/US/CN）の文字列を同時追加。`Docs/Features/ParameterCleanup.md` / `Docs/DEVLOG.md` 更新
+
 
 ### 完了（2026-08-05 DwgLayerTransfer セッション）
 - [x] UI を左右2ペインの段階選択に変更（① 読み取り元ビュー → ② DWG ／ ③ 反映先ビュー（複数可）→ ④ 反映先DWG（複数可））

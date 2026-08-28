@@ -4,28 +4,39 @@ using System.Linq;
 using System.Threading;
 using Autodesk.Revit.DB;
 using Tools28.Commands.ParameterCleanup.Models;
+using Tools28.Localization;
 
 namespace Tools28.Commands.ParameterCleanup.Services
 {
     /// <summary>
     /// プロジェクト内の削除可能なパラメータ（プロジェクト／共有／グローバル）を列挙し、
-    /// 各パラメータに値が入っている要素が1つでもあるかを判定するサービス。
+    /// 各パラメータが「どこで使われているか」「値が入っている要素があるか」を判定するサービス。
+    ///
+    /// 【v2 の重要な変更】
+    /// 値の判定を ParameterBindings（プロジェクトパラメータのバインド）に依存させない。
+    /// バインドされていない共有パラメータ（ファミリ内部で定義され、ファミリ読込により
+    /// プロジェクトに登録された SharedParameterElement）でも、要素側から実際に値を読み取る。
+    /// これにより「バインドなし」と表示されて値の有無が分からないまま削除する事故を防ぐ。
     ///
     /// 大容量モデルでの UI フリーズ回避方針:
     ///   - 列挙 (EnumerateParameters) は ParameterBindings とパラメータ要素の走査のみで軽量。
+    ///   - 使用箇所索引 (ParameterUsageIndex) をドキュメント1回走査で構築し、全パラメータで共有。
     ///   - 値の有無判定 (ScanRow) は反復子として実装し、一定件数ごとに yield して
     ///     呼び出し側（UI スレッド）がメッセージポンプへ制御を返せるようにする。
     ///   - 値が1件でも見つかれば即 break（early-exit）。
-    ///   - カテゴリ単位で要素リストをキャッシュし、同カテゴリの複数パラメータで再利用。
     /// </summary>
     public class ParameterScanner
     {
         /// <summary>この件数ごとに反復子が yield して UI へ制御を返す</summary>
         private const int YieldEvery = 2000;
 
-        // (カテゴリId + I/T) -> 要素リスト のキャッシュ
-        private readonly Dictionary<string, List<Element>> _elementCache
-            = new Dictionary<string, List<Element>>();
+        /// <summary>使用箇所テキストに載せるグループ数の上限</summary>
+        private const int MaxUsageLabels = 12;
+
+        private ParameterUsageIndex _index;
+
+        /// <summary>構築済みの使用箇所索引（未構築なら null）</summary>
+        public ParameterUsageIndex Index => _index;
 
         /// <summary>
         /// 削除可能な全パラメータを列挙する（軽量・同期）。
@@ -35,9 +46,11 @@ namespace Tools28.Commands.ParameterCleanup.Services
             var rows = new List<ParamRow>();
 
             // --- バインド情報を先に構築 ---
-            // get_Item(Definition) は解決に失敗する場合があるため、実績のある
-            // ForwardIterator でバインドマップを一度走査し、パラメータ名でキー化する。
-            // （プロジェクトにバインド済みのパラメータ名は実質一意なので名前キーで安全）
+            // ⚠ 名前ではなく InternalDefinition.Id（= ParameterElement の Id）でキー化する。
+            //    名前キーだと同名パラメータが複数ある場合に取り違え、
+            //    「バインド済みなのにバインドなし」「その逆」の誤判定が起きる。
+            //    Id が取れない環境向けに名前キーもフォールバックとして併用する。
+            var bindingById = new Dictionary<int, BindingInfo>();
             var bindingByName = new Dictionary<string, BindingInfo>();
             try
             {
@@ -60,7 +73,16 @@ namespace Tools28.Commands.ParameterCleanup.Services
                         info.IsTypeBinding = true;
                         CollectCategories(tb.Categories, info.Categories);
                     }
+
                     bindingByName[def.Name] = info;
+
+                    try
+                    {
+                        var idef = def as InternalDefinition;
+                        if (idef != null && idef.Id != null && idef.Id != ElementId.InvalidElementId)
+                            bindingById[idef.Id.IntValue()] = info;
+                    }
+                    catch { }
                 }
             }
             catch { }
@@ -88,23 +110,36 @@ namespace Tools28.Commands.ParameterCleanup.Services
                     Kind = (pe is SharedParameterElement) ? ParamKind.Shared : ParamKind.Project
                 };
 
-                if (bindingByName.TryGetValue(def.Name, out var bi) && bi.Categories.Count > 0)
+                var spe = pe as SharedParameterElement;
+                if (spe != null)
+                {
+                    try { row.SharedGuid = spe.GuidValue; }
+                    catch { row.SharedGuid = Guid.Empty; }
+                }
+
+                BindingInfo bi;
+                if (!bindingById.TryGetValue(pe.Id.IntValue(), out bi))
+                    bindingByName.TryGetValue(def.Name, out bi);
+
+                if (bi != null && bi.Categories.Count > 0)
                 {
                     row.IsTypeBinding = bi.IsTypeBinding;
                     row.BoundCategories = bi.Categories;
                     var names = bi.Categories.Select(c => c.Name).ToList();
                     names.Sort(StringComparer.CurrentCulture);
                     row.CategoriesText = string.Join(", ", names);
-                    // State は Unchecked のまま（スキャン対象）
                 }
                 else
                 {
-                    // どのカテゴリにもバインドされていない（ファミリ用に読込済みの共有パラメータ等）
+                    // プロジェクトのカテゴリにはバインドされていない。
+                    // ただしファミリ内部で定義された共有パラメータとして要素上に実在する場合があるため、
+                    // 「判定対象外」にはせず、使用箇所索引を使って必ず値を確認する。
                     row.IsTypeBinding = null;
-                    row.State = ValueState.NotApplicable;
+                    row.State = ValueState.Unchecked;
                 }
 
-                if (scheduleRefs.TryGetValue(row.Id, out var sref))
+                List<string> sref;
+                if (scheduleRefs.TryGetValue(row.Id, out sref))
                     row.ScheduleRefText = string.Join(", ", sref);
 
                 rows.Add(row);
@@ -144,6 +179,29 @@ namespace Tools28.Commands.ParameterCleanup.Services
                 .OrderByDescending(r => r.IsDuplicateName)
                 .ThenBy(r => r.Name)
                 .ToList();
+        }
+
+        /// <summary>
+        /// 使用箇所索引を構築する反復子（全パラメータで共有する1回だけの走査）。
+        /// </summary>
+        public IEnumerable<int> BuildIndex(Document doc, IEnumerable<ParamRow> rows, CancellationToken ct)
+        {
+            var ids = new HashSet<int>();
+            var guids = new Dictionary<Guid, int>();
+            foreach (var r in rows)
+            {
+                if (r.Kind == ParamKind.Global) continue;
+                if (r.Id == null || r.Id == ElementId.InvalidElementId) continue;
+                int pid = r.Id.IntValue();
+                if (pid <= 0) continue;
+                ids.Add(pid);
+                if (r.SharedGuid != Guid.Empty && !guids.ContainsKey(r.SharedGuid))
+                    guids[r.SharedGuid] = pid;
+            }
+
+            _index = new ParameterUsageIndex(doc);
+            foreach (var n in _index.Build(ids, guids, ct))
+                yield return n;
         }
 
         private static void AddParameterElements(Document doc, Type t, Dictionary<ElementId, ParameterElement> map)
@@ -212,7 +270,8 @@ namespace Tools28.Commands.ParameterCleanup.Services
                         if (pid == null || pid == ElementId.InvalidElementId) continue;
                         if (pid.IntValue() <= 0) continue;   // 組み込みパラメータを除外
 
-                        if (!map.TryGetValue(pid, out var list))
+                        List<string> list;
+                        if (!map.TryGetValue(pid, out list))
                         {
                             list = new List<string>();
                             map[pid] = list;
@@ -226,67 +285,207 @@ namespace Tools28.Commands.ParameterCleanup.Services
         }
 
         /// <summary>
-        /// 1パラメータ分の値有無を判定する反復子。
+        /// 1パラメータ分の使用箇所と値有無を判定する反復子。
         /// 一定件数ごとに「処理済み要素数」を yield する。列挙完了時に row.State を確定させる。
         /// キャンセル時は State を変更せず yield break する（呼び出し側でリセット）。
         /// </summary>
         public IEnumerable<int> ScanRow(Document doc, ParamRow row, CancellationToken ct)
         {
-            if (!row.IsScannable)
+            if (row == null) yield break;
+
+            if (row.Kind == ParamKind.Global)
             {
-                if (row.State == ValueState.Checking || row.State == ValueState.Unchecked)
-                    row.State = ValueState.NotApplicable;
+                row.State = ValueState.NotApplicable;
                 yield break;
             }
 
-            bool isType = row.IsTypeBinding == true;
-            bool found = false;
-            int processed = 0;
-
-            foreach (var cat in row.BoundCategories)
+            if (_index == null || !_index.IsBuilt)
             {
-                var elements = GetElements(doc, cat, isType);
-                foreach (var e in elements)
+                // 索引未構築なら判定不能（呼び出し側で BuildIndex を先に回すこと）
+                if (row.State == ValueState.Checking) row.State = ValueState.Unchecked;
+                yield break;
+            }
+
+            var groups = _index.GetGroups(row.Id);
+
+            if (groups.Count == 0)
+            {
+                // どの要素にも存在しない = 定義だけが残っている未使用パラメータ
+                row.UsageText = "";
+                row.UsageElementCount = 0;
+                row.SampleText = "";
+                row.State = ValueState.NotFound;
+                yield return 0;
+                yield break;
+            }
+
+            row.UsageText = BuildUsageText(groups);
+            row.UsageElementCount = groups.Sum(g => g.Elements.Count);
+
+            int processed = 0;
+            bool found = false;
+            var access = new ParameterAccessor(row);
+
+            foreach (var g in groups)
+            {
+                if (found) break;
+
+                foreach (var eid in g.Elements)
                 {
                     if (ct.IsCancellationRequested) yield break;
 
-                    Parameter p = null;
-                    try { p = e.get_Parameter(row.Definition); }
-                    catch { p = null; }
+                    Element e = null;
+                    try { e = doc.GetElement(eid); }
+                    catch { e = null; }
 
-                    if (HasRealValue(p)) { found = true; break; }
+                    if (e != null)
+                    {
+                        var p = access.Get(e);
+                        if (HasRealValue(p))
+                        {
+                            found = true;
+                            row.SampleText = BuildSampleText(g, e, p);
+                            break;
+                        }
+                    }
 
                     processed++;
                     if (processed % YieldEvery == 0)
                         yield return processed;
                 }
-                if (found) break;
             }
 
+            if (!found) row.SampleText = "";
             row.State = found ? ValueState.HasValue : ValueState.Empty;
             yield return processed;
         }
 
-        private List<Element> GetElements(Document doc, Category cat, bool isType)
+        /// <summary>
+        /// 要素からパラメータを取り出す方法を1度だけ決定してキャッシュするヘルパー。
+        /// 共有パラメータは GUID、非共有は Definition で引ける。
+        /// どちらも効かない場合のみ Parameters 列挙（低速）にフォールバックする。
+        /// </summary>
+        private class ParameterAccessor
         {
-            string key = cat.Id.ToString() + (isType ? "|T" : "|I");
-            if (_elementCache.TryGetValue(key, out var cached))
-                return cached;
+            private enum Mode { Undetermined, Guid, Definition, Enumerate }
 
-            List<Element> list;
+            private readonly ParamRow _row;
+            private readonly int _paramId;
+            private Mode _mode = Mode.Undetermined;
+
+            public ParameterAccessor(ParamRow row)
+            {
+                _row = row;
+                _paramId = (row.Id != null) ? row.Id.IntValue() : 0;
+            }
+
+            public Parameter Get(Element e)
+            {
+                Parameter p;
+
+                // 有効と分かっている方法を先に試す（取得できなければ他の方法も試す）
+                switch (_mode)
+                {
+                    case Mode.Guid:
+                        p = ByGuid(e); if (p != null) return p; break;
+                    case Mode.Definition:
+                        p = ByDefinition(e); if (p != null) return p; break;
+                    case Mode.Enumerate:
+                        return ByEnumerate(e);
+                }
+
+                p = ByGuid(e);
+                if (p != null) { _mode = Mode.Guid; return p; }
+
+                p = ByDefinition(e);
+                if (p != null) { _mode = Mode.Definition; return p; }
+
+                p = ByEnumerate(e);
+                if (p != null) { _mode = Mode.Enumerate; return p; }
+
+                return null;   // この要素に無いだけの可能性があるので Mode は確定させない
+            }
+
+            private Parameter ByGuid(Element e)
+            {
+                if (_row.SharedGuid == Guid.Empty) return null;
+                try { return e.get_Parameter(_row.SharedGuid); }
+                catch { return null; }
+            }
+
+            private Parameter ByDefinition(Element e)
+            {
+                if (_row.Definition == null) return null;
+                try { return e.get_Parameter(_row.Definition); }
+                catch { return null; }
+            }
+
+            private Parameter ByEnumerate(Element e)
+            {
+                if (_paramId <= 0) return null;
+                try
+                {
+                    foreach (Parameter q in e.Parameters)
+                    {
+                        if (q == null || q.Id == null) continue;
+                        if (q.Id.IntValue() == _paramId) return q;
+                    }
+                }
+                catch { }
+                return null;
+            }
+        }
+
+        private static string BuildUsageText(List<ParameterUsageIndex.UsageGroup> groups)
+        {
+            // 「カテゴリ名: 件数」を件数の多い順に並べる
+            var byCat = new Dictionary<string, int>();
+            foreach (var g in groups)
+            {
+                string cat = string.IsNullOrEmpty(g.CategoryName) ? "-" : g.CategoryName;
+                if (g.IsElementType) cat += Loc.S("ParamCleanup.Usage.TypeSuffix");
+                int cur;
+                byCat.TryGetValue(cat, out cur);
+                byCat[cat] = cur + g.Elements.Count;
+            }
+
+            var parts = byCat.OrderByDescending(kv => kv.Value)
+                             .Take(MaxUsageLabels)
+                             .Select(kv => string.Format("{0} ({1})", kv.Key, kv.Value))
+                             .ToList();
+            if (byCat.Count > MaxUsageLabels) parts.Add("…");
+            return string.Join(", ", parts);
+        }
+
+        private static string BuildSampleText(ParameterUsageIndex.UsageGroup g, Element e, Parameter p)
+        {
+            string val = "";
             try
             {
-                var col = new FilteredElementCollector(doc).OfCategoryId(cat.Id);
-                col = isType ? col.WhereElementIsElementType() : col.WhereElementIsNotElementType();
-                list = col.ToList();
+                val = p.AsValueString();
+                if (string.IsNullOrEmpty(val))
+                {
+                    switch (p.StorageType)
+                    {
+                        case StorageType.String: val = p.AsString() ?? ""; break;
+                        case StorageType.Integer: val = p.AsInteger().ToString(); break;
+                        case StorageType.Double: val = p.AsDouble().ToString("0.###"); break;
+                        case StorageType.ElementId:
+                            var id = p.AsElementId();
+                            var t = (id != null) ? e.Document.GetElement(id) : null;
+                            val = (t != null) ? (t.Name ?? id.IntValue().ToString()) : (id != null ? id.IntValue().ToString() : "");
+                            break;
+                    }
+                }
             }
-            catch
-            {
-                list = new List<Element>();
-            }
+            catch { }
 
-            _elementCache[key] = list;
-            return list;
+            string label = !string.IsNullOrEmpty(g.Label) ? g.Label : (g.CategoryName ?? "");
+            string eid = "";
+            try { eid = e.Id.IntValue().ToString(); }
+            catch { }
+
+            return string.Format(Loc.S("ParamCleanup.Usage.Sample"), label, eid, val);
         }
 
         /// <summary>
@@ -327,6 +526,10 @@ namespace Tools28.Commands.ParameterCleanup.Services
             return "";
         }
 
-        public void ClearCache() => _elementCache.Clear();
+        public void ClearCache()
+        {
+            if (_index != null) _index.Clear();
+            _index = null;
+        }
     }
 }
