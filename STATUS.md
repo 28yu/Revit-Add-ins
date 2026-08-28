@@ -64,6 +64,17 @@ GenericModelMerge（一般モデル化）— 新規実装完了。Revit での�
 - [x] `Docs/Features/GenericModelMerge.md` / `Docs/features.json`（`model` カテゴリ追加、`added_in: 2.6`）
       / `Docs/DEVLOG.md` / `CLAUDE.md` を更新
 
+#### 動作確認1回目で判明した不具合の修正（同日）
+- [x] **材質のコピー方法を修正**。`ElementTransformUtils.CopyElements` はプロジェクト↔ファミリ間で
+      使えず「ファミリとプロジェクト間ではコピーできません」エラーになる。
+      `Material.Create(famDoc, 同名)` でファミリ側に作り直す方式へ変更
+- [x] **`Transaction.Commit()` の戻り値を必ず確認**するよう修正。エラーのモーダルを
+      ユーザーがキャンセルするとロールバックされ、**空の .rfa が保存されていた**
+- [x] `FamilyFailurePreprocessor` を新設。警告は削除、エラーは文言を収集してロールバック
+- [x] 保存前にファミリ文書の `FreeFormElement` 数を数え直して検証
+- [x] **元要素を非表示にする前に**生成物が立体形状を持つか検証し、なければ全体をロールバック
+      （「空の一般モデルを作り、元要素だけ消えたビュー」を残さない）
+
 ### 完了（2026-08-28 ParameterCleanup セッション）
 - [x] `Services/ParameterUsageIndex.cs` 新設。「どの要素・タイプがどのパラメータを保持しているか」を
       ドキュメント1回走査で索引化（インスタンス＝タイプ単位、タイプ＝ファミリ単位でグループ化し、

@@ -957,6 +957,7 @@ namespace Tools28.Localization
             { "GmMerge.Err.NoTemplate", "Cancelled because no family template was selected." },
             { "GmMerge.Err.FamilyFailed", "Failed to create the family file.\n\n{0}" },
             { "GmMerge.Err.LoadFailed", "The created family could not be loaded into the project." },
+            { "GmMerge.Err.EmptyResult", "The generic model that was created contained no geometry, so the operation was undone. The model is unchanged.\n\n{0}" },
             { "GmMerge.Result.Created", "Created a generic model with {1} shapes from {0} elements." },
             { "GmMerge.Result.SavedTo", "Family saved to: {0}" },
             { "GmMerge.Result.Hidden", "Hid {0} original elements in this view." },

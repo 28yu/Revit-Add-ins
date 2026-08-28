@@ -148,6 +148,13 @@ namespace Tools28.Commands.GenericModelMerge
             {
                 t.Start();
 
+                // Revit のモーダルエラーで黙ってロールバックされないようにする
+                var failures = new FamilyFailurePreprocessor();
+                var fho = t.GetFailureHandlingOptions();
+                fho.SetFailuresPreprocessor(failures);
+                fho.SetClearAfterRollback(true);
+                t.SetFailureHandlingOptions(fho);
+
                 if (options.OutputKind == MergeOutputKind.Family)
                 {
                     createdId = FamilyBuilder.LoadAndPlace(doc, options.FamilyPath);
@@ -165,15 +172,81 @@ namespace Tools28.Commands.GenericModelMerge
                     createdId = dsOutcome.ElementId;
                 }
 
+                // 元要素を非表示にする前に、生成物に本当に形状が入っているか確かめる。
+                // ここを見ないと「中身が空の一般モデルを作り、元要素だけ消えたビュー」に
+                // なり得る（実際にファミリ側のロールバックでその症状が出た）。
+                doc.Regenerate();
+                if (!HasSolidGeometry(doc, createdId))
+                {
+                    t.RollBack();
+                    DiagLog.Write("[CMD:GenericModelMerge] 生成物に形状がないためロールバック: "
+                                  + failures.JoinErrors());
+                    TaskDialog.Show(Loc.S("GmMerge.Title"),
+                        string.Format(Loc.S("GmMerge.Err.EmptyResult"), failures.JoinErrors()));
+                    return Result.Failed;
+                }
+
                 if (options.HideSourceElements)
                     hiddenCount = HideSourceElements(doc, view, merged.SourceElementIds, createdId);
 
-                t.Commit();
+                if (t.Commit() != TransactionStatus.Committed)
+                {
+                    DiagLog.Write("[CMD:GenericModelMerge] コミットされずロールバック: "
+                                  + failures.JoinErrors());
+                    TaskDialog.Show(Loc.S("GmMerge.Title"),
+                        string.Format(Loc.S("GmMerge.Err.EmptyResult"), failures.JoinErrors()));
+                    return Result.Failed;
+                }
             }
 
             ShowResult(merged, options, dsOutcome, famOutcome, hiddenCount);
             DiagLog.Cmd("GenericModelMerge", "完了");
             return Result.Succeeded;
+        }
+
+        /// <summary>
+        /// 生成した要素が実際に立体形状を持っているかを確認する。
+        /// DirectShape でも、ファミリインスタンス（GeometryInstance 経由）でも判定できる。
+        ///
+        /// 誤って正常な結果を巻き戻さないよう、通常の取得で 0 個だった場合は
+        /// IncludeNonVisibleObjects=true でもう一度だけ確かめる。
+        /// </summary>
+        private static bool HasSolidGeometry(Document doc, ElementId id)
+        {
+            if (id == null || id == ElementId.InvalidElementId) return false;
+            var e = doc.GetElement(id);
+            if (e == null) return false;
+
+            return ProbeSolids(e, false) || ProbeSolids(e, true);
+        }
+
+        private static bool ProbeSolids(Element e, bool includeNonVisible)
+        {
+            var opt = new Options
+            {
+                ComputeReferences = false,
+                IncludeNonVisibleObjects = includeNonVisible,
+                DetailLevel = ViewDetailLevel.Fine,
+            };
+
+            GeometryElement geom;
+            try { geom = e.get_Geometry(opt); }
+            catch { return false; }
+            return geom != null && ContainsSolid(geom);
+        }
+
+        private static bool ContainsSolid(GeometryElement geom)
+        {
+            foreach (GeometryObject obj in geom)
+            {
+                if (obj is Solid s && s.Volume > 1e-6) return true;
+                if (obj is GeometryInstance gi)
+                {
+                    var inst = gi.GetInstanceGeometry();
+                    if (inst != null && ContainsSolid(inst)) return true;
+                }
+            }
+            return false;
         }
 
         /// <summary>

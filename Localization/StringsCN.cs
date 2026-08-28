@@ -956,6 +956,7 @@ namespace Tools28.Localization
             { "GmMerge.Err.NoTemplate", "未选择族样板，已中止。" },
             { "GmMerge.Err.FamilyFailed", "族文件创建失败。\n\n{0}" },
             { "GmMerge.Err.LoadFailed", "无法将创建的族载入到项目中。" },
+            { "GmMerge.Err.EmptyResult", "创建的常规模型中不含任何形状，已取消该操作。模型保持执行前的状态。\n\n{0}" },
             { "GmMerge.Result.Created", "已从 {0} 个图元的形状创建了包含 {1} 个形状的常规模型。" },
             { "GmMerge.Result.SavedTo", "族的保存位置: {0}" },
             { "GmMerge.Result.Hidden", "已在此视图中隐藏 {0} 个原始图元。" },

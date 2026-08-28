@@ -58,9 +58,18 @@ namespace Tools28.Commands.GenericModelMerge.Services
                     return outcome;
                 }
 
+                var failures = new FamilyFailurePreprocessor();
+
                 using (var t = new Transaction(famDoc, "Tools28 GenericModelMerge"))
                 {
                     t.Start();
+
+                    // Revit のモーダルエラーで黙ってロールバックされるのを防ぐ。
+                    // エラー文言は failures に収集し、下でユーザーに伝える。
+                    var fho = t.GetFailureHandlingOptions();
+                    fho.SetFailuresPreprocessor(failures);
+                    fho.SetClearAfterRollback(true);
+                    t.SetFailureHandlingOptions(fho);
 
                     // テンプレートが一般モデル以外でも確実に一般モデルにする
                     try
@@ -70,10 +79,12 @@ namespace Tools28.Commands.GenericModelMerge.Services
                     }
                     catch { }
 
-                    // 材質はプロジェクトからファミリ文書へコピーしてから割り当てる
+                    // 材質はファミリ文書側に同名で作り直して割り当てる。
+                    // ElementTransformUtils.CopyElements は「ファミリとプロジェクト間では
+                    // コピーできません」というエラーになるため使えない。
                     ElementId famMaterialId = ElementId.InvalidElementId;
                     if (materialId != null && materialId != ElementId.InvalidElementId)
-                        famMaterialId = CopyMaterial(projectDoc, famDoc, materialId);
+                        famMaterialId = EnsureMaterial(projectDoc, famDoc, materialId);
 
                     foreach (var solid in solids)
                     {
@@ -96,7 +107,15 @@ namespace Tools28.Commands.GenericModelMerge.Services
                         }
                     }
 
-                    t.Commit();
+                    // Commit の戻り値を必ず見る。エラーやユーザーのキャンセルで
+                    // ロールバックされた場合、ここを見ないと「空のファミリ」を保存してしまう。
+                    if (t.Commit() != TransactionStatus.Committed)
+                    {
+                        outcome.ErrorMessage = failures.HadError
+                            ? failures.JoinErrors()
+                            : "The family transaction was rolled back";
+                        return outcome;
+                    }
                 }
 
                 if (outcome.CreatedSolidCount == 0)
@@ -104,6 +123,27 @@ namespace Tools28.Commands.GenericModelMerge.Services
                     outcome.ErrorMessage = "FreeFormElement could not be created";
                     return outcome;
                 }
+
+                // 保存前に、ファミリ文書に本当に形状が入っているか数え直す。
+                // （ロールバックを見落とすと中身が空の .rfa が出来てしまうため）
+                // 数え方自体が失敗した場合は -1 とし、正常な結果を誤って弾かないようにする。
+                int formCount;
+                try
+                {
+                    formCount = new FilteredElementCollector(famDoc)
+                        .OfClass(typeof(FreeFormElement))
+                        .GetElementCount();
+                }
+                catch { formCount = -1; }
+
+                if (formCount == 0)
+                {
+                    outcome.ErrorMessage = failures.HadError
+                        ? failures.JoinErrors()
+                        : "The family document contains no geometry";
+                    return outcome;
+                }
+                if (formCount > 0) outcome.CreatedSolidCount = formCount;
 
                 var saveOpts = new SaveAsOptions { OverwriteExistingFile = true };
                 famDoc.SaveAs(savePath, saveOpts);
@@ -155,18 +195,42 @@ namespace Tools28.Commands.GenericModelMerge.Services
             return instance?.Id ?? ElementId.InvalidElementId;
         }
 
-        private static ElementId CopyMaterial(Document source, Document dest, ElementId materialId)
+        /// <summary>
+        /// ファミリ文書側に、プロジェクトの材質と同名の材質を用意する。
+        ///
+        /// `ElementTransformUtils.CopyElements` はプロジェクト↔ファミリ間では
+        /// 「ファミリとプロジェクト間ではコピーできません」エラーになるため使えない。
+        /// 代わりに同名の材質を新規作成し、見た目に効く値だけ写す。
+        /// 同名の材質は、ファミリをプロジェクトへロードした時点で
+        /// プロジェクト側の既存材質と対応付けられる。
+        /// </summary>
+        private static ElementId EnsureMaterial(Document source, Document famDoc, ElementId materialId)
         {
-            try
-            {
-                var copied = ElementTransformUtils.CopyElements(
-                    source, new List<ElementId> { materialId }, dest, Transform.Identity, null);
-                return copied?.FirstOrDefault() ?? ElementId.InvalidElementId;
-            }
-            catch
-            {
-                return ElementId.InvalidElementId;
-            }
+            var src = source.GetElement(materialId) as Material;
+            if (src == null) return ElementId.InvalidElementId;
+
+            // テンプレートに同名の材質が既にあれば、それを使う（Create は同名で例外になる）
+            var existing = new FilteredElementCollector(famDoc)
+                .OfClass(typeof(Material))
+                .Cast<Material>()
+                .FirstOrDefault(m => m.Name == src.Name);
+            if (existing != null) return existing.Id;
+
+            ElementId newId;
+            try { newId = Material.Create(famDoc, src.Name); }
+            catch { return ElementId.InvalidElementId; }
+
+            var dst = famDoc.GetElement(newId) as Material;
+            if (dst == null) return ElementId.InvalidElementId;
+
+            // 見た目に効く値だけ写す（塗潰しパターン等は別要素なのでここでは扱わない）
+            try { dst.Color = src.Color; } catch { }
+            try { dst.Transparency = src.Transparency; } catch { }
+            try { dst.Shininess = src.Shininess; } catch { }
+            try { dst.Smoothness = src.Smoothness; } catch { }
+            try { dst.MaterialClass = src.MaterialClass; } catch { }
+
+            return newId;
         }
 
         /// <summary>

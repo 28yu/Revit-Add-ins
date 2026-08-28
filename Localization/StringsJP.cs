@@ -956,6 +956,7 @@ namespace Tools28.Localization
             { "GmMerge.Err.NoTemplate", "ファミリテンプレートが選択されなかったため中止しました。" },
             { "GmMerge.Err.FamilyFailed", "ファミリファイルの作成に失敗しました。\n\n{0}" },
             { "GmMerge.Err.LoadFailed", "作成したファミリをプロジェクトに読み込めませんでした。" },
+            { "GmMerge.Err.EmptyResult", "作成した一般モデルに形状が含まれていなかったため、処理を取り消しました。モデルは実行前の状態のままです。\n\n{0}" },
             { "GmMerge.Result.Created", "{0} 要素の形状から、{1} 個の形状を持つ一般モデルを作成しました。" },
             { "GmMerge.Result.SavedTo", "ファミリの保存先: {0}" },
             { "GmMerge.Result.Hidden", "元になった要素 {0} 個をこのビューで非表示にしました。" },
