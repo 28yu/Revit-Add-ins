@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Timers;
@@ -61,7 +62,7 @@ namespace Tools28.Commands.AutoBackup.Services
 
                 if (_uiCtrlApp != null)
                 {
-                    // 同期中に出るダイアログを自動処理して手を止めさせないため監視する。
+                    // 同期中に出たダイアログを記録し、許可リストに載っているものだけ自動処理する。
                     _uiCtrlApp.DialogBoxShowing += OnDialogBoxShowing;
                     // モデルを開いた直後にバックアップが走らないよう、カウントをリセットする。
                     _uiCtrlApp.ControlledApplication.DocumentOpened += OnDocumentOpened;
@@ -106,25 +107,57 @@ namespace Tools28.Commands.AutoBackup.Services
         }
 
         /// <summary>
-        /// 中央同期の実行中に出るクリック要求ダイアログを自動的に処理（既定=継続）して、
-        /// ユーザーの応答待ちで固まらないようにする。同期中以外は何もしない。
+        /// 自動的に OK 応答してよいと確認できたダイアログの DialogId（許可リスト）。
+        ///
+        /// ここに載っていないダイアログは自動処理せず、Revit に通常どおり表示させて
+        /// ユーザーに判断させる。実運用ログ（C:\temp\Tools28_debug.txt の
+        /// 「AutoBackup 同期中ダイアログ」行）で DialogId を確認し、
+        /// 安全と判断できたものだけをここに追加すること。
+        /// </summary>
+        private static readonly HashSet<string> AutoDismissDialogIds
+            = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                // 例: "TaskDialog_Local_Changes_Not_Synchronized"
+            };
+
+        /// <summary>
+        /// 中央同期の実行中に出たダイアログを記録し、許可リストにあるものだけ自動処理する。
+        /// 同期中以外は何もしない。
+        ///
+        /// ⚠ 以前は同期中の「すべての」ダイアログを OK で自動処理していたが、
+        ///    競合・権限・保存先の警告といった、本来ユーザーが判断すべき確認まで
+        ///    勝手に承認してしまう状態だった。
+        ///    実運用ログから「正常に完了する同期ではダイアログが出ない」ことが確認できたため、
+        ///    許可リスト方式に切り替えた。普段の自動同期は従来どおり止まらずに完了し、
+        ///    例外時だけ手動同期と同じようにユーザーが判断できる。
+        ///
         /// ※ 同期の進捗バー自体はダイアログではないため抑制できず、その間は編集不可（Revit 仕様）。
         /// </summary>
         private void OnDialogBoxShowing(object sender, DialogBoxShowingEventArgs e)
         {
             if (!_isSyncing) return;
-            try
-            {
-                // 【第2段（許可リスト方式）に向けた DialogId の収集】
-                // 現状は同期中の全ダイアログを OK で自動処理しているが、想定外の確認まで
-                // 承認してしまうため、本来は既知の DialogId だけを自動処理すべき。
-                // その許可リストを作るには実運用でどの DialogId が出るかの実データが要るので、
-                // まずは記録だけ行い（挙動は従来どおり）、集まった時点で
-                // AutoDismissDialogIds による絞り込みへ切り替える。
-                DiagLog.Write($"AutoBackup 同期中ダイアログを自動処理: DialogId={e.DialogId}");
-                e.OverrideResult((int)TaskDialogResult.Ok);
-            }
+
+            string dialogId = null;
+            try { dialogId = e.DialogId; }
             catch { }
+
+            if (!string.IsNullOrEmpty(dialogId) && AutoDismissDialogIds.Contains(dialogId))
+            {
+                try
+                {
+                    e.OverrideResult((int)TaskDialogResult.Ok);
+                    DiagLog.Write($"AutoBackup 同期中ダイアログを自動処理: DialogId={dialogId}");
+                }
+                catch (Exception ex)
+                {
+                    DiagLog.Write($"AutoBackup 同期中ダイアログの自動処理に失敗: DialogId={dialogId} / {ex.Message}");
+                }
+                return;
+            }
+
+            // 許可リストに無い＝ユーザーに判断させる。OverrideResult は呼ばない。
+            string shownId = string.IsNullOrEmpty(dialogId) ? "(取得不可)" : dialogId;
+            DiagLog.Write($"AutoBackup 同期中ダイアログ（自動処理せず・ユーザー判断）: DialogId={shownId}");
         }
 
         /// <summary>設定ダイアログからの適用。永続化してタイマーを再構成する。</summary>
