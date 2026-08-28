@@ -113,7 +113,7 @@ namespace Tools28.Commands.FireProtection
                 }
 
                 // ビューテンプレート確認（各ビュー）
-                using (Transaction tpl = new Transaction(doc, "ビューテンプレート解除"))
+                using (Transaction tpl = new Transaction(doc, Loc.S("Common.Txn.ClearViewTemplate")))
                 {
                     bool needTemplate = targetViews.Any(
                         v => v.ViewTemplateId != ElementId.InvalidElementId);
@@ -226,7 +226,7 @@ namespace Tools28.Commands.FireProtection
                 int regionCount = 0;
                 bool hasColumnFrame = false;
 
-                using (Transaction trans = new Transaction(doc, "耐火被覆色分け"))
+                using (Transaction trans = new Transaction(doc, Loc.S("Fire.Txn.Apply")))
                 {
                     trans.Start();
 
@@ -428,7 +428,7 @@ namespace Tools28.Commands.FireProtection
                 // 凡例のシート自動配置（別トランザクション: ビューをコミット後に配置）
                 if (isSheet && legendViewId != null)
                 {
-                    using (Transaction vpTrans = new Transaction(doc, "凡例シート配置"))
+                    using (Transaction vpTrans = new Transaction(doc, Loc.S("Fire.Txn.PlaceLegend")))
                     {
                         vpTrans.Start();
                         try
@@ -502,13 +502,12 @@ namespace Tools28.Commands.FireProtection
             }
             catch (Exception ex)
             {
-                message = $"耐火被覆色分け処理中にエラーが発生しました。\n\n{ex.Message}" +
-                    $"\n\n--- スタックトレース ---\n{ex.StackTrace}" +
-                    (ex.InnerException != null
-                        ? $"\n\n--- InnerException ---\n{ex.InnerException.Message}\n{ex.InnerException.StackTrace}"
-                        : "") +
-                    "\n\nマニュアル: https://28tools.com/addins.html" +
-                    "\n配布サイト: https://28yu.github.io/28tools-download/";
+                message = string.Format(Loc.S("Common.ErrorWithManual"),
+                    string.Format(Loc.S("Fire.ProcessError"), ex.Message)
+                        + $"\n\n--- StackTrace ---\n{ex.StackTrace}"
+                        + (ex.InnerException != null
+                            ? $"\n\n--- InnerException ---\n{ex.InnerException.Message}\n{ex.InnerException.StackTrace}"
+                            : ""));
                 return Result.Failed;
             }
         }

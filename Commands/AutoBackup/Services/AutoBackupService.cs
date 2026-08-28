@@ -115,7 +115,13 @@ namespace Tools28.Commands.AutoBackup.Services
             if (!_isSyncing) return;
             try
             {
-                DiagLog.Write($"AutoBackup 同期中ダイアログを自動処理: {e.DialogId}");
+                // 【第2段（許可リスト方式）に向けた DialogId の収集】
+                // 現状は同期中の全ダイアログを OK で自動処理しているが、想定外の確認まで
+                // 承認してしまうため、本来は既知の DialogId だけを自動処理すべき。
+                // その許可リストを作るには実運用でどの DialogId が出るかの実データが要るので、
+                // まずは記録だけ行い（挙動は従来どおり）、集まった時点で
+                // AutoDismissDialogIds による絞り込みへ切り替える。
+                DiagLog.Write($"AutoBackup 同期中ダイアログを自動処理: DialogId={e.DialogId}");
                 e.OverrideResult((int)TaskDialogResult.Ok);
             }
             catch { }
@@ -267,7 +273,9 @@ namespace Tools28.Commands.AutoBackup.Services
             var syncOptions = new SynchronizeWithCentralOptions();
             // 権利を返却しない（ユーザーが編集中の要素の所有権を保持したまま同期）。
             syncOptions.SetRelinquishOptions(new RelinquishOptions(false));
-            syncOptions.Comment = Loc.S("AutoBackup.Sync.Comment");
+            // 同期コメントは中央モデルの履歴に残り、他のメンバー全員が見る文字列。
+            // アドインの言語設定ではなく Revit 本体の UI 言語に合わせる。
+            syncOptions.Comment = Loc.S("AutoBackup.Sync.Comment", RevitUiLanguage.Resolve(doc));
             syncOptions.Compact = false;
 
             _isSyncing = true;
@@ -320,7 +328,12 @@ namespace Tools28.Commands.AutoBackup.Services
                 string pattern = $"{baseName}{BackupMarker}*{ext}";
                 var files = new DirectoryInfo(folder)
                     .GetFiles(pattern)
-                    .OrderByDescending(f => f.LastWriteTime)
+                    // ⚠ LastWriteTime は使えない。File.Copy はコピー元の更新日時を引き継ぐため、
+                    //    モデルが未変更のまま複数回バックアップすると全ファイルが同じ日時になり、
+                    //    並びが不定になって新しい世代を削除してしまうことがある。
+                    //    自分で付けたファイル名のタイムスタンプで並べる
+                    //    （yyyyMMdd_HHmmss は辞書順＝時系列順）。
+                    .OrderByDescending(f => ExtractBackupStamp(f.Name), StringComparer.Ordinal)
                     .ToList();
 
                 foreach (var old in files.Skip(keep))
@@ -333,6 +346,22 @@ namespace Tools28.Commands.AutoBackup.Services
             {
                 DiagLog.Write($"AutoBackup ローテーション失敗: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// "モデル名_backup_20260828_143000.rvt" から "20260828_143000" を取り出す。
+        /// 取り出せない場合は空文字（＝最も古い扱い）。
+        /// </summary>
+        private static string ExtractBackupStamp(string fileName)
+        {
+            if (string.IsNullOrEmpty(fileName)) return string.Empty;
+
+            int i = fileName.LastIndexOf(BackupMarker, StringComparison.Ordinal);
+            if (i < 0) return string.Empty;
+
+            string rest = fileName.Substring(i + BackupMarker.Length);
+            int dot = rest.LastIndexOf('.');
+            return dot >= 0 ? rest.Substring(0, dot) : rest;
         }
 
         private void SetStatus(bool success, string message, bool updateTime)

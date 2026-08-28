@@ -218,7 +218,7 @@ namespace Tools28.Commands.BeamUnderLevel
 
                         var customRadio = new RadioButton
                         {
-                            Content = "その他: ",
+                            Content = Loc.S("Common.Other"),
                             GroupName = groupName,
                             FontSize = 11,
                             VerticalAlignment = VerticalAlignment.Center
@@ -406,7 +406,7 @@ namespace Tools28.Commands.BeamUnderLevel
 
                     var customRadio = new RadioButton
                     {
-                        Content = "その他: ",
+                        Content = Loc.S("Common.Other"),
                         GroupName = groupName,
                         FontSize = 11,
                         VerticalAlignment = VerticalAlignment.Center,
@@ -593,7 +593,7 @@ namespace Tools28.Commands.BeamUnderLevel
                 // バリデーション
                 if (SelectedLowerLevel == null)
                 {
-                    MessageBox.Show("上位レベルを選択してください。", "入力エラー",
+                    MessageBox.Show(Loc.S("BeamUnder.SelectUpperLevel"), Loc.S("Common.InputError"),
                         MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }

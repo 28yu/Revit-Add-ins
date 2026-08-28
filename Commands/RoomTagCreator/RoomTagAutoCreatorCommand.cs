@@ -100,14 +100,14 @@ namespace Tools28.Commands.RoomTagCreator
                 }
 
                 // トランザクショングループで処理を実行
-                using (TransactionGroup tg = new TransactionGroup(doc, "部屋タグ自動配置"))
+                using (TransactionGroup tg = new TransactionGroup(doc, Loc.S("RoomTag.Txn.Group")))
                 {
                     tg.Start();
 
                     ViewPlan newView = null;
 
                     // 1. 新規ビュー作成
-                    using (Transaction t1 = new Transaction(doc, "新規ビュー作成"))
+                    using (Transaction t1 = new Transaction(doc, Loc.S("RoomTag.Txn.CreateView")))
                     {
                         t1.Start();
                         try
@@ -127,7 +127,7 @@ namespace Tools28.Commands.RoomTagCreator
                     }
 
                     // 2. 部屋タグ生成
-                    using (Transaction t2 = new Transaction(doc, "部屋タグ生成"))
+                    using (Transaction t2 = new Transaction(doc, Loc.S("RoomTag.Txn.CreateTags")))
                     {
                         t2.Start();
                         try
@@ -168,10 +168,9 @@ namespace Tools28.Commands.RoomTagCreator
             }
             catch (Exception ex)
             {
-                message = $"部屋タグ自動配置中にエラーが発生しました。\n\n{ex.Message}" +
-                    $"\n\n--- スタックトレース ---\n{ex.StackTrace}" +
-                    "\n\nマニュアル: https://28tools.com/addins.html" +
-                    "\n配布サイト: https://28yu.github.io/28tools-download/";
+                message = string.Format(Loc.S("Common.ErrorWithManual"),
+                    string.Format(Loc.S("RoomTag.ProcessError"), ex.Message)
+                        + $"\n\n--- StackTrace ---\n{ex.StackTrace}");
                 return Result.Failed;
             }
         }

@@ -163,7 +163,7 @@ namespace Tools28.Commands.BeamTopLevel
 
                     var customRadio = new RadioButton
                     {
-                        Content = "その他: ",
+                        Content = Loc.S("Common.Other"),
                         GroupName = groupName,
                         FontSize = 11,
                         VerticalAlignment = VerticalAlignment.Center,

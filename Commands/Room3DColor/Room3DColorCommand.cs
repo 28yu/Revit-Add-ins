@@ -50,19 +50,19 @@ namespace Tools28.Commands.Room3DColor
                 ElementId legendViewId = null;
                 View3D colorView = null;
 
-                using (TransactionGroup tg = new TransactionGroup(doc, "部屋3D色分け"))
+                using (TransactionGroup tg = new TransactionGroup(doc, Loc.S("Room3D.Txn.Group")))
                 {
                     tg.Start();
 
                     // 体積計算の有効化（別トランザクションでジオメトリ再計算を確定）
-                    using (Transaction t1 = new Transaction(doc, "体積計算を有効化"))
+                    using (Transaction t1 = new Transaction(doc, Loc.S("Room3D.Txn.EnableVolume")))
                     {
                         t1.Start();
                         volumeEnabled = RoomSolidGenerator.EnsureVolumeComputation(doc);
                         t1.Commit();
                     }
 
-                    using (Transaction t2 = new Transaction(doc, "部屋ソリッド生成・色分け"))
+                    using (Transaction t2 = new Transaction(doc, Loc.S("Room3D.Txn.Generate")))
                     {
                         t2.Start();
 

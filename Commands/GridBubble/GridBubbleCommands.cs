@@ -4,6 +4,7 @@ using System.Linq;
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using Tools28.Localization;
 
 namespace Tools28.Commands.GridBubble
 {
@@ -18,7 +19,7 @@ namespace Tools28.Commands.GridBubble
 
             try
             {
-                using (Transaction trans = new Transaction(doc, "符号両端表示切替"))
+                using (Transaction trans = new Transaction(doc, Loc.S("GridBubble.Txn.Both")))
                 {
                     trans.Start();
 
@@ -143,7 +144,7 @@ namespace Tools28.Commands.GridBubble
 
             try
             {
-                using (Transaction trans = new Transaction(doc, "符号左端表示切替"))
+                using (Transaction trans = new Transaction(doc, Loc.S("GridBubble.Txn.Left")))
                 {
                     trans.Start();
 
@@ -264,7 +265,7 @@ namespace Tools28.Commands.GridBubble
 
             try
             {
-                using (Transaction trans = new Transaction(doc, "符号右端表示切替"))
+                using (Transaction trans = new Transaction(doc, Loc.S("GridBubble.Txn.Right")))
                 {
                     trans.Start();
 

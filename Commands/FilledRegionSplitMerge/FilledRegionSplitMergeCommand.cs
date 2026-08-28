@@ -60,7 +60,7 @@ namespace Tools28.Commands.FilledRegionSplitMerge
                 }
 
                 // ステップ7-9: トランザクション開始と処理実行
-                using (Transaction trans = new Transaction(doc, "塗潰し領域 分割/統合"))
+                using (Transaction trans = new Transaction(doc, Loc.S("FilledRegion.Txn.Apply")))
                 {
                     trans.Start();
 

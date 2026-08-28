@@ -53,7 +53,7 @@ namespace Tools28.Commands.ExcelExportImport
                     const int maxPasses = 5;
                     for (int pass = 0; pass < maxPasses; pass++)
                     {
-                        using (var trans = new Transaction(doc, "Excelインポート"))
+                        using (var trans = new Transaction(doc, Loc.S("Import.Txn")))
                         {
                             trans.Start();
 

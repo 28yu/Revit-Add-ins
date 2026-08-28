@@ -193,7 +193,7 @@ namespace Tools28.Commands.FormworkCalculator
 
                 if (settings.CreateSchedule || settings.Create3DView)
                 {
-                    using (var tParams = new Transaction(doc, "型枠数量算出 - 共有パラメータ"))
+                    using (var tParams = new Transaction(doc, Loc.S("Formwork.Txn.Params")))
                     {
                         tParams.Start();
                         try
@@ -217,7 +217,7 @@ namespace Tools28.Commands.FormworkCalculator
                     if (doc.IsWorkshared && settings.Create3DView)
                     {
                         WorksetId formworkWsId = null;
-                        using (var tWs = new Transaction(doc, "型枠数量算出 - ワークセット作成"))
+                        using (var tWs = new Transaction(doc, Loc.S("Formwork.Txn.Workset")))
                         {
                             tWs.Start();
                             try
@@ -253,7 +253,7 @@ namespace Tools28.Commands.FormworkCalculator
                         }
                     }
 
-                    using (var t = new Transaction(doc, "型枠数量算出 - ビュー作成"))
+                    using (var t = new Transaction(doc, Loc.S("Formwork.Txn.View")))
                     {
                         t.Start();
                         try
@@ -346,7 +346,7 @@ namespace Tools28.Commands.FormworkCalculator
                     // 過去実行で作成された他ビューの DirectShape (ParamSourceView でタグ済) も含めて
                     // 再ラベリングする。これにより、本実行で新規作成された分析ビューに
                     // 過去の他ビュー DirectShape が紛れ込む問題を防ぐ。
-                    using (var tHide = new Transaction(doc, "型枠数量算出 - 他ビュー非表示"))
+                    using (var tHide = new Transaction(doc, Loc.S("Formwork.Txn.HideOtherViews")))
                     {
                         tHide.Start();
                         try
@@ -375,7 +375,7 @@ namespace Tools28.Commands.FormworkCalculator
                         // 同一トランザクション内でシート削除→Viewport.Create をすると
                         // Viewport.Create が null を返す既知の Revit API 問題を回避するため。
                         string savedSheetName = null, savedSheetNumber = null;
-                        using (var tDeleteSheet = new Transaction(doc, "型枠数量算出 - 既存シート削除"))
+                        using (var tDeleteSheet = new Transaction(doc, Loc.S("Formwork.Txn.DeleteSheet")))
                         {
                             tDeleteSheet.Start();
                             try
@@ -391,7 +391,7 @@ namespace Tools28.Commands.FormworkCalculator
                             }
                         }
 
-                        using (var tSheet = new Transaction(doc, "型枠数量算出 - シート作成"))
+                        using (var tSheet = new Transaction(doc, Loc.S("Formwork.Txn.Sheet")))
                         {
                             tSheet.Start();
                             try

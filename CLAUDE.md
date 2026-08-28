@@ -14,6 +14,44 @@
 - リボンボタン追加時は `_buttonTextKeys` / `_buttonTipKeys` へのマッピング追加も忘れないこと
 - 詳細は「新機能追加手順 > 2. 多言語リソースの追加」を参照
 
+## ⚠️ 文字列の3分類（多言語化する / しない の判断基準）
+
+**多言語化の前に必ずこの分類を確認すること。** 分類を誤ると、モデル内の既存要素を
+見つけられなくなり、重複作成や更新失敗といった実害が出る。
+
+| 分類 | 定義 | 扱い | 例 |
+|--|--|--|--|
+| **A. UI 表示のみ** | アドインの画面に出るだけで、モデルには残らない | `Loc.S(key)`（アドインの言語設定に追従） | ボタン名、ダイアログ、ツールチップ、エラーメッセージ、**トランザクション名** |
+| **B. モデルに保存されるが検索キーではない** | モデルに残り他者も見るが、再実行時に名前で探さない | `Loc.S(key, RevitUiLanguage.Resolve(...))`（**Revit 本体の UI 言語**に追従） | 新規シート名、中央同期のコメント |
+| **C. モデルに保存され、検索キーになる** | 再実行時に「この名前の要素があるか」を探すのに使う | **絶対に多言語化しない（日本語固定）** | フィルタ名、凡例ビュー名、共有パラメータ名、集計表/シート名、ワークセット名、Excel ヘッダー |
+
+### B を Revit 本体の言語に合わせる理由
+カテゴリ名・既定ビュー名など、モデル内で Revit 自身が生成する文字列は Revit の UI 言語に従う。
+アドインが作る「モデルに残る名前」もそれに揃えないと、同じモデル内で言語が混在する。
+`Localization/RevitUiLanguage.cs` の `Resolve()` で `LanguageType` → JP/US/CN に変換する。
+
+```csharp
+// シート名など、モデルに保存される文字列
+string modelLang = RevitUiLanguage.Resolve(commandData.Application);
+string sheetName = string.Format(Loc.S("Sheet.NewSheetName", modelLang), sheetNumber);
+```
+
+### C に該当する既存の定数（多言語化禁止）
+これらは `FindXxxByName` 等で既存要素を検索するキーになっている。変更・多言語化すると
+別言語環境で再実行したときに既存要素を発見できず、重複作成や削除漏れを起こす。
+
+- `Commands/BeamTopLevel/`, `Commands/BeamUnderLevel/` — `ParameterManager.Param*`（共有パラメータ名）、
+  `FilterManager.FilterPrefix` / `ErrorFilterName`、`LegendManager.LegendViewName`
+- `Commands/FormworkCalculator/` — `FormworkParameterManager.Param*` / `*Label`、
+  `ScheduleCreator.ScheduleName`、`FormworkSheetCreator.SheetName`、`FormworkVisualizer.AnalysisViewName` 系、
+  ワークセット名 `28Tools_型枠`
+- `Commands/FireProtection/` — `LegendManager.LegendViewName`、`FilledRegionCreator.TypePrefix`
+- `Commands/Room3DColor/` — `RoomColorLegendManager.TypePrefix`、DirectShape の識別マーカー
+- `Commands/ExcelExportImport/` — `ExportSettingsExcelReader` の `"要素ID"` / `"カテゴリ"`、
+  `ParameterHeaderMarker.*`（書き出した Excel を読み戻すときの目印）
+
+**新しく C に該当する定数を追加する場合は、この一覧にも追記すること。**
+
 ## プロジェクト概要
 - **名前**: Tools28
 - **種類**: Autodesk Revit アドイン (C# / .NET Framework 4.8)
@@ -113,10 +151,13 @@ msbuild Tools28.csproj /p:Configuration=Release /p:RevitVersion=2024
    - 3ファイル全てに同じキーを追加（キー不一致は禁止）
 
 2. **`Packages/{VERSION}/README.txt`** (全6バージョン)
-   - タイトルのバージョン番号とリリースノートを更新
+   - **タイトル行のバージョン番号は CI が自動で書き換える**（手作業不要）
+   - **リリースノート本文（「【vX 修正点】」以下）は手で追記する**
+   - ⚠ 全文一括 sed は禁止。README 下部には過去バージョンの履歴が載っており、
+     一括置換すると履歴まで書き換わる
 
 3. **`Packages/{VERSION}/install.bat`** (全6バージョン)
-   - ヘッダーのバージョン番号を更新
+   - **バージョン番号は CI が自動で書き換える**（手作業不要）
 
 4. **`Docs/features.json`**（Release body は**自動生成**）
    - Release body の「⭐新機能」「全機能一覧」は `scripts/generate-release-body.py` が
@@ -128,12 +169,27 @@ msbuild Tools28.csproj /p:Configuration=Release /p:RevitVersion=2024
    - リボンに新しいボタンを登録
    - `_buttonTextKeys` / `_buttonTipKeys` にマッピングを追加（言語切替時の動的更新用）
 
+### バージョン番号の反映は CI が行う
+
+`Properties/AssemblyInfo.cs` は `GenerateAssemblyInfo=false` のため MSBuild の
+`/p:Version` が効かない。そのため **`build-and-release.yml` の `version` ジョブで
+バージョンを1回だけ決め、`build` ジョブが `Stamp version into sources` ステップで
+AssemblyInfo.cs / README.txt / install.bat に書き込む**。
+
+- リポジトリ上の `AssemblyInfo.cs` の値はローカルビルド用。リリース物には CI の値が入る
+- 反映に失敗した場合はビルドが失敗する（取り残し防止のガードあり）
+- `scripts/check-expiry.py` が有効期限を検査する。残り30日以下でビルド失敗、180日以下で警告
+
+### 未リリースのまま added_in が進んだ場合
+
+`scripts/generate-release-body.py` は既定では `added_in == --version` の完全一致でしか
+⭐新機能を付けない。バージョンを飛ばしてリリースすると途中の機能が本文に載らないため、
+`--since <前回リリース>` を渡す（CI は直近のタグから自動判定し、
+手動実行時は `since` 入力で上書きできる）。
+
 ```bash
-# README.txt / install.bat のバージョン番号を一括置換
-for ver in 2021 2022 2023 2024 2025 2026; do
-  sed -i 's/v2.0/v2.1/g' Packages/$ver/README.txt
-  sed -i 's/v2.0/v2.1/g' Packages/$ver/install.bat
-done
+# 手元確認: 前回 2.1 → 今回 2.5 の場合
+python3 scripts/generate-release-body.py --version 2.5 --since 2.1 --features Docs/features.json
 ```
 
 ## 開発ワークフロー

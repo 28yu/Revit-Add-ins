@@ -99,7 +99,7 @@ namespace Tools28.Commands.ExcelExportImport.Views
         {
             var selectWindow = new Window
             {
-                Title = "Excelファイルを選択",
+                Title = Loc.S("Import.SelectExcelFile"),
                 Width = 500,
                 Height = 300,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
@@ -164,7 +164,7 @@ namespace Tools28.Commands.ExcelExportImport.Views
 
             var cancelBtn = new Button
             {
-                Content = "キャンセル",
+                Content = Loc.S("Common.Cancel"),
                 Width = 80,
                 Height = 28,
                 Margin = new Thickness(4, 0, 0, 0),

@@ -40,7 +40,7 @@ namespace Tools28.Commands.BeamUnderLevel
 
                     if (templateResult == TaskDialogResult.Yes)
                     {
-                        using (Transaction t = new Transaction(doc, "ビューテンプレート解除"))
+                        using (Transaction t = new Transaction(doc, Loc.S("Common.Txn.ClearViewTemplate")))
                         {
                             t.Start();
                             activeView.ViewTemplateId = ElementId.InvalidElementId;
@@ -193,7 +193,7 @@ namespace Tools28.Commands.BeamUnderLevel
 
                 // パラメータ作成・値の書き込み・フィルタ作成をトランザクションで実行
                 ElementId legendViewId = null;
-                using (Transaction trans = new Transaction(doc, "梁下端色分け"))
+                using (Transaction trans = new Transaction(doc, Loc.S("BeamUnder.Txn.Apply")))
                 {
                     trans.Start();
 
@@ -260,9 +260,8 @@ namespace Tools28.Commands.BeamUnderLevel
             }
             catch (Exception ex)
             {
-                message = $"梁下端色分け処理中にエラーが発生しました。\n\n{ex.Message}" +
-                    "\n\nマニュアル: https://28tools.com/addins.html" +
-                    "\n配布サイト: https://28yu.github.io/28tools-download/";
+                message = string.Format(Loc.S("Common.ErrorWithManual"),
+                    string.Format(Loc.S("BeamUnder.ProcessError"), ex.Message));
                 return Result.Failed;
             }
         }

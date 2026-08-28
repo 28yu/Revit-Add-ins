@@ -1064,6 +1064,102 @@ v2.1.x のパッチではバージョン番号 + 修正点追記がメインな�
 - `System.Windows.Point` と `Autodesk.Revit.DB.Point` が衝突（CS0104）。
   描画クラスは Revit非依存にして解消（`Autodesk.Revit.DB` を using しない）。
 
+## 全機能監査で見つかった不具合と対策（2026-08-28）
+
+全 21 機能を静的解析＋コード読解で監査し、優先度の高いものを修正した。以下は再発防止の要点。
+
+### 「未設定」と「意味のある既定値」を同じ表現で持たない（切断ボックス）
+```csharp
+// ❌ 旧: 未コピーとコピー元OFFがどちらも成立してしまう
+public static bool HasCopiedData => CopiedSectionBox != null || !IsSectionBoxActive;
+```
+`IsSectionBoxActive` の初期値 `false` が「コピー元がOFFだった」と区別できず、
+起動直後のペーストでガードを素通りし、対象ビューの切断ボックスを解除していた。
+→ **「操作を実行したか」を独立したフラグ (`HasCopied`) で持つ。**
+null や既定値を状態の代用にしないこと。
+
+同種のクリップボード（ViewCopy / CropBox / ViewportPosition）は
+`CopiedXxx != null` の素直な判定で、この問題は無い。
+
+### `ref string message` は Result.Failed / Cancelled のときしか表示されない
+```csharp
+if (errorCount > 0) message = "一部失敗…";
+return Result.Succeeded;   // ← message は捨てられる
+```
+コピー＆ペースト系3機能で部分失敗が完全に無通知だった。
+→ **成功を返すなら `TaskDialog.Show()` で明示的に伝える。**
+
+### 画面更新のために対象ビューをアクティブ化しない
+`uidoc.ActiveView = targetView` を対象ビュー分ループしていたため、
+50ビューへ一括ペーストすると50ビューが開いて極端に遅くなっていた。
+→ **非アクティブなビューは次に開いた時点で最新状態で描画される。**
+アクティブビューが対象に含まれるときだけ `RefreshActiveView()` すれば足りる。
+
+### 連番の採番は「プレフィックスが一致するもの」だけを数える（シート一括作成）
+`ExtractNumberFromSheetNumber` のフォールバックが、プレフィックス不一致でも
+最後のハイフン以降を数値として返していたため、`B - 57` や `S-101` を拾って
+プレフィックス "A" の1枚目が `A - 58` から始まっていた。
+→ **一致しない場合は null を返して対象外にする。**
+
+### File.Copy は元ファイルの更新日時を引き継ぐ（自動バックアップ）
+`OrderByDescending(f => f.LastWriteTime)` で世代を並べていたが、モデルが未変更だと
+全バックアップの更新日時が同一になり、並びが不定化して新しい世代を削除しうる。
+→ **自分で付けたファイル名のタイムスタンプで並べる**（`yyyyMMdd_HHmmss` は辞書順＝時系列順）。
+
+### 設定ファイルを DLL と同じフォルダに置かない（言語設定）
+`Assembly.Location` のフォルダ＝`C:\ProgramData\Autodesk\Revit\Addins\<ver>\28Tools\`。
+install.bat が管理者権限で作るため、一般ユーザー権限の Revit からは書き込めない。
+`SaveLanguageSetting` が `catch { }` で握り潰していたため、
+**言語を切り替えても再起動で日本語に戻る**現象が無言で起きていた。
+→ **`%AppData%\Tools28\` に統一**（AutoBackup / ExcelExportImport と同じ）。
+旧保存先からの移行読み込みを追加し、保存失敗は DiagLog に記録する。
+
+⚠ 設定の保存先を `Assembly.Location` 基準にしないこと。副次的に Revit バージョンごとに
+設定が分かれてしまう問題もある（%AppData% なら全バージョン共通になる）。
+
+### 文字列の3分類（多言語化の判断基準）
+詳細は CLAUDE.md「文字列の3分類」。要点のみ:
+
+| 分類 | 扱い |
+|--|--|
+| A. UI 表示のみ | `Loc.S(key)`（アドインの言語設定） |
+| B. モデルに保存・検索キーではない | `Loc.S(key, RevitUiLanguage.Resolve(...))`（**Revit 本体の言語**） |
+| C. モデルに保存・検索キーになる | **多言語化しない**（日本語固定） |
+
+B は `Localization/RevitUiLanguage.cs` を新設して対応した。
+新規シート名と中央同期コメントが該当。日本語 Revit では従来どおりの日本語になる。
+
+C を多言語化すると、別言語環境で再実行したときに `FindXxxByName` が既存要素を
+見つけられず、重複作成や削除漏れを起こす。該当する約50個の定数は CLAUDE.md に一覧化した。
+
+### リリース時のバージョン取り残し
+`Tools28.csproj` は `GenerateAssemblyInfo=false` のため MSBuild の `/p:Version` が効かず、
+ワークフローも `AssemblyInfo.cs` を書き換えていなかった。結果、リリースしても
+配布 DLL のバージョンが古いまま（バージョン情報ダイアログに旧番号が出る）。
+→ **`version` ジョブでバージョンを1回決め、`build` ジョブがビルド直前に
+`AssemblyInfo.cs` / `README.txt` / `install.bat` へ書き込む。反映失敗でビルドを落とす。**
+
+⚠ README.txt は下部に過去バージョンの履歴が載っているため、全文一括 sed は禁止。
+**タイトル行（`28 Tools vX for Revit YYYY`）だけ**を置換する。
+
+`generate-release-body.py` は `added_in == --version` の完全一致でしか ⭐新機能 を
+付けないため、バージョンを飛ばすと途中の機能が本文から欠落する。
+→ `--since <前回リリース>` を追加（CI は直近タグから自動判定）。
+
+### 未対応で残した項目（次回以降）
+- **AutoBackup の同期中ダイアログ**: 現状は全ダイアログを OK で自動処理している。
+  許可リスト方式へ移行したいが、対象 `DialogId` の実データが無い。
+  今回は `DiagLog` への記録だけ追加（挙動は現状維持）。ログが集まり次第、
+  `AutoDismissDialogIds` による絞り込みへ切り替える。
+- **`Cast<FamilyInstance>()` の InvalidCastException リスク**: `OfCategory(OST_StructuralFraming)`
+  等に非 FamilyInstance（DirectShape 等）が混ざると例外でコマンドごと落ちる。`OfType<>` が安全。
+- **Excel 連携の ElementId 幅**: 書き出しは long、読み込みは `int.TryParse`。
+  int 範囲を超える要素 Id を持つモデルで行がスキップされる。
+- **デバッグログ**: `C:\temp` へ無制限追記、OFF スイッチ無し、実装が6種類に分散。
+- **`Docs/Features/SheetCreation.md` が実装と不一致**: マニュアルは「番号と名前のリストを
+  入力／Excel から貼り付け」と書いているが、実際のダイアログは「図枠・作成枚数・図面No」。
+  どちらが正なのか要判断（マニュアル修正 or 機能追加）。
+
 ## ParameterCleanup（パラメータ整理）開発知見
 
 新機能。プロジェクト内の削除可能なパラメータを一覧化し、同名の特定・値の有無の自動判定・不要パラメータの削除を行う。`Commands/ParameterCleanup/`（Command / Services/ParameterScanner / Models/ParamRow / Views/ParameterCleanupDialog）。

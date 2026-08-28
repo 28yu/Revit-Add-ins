@@ -4,6 +4,7 @@ using System.Linq;
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using Tools28.Localization;
 
 namespace Tools28.Commands.SheetCreation
 {
@@ -49,10 +50,9 @@ namespace Tools28.Commands.SheetCreation
                 {
                     LogDebug("エラー: 図枠が見つかりません");
 
-                    TaskDialog errorDialog = new TaskDialog("エラー");
-                    errorDialog.MainInstruction = "図枠ファミリがロードされていません";
-                    errorDialog.MainContent = "プロジェクトに図枠ファミリをロードしてから実行してください。\n\n" +
-                                              "「挿入」タブ → 「ファミリのロード」→ タイトルブロック";
+                    TaskDialog errorDialog = new TaskDialog(Loc.S("Common.Error"));
+                    errorDialog.MainInstruction = Loc.S("Sheet.NoTitleBlockLoaded.Main");
+                    errorDialog.MainContent = Loc.S("Sheet.NoTitleBlockLoaded.Content");
                     errorDialog.CommonButtons = TaskDialogCommonButtons.Ok;
                     errorDialog.Show();
                     return Result.Cancelled;
@@ -76,7 +76,7 @@ namespace Tools28.Commands.SheetCreation
                 if (dialog.SelectedTitleBlock == null)
                 {
                     LogDebug("エラー: SelectedTitleBlock が null");
-                    message = "図枠が選択されていません。";
+                    message = Loc.S("Sheet.NoTitleBlockSelected");
                     return Result.Failed;
                 }
 
@@ -86,19 +86,24 @@ namespace Tools28.Commands.SheetCreation
                 if (titleBlock == null)
                 {
                     LogDebug("エラー: titleBlock.Symbol が null");
-                    message = "図枠の取得に失敗しました。";
+                    message = Loc.S("Sheet.TitleBlockFailed");
                     return Result.Failed;
                 }
 
                 int sheetCount = dialog.SheetCount;
                 string prefix = dialog.Prefix ?? "";
 
+                // シート名はモデルに保存され、そのモデルを開く全員が見る文字列。
+                // アドインの言語設定ではなく Revit 本体の UI 言語に合わせる
+                // （カテゴリ名や既定ビュー名など Revit が生成する他の名前と揃えるため）。
+                string modelLang = RevitUiLanguage.Resolve(commandData.Application);
+
                 LogDebug($"図枠: {titleBlock.FamilyName} - {titleBlock.Name}");
                 LogDebug($"作成枚数: {sheetCount}");
                 LogDebug($"プレフィックス: '{prefix}'");
 
                 // シートを作成
-                using (Transaction trans = new Transaction(doc, "シート一括作成"))
+                using (Transaction trans = new Transaction(doc, Loc.S("Sheet.Txn.Create")))
                 {
                     trans.Start();
                     LogDebug("トランザクション開始");
@@ -121,7 +126,7 @@ namespace Tools28.Commands.SheetCreation
                     {
                         int currentNumber = nextNumber + i;
                         string sheetNumber = FormatSheetNumber(prefix, currentNumber);
-                        string sheetName = $"新規シート {sheetNumber}";
+                        string sheetName = string.Format(Loc.S("Sheet.NewSheetName", modelLang), sheetNumber);
 
                         LogDebug($"シート作成中 [{i + 1}/{sheetCount}]: {sheetNumber}");
 
@@ -149,7 +154,7 @@ namespace Tools28.Commands.SheetCreation
                 LogDebug($"メッセージ: {ex.Message}");
                 LogDebug($"スタックトレース: {ex.StackTrace}");
 
-                message = GetErrorMessageWithManualUrl($"シート作成中にエラーが発生しました。\n\n{ex.Message}");
+                message = GetErrorMessageWithManualUrl(string.Format(Loc.S("Sheet.ProcessError"), ex.Message));
                 return Result.Failed;
             }
         }
@@ -170,7 +175,9 @@ namespace Tools28.Commands.SheetCreation
         }
 
         /// <summary>
-        /// 次のシート番号を取得
+        /// 指定プレフィックスにおける次のシート番号を取得する。
+        /// ⚠ 対象は「同じプレフィックスのシート」だけ。
+        ///    他プレフィックス（"B - 57"）や独自形式（"S-101"）まで数えると採番が飛ぶ。
         /// </summary>
         private int GetNextSheetNumber(Document doc, string prefix)
         {
@@ -185,6 +192,7 @@ namespace Tools28.Commands.SheetCreation
             foreach (string sheetNumber in existingSheets)
             {
                 string numberPart = ExtractNumberFromSheetNumber(sheetNumber, prefix);
+                if (numberPart == null) continue;   // プレフィックスが違う＝対象外
 
                 if (int.TryParse(numberPart, out int number))
                 {
@@ -196,43 +204,31 @@ namespace Tools28.Commands.SheetCreation
         }
 
         /// <summary>
-        /// シート番号から数値部分を抽出
+        /// シート番号から数値部分を抽出する。
+        /// 指定プレフィックスの形式に一致しない場合は null を返す（採番の対象外）。
         /// </summary>
         private string ExtractNumberFromSheetNumber(string sheetNumber, string prefix)
         {
+            if (string.IsNullOrEmpty(sheetNumber)) return null;
+
             if (!string.IsNullOrEmpty(prefix))
             {
-                string searchPattern = $"{prefix} - ";
-                if (sheetNumber.StartsWith(searchPattern))
-                {
-                    return sheetNumber.Substring(searchPattern.Length).Trim();
-                }
+                string current = prefix + " - ";
+                if (sheetNumber.StartsWith(current))
+                    return sheetNumber.Substring(current.Length).Trim();
+
+                string legacy = prefix + "- ";   // 旧形式（スペース無し）
+                if (sheetNumber.StartsWith(legacy))
+                    return sheetNumber.Substring(legacy.Length).Trim();
+
+                return null;
             }
 
+            // プレフィックス無し（"- 12" 形式）
             if (sheetNumber.StartsWith("- "))
-            {
                 return sheetNumber.Substring(2).Trim();
-            }
 
-            if (!string.IsNullOrEmpty(prefix))
-            {
-                string oldPattern = $"{prefix}- ";
-                if (sheetNumber.StartsWith(oldPattern))
-                {
-                    return sheetNumber.Substring(oldPattern.Length).Trim();
-                }
-            }
-
-            int hyphenIndex = sheetNumber.LastIndexOf('-');
-            if (hyphenIndex >= 0)
-            {
-                string afterHyphen = sheetNumber.Substring(hyphenIndex + 1).Trim();
-                string trimmed = afterHyphen.TrimStart('0');
-                return string.IsNullOrEmpty(trimmed) ? "1" : trimmed;
-            }
-
-            string result = sheetNumber.TrimStart('0');
-            return string.IsNullOrEmpty(result) ? "1" : result;
+            return null;
         }
 
         /// <summary>
@@ -240,17 +236,18 @@ namespace Tools28.Commands.SheetCreation
         /// </summary>
         private void ShowResultDialog(List<ViewSheet> createdSheets, FamilySymbol titleBlock)
         {
-            TaskDialog resultDialog = new TaskDialog("シート作成完了");
-            resultDialog.MainInstruction = $"{createdSheets.Count}枚のシートを作成しました";
+            if (createdSheets == null || createdSheets.Count == 0) return;
 
-            string detailText = $"図枠: {titleBlock.FamilyName} - {titleBlock.Name}\n";
-            detailText += $"シート番号: {createdSheets.First().SheetNumber}";
-            if (createdSheets.Count > 1)
-            {
-                detailText += $" ～ {createdSheets.Last().SheetNumber}";
-            }
+            TaskDialog resultDialog = new TaskDialog(Loc.S("Sheet.Result.Title"));
+            resultDialog.MainInstruction = string.Format(Loc.S("Sheet.Result.Main"), createdSheets.Count);
 
-            resultDialog.MainContent = detailText;
+            string titleBlockName = $"{titleBlock.FamilyName} - {titleBlock.Name}";
+            resultDialog.MainContent = createdSheets.Count > 1
+                ? string.Format(Loc.S("Sheet.Result.DetailRange"), titleBlockName,
+                    createdSheets.First().SheetNumber, createdSheets.Last().SheetNumber)
+                : string.Format(Loc.S("Sheet.Result.Detail"), titleBlockName,
+                    createdSheets.First().SheetNumber);
+
             resultDialog.CommonButtons = TaskDialogCommonButtons.Ok;
             resultDialog.Show();
         }

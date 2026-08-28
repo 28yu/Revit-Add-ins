@@ -22,9 +22,50 @@ on:
         description: 'テストビルドのみ（リリースしない）'
         type: boolean
         default: false
+      since:
+        description: '前回リリースバージョン (例: 2.2)。空なら直近のタグから自動判定'
+        required: false
+        default: ''
 
 jobs:
+  # バージョンを1箇所で決める。build / release の両方から参照する。
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      since: ${{ steps.v.outputs.since }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # 直近タグから since を求めるため全履歴が必要
+
+      - name: Determine version
+        id: v
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          elif [[ "${{ github.ref }}" == refs/tags/v* || "${{ github.ref }}" == refs/heads/release/v* ]]; then
+            REF="${{ github.ref_name }}"
+            REF="${REF#release/}"
+            VERSION="${REF#v}"
+          else
+            VERSION=""   # build/* のテストビルドはバージョン無し（スタンプもリリースもしない）
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+          # ⭐新機能の判定基準となる「前回リリース」。
+          # 未リリースのまま added_in だけ進んだ機能を取りこぼさないため、
+          # 「前回リリースより新しい added_in」を全て新機能として扱う。
+          SINCE="${{ github.event.inputs.since }}"
+          if [ -z "$SINCE" ] && [ -n "$VERSION" ]; then
+            SINCE=$(git tag -l 'v*' --sort=-v:refname | grep -v "^v${VERSION}$" | head -1 | sed 's/^v//')
+          fi
+          echo "since=$SINCE" >> $GITHUB_OUTPUT
+          echo "version=$VERSION / since=$SINCE"
+
   build:
+    needs: version
     runs-on: windows-latest
 
     strategy:
@@ -43,6 +84,38 @@ jobs:
 
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
+
+      # AssemblyInfo.cs は GenerateAssemblyInfo=false のため MSBuild の /p:Version が効かない。
+      # 配布物のバージョン表記（バージョン情報ダイアログ・README・install.bat）が
+      # 取り残されないよう、ビルド直前にリリースバージョンを書き込む。
+      - name: Stamp version into sources
+        if: needs.version.outputs.version != ''
+        shell: bash
+        run: |
+          set -e
+          V="${{ needs.version.outputs.version }}"
+
+          sed -i "s/AssemblyVersion(\"[^\"]*\")/AssemblyVersion(\"${V}.0\")/"         Properties/AssemblyInfo.cs
+          sed -i "s/AssemblyFileVersion(\"[^\"]*\")/AssemblyFileVersion(\"${V}.0\")/" Properties/AssemblyInfo.cs
+
+          # README / install.bat は「28 Tools vX for Revit YYYY」のタイトル行だけを書き換える。
+          # README 下部のリリースノート履歴（過去バージョンの記載）は書き換えない。
+          for ver in 2021 2022 2023 2024 2025 2026; do
+            sed -i "s/\(28 Tools \)v[0-9][0-9.]*\( for Revit\)/\1v${V}\2/" \
+              "Packages/$ver/README.txt" "Packages/$ver/install.bat"
+          done
+
+          grep -q "AssemblyVersion(\"${V}.0\")" Properties/AssemblyInfo.cs \
+            || { echo "::error::AssemblyInfo へのバージョン反映に失敗しました"; exit 1; }
+          grep -q "28 Tools v${V} for Revit" Packages/2024/README.txt \
+            || { echo "::error::README.txt へのバージョン反映に失敗しました"; exit 1; }
+          echo "スタンプ完了: v${V}"
+
+      # 期限切れ間近のビルドを配布してしまわないためのガード（CLAUDE.md のリリース手順）。
+      - name: Check expiry date
+        if: needs.version.outputs.version != '' && matrix.revit-version == '2024'
+        shell: bash
+        run: python3 scripts/check-expiry.py --warn-days 180 --fail-days 30
 
       - name: Build for Revit ${{ matrix.revit-version }}
         run: |
@@ -77,7 +150,7 @@ jobs:
           path: artifact/
 
   release:
-    needs: build
+    needs: [version, build]
     runs-on: ubuntu-latest
     if: (startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/heads/release/v') || github.event_name == 'workflow_dispatch') && github.event.inputs.test_only != 'true'
     permissions:
@@ -87,22 +160,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Determine version
-        id: version
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
-          else
-            REF="${{ github.ref_name }}"
-            # release/v2.2 -> v2.2 -> 2.2 or v2.2 -> 2.2
-            REF="${REF#release/}"
-            echo "version=${REF#v}" >> $GITHUB_OUTPUT
-          fi
-
       - name: Generate release body
         run: |
+          SINCE_ARG=""
+          if [ -n "${{ needs.version.outputs.since }}" ]; then
+            SINCE_ARG="--since ${{ needs.version.outputs.since }}"
+          fi
           python3 scripts/generate-release-body.py \
-            --version ${{ steps.version.outputs.version }} \
+            --version ${{ needs.version.outputs.version }} \
+            $SINCE_ARG \
             --features Docs/features.json \
             > release-body.md
           cat release-body.md
@@ -114,7 +180,7 @@ jobs:
 
       - name: Create ZIP packages
         run: |
-          VERSION="${{ steps.version.outputs.version }}"
+          VERSION="${{ needs.version.outputs.version }}"
           mkdir -p dist
 
           for dir in artifacts/28Tools_Revit*/; do
@@ -131,10 +197,10 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: "28 Tools v${{ steps.version.outputs.version }}"
+          name: "28 Tools v${{ needs.version.outputs.version }}"
           body_path: release-body.md
           files: dist/*.zip
-          tag_name: v${{ steps.version.outputs.version }}
+          tag_name: v${{ needs.version.outputs.version }}
           generate_release_notes: false
 
       - name: Upload to download site (28tools-download)
@@ -142,10 +208,10 @@ jobs:
         with:
           token: ${{ secrets.DOWNLOAD_SITE_TOKEN }}
           repository: 28yu/28tools-download
-          name: "28 Tools v${{ steps.version.outputs.version }}"
+          name: "28 Tools v${{ needs.version.outputs.version }}"
           body_path: release-body.md
           files: dist/*.zip
-          tag_name: v${{ steps.version.outputs.version }}
+          tag_name: v${{ needs.version.outputs.version }}
           generate_release_notes: false
 
       - name: Delete release branch

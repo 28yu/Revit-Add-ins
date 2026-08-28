@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Autodesk.Revit.Attributes;
+using Tools28.Localization;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using Autodesk.Revit.UI.Selection;
@@ -51,14 +52,14 @@ namespace Tools28.Commands.CropBoxCopy
 
                 if (activeView == null)
                 {
-                    message = "アクティブなビューがありません。";
+                    message = Loc.S("Common.NoActiveView");
                     return Result.Failed;
                 }
 
                 // 対象ビュータイプかチェック
                 if (!IsSupportedViewType(activeView))
                 {
-                    message = $"このビュータイプ（{GetViewTypeName(activeView.ViewType)}）はサポートされていません。";
+                    message = string.Format(Loc.S("CropBox.UnsupportedViewType"), GetViewTypeName(activeView.ViewType));
                     return Result.Failed;
                 }
 
@@ -81,7 +82,7 @@ namespace Tools28.Commands.CropBoxCopy
             }
             catch (Exception ex)
             {
-                message = $"トリミング領域のコピーに失敗しました。{ex.Message}";
+                message = string.Format(Loc.S("CropBox.CopyError"), ex.Message);
                 return Result.Failed;
             }
         }
@@ -127,7 +128,7 @@ namespace Tools28.Commands.CropBoxCopy
                 // コピーされたデータがあるかチェック
                 if (!CropBoxClipboard.HasCopiedData)
                 {
-                    message = "コピーされたトリミング領域がありません。先にトリミング領域をコピーしてください。";
+                    message = Loc.S("CropBox.NothingCopied");
                     return Result.Failed;
                 }
 
@@ -142,13 +143,13 @@ namespace Tools28.Commands.CropBoxCopy
 
                     if (activeView == null)
                     {
-                        message = "アクティブなビューがありません。";
+                        message = Loc.S("Common.NoActiveView");
                         return Result.Failed;
                     }
 
                     if (!IsSupportedViewType(activeView))
                     {
-                        message = $"このビュータイプ（{GetViewTypeName(activeView.ViewType)}）はサポートされていません。";
+                        message = string.Format(Loc.S("CropBox.UnsupportedViewType"), GetViewTypeName(activeView.ViewType));
                         return Result.Failed;
                     }
 
@@ -168,13 +169,13 @@ namespace Tools28.Commands.CropBoxCopy
 
                     if (targetViews.Count == 0)
                     {
-                        message = "対応するビューが選択されていません。";
+                        message = Loc.S("CropBox.NoValidView");
                         return Result.Failed;
                     }
                 }
 
                 // トランザクション開始
-                using (Transaction trans = new Transaction(doc, "トリミング領域の適用"))
+                using (Transaction trans = new Transaction(doc, Loc.S("CropBox.Txn.Paste")))
                 {
                     trans.Start();
 
@@ -218,10 +219,12 @@ namespace Tools28.Commands.CropBoxCopy
 
                     trans.Commit();
 
-                    // エラーがある場合のみメッセージ設定
+                    // Revit は Result.Succeeded のとき message を表示しないため、
+                    // 部分失敗は TaskDialog で明示的に伝える。
                     if (failCount > 0)
                     {
-                        message = $"一部のビューで適用に失敗しました。成功: {successCount}件、失敗: {failCount}件";
+                        TaskDialog.Show(Loc.S("Common.Warning"),
+                            string.Format(Loc.S("Common.PartialFail"), successCount, failCount));
                     }
                 }
 
@@ -229,7 +232,7 @@ namespace Tools28.Commands.CropBoxCopy
             }
             catch (Exception ex)
             {
-                message = $"トリミング領域の適用に失敗しました。{ex.Message}";
+                message = string.Format(Loc.S("CropBox.PasteError"), ex.Message);
                 return Result.Failed;
             }
         }

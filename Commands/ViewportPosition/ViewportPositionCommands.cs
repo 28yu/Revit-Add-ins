@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using Autodesk.Revit.Attributes;
+using Tools28.Localization;
 
 namespace Tools28.Commands.ViewportPosition
 {
@@ -436,7 +437,7 @@ namespace Tools28.Commands.ViewportPosition
                 ViewSheet activeSheet = doc.ActiveView as ViewSheet;
                 if (activeSheet == null)
                 {
-                    message = "シートをアクティブにしてから実行してください。";
+                    message = Loc.S("ViewportPos.NeedSheet");
                     return Result.Failed;
                 }
 
@@ -444,7 +445,7 @@ namespace Tools28.Commands.ViewportPosition
                 var selectedIds = uidoc.Selection.GetElementIds();
                 if (selectedIds.Count == 0)
                 {
-                    message = "ビューポートを選択してから実行してください。";
+                    message = Loc.S("ViewportPos.NeedViewport");
                     return Result.Failed;
                 }
 
@@ -456,13 +457,13 @@ namespace Tools28.Commands.ViewportPosition
 
                 if (viewports.Count == 0)
                 {
-                    message = "選択された要素にビューポートが含まれていません。シート上のビューポートを選択してください。";
+                    message = Loc.S("ViewportPos.NoViewportInSelection");
                     return Result.Failed;
                 }
 
                 if (viewports.Count > 1)
                 {
-                    message = "複数のビューポートが選択されています。1つのビューポートを選択してください。";
+                    message = Loc.S("ViewportPos.MultipleViewports");
                     return Result.Failed;
                 }
 
@@ -484,7 +485,7 @@ namespace Tools28.Commands.ViewportPosition
             }
             catch (Exception ex)
             {
-                message = $"位置コピー中にエラーが発生しました。{ex.Message}";
+                message = string.Format(Loc.S("ViewportPos.CopyError"), ex.Message);
                 return Result.Failed;
             }
         }
@@ -503,7 +504,7 @@ namespace Tools28.Commands.ViewportPosition
                 // コピーされた位置情報があるかチェック
                 if (!ViewportPositionClipboard.HasCopiedPosition)
                 {
-                    message = "コピーされた位置情報がありません。先に位置コピーを実行してください。";
+                    message = Loc.S("ViewportPos.NothingCopied");
                     return Result.Failed;
                 }
 
@@ -557,12 +558,12 @@ namespace Tools28.Commands.ViewportPosition
                 }
 
                 // どれでもない場合はエラー
-                message = "ビューポート、シート、またはビューを選択してから実行してください。";
+                message = Loc.S("ViewportPos.NeedTarget");
                 return Result.Failed;
             }
             catch (Exception ex)
             {
-                message = $"位置ペースト中にエラーが発生しました。{ex.Message}";
+                message = string.Format(Loc.S("ViewportPos.PasteError"), ex.Message);
                 return Result.Failed;
             }
         }
@@ -689,7 +690,7 @@ namespace Tools28.Commands.ViewportPosition
                 return Result.Failed;
             }
 
-            using (Transaction trans = new Transaction(doc, "シート ビューポート位置変更"))
+            using (Transaction trans = new Transaction(doc, Loc.S("ViewportPos.Txn.Paste")))
             {
                 trans.Start();
 

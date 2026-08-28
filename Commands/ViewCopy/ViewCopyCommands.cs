@@ -4,6 +4,7 @@ using System.Linq;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using Autodesk.Revit.Attributes;
+using Tools28.Localization;
 
 namespace Tools28.Commands.ViewCopy
 {
@@ -30,7 +31,7 @@ namespace Tools28.Commands.ViewCopy
                 View activeView = doc.ActiveView;
                 if (!(activeView is View3D sourceView))
                 {
-                    message = "現在のアクティブビューが3Dビューではありません。3Dビューをアクティブにしてから実行してください。";
+                    message = Loc.S("Common.Need3DViewActive");
                     return Result.Failed;
                 }
 
@@ -42,7 +43,7 @@ namespace Tools28.Commands.ViewCopy
             }
             catch (Exception ex)
             {
-                message = $"視点のコピー中にエラーが発生しました: {ex.Message}";
+                message = string.Format(Loc.S("ViewCopy.CopyError"), ex.Message);
                 return Result.Failed;
             }
         }
@@ -62,7 +63,7 @@ namespace Tools28.Commands.ViewCopy
                 // コピーされた視点情報があるかチェック
                 if (!ViewOrientationClipboard.HasCopiedOrientation)
                 {
-                    message = "コピーされた視点情報がありません。先に3Dビューの視点をコピーしてください。";
+                    message = Loc.S("ViewCopy.NothingCopied");
                     return Result.Failed;
                 }
 
@@ -78,14 +79,14 @@ namespace Tools28.Commands.ViewCopy
 
                     if (!(activeView is View3D activeView3D))
                     {
-                        message = "アクティブビューが3Dビューではありません。3Dビューをアクティブにするか、プロジェクトブラウザで3Dビューを選択してください。";
+                        message = Loc.S("Common.Need3DViewOrSelect");
                         return Result.Failed;
                     }
 
                     // テンプレートビューは除外
                     if (activeView3D.IsTemplate)
                     {
-                        message = "テンプレートビューには視点を適用できません。";
+                        message = Loc.S("ViewCopy.TemplateNotSupported");
                         return Result.Failed;
                     }
 
@@ -118,13 +119,13 @@ namespace Tools28.Commands.ViewCopy
                     // 有効な3Dビューがない場合
                     if (targetViews.Count == 0)
                     {
-                        message = "有効な3Dビューが選択されていません。テンプレートビュー以外の3Dビューを選択してください。";
+                        message = Loc.S("ViewCopy.NoValidView");
                         return Result.Failed;
                     }
                 }
 
                 // 視点を一括ペースト
-                using (Transaction trans = new Transaction(doc, "3Dビュー視点一括ペースト"))
+                using (Transaction trans = new Transaction(doc, Loc.S("ViewCopy.Txn.Paste")))
                 {
                     trans.Start();
 
@@ -150,10 +151,12 @@ namespace Tools28.Commands.ViewCopy
                     // 画面更新を強制実行
                     ForceViewUpdate(uidoc, currentActiveView, targetViews);
 
-                    // エラーがある場合のみメッセージ設定
+                    // Revit は Result.Succeeded のとき message を表示しないため、
+                    // 部分失敗は TaskDialog で明示的に伝える。
                     if (errorCount > 0)
                     {
-                        message = $"一部のビューで適用に失敗しました。成功: {successCount}件、失敗: {errorCount}件";
+                        TaskDialog.Show(Loc.S("Common.Warning"),
+                            string.Format(Loc.S("Common.PartialFail"), successCount, errorCount));
                     }
 
                     return Result.Succeeded;
@@ -161,55 +164,26 @@ namespace Tools28.Commands.ViewCopy
             }
             catch (Exception ex)
             {
-                message = $"視点の適用中にエラーが発生しました: {ex.Message}";
+                message = string.Format(Loc.S("ViewCopy.PasteError"), ex.Message);
                 return Result.Failed;
             }
         }
 
         /// <summary>
-        /// 3Dビューの画面更新を強制実行
+        /// 画面更新。
+        /// 非アクティブなビューは次に開いた時点で最新状態で描画されるため、
+        /// 各ビューを一時的にアクティブ化する必要はない。
+        /// （旧実装は対象ビューを1つずつアクティブにしていたため、
+        ///   多数のビューへペーストすると全ビューが開き著しく遅くなっていた）
         /// </summary>
         private void ForceViewUpdate(UIDocument uidoc, View3D currentActiveView, List<View3D> targetViews)
         {
             try
             {
-                // 方法1: アクティブビューが対象に含まれている場合は再描画
-                if (currentActiveView != null && targetViews.Contains(currentActiveView))
+                if (currentActiveView != null &&
+                    targetViews.Any(v => v != null && v.Id == currentActiveView.Id))
                 {
-                    // 現在のアクティブビューを再描画
                     uidoc.RefreshActiveView();
-                }
-
-                // 方法2: 各ターゲットビューを一時的にアクティブにして更新
-                foreach (View3D targetView in targetViews)
-                {
-                    try
-                    {
-                        // 対象ビューを一時的にアクティブにして更新を強制
-                        if (targetView.Id != uidoc.ActiveView.Id)
-                        {
-                            uidoc.ActiveView = targetView;
-                            uidoc.RefreshActiveView();
-                        }
-                    }
-                    catch
-                    {
-                        // 個別のビュー更新エラーは無視
-                    }
-                }
-
-                // 方法3: 元のアクティブビューに戻す
-                if (currentActiveView != null && currentActiveView.Id != uidoc.ActiveView.Id)
-                {
-                    try
-                    {
-                        uidoc.ActiveView = currentActiveView;
-                        uidoc.RefreshActiveView();
-                    }
-                    catch
-                    {
-                        // 復帰エラーは無視
-                    }
                 }
             }
             catch
