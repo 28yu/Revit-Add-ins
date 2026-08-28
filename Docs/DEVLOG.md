@@ -1877,3 +1877,105 @@ V/G の外に原因がある可能性を潰せていなかった。
   この件では検証を4回強化したが、いずれも「V/G の中で」正しいかを見ていただけだった
 - **モデル全体に効く操作を既定 ON にしない**
 - **間接的な書き込み先へ振り替える機能は、振り替え先を実行前・実行後の両方で必ず見せる**
+
+## GenericModelMerge（一般モデル化）開発知見（2026-08-28） {#GenericModelMerge}
+
+3Dビューに表示されている複数カテゴリの要素から形状を読み取り、一つの一般モデル
+（ダイレクトシェイプ または 一般モデルファミリ）にまとめる機能。
+
+### コード構成
+
+```
+Commands/GenericModelMerge/
+├── GenericModelMergeCommand.cs      # エントリポイント。3Dビュー限定・全体フロー制御
+├── Models/
+│   ├── MergeOptions.cs              # 出力形式/結合方法/材質/名前/非表示 の実行条件
+│   └── MergeCategoryRow.cs          # カテゴリチェックリスト行・材質コンボ行
+├── Services/
+│   ├── ViewElementScanner.cs        # ビュー内可視要素のカテゴリ別集計・材質一覧
+│   ├── SolidMerger.cs               # Solid 取得と3種の結合（Union-Find による接触判定）
+│   ├── DirectShapeBuilder.cs        # DirectShape 生成 + Paint による材質適用
+│   └── FamilyBuilder.cs             # .rfa 生成 → ロード → 配置、テンプレート探索
+└── Views/
+    └── GenericModelMergeDialog.xaml(.cs)
+```
+
+### 設計上の判断と、その理由
+
+**1. 対象を「ビュー内の全要素」にし、3Dビュー限定にした**
+
+`FilteredElementCollector(doc, view.Id)` にビュー Id を渡すと、セクションボックス・
+ビューフィルタ・要素の非表示が効いた「そのビューで見えている要素」だけが返る。
+つまり範囲の絞り込みロジックを自前で持つ必要がなく、**画面で見えている状態＝処理範囲**
+という分かりやすさが得られる。平面ビューだとビュー深さ・トリミング領域が絡んで
+「どこまでが対象か」が直感的でないため、3Dビュー限定にした。
+
+**2. ダイレクトシェイプの材質は `Document.Paint()` で当てるしかない**
+
+Revit API には **Solid の材質を直接差し替える手段がない**。面ごとの
+`Face.MaterialElementId` は読み取り専用で、`SolidUtils` / `BooleanOperationsUtils` にも
+材質を指定する口がない。`TessellatedShapeBuilder` なら材質を指定できるが、
+曲面がファセット化されて形状が劣化するため採用しない。
+
+したがって DirectShape 作成後に `doc.Regenerate()` → `ComputeReferences=true` で
+面を取り直し → 全面を `doc.Paint()` する。面数が多いと時間がかかるので
+**20,000面を上限**とし、超えたら材質適用を諦めて結果ダイアログで通知する
+（形状は常に正確に作られる、を優先）。
+
+一方 **ファミリ側は `FreeFormElement` に `BuiltInParameter.MATERIAL_ID_PARAM` があり、
+そのまま設定できる**。材質を確実に当てたいならファミリ出力が有利。
+
+**3. ファミリ文書の作成・保存は、プロジェクトのトランザクションを開く前に済ませる**
+
+`Document.SaveAs()` は**どこかにトランザクションが開いていると失敗する**。そのため
+処理を 2 フェーズに分けた。
+
+- Phase A `CreateFamilyFile()`: `NewFamilyDocument` → `FreeFormElement.Create` →
+  材質設定 → `SaveAs` → `Close`（プロジェクトのトランザクションは開いていない）
+- Phase B `LoadAndPlace()`: プロジェクトのトランザクション内で `LoadFamily` → 原点に配置
+
+材質はプロジェクト側の ElementId をそのまま使えないため、
+`ElementTransformUtils.CopyElements` でファミリ文書へコピーしてから割り当てる。
+
+形状の座標はプロジェクト座標のまま持ち込むので、**原点に配置すれば元の位置に重なる**。
+
+**4. ブーリアン失敗時に形状を捨てない**
+
+既存の `SolidUnionProcessor.Union()` は Boolean 失敗を `catch { }` で握りつぶすため、
+**失敗した Solid が結果から消える**。型枠算出では許容できても、「かたまりを作る」機能で
+形状が黙って欠けるのは致命的。そこで `SolidMerger.AddUnioned()` を独自に持ち、
+失敗した Solid は `leftovers` として単独形状のまま結果に残し、その個数を
+結果ダイアログで通知するようにした。
+
+**5. 接触判定は Union-Find で推移的に連結する**
+
+既存の `SolidUnionProcessor.UnionByProximity()` は「最初に重なったグループへ入れる」
+単一パスのため、A-C が接し C-B が接する場合に A と B が別グループのまま残る。
+「くっついているものだけつなげる」では推移的な連結が必要なので、
+外形範囲の重なりを総当たりで判定して Union-Find でまとめ直している。
+
+**6. 非表示は `CanBeHidden` でふるってから渡す**
+
+`View.HideElements()` は非表示にできない要素が混ざると**例外を投げてトランザクションごと
+巻き込む**。要素ごとに `CanBeHidden(view)` で事前にふるい落としてから渡す。
+
+### 文字列の3分類（CLAUDE.md のルール）への当てはめ
+
+| 文字列 | 分類 | 扱い |
+|--|--|--|
+| ボタン名・ダイアログ・エラー・**トランザクション名** | A | `Loc.S(key)`（アドインの言語設定） |
+| **既定名 `GmMerge.DefaultName`** | **B** | `Loc.S(key, RevitUiLanguage.Resolve(uiapp))`。作成する要素／ファミリの名前は**モデルに保存され、そのモデルを開く全員が見る**ため、Revit 本体の UI 言語に合わせる |
+| DirectShape の識別マーカー `ApplicationId="Tools28"` / `ApplicationDataId="GenericModelMerge"` | C | ASCII 固定。多言語化しない |
+
+カテゴリ名は `Category.Name` をそのまま表示する（ExcelExportImport と同じ方針。
+固定翻訳は Revit のバージョン・言語で実名とずれるため持たない）。
+
+### 再利用したもの
+
+- `SolidUnionProcessor.GetSolids()`（FormworkCalculator）— GeometryInstance の再帰展開・
+  微小ソリッド除外・リンクの Transform 対応まで実績があるためそのまま使用
+- `RevitDialogHelper.SetRevitOwner()` — WPF ダイアログの Owner 設定（.NET 8 対応）
+
+### 動作確認対象
+
+Revit 2022 / 2024（AutoBuild を `[build:2022,2024]` で実行）

@@ -9,6 +9,7 @@
     "annotation": { "ja": "注釈・詳細", "en": "Annotation & Detail", "zh": "注释·详图" },
     "structure": { "ja": "構造", "en": "Structure", "zh": "结构" },
     "data": { "ja": "データ連携", "en": "Data", "zh": "数据" },
+    "model": { "ja": "モデル", "en": "Model", "zh": "模型" },
     "settings": { "ja": "設定", "en": "Settings", "zh": "设置" }
   },
   "features": [
@@ -227,6 +228,18 @@
         "ja": "DWGレイヤ表示設定の移行",
         "en": "Transfer DWG Layer Display Settings",
         "zh": "DWG图层显示设置迁移"
+      }
+    },
+    {
+      "id": "GenericModelMerge",
+      "category": "model",
+      "icon": "icons/features/generic_model_merge.png",
+      "manual": "Features/GenericModelMerge.md",
+      "added_in": "2.6",
+      "names": {
+        "ja": "一般モデル化（複数要素の形状を1つにまとめる）",
+        "en": "Merge to Generic Model (Combine Shapes into One)",
+        "zh": "合并为常规模型（将多个图元形状合为一体）"
       }
     },
     {

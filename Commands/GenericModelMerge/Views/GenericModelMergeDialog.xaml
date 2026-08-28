@@ -1,0 +1,227 @@
+<Window x:Class="Tools28.Commands.GenericModelMerge.Views.GenericModelMergeDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="一般モデル化"
+        Width="980"
+        Height="660"
+        MinWidth="880"
+        MinHeight="560"
+        WindowStartupLocation="CenterScreen"
+        Background="#F5F5F5">
+
+    <Window.Resources>
+        <SolidColorBrush x:Key="RevitBlue" Color="#0066CC"/>
+        <SolidColorBrush x:Key="RevitHoverBlue" Color="#0052A3"/>
+        <SolidColorBrush x:Key="RevitDarkGray" Color="#333333"/>
+        <SolidColorBrush x:Key="HintGray" Color="#666666"/>
+
+        <Style x:Key="PrimaryButtonStyle" TargetType="Button">
+            <Setter Property="MinWidth" Value="130"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="Margin" Value="6,0,0,0"/>
+            <Setter Property="Background" Value="{StaticResource RevitBlue}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="{StaticResource RevitBlue}"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="2" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{StaticResource RevitHoverBlue}"/>
+                    <Setter Property="BorderBrush" Value="{StaticResource RevitHoverBlue}"/>
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Background" Value="#CCCCCC"/>
+                    <Setter Property="BorderBrush" Value="#CCCCCC"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="SecondaryButtonStyle" TargetType="Button" BasedOn="{StaticResource PrimaryButtonStyle}">
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="Foreground" Value="{StaticResource RevitDarkGray}"/>
+            <Setter Property="BorderBrush" Value="#BBBBBB"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#EAEAEA"/>
+                    <Setter Property="BorderBrush" Value="#999999"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="SmallButtonStyle" TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+            <Setter Property="MinWidth" Value="90"/>
+            <Setter Property="Height" Value="24"/>
+            <Setter Property="Margin" Value="0,0,6,0"/>
+            <Setter Property="FontSize" Value="11"/>
+        </Style>
+
+        <!-- 選択肢のタイトル行 -->
+        <Style x:Key="OptionTitleStyle" TargetType="RadioButton">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{StaticResource RevitDarkGray}"/>
+            <Setter Property="Margin" Value="0,4,0,0"/>
+        </Style>
+
+        <!-- 選択肢の説明文（誰が見ても分かるように必ず添える） -->
+        <Style x:Key="OptionHintStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Foreground" Value="{StaticResource HintGray}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Margin" Value="20,1,0,6"/>
+        </Style>
+
+        <Style x:Key="GroupStyle" TargetType="GroupBox">
+            <Setter Property="Margin" Value="0,0,0,10"/>
+            <Setter Property="Padding" Value="10,6,10,8"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="#DDDDDD"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Foreground" Value="{StaticResource RevitDarkGray}"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="14">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- 説明 -->
+        <TextBlock x:Name="txtDescription" Grid.Row="0"
+                   TextWrapping="Wrap" FontSize="12"
+                   Foreground="{StaticResource RevitDarkGray}"
+                   Margin="0,0,0,10"/>
+
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="14"/>
+                <ColumnDefinition Width="420"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- 左: 対象カテゴリ -->
+            <GroupBox x:Name="grpCategories" Grid.Column="0" Style="{StaticResource GroupStyle}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock x:Name="txtCategoryHint" Grid.Row="0"
+                               Style="{StaticResource OptionHintStyle}" Margin="0,0,0,6"/>
+
+                    <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,6">
+                        <Button x:Name="btnSelectAll" Style="{StaticResource SmallButtonStyle}"
+                                Click="btnSelectAll_Click"/>
+                        <Button x:Name="btnDeselectAll" Style="{StaticResource SmallButtonStyle}"
+                                Click="btnDeselectAll_Click"/>
+                    </StackPanel>
+
+                    <ListBox x:Name="lstCategories" Grid.Row="2"
+                             BorderBrush="#DDDDDD" BorderThickness="1"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             HorizontalContentAlignment="Stretch">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                          Content="{Binding Display}"
+                                          FontSize="12" Margin="2,3"/>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
+            </GroupBox>
+
+            <!-- 右: 出力の設定 -->
+            <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+
+                    <!-- 出力形式 -->
+                    <GroupBox x:Name="grpOutput" Style="{StaticResource GroupStyle}">
+                        <StackPanel>
+                            <RadioButton x:Name="rbDirectShape" GroupName="Output"
+                                         Style="{StaticResource OptionTitleStyle}" IsChecked="True"
+                                         Checked="OutputKind_Changed"/>
+                            <TextBlock x:Name="txtDirectShapeHint" Style="{StaticResource OptionHintStyle}"/>
+
+                            <RadioButton x:Name="rbFamily" GroupName="Output"
+                                         Style="{StaticResource OptionTitleStyle}"
+                                         Checked="OutputKind_Changed"/>
+                            <TextBlock x:Name="txtFamilyHint" Style="{StaticResource OptionHintStyle}"/>
+                        </StackPanel>
+                    </GroupBox>
+
+                    <!-- まとめ方 -->
+                    <GroupBox x:Name="grpCombine" Style="{StaticResource GroupStyle}">
+                        <StackPanel>
+                            <RadioButton x:Name="rbKeepShapes" GroupName="Combine"
+                                         Style="{StaticResource OptionTitleStyle}" IsChecked="True"/>
+                            <TextBlock x:Name="txtKeepShapesHint" Style="{StaticResource OptionHintStyle}"/>
+
+                            <RadioButton x:Name="rbUnionAll" GroupName="Combine"
+                                         Style="{StaticResource OptionTitleStyle}"/>
+                            <TextBlock x:Name="txtUnionAllHint" Style="{StaticResource OptionHintStyle}"/>
+
+                            <RadioButton x:Name="rbUnionTouching" GroupName="Combine"
+                                         Style="{StaticResource OptionTitleStyle}"/>
+                            <TextBlock x:Name="txtUnionTouchingHint" Style="{StaticResource OptionHintStyle}"/>
+                        </StackPanel>
+                    </GroupBox>
+
+                    <!-- 材質・名前・元要素 -->
+                    <GroupBox x:Name="grpResult" Style="{StaticResource GroupStyle}">
+                        <StackPanel>
+                            <TextBlock x:Name="lblMaterial" FontSize="12" Margin="0,2,0,3"
+                                       Foreground="{StaticResource RevitDarkGray}"/>
+                            <ComboBox x:Name="cmbMaterial" Height="24" FontSize="12"
+                                      DisplayMemberPath="Name"/>
+                            <TextBlock x:Name="txtMaterialHint" Style="{StaticResource OptionHintStyle}"
+                                       Margin="0,3,0,8"/>
+
+                            <TextBlock x:Name="lblName" FontSize="12" Margin="0,2,0,3"
+                                       Foreground="{StaticResource RevitDarkGray}"/>
+                            <TextBox x:Name="txtName" Height="24" FontSize="12"
+                                     VerticalContentAlignment="Center" Padding="4,0"/>
+                            <TextBlock x:Name="txtNameHint" Style="{StaticResource OptionHintStyle}"
+                                       Margin="0,3,0,8"/>
+
+                            <CheckBox x:Name="chkHideSource" FontSize="12" IsChecked="True"
+                                      Foreground="{StaticResource RevitDarkGray}" Margin="0,2,0,0"/>
+                            <TextBlock x:Name="txtHideSourceHint" Style="{StaticResource OptionHintStyle}"/>
+                        </StackPanel>
+                    </GroupBox>
+
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+
+        <!-- 下部: 件数と実行ボタン -->
+        <Grid Grid.Row="2" Margin="0,10,0,0">
+            <TextBlock x:Name="txtSummary" VerticalAlignment="Center" FontSize="12"
+                       Foreground="{StaticResource RevitDarkGray}"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button x:Name="btnRun" Style="{StaticResource PrimaryButtonStyle}"
+                        Click="btnRun_Click"/>
+                <Button x:Name="btnCancel" Style="{StaticResource SecondaryButtonStyle}"
+                        Click="btnCancel_Click" IsCancel="True"/>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>

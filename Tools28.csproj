@@ -96,6 +96,8 @@
     <Resource Include="Resources\Icons\view_template_16.png" />
     <Resource Include="Resources\Icons\dwg_layer_transfer.png" />
     <Resource Include="Resources\Icons\dwg_layer_transfer_16.png" />
+    <Resource Include="Resources\Icons\generic_model_merge.png" />
+    <Resource Include="Resources\Icons\generic_model_merge_16.png" />
   </ItemGroup>
 
 

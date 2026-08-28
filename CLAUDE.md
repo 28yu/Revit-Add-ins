@@ -49,6 +49,8 @@ string sheetName = string.Format(Loc.S("Sheet.NewSheetName", modelLang), sheetNu
 - `Commands/Room3DColor/` — `RoomColorLegendManager.TypePrefix`、DirectShape の識別マーカー
 - `Commands/ExcelExportImport/` — `ExportSettingsExcelReader` の `"要素ID"` / `"カテゴリ"`、
   `ParameterHeaderMarker.*`（書き出した Excel を読み戻すときの目印）
+- `Commands/GenericModelMerge/` — 生成した DirectShape の識別マーカー
+  `ApplicationId = "Tools28"` / `ApplicationDataId = "GenericModelMerge"`
 
 **新しく C に該当する定数を追加する場合は、この一覧にも追記すること。**
 
@@ -422,6 +424,7 @@ _buttonTipKeys["FeatureName"] = "Ribbon.FeatureName.Button.Tip";
 | DwgLayerTransfer（DWGレイヤ表示設定の移行/モデル間直接コピー） | `Commands/DwgLayerTransfer/` | `Docs/Features/DwgLayerTransfer.md` |
 | LanguageSwitch / Localization（多言語UI） | `Commands/LanguageSwitch/` + `Localization/` | `Docs/DEVLOG.md#LocSystem` |
 | AutoBackup（自動バックアップ/定期ローカル保存・クラウド同期） | `Commands/AutoBackup/` | `Docs/Features/AutoBackup.md` |
+| GenericModelMerge（一般モデル化/複数要素の形状を1つにまとめる） | `Commands/GenericModelMerge/` | `Docs/Features/GenericModelMerge.md` |
 
 ### リボンパネル構成（左から順）
 1. **通り芯・レベル** — 符号表示切替（両方/左/右）
@@ -429,9 +432,10 @@ _buttonTipKeys["FeatureName"] = "Ribbon.FeatureName.Button.Tip";
 3. **ビュー** — ビューポート位置/トリミング領域のコピー・ペースト（各ペアは縦並びスタックで配置）、3Dビュー/セクションボックスのコピー、フィルタ整理（使用ビュー確認・名前変更・削除）、テンプレート整理（使用ビュー確認・名前変更・削除）、DWGレイヤ表示設定の移行（モデル間直接コピー）
 4. **注釈・詳細** — 部屋タグ自動配置、部屋3D色分け、塗潰し領域 分割・統合、塗潰しパターン入出力
 5. **構造** — 梁下端色分け、梁天端色分け、耐火被覆色分け、型枠数量算出
-6. **データ** — EXCELエクスポート、EXCELインポート
-7. **パラメータ** — パラメータ整理（同名特定・値の有無確認・未使用削除）
-8. **設定** — 自動バックアップ（定期ローカル保存・ワークシェア/クラウド中央同期）、言語切替（JP/US/CN）、バージョン情報、マニュアル
+6. **モデル** — 一般モデル化（3Dビュー内の複数カテゴリの形状を1つの一般モデル／.rfa にまとめる）
+7. **データ** — EXCELエクスポート、EXCELインポート
+8. **パラメータ** — パラメータ整理（同名特定・値の有無確認・未使用削除）
+9. **設定** — 自動バックアップ（定期ローカル保存・ワークシェア/クラウド中央同期）、言語切替（JP/US/CN）、バージョン情報、マニュアル
 
 実装: `Application.cs` の `CreateGridLevelPanel()` 等、パネル別メソッドで構築
 

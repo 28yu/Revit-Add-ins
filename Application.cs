@@ -19,7 +19,8 @@ namespace Tools28
         private static readonly string[] _panelKeys = {
             "Ribbon.Panel.GridBubble", "Ribbon.Panel.SheetView", "Ribbon.Panel.3DView",
             "Ribbon.Panel.Annotation", "Ribbon.Panel.Structural", "Ribbon.Panel.Quantity",
-            "Ribbon.Panel.Excel", "Ribbon.Panel.Parameter", "Ribbon.Panel.Settings"
+            "Ribbon.Panel.Model", "Ribbon.Panel.Excel", "Ribbon.Panel.Parameter",
+            "Ribbon.Panel.Settings"
         };
 
         private static readonly Dictionary<string, string> _buttonTextKeys = new Dictionary<string, string>
@@ -44,6 +45,7 @@ namespace Tools28
             { "BeamTopLevel", "Ribbon.BeamTop" },
             { "FireProtection", "Ribbon.FireProtection" },
             { "Formwork", "Ribbon.Formwork" },
+            { "GenericModelMerge", "Ribbon.GmMerge" },
             { "ExcelExport", "Ribbon.Excel.Export" },
             { "ExcelImport", "Ribbon.Excel.Import" },
             { "ParameterCleanup", "Ribbon.ParamCleanup" },
@@ -77,6 +79,7 @@ namespace Tools28
             { "BeamTopLevel", "Ribbon.BeamTop.Tip" },
             { "FireProtection", "Ribbon.FireProtection.Tip" },
             { "Formwork", "Ribbon.Formwork.Tip" },
+            { "GenericModelMerge", "Ribbon.GmMerge.Tip" },
             { "ExcelExport", "Ribbon.Excel.Export.Tip" },
             { "ExcelImport", "Ribbon.Excel.Import.Tip" },
             { "ParameterCleanup", "Ribbon.ParamCleanup.Tip" },
@@ -139,6 +142,7 @@ namespace Tools28
                 CreateAnnotationPanel(application, tabName, assemblyPath);
                 CreateStructuralPanel(application, tabName, assemblyPath);
                 CreateQuantityPanel(application, tabName, assemblyPath);
+                CreateModelPanel(application, tabName, assemblyPath);
                 CreateExcelPanel(application, tabName, assemblyPath);
                 CreateParameterPanel(application, tabName, assemblyPath);
                 CreateSettingsPanel(application, tabName, assemblyPath);
@@ -461,6 +465,18 @@ namespace Tools28
             formworkData.ToolTip = Loc.S("Ribbon.Formwork.Tip");
             formworkData.LargeImage = LoadImage("formwork.png");
             AddButton(panel, formworkData);
+        }
+
+        private void CreateModelPanel(UIControlledApplication application, string tabName, string assemblyPath)
+        {
+            RibbonPanel panel = application.CreateRibbonPanel(tabName, Loc.S("Ribbon.Panel.Model"));
+            _panels.Add(panel);
+
+            var mergeData = new PushButtonData("GenericModelMerge", Loc.S("Ribbon.GmMerge"), assemblyPath, "Tools28.Commands.GenericModelMerge.GenericModelMergeCommand");
+            mergeData.ToolTip = Loc.S("Ribbon.GmMerge.Tip");
+            mergeData.Image = LoadImage("generic_model_merge_16.png");
+            mergeData.LargeImage = LoadImage("generic_model_merge.png");
+            AddButton(panel, mergeData);
         }
 
         private void CreateExcelPanel(UIControlledApplication application, string tabName, string assemblyPath)

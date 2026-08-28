@@ -1,4 +1,12 @@
-## 最終セッション: 2026-08-28 (2)
+## 最終セッション: 2026-08-28 03:18
+変更ファイル: Application.cs,CLAUDE.md,Commands/GenericModelMerge/GenericModelMergeCommand.cs,Commands/GenericModelMerge/Models/MergeCategoryRow.cs,Commands/GenericModelMerge/Models/MergeOptions.cs
+
+**GenericModelMerge（一般モデル化）** を新規追加。3Dビューに表示されている複数カテゴリの
+要素から形状を読み取り、一つの一般モデルのかたまりを作成する。出力はダイレクトシェイプと
+一般モデルファミリ(.rfa)の2択、まとめ方は「形はそのまま／すべてつなげる／くっついているものだけ」
+の3択をダイアログで切替。リボンに新規パネル「モデル」を新設。
+
+## 前回セッション: 2026-08-28（全機能監査）
 全 21 機能を監査し、優先度の高い不具合を修正。
 切断ボックスの誤ペースト（未コピーでもペーストできて解除される）、言語設定が
 一般ユーザー権限で保存されない問題、コピー＆ペースト系の無通知な部分失敗と
@@ -6,7 +14,7 @@
 並び順を修正。多言語化（トランザクション名29・message39ほか）と
 リリース時のバージョン反映を CI に一元化。
 
-## 前回セッション: 2026-08-28
+## 前回セッション: 2026-08-28（パラメータ整理）
 **ParameterCleanup（パラメータ整理）** の値判定をバインド非依存に刷新。
 「バインドなし」表示のパラメータ（ファミリ内部定義の共有パラメータ）でも要素側から
 実際の値を読み取るようにし、値が入ったまま削除してしまう事故を防止。
@@ -33,9 +41,28 @@ OKボタンを「エクスポート実行」に改名、Excelインポートの�
 > このファイルはセッション終了時に更新すること
 
 ## 現在作業中
-ParameterCleanup（パラメータ整理）— バインドなしパラメータの値判定を実装。Revit での動作確認待ち
+GenericModelMerge（一般モデル化）— 新規実装完了。Revit での動作確認待ち
 動作確認対象: **Revit 2022 / 2024**（AutoBuild を `[build:2022,2024]` で実行）
-ブランチ: `claude/parameter-organization-improvement-1eol6q`
+ブランチ: `claude/unified-model-generation-fzdtr1`
+
+### 完了（2026-08-28 GenericModelMerge セッション）
+- [x] `Commands/GenericModelMerge/` 一式を新設（Command / Models / Services / Views）
+- [x] 対象は**アクティブ3Dビューに表示されている要素**。セクションボックス・ビューフィルタ・
+      非表示設定がそのまま効く（`FilteredElementCollector(doc, view.Id)`）
+- [x] ダイアログにカテゴリチェックリスト（要素数つき・初期は全チェック）
+- [x] 出力形式を2択に：**ダイレクトシェイプ** / **一般モデルファミリ(.rfa)**。
+      各選択肢に平易な説明文（`*.Hint`）を必ず併記
+- [x] まとめ方を3択に：形はそのまま／すべてつなげる／くっついているものだけつなげる
+- [x] 接触判定は **Union-Find** で推移的に連結（既存 `UnionByProximity` の単一パスの穴を回避）
+- [x] ブーリアン失敗時に**形状を捨てず**単独形状として残し、件数を結果ダイアログで通知
+- [x] 材質は単一材質を指定。ファミリは `MATERIAL_ID_PARAM`、DirectShape は `doc.Paint()`
+      （20,000面超は適用を見送り通知。形状は常に正確に作成）
+- [x] `.rfa` の保存先はダイアログ指定。ファミリテンプレート(.rft)は自動探索＋手動選択フォールバック
+- [x] 元要素の非表示はチェックボックスでON/OFF（初期ON）。`CanBeHidden` でふるってから `HideElements`
+- [x] リボンに新規パネル **「モデル」** を新設＋アイコン生成（32/16px + features 用）
+- [x] 3言語（JP/US/CN）の文字列を55キー同時追加。キー一致を検証済み
+- [x] `Docs/Features/GenericModelMerge.md` / `Docs/features.json`（`model` カテゴリ追加、`added_in: 2.6`）
+      / `Docs/DEVLOG.md` / `CLAUDE.md` を更新
 
 ### 完了（2026-08-28 ParameterCleanup セッション）
 - [x] `Services/ParameterUsageIndex.cs` 新設。「どの要素・タイプがどのパラメータを保持しているか」を
