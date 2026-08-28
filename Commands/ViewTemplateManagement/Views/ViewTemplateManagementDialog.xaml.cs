@@ -210,6 +210,7 @@ namespace Tools28.Commands.ViewTemplateManagement.Views
                               .Where(id => id != null && id != ElementId.InvalidElementId)
                               .ToList();
             int ok = 0, fail = 0;
+            List<string> warnings = null;   // 削除時に Revit が出した警告（記録して後で通知）
 
             try
             {
@@ -221,7 +222,9 @@ namespace Tools28.Commands.ViewTemplateManagement.Views
                     var fho = t.GetFailureHandlingOptions();
                     fho = fho.SetForcedModalHandling(false);
                     fho = fho.SetClearAfterRollback(true);
-                    fho = fho.SetFailuresPreprocessor(new WarningSwallower());
+                    var swallower = new WarningSwallower();
+                    warnings = swallower.Messages;
+                    fho = fho.SetFailuresPreprocessor(swallower);
                     t.SetFailureHandlingOptions(fho);
 
                     ICollection<ElementId> deleted;
@@ -259,8 +262,14 @@ namespace Tools28.Commands.ViewTemplateManagement.Views
                 return;
             }
 
-            TaskDialog.Show(Loc.S("TemplateMgmt.Result.Title"),
-                string.Format(Loc.S("TemplateMgmt.Result.Msg"), ok, fail));
+            string resultMsg = string.Format(Loc.S("TemplateMgmt.Result.Msg"), ok, fail);
+            if (warnings != null && warnings.Count > 0)
+            {
+                resultMsg += "\n\n" + Loc.S("Common.RevitWarnings") + "\n"
+                           + string.Join("\n", warnings.Take(10).Select(w => "・" + w));
+                if (warnings.Count > 10) resultMsg += "\n…";
+            }
+            TaskDialog.Show(Loc.S("TemplateMgmt.Result.Title"), resultMsg);
 
             LoadRows();   // 一覧を再構築
             this.BringToFrontDeferred();   // Revit 本体の背面に隠れるのを防ぐ
@@ -285,11 +294,28 @@ namespace Tools28.Commands.ViewTemplateManagement.Views
             catch { }
         }
 
-        /// <summary>削除トランザクション中の警告を自動的に無視（ダイアログを出さない）。</summary>
+        /// <summary>
+        /// 削除トランザクション中の警告をモーダル表示せずに処理する。
+        /// ただし警告文は捨てずに記録し、削除後に結果ダイアログでまとめて通知する
+        /// （「要素が削除されます」等の重要な警告を見落とさないため）。
+        /// </summary>
         private class WarningSwallower : IFailuresPreprocessor
         {
+            public List<string> Messages { get; } = new List<string>();
+
             public FailureProcessingResult PreprocessFailures(FailuresAccessor a)
             {
+                try
+                {
+                    foreach (var f in a.GetFailureMessages())
+                    {
+                        var text = f?.GetDescriptionText();
+                        if (!string.IsNullOrWhiteSpace(text) && !Messages.Contains(text))
+                            Messages.Add(text);
+                    }
+                }
+                catch { }
+
                 a.DeleteAllWarnings();
                 return FailureProcessingResult.Continue;
             }

@@ -28,7 +28,11 @@ namespace Tools28.Commands.ExcelExportImport.Services
     /// </summary>
     public class ImportPreviewRow
     {
-        public int ElementId { get; set; }
+        /// <summary>
+        /// 要素 Id。Revit 2026 で要素 Id が 64bit 化されたため long で保持する
+        /// （書き出し側も long。int だと大きな Id の行が読み込めない）。
+        /// </summary>
+        public long ElementId { get; set; }
         public string CategoryName { get; set; }
         public string ParameterName { get; set; }
         public string CurrentValue { get; set; }
@@ -108,10 +112,10 @@ namespace Tools28.Commands.ExcelExportImport.Services
                         string elementIdStr = worksheet.Cell(row, 1).GetString();
                         string categoryName = worksheet.Cell(row, 2).GetString();
 
-                        if (!int.TryParse(elementIdStr, out int elementIdInt))
+                        if (!TryParseElementId(elementIdStr, out long elementIdInt))
                             continue;
 
-                        var elementId = new ElementId(elementIdInt);
+                        var elementId = ToElementId(elementIdInt);
                         var elem = doc.GetElement(elementId);
                         if (elem == null)
                         {
@@ -253,14 +257,14 @@ namespace Tools28.Commands.ExcelExportImport.Services
                     {
                         string elementIdStr = worksheet.Cell(row, 1).GetString();
 
-                        if (!int.TryParse(elementIdStr, out int elementIdInt))
+                        if (!TryParseElementId(elementIdStr, out long elementIdInt))
                         {
                             result.FailCount++;
                             result.Errors.Add($"シート '{worksheet.Name}' 行{row}: ElementIdの解析に失敗");
                             continue;
                         }
 
-                        var elementId = new ElementId(elementIdInt);
+                        var elementId = ToElementId(elementIdInt);
                         var elem = doc.GetElement(elementId);
                         if (elem == null)
                         {
@@ -369,7 +373,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
             foreach (var pr in previewRows.Where(r => r.HasChange && !r.IsReadOnly
                         && (excludeElementIds == null || !excludeElementIds.Contains(r.ElementId))))
             {
-                var elem = doc.GetElement(new ElementId(pr.ElementId));
+                var elem = doc.GetElement(ToElementId(pr.ElementId));
                 if (elem == null)
                 {
                     result.FailCount++;
@@ -485,6 +489,40 @@ namespace Tools28.Commands.ExcelExportImport.Services
         }
 
         /// <summary>
+        /// Excel セルの文字列から要素 Id を読む。
+        /// 数値セルが指数表記（1.23E+09）で返る場合にも対応する。
+        /// </summary>
+        private static bool TryParseElementId(string text, out long id)
+        {
+            id = 0;
+            if (string.IsNullOrWhiteSpace(text)) return false;
+
+            text = text.Trim();
+            if (long.TryParse(text, out id)) return true;
+
+            if (double.TryParse(text, System.Globalization.NumberStyles.Float,
+                                System.Globalization.CultureInfo.InvariantCulture, out double d))
+            {
+                id = (long)d;
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// long から ElementId を作る（バージョン差異を吸収）。
+        /// Revit 2025 以前は要素 Id が int の範囲に収まる。
+        /// </summary>
+        private static ElementId ToElementId(long value)
+        {
+#if REVIT2026
+            return new ElementId(value);
+#else
+            return new ElementId((int)value);
+#endif
+        }
+
+        /// <summary>
         /// ElementId を long に変換（バージョン差異を吸収）
         /// </summary>
         private static long ElementIdToLong(ElementId id)
@@ -501,7 +539,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
         /// 値設定に失敗した理由を、パラメータ型に応じて分かりやすいメッセージにする。
         /// 特に ElementId（要素参照）型は文字値を直接設定できないことを明示する。
         /// </summary>
-        private static string BuildSetFailureMessage(Parameter param, string headerName, int elementId, string value)
+        private static string BuildSetFailureMessage(Parameter param, string headerName, long elementId, string value)
         {
             if (ParameterService.IsTypeChangeParameter(param))
                 return $"タイプ変更に失敗（要素 {elementId}, 値: '{value}'）— 一致するタイプが見つかりません";
@@ -618,11 +656,13 @@ namespace Tools28.Commands.ExcelExportImport.Services
 
                     for (int row = 2; row <= rowCount; row++)
                     {
-                        string elementIdStr = worksheet.Cell(row, 1).GetString().Trim();
-                        if (double.TryParse(elementIdStr, out double idDouble))
-                        {
-                            elementIdStr = ((int)idDouble).ToString();
-                        }
+                        // 要素 Id の解釈は他の経路と同じヘルパーに統一する
+                        // （旧実装はここだけ double 経由で int に丸めていた）。
+                        string elementIdStr = worksheet.Cell(row, 1).GetString();
+                        if (TryParseElementId(elementIdStr, out long idValue))
+                            elementIdStr = idValue.ToString();
+                        else
+                            elementIdStr = elementIdStr.Trim();
 
                         // セル単位で成功(変更)/削除(クリア)/失敗を判定
                         var successCols = new HashSet<int>();

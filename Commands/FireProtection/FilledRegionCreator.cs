@@ -12,6 +12,9 @@ namespace Tools28.Commands.FireProtection
     {
         internal const string TypePrefix = "耐火被覆_";
 
+        /// <summary>耐火被覆の診断ログのファイル名（DiagLog がローテーションと ON/OFF を管理する）。</summary>
+        internal const string FireLogFile = "FireProtection_debug.txt";
+
         /// <summary>
         /// 耐火被覆種類ごとに塗潰領域を作成
         /// </summary>
@@ -62,15 +65,8 @@ namespace Tools28.Commands.FireProtection
                         outlines.Add(outline);
                 }
 
-                // デバッグログ
-                try
-                {
-                    System.IO.Directory.CreateDirectory(@"C:\temp");
-                    System.IO.File.AppendAllText(@"C:\temp\FireProtection_debug.txt",
-                        $"\n[{System.DateTime.Now:HH:mm:ss}] {typeName} offset={offsetFeet * 304.8:F0}mm" +
-                        $" outlines={outlines.Count}\n");
-                }
-                catch { }
+                DiagLog.WriteTo(FireLogFile,
+                    $"{typeName} offset={offsetFeet * 304.8:F0}mm outlines={outlines.Count}");
 
                 if (outlines.Count == 0) continue;
 
@@ -266,8 +262,8 @@ namespace Tools28.Commands.FireProtection
                 if (lp == null) continue;
                 XYZ center = new XYZ(lp.Point.X, lp.Point.Y, 0);
 
-                try { System.IO.File.AppendAllText(@"C:\temp\FireProtection_debug.txt",
-                    $"  柱枠作成: {value} center=({center.X * 304.8:F0},{center.Y * 304.8:F0}) A={aFeet * 304.8:F0} B={bFeet * 304.8:F0}\n"); } catch { }
+                DiagLog.WriteTo(FireLogFile,
+                    $"  柱枠作成: {value} center=({center.X * 304.8:F0},{center.Y * 304.8:F0}) A={aFeet * 304.8:F0} B={bFeet * 304.8:F0}");
 
                 // 外側矩形: center ± (A + B)
                 double outer = aFeet + bFeet;
@@ -288,12 +284,7 @@ namespace Tools28.Commands.FireProtection
                 }
                 catch (Exception ex)
                 {
-                    try
-                    {
-                        System.IO.File.AppendAllText(@"C:\temp\FireProtection_debug.txt",
-                            $"  柱枠エラー: {ex.Message}\n");
-                    }
-                    catch { }
+                    DiagLog.WriteTo(FireLogFile, $"  柱枠エラー: {ex.Message}");
                 }
             }
 

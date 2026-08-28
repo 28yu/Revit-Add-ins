@@ -127,19 +127,9 @@ namespace Tools28.Commands.FilledRegionSplitMerge
         }
 
         /// <summary>
-        /// デバッグログをファイルに出力
+        /// デバッグログ。出力先・ローテーション・ON/OFF は DiagLog に一元化している。
+        /// （旧実装はディレクトリを作らずに追記していたため、C:\temp が無いと無言で失敗していた）
         /// </summary>
-        private void LogToFile(string logMessage)
-        {
-            try
-            {
-                string logPath = @"C:\temp\Tools28_debug.txt";
-                System.IO.File.AppendAllText(logPath, logMessage + "\n");
-            }
-            catch
-            {
-                // ログ出力失敗は無視
-            }
-        }
+        private void LogToFile(string logMessage) => DiagLog.Write("[FilledRegion] " + logMessage);
     }
 }

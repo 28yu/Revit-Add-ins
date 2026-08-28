@@ -23,7 +23,8 @@ namespace Tools28.Commands.RoomTagCreator
             var rooms = new FilteredElementCollector(doc, viewId)
                 .OfCategory(BuiltInCategory.OST_Rooms)
                 .WhereElementIsNotElementType()
-                .Cast<Room>()
+                // カテゴリ指定だけでは型が保証されないため OfType を使う（Cast は例外になる）
+                .OfType<Room>()
                 .Where(r => r.Location != null)
                 .OrderBy(r => r.LookupParameter("名前")?.AsString() ?? r.Name ?? "")
                 .Select(r => new RoomInfo(r))

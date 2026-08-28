@@ -57,7 +57,9 @@ namespace Tools28.Commands.BeamUnderLevel
                 var beams = new FilteredElementCollector(doc, activeView.Id)
                     .OfCategory(BuiltInCategory.OST_StructuralFraming)
                     .WhereElementIsNotElementType()
-                    .Cast<FamilyInstance>()
+                    // ⚠ Cast<> は使わない。構造フレームカテゴリには DirectShape 等の
+                    //    FamilyInstance でない要素が混ざりうるため、1つでもあると例外で落ちる。
+                    .OfType<FamilyInstance>()
                     .ToList();
 
                 if (beams.Count == 0)

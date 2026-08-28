@@ -1146,19 +1146,79 @@ C を多言語化すると、別言語環境で再実行したときに `FindXxx
 付けないため、バージョンを飛ばすと途中の機能が本文から欠落する。
 → `--since <前回リリース>` を追加（CI は直近タグから自動判定）。
 
+### 監査で残していた項目の対応（2026-08-28 第2弾）
+
+#### `Cast<T>()` はカテゴリ指定だけでは型を保証しない
+`OfCategory(OST_StructuralFraming).WhereElementIsNotElementType().Cast<FamilyInstance>()` は、
+DirectShape 等が混ざると `InvalidCastException`。しかも**遅延評価なので列挙時に落ち、
+コレクタを囲んだ try/catch では捕まらない**ことがある。
+→ **カテゴリで絞っただけの場合は `OfType<T>()` を使う。**
+`OfClass(typeof(T))` や `WhereElementIsElementType()` で型が保証されている場合のみ `Cast<T>()` でよい。
+
+#### Excel の要素 Id は long で通す
+書き出しは `long`（2026 は `id.Value`）なのに、読み込みは `int.TryParse`、
+結果マーキングは `double.TryParse` → `(int)` と**1ファイル内で3通り**になっていた。
+Revit 2026 で要素 Id が 64bit 化されたため、大きな Id の行が黙ってスキップされる。
+→ `TryParseElementId(string, out long)` と `ToElementId(long)`（`#if REVIT2026` で分岐）に統一。
+`ImportPreviewRow.ElementId` も `long` へ。数値セルが指数表記で返るケースも同じ経路で吸収する。
+
+#### 名前一致で既存要素を消す処理には確認を挟む
+`FormworkOutputFinder.FindFormworkSheet` は、出力種別パラメータ（タグ）で見つからないとき
+**シート名の一致**でフォールバックしていた。旧バージョンで作ったシートを拾うための仕組みだが、
+ユーザーが同名で作った自作シートも拾ってしまう。
+→ `FindFormworkSheet(doc, out bool byNameOnly)` を追加し、**名前一致だけで見つかった場合は
+トランザクション開始前に確認ダイアログ**を出す。「いいえ」ならシート出力全体をスキップする。
+
+⚠ 確認ダイアログはトランザクションの**外**で出すこと。トランザクション内でモーダルを出すと
+Revit の失敗処理と競合しうる。
+
+#### プルダウンの子項目はリボン項目として保持しないと言語切替で更新されない
+`PulldownButton.AddPushButton(data)` の戻り値を捨てていたため、言語メニュー（JP/US/CN）の
+ツールチップだけが起動時の言語のまま固定されていた。
+→ 戻り値を `_buttons` に登録し、`_buttonTipKeys` にも追加して `UpdateRibbonLanguage()` の対象にする。
+
+#### 診断ログは1箇所に集約する
+`DiagLog` が常時 ON・サイズ上限なし・無効化手段なしで、さらに Application /
+SheetCreation / FilledRegionSplitMerge / FireProtection がそれぞれ独自にファイル追記していた
+（`FilledRegionSplitMerge` はディレクトリを作らずに追記していて `C:\temp` が無いと無言で失敗）。
+→ `DiagLog` に **5MB でローテーション（退避は3世代）**と **ON/OFF スイッチ**を実装し、
+独自実装をすべて `DiagLog.Write` / `DiagLog.WriteTo(fileName, msg)` へ委譲。
+
+- 出力先は従来どおり `C:\temp`（マニュアル記載やユーザーの参照先を変えないため）
+- 既定は **ON**（不具合報告時にログが残っている状態を優先）
+- `%AppData%\Tools28\diaglog.setting` に `off` と書くと無効化できる。
+  この案内はログ先頭のヘッダー行にも出力している
+- `FormworkDebugLog` は元から上限・退避・ON/OFF を備えていたのでそのまま
+
+#### 図面No 空欄でシート番号が "- 1" になっていた
+`FormatSheetNumber` がプレフィックス空欄でも `$"- {number}"` を返していた。
+ヒント文の「図面Noなし」と食い違う。
+→ 空欄なら番号のみ。採番側は**旧形式 "- 12" も引き続き認識**して、
+旧バージョンで作ったシートからも連番を継続できるようにした。
+
+#### マニュアルと実装の乖離（SheetCreation）
+`Docs/Features/SheetCreation.md` は「番号と名前をタブ区切りで複数行入力／Excel から貼り付け／
+重複はスキップ」と書いていたが、**実装にはその機能が一切なかった**（実際は図枠＋作成枚数＋図面No）。
+3言語のローカライズキーは実装側の文言のみ揃っており、実装が現役でマニュアルが取り残されていた。
+→ マニュアルを実装に合わせて全面的に書き直し、「この機能でできないこと」節を設けた。
+リスト入力方式は将来の機能追加として別途検討する。
+
+**教訓: 機能の正否はローカライズキーの有無で判断できる。**
+3言語に文言が揃っている＝実装済みで保守されている、揃っていない＝存在しない。
+
 ### 未対応で残した項目（次回以降）
 - **AutoBackup の同期中ダイアログ**: 現状は全ダイアログを OK で自動処理している。
   許可リスト方式へ移行したいが、対象 `DialogId` の実データが無い。
-  今回は `DiagLog` への記録だけ追加（挙動は現状維持）。ログが集まり次第、
-  `AutoDismissDialogIds` による絞り込みへ切り替える。
-- **`Cast<FamilyInstance>()` の InvalidCastException リスク**: `OfCategory(OST_StructuralFraming)`
-  等に非 FamilyInstance（DirectShape 等）が混ざると例外でコマンドごと落ちる。`OfType<>` が安全。
-- **Excel 連携の ElementId 幅**: 書き出しは long、読み込みは `int.TryParse`。
-  int 範囲を超える要素 Id を持つモデルで行がスキップされる。
-- **デバッグログ**: `C:\temp` へ無制限追記、OFF スイッチ無し、実装が6種類に分散。
-- **`Docs/Features/SheetCreation.md` が実装と不一致**: マニュアルは「番号と名前のリストを
-  入力／Excel から貼り付け」と書いているが、実際のダイアログは「図枠・作成枚数・図面No」。
-  どちらが正なのか要判断（マニュアル修正 or 機能追加）。
+  `DiagLog` への記録は実装済み。ログが集まり次第、`AutoDismissDialogIds` による絞り込みへ切り替える。
+- **梁色分けのフィルタ削除**: `doc.Delete(filterId)` はプロジェクト全体からフィルタを消すため、
+  他ビューに手動適用していた場合もそこから消える。対象はツールが作った `梁天端_` 系のみで
+  「上書き」チェックが必要なため、現状維持と判断。
+- **Excel ヘッダー「要素ID」「カテゴリ」**: 書き出しと読み戻しが同じ文字列で対になっているため
+  多言語化すると過去の Excel が読めなくなる。やるなら
+  「書き出しは現在の言語／読み込みは3言語すべてを候補にする」という別設計が必要。
+- **シート一括作成のリスト入力方式**: 番号と名前を1枚ずつ指定する／Excel の図面リストから
+  貼り付ける方式。実用価値は高いが、既存の「枚数＋図面No」方式を残すか置き換えるかの
+  設計判断を伴うため、独立した機能追加として扱う。
 
 ## ParameterCleanup（パラメータ整理）開発知見
 

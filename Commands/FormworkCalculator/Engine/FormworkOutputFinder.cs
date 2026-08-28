@@ -98,7 +98,23 @@ namespace Tools28.Commands.FormworkCalculator.Engine
         /// <summary>型枠集計シートを返す。</summary>
         internal static ViewSheet FindFormworkSheet(Document doc)
         {
+            return FindFormworkSheet(doc, out _);
+        }
+
+        /// <summary>
+        /// 型枠出力シートを探す。
+        /// </summary>
+        /// <param name="byNameOnly">
+        /// タグ（出力種別パラメータ）では見つからず、名前一致だけで見つかった場合に true。
+        /// 名前一致は旧バージョンで作ったシートを拾うためのフォールバックだが、
+        /// ユーザーが同名で作った自作シートを拾ってしまう可能性もあるため、
+        /// 削除する前に必ず確認を取ること。
+        /// </param>
+        internal static ViewSheet FindFormworkSheet(Document doc, out bool byNameOnly)
+        {
+            byNameOnly = false;
             if (doc == null) return null;
+
             var all = new FilteredElementCollector(doc)
                 .OfClass(typeof(ViewSheet))
                 .Cast<ViewSheet>()
@@ -109,9 +125,11 @@ namespace Tools28.Commands.FormworkCalculator.Engine
                 FormworkParameterManager.GetOutputKind(s) == FormworkParameterManager.OutputKindSheet);
             if (tagged != null) return tagged;
 
-            return all.FirstOrDefault(s =>
+            var named = all.FirstOrDefault(s =>
                 s.Name == FormworkSheetCreator.SheetName
                 || s.Name.StartsWith(FormworkSheetCreator.SheetName + " "));
+            byNameOnly = named != null;
+            return named;
         }
     }
 }

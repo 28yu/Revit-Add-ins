@@ -15,17 +15,8 @@ namespace Tools28.Commands.SheetCreation
     [Regeneration(RegenerationOption.Manual)]
     public class ExecuteSheetCreationCommand : IExternalCommand
     {
-        // デバッグログ用
-        private void LogDebug(string message)
-        {
-            try
-            {
-                System.IO.Directory.CreateDirectory(@"C:\temp");
-                System.IO.File.AppendAllText(@"C:\temp\Tools28_debug.txt",
-                    DateTime.Now.ToString("HH:mm:ss.fff") + ": " + message + "\n");
-            }
-            catch { }
-        }
+        /// <summary>デバッグログ。出力先・ローテーション・ON/OFF は DiagLog に一元化している。</summary>
+        private void LogDebug(string message) => DiagLog.Write("[SheetCreation] " + message);
 
         public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
         {
@@ -160,18 +151,15 @@ namespace Tools28.Commands.SheetCreation
         }
 
         /// <summary>
-        /// シート番号をフォーマット
+        /// シート番号をフォーマットする。
+        /// 図面No（プレフィックス）が空欄なら番号だけにする。
+        /// （旧実装は空欄でも先頭に "- " を付けており、"- 1" という番号になっていた）
         /// </summary>
         private string FormatSheetNumber(string prefix, int number)
         {
-            if (string.IsNullOrEmpty(prefix))
-            {
-                return $"- {number}";
-            }
-            else
-            {
-                return $"{prefix} - {number}";
-            }
+            return string.IsNullOrEmpty(prefix)
+                ? number.ToString()
+                : $"{prefix} - {number}";
         }
 
         /// <summary>
@@ -224,7 +212,11 @@ namespace Tools28.Commands.SheetCreation
                 return null;
             }
 
-            // プレフィックス無し（"- 12" 形式）
+            // プレフィックス無し。現行形式は番号のみ（"12"）。
+            if (int.TryParse(sheetNumber.Trim(), out _))
+                return sheetNumber.Trim();
+
+            // 旧形式（"- 12"）。旧バージョンで作ったシートからも採番を続けられるようにする。
             if (sheetNumber.StartsWith("- "))
                 return sheetNumber.Substring(2).Trim();
 

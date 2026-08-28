@@ -965,6 +965,11 @@ namespace Tools28.Localization
             { "GmMerge.Result.ShapeFailed", "ファミリに取り込めなかった形状: {0} 個" },
             { "GmMerge.Result.MaterialSkipped", "面の数が多すぎるため、材質の割り当ては行いませんでした（形状はそのまま作成されています）。" },
             { "GmMerge.Result.MaterialFailed", "材質を割り当てられませんでした（形状はそのまま作成されています）。" },
+            { "Common.RevitWarnings", "Revit からの警告:" },
+            { "Formwork.Sheet.ConfirmDelete.Title", "既存シートの削除確認" },
+            { "Formwork.Sheet.ConfirmDelete.Main", "「{0} - {1}」というシートが見つかりました。" },
+            { "Formwork.Sheet.ConfirmDelete.Content", "このシートには 28 Tools が作成したという記録がありません。手動で作成されたシートの可能性があります。\n\n続行すると、このシートは削除され、今回の結果で作り直されます。シート上に配置した他のビューやビューポートも失われます。\n\n削除して作り直しますか？\n「いいえ」を選ぶと、シートの作成をスキップします。" },
+            { "Formwork.Sheet.Skipped", "シートの作成をスキップしました（既存シートの削除を中止したため）。" },
         };
     }
 }

@@ -89,18 +89,19 @@ namespace Tools28
             { "AutoBackup", "Ribbon.AutoBackup.Tip" },
             { "About", "Ribbon.Settings.About.Tip" },
             { "Manual", "Ribbon.Settings.Manual.Tip" },
+            // 言語メニューの各項目。ボタン名(JP/US/CN)は言語共通なので _buttonTextKeys には入れない。
+            { "LangJP", "Ribbon.Settings.Lang.JP.Tip" },
+            { "LangUS", "Ribbon.Settings.Lang.US.Tip" },
+            { "LangCN", "Ribbon.Settings.Lang.CN.Tip" },
         };
 
-        private static readonly string DebugLogPath = @"C:\temp\Tools28_debug.txt";
+        /// <summary>起動処理のログ。出力先・ローテーション・ON/OFF は DiagLog に一元化している。</summary>
+        private static void Log(string msg) => DiagLog.Write(msg);
 
-        private static void Log(string msg)
+        /// <summary>言語切替時に文言を更新できるよう、生成したリボン項目を登録する。</summary>
+        private static void RegisterButton(string key, RibbonItem item)
         {
-            try
-            {
-                Directory.CreateDirectory(@"C:\temp");
-                File.AppendAllText(DebugLogPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {msg}\n");
-            }
-            catch { }
+            if (item != null) _buttons[key] = item;
         }
 
         public Result OnStartup(UIControlledApplication application)
@@ -546,19 +547,21 @@ namespace Tools28
                 jpData.Image = LoadImage("flag_jp_16.png");
                 jpData.LargeImage = LoadImage("flag_jp_32.png");
                 jpData.ToolTip = Loc.S("Ribbon.Settings.Lang.JP.Tip");
-                LanguagePulldown.AddPushButton(jpData);
+                // 戻り値を保持しないと UpdateRibbonLanguage() の対象外になり、
+                // 言語を切り替えてもツールチップが旧言語のまま残る。
+                RegisterButton("LangJP", LanguagePulldown.AddPushButton(jpData));
 
                 var enData = new PushButtonData("LangUS", "US", assemblyPath, "Tools28.Commands.LanguageSwitch.SwitchToEnglishCommand");
                 enData.Image = LoadImage("flag_us_16.png");
                 enData.LargeImage = LoadImage("flag_us_32.png");
                 enData.ToolTip = Loc.S("Ribbon.Settings.Lang.US.Tip");
-                LanguagePulldown.AddPushButton(enData);
+                RegisterButton("LangUS", LanguagePulldown.AddPushButton(enData));
 
                 var cnData = new PushButtonData("LangCN", "CN", assemblyPath, "Tools28.Commands.LanguageSwitch.SwitchToChineseCommand");
                 cnData.Image = LoadImage("flag_cn_16.png");
                 cnData.LargeImage = LoadImage("flag_cn_32.png");
                 cnData.ToolTip = Loc.S("Ribbon.Settings.Lang.CN.Tip");
-                LanguagePulldown.AddPushButton(cnData);
+                RegisterButton("LangCN", LanguagePulldown.AddPushButton(cnData));
             }
         }
 

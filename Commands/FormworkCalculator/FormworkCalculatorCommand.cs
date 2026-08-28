@@ -371,10 +371,36 @@ namespace Tools28.Commands.FormworkCalculator
                     // 更新モードでは既存シートをそのまま保持する ([2])
                     if (settings.CreateSheet && haveAnyOutput && !updateMode)
                     {
+                        // タグが無く「名前一致」だけで既存シートが見つかった場合は、
+                        // ユーザーが自分で作った同名シートを削除してしまう恐れがあるため、
+                        // トランザクションを始める前に確認を取る。
+                        bool skipSheet = false;
+                        var foundSheet = FormworkOutputFinder.FindFormworkSheet(doc, out bool sheetByNameOnly);
+                        if (foundSheet != null && sheetByNameOnly)
+                        {
+                            var confirmSheet = new TaskDialog(Loc.S("Formwork.Sheet.ConfirmDelete.Title"))
+                            {
+                                MainInstruction = string.Format(
+                                    Loc.S("Formwork.Sheet.ConfirmDelete.Main"),
+                                    foundSheet.SheetNumber, foundSheet.Name),
+                                MainContent = Loc.S("Formwork.Sheet.ConfirmDelete.Content"),
+                                CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No,
+                                DefaultButton = TaskDialogResult.No
+                            };
+                            if (confirmSheet.Show() != TaskDialogResult.Yes)
+                            {
+                                skipSheet = true;
+                                FormworkDebugLog.Log("  [Sheet] 既存シート削除をユーザーが中止 → シート出力をスキップ");
+                                TaskDialog.Show(Loc.S("Formwork.Title"), Loc.S("Formwork.Sheet.Skipped"));
+                            }
+                        }
+
                         // 既存シートの削除は別トランザクションで先に行う。
                         // 同一トランザクション内でシート削除→Viewport.Create をすると
                         // Viewport.Create が null を返す既知の Revit API 問題を回避するため。
                         string savedSheetName = null, savedSheetNumber = null;
+                        if (!skipSheet)
+                        {
                         using (var tDeleteSheet = new Transaction(doc, Loc.S("Formwork.Txn.DeleteSheet")))
                         {
                             tDeleteSheet.Start();
@@ -410,6 +436,7 @@ namespace Tools28.Commands.FormworkCalculator
                                 FormworkDebugLog.Log($"  [Sheet] CreateSheet EX: {ex.Message}");
                             }
                         }
+                        }   // if (!skipSheet)
                     }
                 }
 

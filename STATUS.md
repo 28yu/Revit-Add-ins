@@ -1,4 +1,11 @@
-## 最終セッション: 2026-08-28 03:18
+## 最終セッション: 2026-08-28（監査対応 第2弾）
+全機能監査で残していた項目をすべて対応。`Cast<T>()` の例外リスク（`OfType<T>()` へ）、
+Excel の要素Id 幅の統一、型枠シートの名前一致削除に確認ダイアログ、
+言語メニューのツールチップ更新、フィルタ/テンプレート整理での Revit 警告の記録、
+診断ログの集約（ローテーション・ON/OFF）、図面No 空欄で番号が "- 1" になる不具合を修正。
+`Docs/Features/SheetCreation.md` を実装に合わせて全面改訂（マニュアルが存在しない機能を説明していた）。
+
+## 前回セッション: 2026-08-28 03:18
 変更ファイル: Application.cs,CLAUDE.md,Commands/GenericModelMerge/GenericModelMergeCommand.cs,Commands/GenericModelMerge/Models/MergeCategoryRow.cs,Commands/GenericModelMerge/Models/MergeOptions.cs
 
 **GenericModelMerge（一般モデル化）** を新規追加。3Dビューに表示されている複数カテゴリの
@@ -44,6 +51,36 @@ OKボタンを「エクスポート実行」に改名、Excelインポートの�
 GenericModelMerge（一般モデル化）— 新規実装完了。Revit での動作確認待ち
 動作確認対象: **Revit 2022 / 2024**（AutoBuild を `[build:2022,2024]` で実行）
 ブランチ: `claude/unified-model-generation-fzdtr1`
+
+### 完了（2026-08-28 監査対応 第2弾）
+- [x] **`Cast<T>()` → `OfType<T>()`**（5箇所）: 梁天端/梁下端（構造フレーム）、型枠（図枠）、
+      部屋3D色分け/部屋タグ（部屋）。カテゴリ指定だけでは型が保証されず、DirectShape 等が
+      混ざると遅延評価中に `InvalidCastException` でコマンドごと落ちていた
+- [x] **Excel の要素Id 幅を統一**: 書出 long / 読込 `int.TryParse` / 結果マーキング `double`→`int` の
+      3通りを `TryParseElementId` + `ToElementId`（`#if REVIT2026`）に集約。
+      `ImportPreviewRow.ElementId` も `long` へ。Revit 2026 で大きな Id の行が
+      黙ってスキップされる問題を解消
+- [x] **型枠シートの名前一致削除に確認ダイアログ**: `FindFormworkSheet(doc, out bool byNameOnly)` を
+      追加し、タグで見つからず名前一致だけの場合はトランザクション開始前に確認。
+      「いいえ」でシート出力全体をスキップ
+- [x] **言語メニュー（JP/US/CN）のツールチップ**: `AddPushButton` の戻り値を `_buttons` に登録し、
+      `_buttonTipKeys` にも追加。言語切替で更新されるようになった
+- [x] **フィルタ整理／テンプレート整理**: Revit の警告を記録して結果ダイアログで通知
+      （パラメータ整理と挙動を統一）
+- [x] **診断ログを DiagLog に集約**: 5MB でローテーション（退避3世代）、ON/OFF スイッチを実装。
+      Application / SheetCreation / FilledRegionSplitMerge / FireProtection の独自実装を委譲。
+      出力先は `C:\temp` のまま、既定 ON。`%AppData%\Tools28\diaglog.setting` に `off` で無効化
+- [x] **図面No 空欄でシート番号が "- 1" になる不具合**を修正。旧形式 "- 12" も採番対象として
+      認識し続けるため、旧バージョンで作ったシートからも連番を継続できる
+- [x] **`Docs/Features/SheetCreation.md` を全面改訂**（C案）。マニュアルは「番号と名前を
+      タブ区切りで複数行入力／Excel 貼り付け／重複スキップ」と書いていたが、実装には
+      その機能が一切無かった。実装（図枠＋作成枚数＋図面No）の説明に書き直し、
+      「この機能でできないこと」節を追加
+
+### 次回以降
+- [ ] AutoBackup 同期ダイアログの許可リスト方式（`DialogId` のログが集まってから）
+- [ ] シート一括作成のリスト入力方式（番号・名前を1枚ずつ指定 / Excel 貼り付け）— 機能追加として検討
+- [ ] Excel ヘッダー「要素ID」「カテゴリ」の多言語化 — 読み戻し互換の設計が必要
 
 ### 完了（2026-08-28 GenericModelMerge セッション）
 - [x] `Commands/GenericModelMerge/` 一式を新設（Command / Models / Services / Views）

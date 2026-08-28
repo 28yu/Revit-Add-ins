@@ -22,7 +22,8 @@ namespace Tools28.Commands.Room3DColor
             return new FilteredElementCollector(doc)
                 .OfCategory(BuiltInCategory.OST_Rooms)
                 .WhereElementIsNotElementType()
-                .Cast<Room>()
+                // カテゴリ指定だけでは型が保証されないため OfType を使う（Cast は例外になる）
+                .OfType<Room>()
                 .Where(r => r.Location != null && r.Area > 0)
                 .ToList();
         }

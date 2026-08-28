@@ -965,6 +965,11 @@ namespace Tools28.Localization
             { "GmMerge.Result.ShapeFailed", "未能加入族的形状: {0} 个" },
             { "GmMerge.Result.MaterialSkipped", "由于面数过多，未应用材质（形状本身已正常创建）。" },
             { "GmMerge.Result.MaterialFailed", "未能应用材质（形状本身已正常创建）。" },
+            { "Common.RevitWarnings", "Revit 的警告:" },
+            { "Formwork.Sheet.ConfirmDelete.Title", "确认删除现有图纸" },
+            { "Formwork.Sheet.ConfirmDelete.Main", "找到名为“{0} - {1}”的图纸。" },
+            { "Formwork.Sheet.ConfirmDelete.Content", "该图纸没有由 28 Tools 创建的记录，可能是手动创建的。\n\n继续将删除该图纸并按本次结果重新创建。图纸上放置的其他视图和视口也会丢失。\n\n要删除并重新创建吗？\n选择“否”将跳过图纸创建。" },
+            { "Formwork.Sheet.Skipped", "已跳过图纸创建（因为取消了删除现有图纸）。" },
         };
     }
 }

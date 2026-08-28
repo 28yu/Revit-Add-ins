@@ -966,6 +966,11 @@ namespace Tools28.Localization
             { "GmMerge.Result.ShapeFailed", "Shapes that could not be added to the family: {0}" },
             { "GmMerge.Result.MaterialSkipped", "The material was not applied because there are too many faces (the shape itself was created normally)." },
             { "GmMerge.Result.MaterialFailed", "The material could not be applied (the shape itself was created normally)." },
+            { "Common.RevitWarnings", "Warnings reported by Revit:" },
+            { "Formwork.Sheet.ConfirmDelete.Title", "Confirm Deleting an Existing Sheet" },
+            { "Formwork.Sheet.ConfirmDelete.Main", "A sheet named \"{0} - {1}\" was found." },
+            { "Formwork.Sheet.ConfirmDelete.Content", "This sheet has no record of being created by 28 Tools. It may have been created manually.\n\nIf you continue, the sheet will be deleted and rebuilt from this run. Any other views or viewports placed on it will be lost.\n\nDelete and rebuild it?\nChoose No to skip sheet creation." },
+            { "Formwork.Sheet.Skipped", "Sheet creation was skipped because deleting the existing sheet was cancelled." },
         };
     }
 }

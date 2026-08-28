@@ -464,13 +464,8 @@ namespace Tools28.Commands.FireProtection
                                     doc, sheet.Id, legendViewId,
                                     new XYZ(vpCX, vpCY, 0));
 
-                                try
-                                {
-                                    System.IO.File.AppendAllText(
-                                        @"C:\temp\FireProtection_debug.txt",
-                                        $"\n凡例配置: VP={vp?.Id?.IntValue()} pos=({vpCX * 304.8:F0},{vpCY * 304.8:F0})\n");
-                                }
-                                catch { }
+                                DiagLog.WriteTo(FilledRegionCreator.FireLogFile,
+                                    $"凡例配置: VP={vp?.Id?.IntValue()} pos=({vpCX * 304.8:F0},{vpCY * 304.8:F0})");
                             }
 
                             vpTrans.Commit();
@@ -478,13 +473,8 @@ namespace Tools28.Commands.FireProtection
                         catch (Exception vpEx)
                         {
                             vpTrans.RollBack();
-                            try
-                            {
-                                System.IO.File.AppendAllText(
-                                    @"C:\temp\FireProtection_debug.txt",
-                                    $"\n凡例配置エラー: {vpEx.Message}\n");
-                            }
-                            catch { }
+                            DiagLog.WriteTo(FilledRegionCreator.FireLogFile,
+                                $"凡例配置エラー: {vpEx.Message}");
                         }
                     }
                 }

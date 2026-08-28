@@ -457,7 +457,9 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     tbInstances = new FilteredElementCollector(doc, sh.Id)
                         .OfCategory(BuiltInCategory.OST_TitleBlocks)
                         .WhereElementIsNotElementType()
-                        .Cast<FamilyInstance>();
+                        // ⚠ Cast<> は使わない。図枠カテゴリに FamilyInstance でない要素が
+                        //    混ざると例外になる（遅延評価のため列挙時に落ちて catch も効かない）。
+                        .OfType<FamilyInstance>();
                 }
                 catch { continue; }
 
