@@ -26,6 +26,7 @@ OKボタンを「エクスポート実行」に改名、Excelインポートの�
 
 ## 現在作業中
 ParameterCleanup（パラメータ整理）— バインドなしパラメータの値判定を実装。Revit での動作確認待ち
+動作確認対象: **Revit 2022 / 2024**（AutoBuild を `[build:2022,2024]` で実行）
 ブランチ: `claude/parameter-organization-improvement-1eol6q`
 
 ### 完了（2026-08-28 ParameterCleanup セッション）
