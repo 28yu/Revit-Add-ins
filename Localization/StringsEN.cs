@@ -971,6 +971,19 @@ namespace Tools28.Localization
             { "Formwork.Sheet.ConfirmDelete.Main", "A sheet named \"{0} - {1}\" was found." },
             { "Formwork.Sheet.ConfirmDelete.Content", "This sheet has no record of being created by 28 Tools. It may have been created manually.\n\nIf you continue, the sheet will be deleted and rebuilt from this run. Any other views or viewports placed on it will be lost.\n\nDelete and rebuild it?\nChoose No to skip sheet creation." },
             { "Formwork.Sheet.Skipped", "Sheet creation was skipped because deleting the existing sheet was cancelled." },
+            { "Export.Header.ElementId", "Element ID" },
+            { "Export.Header.Category", "Category" },
+            { "Export.SheetName.Merged", "Data" },
+            { "Export.Marker.ReadOnly", "(*Read-only)" },
+            { "Export.Marker.Image", "(*Image ref/no text)" },
+            { "Export.Marker.Reference", "(*Element ref/name required)" },
+            { "Sheet.Mode", "Creation method:" },
+            { "Sheet.Mode.Count", "Create a numbered series by count" },
+            { "Sheet.Mode.List", "Create from a list of numbers and names" },
+            { "Sheet.List", "Sheet list:" },
+            { "Sheet.ListHint", "One sheet per line, in the form \"Sheet number[Tab]Sheet name\". You can paste two columns straight from Excel." },
+            { "Sheet.ListEmpty", "The sheet list is empty. Enter one sheet per line." },
+            { "Sheet.Result.Skipped", "Skipped because the sheet number already exists: {0}" },
         };
     }
 }

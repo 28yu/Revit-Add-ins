@@ -107,32 +107,29 @@ namespace Tools28.Commands.SheetCreation
                         doc.Regenerate();
                     }
 
-                    // 次のシート番号を取得
-                    int nextNumber = GetNextSheetNumber(doc, prefix);
-                    LogDebug($"開始シート番号: {nextNumber}");
+                    List<ViewSheet> createdSheets;
+                    var skippedNumbers = new List<string>();
 
-                    // シートを作成
-                    List<ViewSheet> createdSheets = new List<ViewSheet>();
-                    for (int i = 0; i < sheetCount; i++)
+                    if (dialog.UseListMode)
                     {
-                        int currentNumber = nextNumber + i;
-                        string sheetNumber = FormatSheetNumber(prefix, currentNumber);
-                        string sheetName = string.Format(Loc.S("Sheet.NewSheetName", modelLang), sheetNumber);
-
-                        LogDebug($"シート作成中 [{i + 1}/{sheetCount}]: {sheetNumber}");
-
-                        ViewSheet sheet = ViewSheet.Create(doc, titleBlock.Id);
-                        sheet.SheetNumber = sheetNumber;
-                        sheet.Name = sheetName;
-
-                        createdSheets.Add(sheet);
+                        LogDebug($"リストモード: {dialog.SheetList.Count} 行");
+                        createdSheets = CreateSheetsFromList(
+                            doc, titleBlock, dialog.SheetList, modelLang, skippedNumbers);
+                    }
+                    else
+                    {
+                        // 次のシート番号を取得
+                        int nextNumber = GetNextSheetNumber(doc, prefix);
+                        LogDebug($"開始シート番号: {nextNumber}");
+                        createdSheets = CreateSheetsByCount(
+                            doc, titleBlock, prefix, sheetCount, nextNumber, modelLang);
                     }
 
                     trans.Commit();
                     LogDebug("トランザクションコミット完了");
 
                     // 結果を表示
-                    ShowResultDialog(createdSheets, titleBlock);
+                    ShowResultDialog(createdSheets, titleBlock, skippedNumbers);
                     LogDebug("結果ダイアログ表示完了");
                 }
 
@@ -148,6 +145,78 @@ namespace Tools28.Commands.SheetCreation
                 message = GetErrorMessageWithManualUrl(string.Format(Loc.S("Sheet.ProcessError"), ex.Message));
                 return Result.Failed;
             }
+        }
+
+        /// <summary>
+        /// 「枚数＋図面No」モード。連番でシートを作る。トランザクション内で呼ぶこと。
+        /// </summary>
+        private List<ViewSheet> CreateSheetsByCount(
+            Document doc, FamilySymbol titleBlock, string prefix, int sheetCount,
+            int nextNumber, string modelLang)
+        {
+            var created = new List<ViewSheet>();
+
+            for (int i = 0; i < sheetCount; i++)
+            {
+                string sheetNumber = FormatSheetNumber(prefix, nextNumber + i);
+                string sheetName = string.Format(Loc.S("Sheet.NewSheetName", modelLang), sheetNumber);
+
+                LogDebug($"シート作成中 [{i + 1}/{sheetCount}]: {sheetNumber}");
+
+                ViewSheet sheet = ViewSheet.Create(doc, titleBlock.Id);
+                sheet.SheetNumber = sheetNumber;
+                sheet.Name = sheetName;
+                created.Add(sheet);
+            }
+
+            return created;
+        }
+
+        /// <summary>
+        /// 「リスト入力」モード。指定された番号・名前でシートを作る。トランザクション内で呼ぶこと。
+        /// すでに同じシート番号が存在する行はスキップし、skipped に記録する
+        /// （Revit はシート番号の重複を許さないため、そのまま設定すると例外になる）。
+        /// シート名が空の行は連番モードと同じ既定名にする。
+        /// </summary>
+        private List<ViewSheet> CreateSheetsFromList(
+            Document doc, FamilySymbol titleBlock, List<SheetListEntry> entries,
+            string modelLang, List<string> skipped)
+        {
+            var created = new List<ViewSheet>();
+            if (entries == null || entries.Count == 0) return created;
+
+            // 既存シート番号（大文字小文字を区別しない）。Revit の重複判定に合わせる。
+            var existingNumbers = new HashSet<string>(
+                new FilteredElementCollector(doc)
+                    .OfClass(typeof(ViewSheet))
+                    .Cast<ViewSheet>()
+                    .Select(v => v.SheetNumber ?? ""),
+                StringComparer.CurrentCultureIgnoreCase);
+
+            for (int i = 0; i < entries.Count; i++)
+            {
+                var entry = entries[i];
+                if (entry == null || string.IsNullOrWhiteSpace(entry.Number)) continue;
+
+                if (!existingNumbers.Add(entry.Number))
+                {
+                    LogDebug($"シート番号が重複のためスキップ: {entry.Number}");
+                    skipped.Add(entry.Number);
+                    continue;
+                }
+
+                LogDebug($"シート作成中 [{i + 1}/{entries.Count}]: {entry.Number}");
+
+                ViewSheet sheet = ViewSheet.Create(doc, titleBlock.Id);
+                sheet.SheetNumber = entry.Number;
+                sheet.Name = string.IsNullOrWhiteSpace(entry.Name)
+                    ? string.Format(Loc.S("Sheet.NewSheetName", modelLang), entry.Number)
+                    : entry.Name;
+
+                created.Add(sheet);
+            }
+
+            return created;
         }
 
         /// <summary>
@@ -226,20 +295,38 @@ namespace Tools28.Commands.SheetCreation
         /// <summary>
         /// 結果ダイアログを表示
         /// </summary>
-        private void ShowResultDialog(List<ViewSheet> createdSheets, FamilySymbol titleBlock)
+        private void ShowResultDialog(List<ViewSheet> createdSheets, FamilySymbol titleBlock,
+                                      List<string> skippedNumbers)
         {
-            if (createdSheets == null || createdSheets.Count == 0) return;
+            bool hasCreated = createdSheets != null && createdSheets.Count > 0;
+            bool hasSkipped = skippedNumbers != null && skippedNumbers.Count > 0;
+            if (!hasCreated && !hasSkipped) return;
 
             TaskDialog resultDialog = new TaskDialog(Loc.S("Sheet.Result.Title"));
-            resultDialog.MainInstruction = string.Format(Loc.S("Sheet.Result.Main"), createdSheets.Count);
+            resultDialog.MainInstruction = string.Format(
+                Loc.S("Sheet.Result.Main"), hasCreated ? createdSheets.Count : 0);
 
-            string titleBlockName = $"{titleBlock.FamilyName} - {titleBlock.Name}";
-            resultDialog.MainContent = createdSheets.Count > 1
-                ? string.Format(Loc.S("Sheet.Result.DetailRange"), titleBlockName,
-                    createdSheets.First().SheetNumber, createdSheets.Last().SheetNumber)
-                : string.Format(Loc.S("Sheet.Result.Detail"), titleBlockName,
-                    createdSheets.First().SheetNumber);
+            string content = "";
+            if (hasCreated)
+            {
+                string titleBlockName = $"{titleBlock.FamilyName} - {titleBlock.Name}";
+                content = createdSheets.Count > 1
+                    ? string.Format(Loc.S("Sheet.Result.DetailRange"), titleBlockName,
+                        createdSheets.First().SheetNumber, createdSheets.Last().SheetNumber)
+                    : string.Format(Loc.S("Sheet.Result.Detail"), titleBlockName,
+                        createdSheets.First().SheetNumber);
+            }
 
+            // 既存と重複してスキップした番号を明示する（黙って減らさない）
+            if (hasSkipped)
+            {
+                if (content.Length > 0) content += "\n\n";
+                content += string.Format(Loc.S("Sheet.Result.Skipped"), skippedNumbers.Count)
+                         + "\n" + string.Join(", ", skippedNumbers.Take(10));
+                if (skippedNumbers.Count > 10) content += " …";
+            }
+
+            resultDialog.MainContent = content;
             resultDialog.CommonButtons = TaskDialogCommonButtons.Ok;
             resultDialog.Show();
         }

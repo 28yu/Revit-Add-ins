@@ -970,6 +970,19 @@ namespace Tools28.Localization
             { "Formwork.Sheet.ConfirmDelete.Main", "「{0} - {1}」というシートが見つかりました。" },
             { "Formwork.Sheet.ConfirmDelete.Content", "このシートには 28 Tools が作成したという記録がありません。手動で作成されたシートの可能性があります。\n\n続行すると、このシートは削除され、今回の結果で作り直されます。シート上に配置した他のビューやビューポートも失われます。\n\n削除して作り直しますか？\n「いいえ」を選ぶと、シートの作成をスキップします。" },
             { "Formwork.Sheet.Skipped", "シートの作成をスキップしました（既存シートの削除を中止したため）。" },
+            { "Export.Header.ElementId", "要素ID" },
+            { "Export.Header.Category", "カテゴリ" },
+            { "Export.SheetName.Merged", "データ" },
+            { "Export.Marker.ReadOnly", "(*変更不可)" },
+            { "Export.Marker.Image", "(*画像参照/文字不可)" },
+            { "Export.Marker.Reference", "(*要素参照/名称必須)" },
+            { "Sheet.Mode", "作成方法:" },
+            { "Sheet.Mode.Count", "枚数を指定して連番で作る" },
+            { "Sheet.Mode.List", "番号と名前のリストから作る" },
+            { "Sheet.List", "シートリスト:" },
+            { "Sheet.ListHint", "※ 1行に1シート。「シート番号[Tab]シート名」の形式です。Excelの2列を選択してそのまま貼り付けられます。" },
+            { "Sheet.ListEmpty", "シートリストが空です。1行に1シートずつ入力してください。" },
+            { "Sheet.Result.Skipped", "シート番号が既存と重複したためスキップ: {0} 件" },
         };
     }
 }

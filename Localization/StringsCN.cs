@@ -970,6 +970,19 @@ namespace Tools28.Localization
             { "Formwork.Sheet.ConfirmDelete.Main", "找到名为“{0} - {1}”的图纸。" },
             { "Formwork.Sheet.ConfirmDelete.Content", "该图纸没有由 28 Tools 创建的记录，可能是手动创建的。\n\n继续将删除该图纸并按本次结果重新创建。图纸上放置的其他视图和视口也会丢失。\n\n要删除并重新创建吗？\n选择“否”将跳过图纸创建。" },
             { "Formwork.Sheet.Skipped", "已跳过图纸创建（因为取消了删除现有图纸）。" },
+            { "Export.Header.ElementId", "图元ID" },
+            { "Export.Header.Category", "类别" },
+            { "Export.SheetName.Merged", "数据" },
+            { "Export.Marker.ReadOnly", "(*不可修改)" },
+            { "Export.Marker.Image", "(*图像引用/不可输入文字)" },
+            { "Export.Marker.Reference", "(*图元引用/需要名称)" },
+            { "Sheet.Mode", "创建方式:" },
+            { "Sheet.Mode.Count", "按数量创建连续编号" },
+            { "Sheet.Mode.List", "根据编号与名称列表创建" },
+            { "Sheet.List", "图纸列表:" },
+            { "Sheet.ListHint", "每行一张图纸，格式为“图纸编号[Tab]图纸名称”。可直接从 Excel 复制两列粘贴。" },
+            { "Sheet.ListEmpty", "图纸列表为空。请每行输入一张图纸。" },
+            { "Sheet.Result.Skipped", "因图纸编号已存在而跳过: {0} 项" },
         };
     }
 }

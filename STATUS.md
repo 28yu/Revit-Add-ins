@@ -1,9 +1,11 @@
-## 最終セッション: 2026-08-28（監査対応 第2弾）
-全機能監査で残していた項目をすべて対応。`Cast<T>()` の例外リスク（`OfType<T>()` へ）、
-Excel の要素Id 幅の統一、型枠シートの名前一致削除に確認ダイアログ、
-言語メニューのツールチップ更新、フィルタ/テンプレート整理での Revit 警告の記録、
-診断ログの集約（ローテーション・ON/OFF）、図面No 空欄で番号が "- 1" になる不具合を修正。
-`Docs/Features/SheetCreation.md` を実装に合わせて全面改訂（マニュアルが存在しない機能を説明していた）。
+## 最終セッション: 2026-08-28（残項目2件の対応）
+シート一括作成に**リスト入力モード**を追加（案A: ラジオボタンで従来の「枚数＋図面No」方式と切替）。
+番号と名前を1枚ずつ指定でき、Excel の2列をそのまま貼り付けられる。既存番号との重複はスキップし
+結果ダイアログに列挙する。
+Excel ヘッダー（要素ID / カテゴリ / 統合シート名 / 編集可否マーカー）を多言語化。
+書き出しは現在の言語、読み込みは3言語すべてを候補にするため、別言語で書き出した Excel も
+旧バージョンの Excel も読み戻せる。あわせて英語 Revit で「タイプ」列が編集不可扱いになる
+不具合（パラメータ名を日本語literalと比較していた）を修正。
 
 ## 前回セッション: 2026-08-28 03:18
 変更ファイル: Application.cs,CLAUDE.md,Commands/GenericModelMerge/GenericModelMergeCommand.cs,Commands/GenericModelMerge/Models/MergeCategoryRow.cs,Commands/GenericModelMerge/Models/MergeOptions.cs
@@ -48,6 +50,27 @@ OKボタンを「エクスポート実行」に改名、Excelインポートの�
 > このファイルはセッション終了時に更新すること
 
 ## 現在作業中
+残項目2件の対応 — Revit での動作確認待ち
+動作確認対象: **Revit 2022 / 2024**
+ブランチ: `claude/parameter-organization-improvement-1eol6q`
+
+### 完了（2026-08-28 残項目2件）
+- [x] **シート一括作成にリスト入力モードを追加**（案A）
+      - ラジオボタンで「枚数を指定して連番で作る」/「番号と名前のリストから作る」を切替
+      - `シート番号[Tab]シート名` を複数行入力。Excel の2列をそのまま貼り付け可能
+      - 空行無視／タブ無しは番号のみ／3列目以降無視／入力内の重複は先勝ち
+      - 既存シート番号と重複する行はスキップし、**スキップした番号を結果ダイアログに列挙**
+      - ダイアログは `SizeToContent="Height"` でモードによる高さ差を吸収
+      - ⚠ `Window` 派生での `Visibility` は CS0176 になるため完全修飾（DEVLOG 参照）
+- [x] **Excel ヘッダーの多言語化**
+      - `ExcelHeaderNames` を新設（要素ID / カテゴリ / 統合シート名）
+      - `ParameterHeaderMarker` のマーカー3種も `Loc.S` 化
+      - **書き出しは現在の言語 / 読み込みは3言語すべてを候補**にするため、
+        別言語で書き出した Excel も、日本語固定だった旧版の Excel も読める
+      - 英語 Revit で「タイプ」列が編集不可扱いになる不具合を修正
+        （`p.RawName == "タイプ"` → `BuiltInParameter.ELEM_TYPE_PARAM` の Id で判定）
+
+### 旧・現在作業中
 GenericModelMerge（一般モデル化）— 新規実装完了。Revit での動作確認待ち
 動作確認対象: **Revit 2022 / 2024**（AutoBuild を `[build:2022,2024]` で実行）
 ブランチ: `claude/unified-model-generation-fzdtr1`

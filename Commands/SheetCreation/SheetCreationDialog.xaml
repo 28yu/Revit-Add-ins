@@ -2,8 +2,9 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="シート一括作成" 
-        Width="520" 
-        Height="420"
+        Width="560" 
+        SizeToContent="Height"
+        MinHeight="420"
         WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize"
         Background="#F5F5F5"
@@ -207,7 +208,8 @@
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
@@ -220,8 +222,19 @@
                           DisplayMemberPath="DisplayName"/>
             </StackPanel>
 
-            <!-- 作成枚数 -->
-            <StackPanel Grid.Row="1" Margin="0,0,0,20">
+            <!-- 作成方法の選択 -->
+            <StackPanel Grid.Row="1" Margin="0,0,0,14">
+                <TextBlock x:Name="txtMode" Text="作成方法:" Style="{StaticResource LabelStyle}"/>
+                <RadioButton x:Name="rbModeCount" GroupName="CreateMode" IsChecked="True"
+                             Content="枚数を指定して連番で作る"
+                             FontSize="12" Margin="2,4,0,0" Checked="Mode_Changed"/>
+                <RadioButton x:Name="rbModeList" GroupName="CreateMode"
+                             Content="番号と名前のリストから作る"
+                             FontSize="12" Margin="2,6,0,0" Checked="Mode_Changed"/>
+            </StackPanel>
+
+            <!-- 連番モードの入力（作成枚数・図面No） -->
+            <StackPanel x:Name="pnlCountMode" Grid.Row="2" Margin="0,0,0,20">
                 <TextBlock x:Name="txtCount" Text="作成枚数:" Style="{StaticResource LabelStyle}"/>
                 <TextBox x:Name="SheetCountTextBox" 
                          Style="{StaticResource TextBoxStyle}"
@@ -232,11 +245,8 @@
                            FontSize="10"
                            Foreground="#666666"
                            Margin="0,5,0,0"/>
-            </StackPanel>
 
-            <!-- 図面No -->
-            <StackPanel Grid.Row="2" Margin="0,0,0,20">
-                <TextBlock x:Name="txtDrawingNo" Text="図面No:" Style="{StaticResource LabelStyle}"/>
+                <TextBlock x:Name="txtDrawingNo" Text="図面No:" Style="{StaticResource LabelStyle}" Margin="0,14,0,0"/>
                 <TextBox x:Name="PrefixTextBox" 
                          Style="{StaticResource TextBoxStyle}"
                          TextChanged="PrefixTextBox_TextChanged"
@@ -247,11 +257,36 @@
                            Margin="0,5,0,0"/>
             </StackPanel>
 
+            <!-- リストモードの入力（番号[Tab]名前 を複数行） -->
+            <StackPanel x:Name="pnlListMode" Grid.Row="3" Margin="0,0,0,20" Visibility="Collapsed">
+                <TextBlock x:Name="txtList" Text="シートリスト:" Style="{StaticResource LabelStyle}"/>
+                <TextBox x:Name="SheetListTextBox"
+                         Height="150"
+                         FontSize="12"
+                         FontFamily="Consolas, ＭＳ ゴシック"
+                         AcceptsReturn="True"
+                         AcceptsTab="True"
+                         TextWrapping="NoWrap"
+                         VerticalScrollBarVisibility="Auto"
+                         HorizontalScrollBarVisibility="Auto"
+                         VerticalContentAlignment="Top"
+                         Padding="6,4"
+                         BorderBrush="#CCCCCC"
+                         BorderThickness="1"
+                         TextChanged="SheetListTextBox_TextChanged"/>
+                <TextBlock x:Name="txtListHint"
+                           Text="※ 1行に1シート。「シート番号[Tab]シート名」の形式です。Excelの2列を選択してそのまま貼り付けられます。"
+                           FontSize="10"
+                           Foreground="#666666"
+                           TextWrapping="Wrap"
+                           Margin="0,5,0,0"/>
+            </StackPanel>
+
             <!-- スペーサー -->
-            <Border Grid.Row="3"/>
+            <Border Grid.Row="4"/>
 
             <!-- ボタンエリア（右下） -->
-            <StackPanel Grid.Row="4" 
+            <StackPanel Grid.Row="5" 
                         Orientation="Horizontal" 
                         HorizontalAlignment="Right"
                         Margin="0,15,0,0">

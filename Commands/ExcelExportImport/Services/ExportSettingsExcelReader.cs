@@ -13,19 +13,18 @@ namespace Tools28.Commands.ExcelExportImport.Services
     /// </summary>
     /// <remarks>
     /// エクスポート形式（<see cref="ExcelExportService"/>）を前提に読み取る:
-    ///  - 1行目がヘッダー。1列目「要素ID」、2列目「カテゴリ」、3列目以降が
+    ///  - 1行目がヘッダー。1列目「要素ID」、2列目「カテゴリ」（書き出し時の言語による）、3列目以降が
     ///    パラメータ列で、見出しは "I-"/"T-" プレフィックス付き DisplayName
     ///    （読取専用は "(*変更不可)" サフィックス付き）。
     ///  - データ行の2列目には Revit の実カテゴリ名が入る。
     ///  - カテゴリ毎シート分割: 各シート＝1カテゴリ。
-    ///  - 1シート統合（"データ"）: 2列目で複数カテゴリが混在。
+    ///  - 1シート統合（"データ"／"Data"／"数据"）: 2列目で複数カテゴリが混在。
     /// </remarks>
     public static class ExportSettingsExcelReader
     {
-        // ExcelExportService が出力する固定ヘッダー名（1列目・2列目）。
-        // 列位置ではなくこの見出しで列を特定するため、列を入れ替えても読める。
-        private const string ElementIdHeader = "要素ID";
-        private const string CategoryHeader = "カテゴリ";
+        // 固定ヘッダー名（1列目・2列目）と統合シート名の照合は ExcelHeaderNames に集約している。
+        // 列位置ではなく見出しで列を特定するため、列を入れ替えても読める。
+        // 照合は全言語の候補に対して行うので、別言語で書き出した Excel も読める。
 
         /// <summary>
         /// エクスポート済み Excel から出力設定を復元する。
@@ -74,9 +73,9 @@ namespace Tools28.Commands.ExcelExportImport.Services
                     foreach (var cell in worksheet.Row(1).CellsUsed())
                     {
                         string text = cell.GetString();
-                        if (text == ElementIdHeader)
+                        if (ExcelHeaderNames.IsElementIdHeader(text))
                             continue; // 要素ID列（設定復元には不要）
-                        if (text == CategoryHeader)
+                        if (ExcelHeaderNames.IsCategoryHeader(text))
                         {
                             categoryCol = cell.Address.ColumnNumber; // カテゴリ列を記録
                             continue;
@@ -91,11 +90,11 @@ namespace Tools28.Commands.ExcelExportImport.Services
                     if (headerParams.Count == 0)
                         continue; // このシートに有効なパラメータ列が無い
 
-                    // 統合シート（ExportSingleSheet が付ける固定名 "データ"）だけは
+                    // 統合シート（ExportSingleSheet が付けるシート名。言語で変わる）だけは
                     // 複数カテゴリが混在するため列→カテゴリの対応判定が要る。
                     // それ以外（カテゴリ毎シート分割）は 1シート=1カテゴリなので、
                     // 先頭データ行(2行目)のカテゴリ列からカテゴリ名を1回読むだけで済む。
-                    if (worksheet.Name != "データ")
+                    if (!ExcelHeaderNames.IsMergedSheetName(worksheet.Name))
                     {
                         // カテゴリ列が見つかればその値、無ければシート名（サニタイズ済みの実名）を使う
                         string cat = null;

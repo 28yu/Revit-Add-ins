@@ -167,7 +167,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
             if (allParams.Count == 0)
                 return;
 
-            var worksheet = workbook.Worksheets.Add("データ");
+            var worksheet = workbook.Worksheets.Add(ExcelHeaderNames.MergedSheet);
             worksheet.Style.Font.FontName = "ＭＳ 明朝";
 
             // ヘッダー行を作成（文字値を入れられない列はマーカー＋灰色で明示）
@@ -392,8 +392,10 @@ namespace Tools28.Commands.ExcelExportImport.Services
         /// </summary>
         private static void WriteHeaderRow(IXLWorksheet worksheet, List<ParameterInfo> headerParams)
         {
-            worksheet.Cell(1, 1).Value = "要素ID";
-            worksheet.Cell(1, 2).Value = "カテゴリ";
+            // 見出しは現在のアドイン言語で書く。読み戻し側（ExportSettingsExcelReader）は
+            // 全言語の候補と照合するため、別言語環境で取り込んでも列を特定できる。
+            worksheet.Cell(1, 1).Value = ExcelHeaderNames.ElementId;
+            worksheet.Cell(1, 2).Value = ExcelHeaderNames.Category;
             for (int i = 0; i < headerParams.Count; i++)
             {
                 var p = headerParams[i];
