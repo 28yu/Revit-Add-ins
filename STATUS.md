@@ -1,10 +1,11 @@
 ## 最終セッション: 2026-08-28（アイコンの青を Revit に合わせた）
 Revit 2024 以降の既定アイコンの淡い青 `#67B1E6`（ユーザーが実測）に合わせて、
-アドインのボタンアイコン35ファイルの青を一括変換。単純置換ではなく
-アンカー `#0066CC → #67B1E6` の HSV 関係を青系ピクセル全体に適用し、
-陰影・グラデーション・アンチエイリアスを保持。
-国旗・部屋3D色分けの4色パレット・型枠の構造物グレーは除外。
-変換は `scripts/recolor-icons.py` として再利用可能な形で保存。
+アドインのボタンアイコンの青を一括変換。単純置換ではなくアンカーの HSV 関係を
+青系ピクセル全体に適用し、陰影・グラデーション・アンチエイリアスを保持。
+白抜き文字があるアイコン（manual_16 / ver_16 / view_template 系）は
+同じ色相のやや濃い `#1D7CBF` にしてコントラストを確保。
+国旗・部屋3D色分けの4色パレット・型枠の構造物グレー・梁天端/梁下端の3色凡例は除外。
+変換は `scripts/recolor-icons.py`（--from/--to/--only/--dry-run）として保存。
 ## 前回セッション: 2026-08-28 03:18
 変更ファイル: Application.cs,CLAUDE.md,Commands/GenericModelMerge/GenericModelMergeCommand.cs,Commands/GenericModelMerge/Models/MergeCategoryRow.cs,Commands/GenericModelMerge/Models/MergeOptions.cs
 

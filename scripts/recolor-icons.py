@@ -20,6 +20,9 @@
 
 適用履歴:
     2026-08-28  #0066CC → #67B1E6  Revit 2024 以降の既定アイコンの青に合わせた
+    2026-08-28  #0066CC → #1D7CBF  白抜き文字があるアイコンのみ、同じ色相 205° の
+                                    やや濃い青にしてコントラストを確保した
+                                    （manual_16 / ver_16 / view_template / view_template_16）
 """
 import argparse
 import colorsys
@@ -46,6 +49,8 @@ EXCLUDE = {
     'room_3d_color.png',
     # 型枠数量算出（ブランド青ではなく構造物のグレー #A2A7B0 / #8094A5）
     'formwork.png',
+    # 梁天端/梁下端レベル色分け（青・黄・桃の3色凡例。青だけ淡くすると凡例の統一感が崩れる）
+    'beam_top_level.png', 'beam_under_level.png',
 }
 
 TARGET_GLOBS = ('Resources/Icons/*.png', 'Docs/icons/features/*.png')
@@ -111,6 +116,8 @@ def main():
                         help='変換前の代表色（アンカー）。既定 0066CC')
     parser.add_argument('--to', dest='dst', type=parse_hex, default=parse_hex('67B1E6'),
                         help='目標色。既定 67B1E6（Revit の青）')
+    parser.add_argument('--only', nargs='+', metavar='NAME', default=None,
+                        help='指定したファイル名だけを対象にする（例: --only manual_16.png ver_16.png）')
     parser.add_argument('--dry-run', action='store_true', help='書き換えずに件数だけ表示する')
     args = parser.parse_args()
 
@@ -129,6 +136,8 @@ def main():
     total = 0
     for path in targets:
         name = os.path.basename(path)
+        if args.only is not None and name not in args.only:
+            continue
         if name in EXCLUDE:
             print(f"{path:42} skip")
             continue
