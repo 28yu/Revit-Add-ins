@@ -1,6 +1,7 @@
 # Tools28 - Revit Add-in 開発ガイド (Claude Code用)
 
 > 現在の作業状況 → **STATUS.md** / TODOリスト → **TASKS.md** / 開発知見 → **Docs/DEVLOG.md**
+> 開発体制（Claude／CI／ローカル自動ビルドの分担）の仕様 → **Docs/DEV-ENVIRONMENT.md**
 
 ## コミットメッセージのルール
 - **コミットメッセージは必ず日本語で書くこと**
