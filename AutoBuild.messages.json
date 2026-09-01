@@ -1,0 +1,12 @@
+{
+  "_comment": "AutoBuild.ps1 の通知ダイアログに出す日本語メッセージ。{0} は Revit バージョン（例: 2022）に置き換わります。PowerShell 5.1 の文字コード問題を避けるため、日本語はこのファイル（UTF-8）に分離しています。",
+  "SuccessTitle": "Tools28 ビルド成功",
+  "FailedTitle": "Tools28 ビルド失敗",
+  "BuildFailed": "ビルド失敗",
+  "DeployApplied": "デプロイ完了\n\nRevit は起動していなかったため、そのまま反映済みです。\nRevit {0} を起動してテストしてください。",
+  "DeployRestartRequired": "デプロイ完了（Revit 起動中）\n\nRevit が起動中でしたが、新しい DLL への差し替えは完了しています。\n起動中の Revit には反映されないので、Revit {0} を再起動してください。",
+  "DeployPending": "ビルド完了（反映待ち）\n\nRevit {0} が使用中で DLL を差し替えられませんでした。\nRevit を終了すると自動で適用されます。\nその後 Revit を起動すると反映されます。",
+  "DeployFailed": "デプロイ失敗\n\nRevit {0} への配置に失敗しました。\nAutoBuild_detail.log を確認してください。",
+  "PendingAppliedTitle": "Tools28 更新を適用しました",
+  "PendingAppliedBody": "Revit の終了を検知したので、保留していた更新を適用しました。\n\nRevit {0} を起動すると反映されます。"
+}

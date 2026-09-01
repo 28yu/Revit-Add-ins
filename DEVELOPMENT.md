@@ -288,7 +288,12 @@ cd C:\path\to\Revit-Add-ins
 
 ### 注意事項
 
-- **Revit 起動中の場合**: DLL がロックされてデプロイが失敗します。先に Revit を閉じてください。
+- **Revit 起動中でもビルドは成功します**: デプロイ先の DLL は Revit がロックしていますが、
+  旧 DLL を `*.old` にリネームして退避してから新しい DLL を配置するため、
+  **Revit を再起動すればビルド内容が反映されます**（起動中の Revit には反映されません）。
+  通知メッセージにも「Revit を再起動してください」と表示されます。
+  万一リネームもできなかった場合は `%ProgramData%\Tools28\PendingDeploy\{ver}\` に保留され、
+  Revit を終了したタイミングで AutoBuild が自動適用します。
 - **終了**: Ctrl+C で停止。
 - **PowerShell ウィンドウ**: スクリプト実行中は PowerShell を開いたままにしてください。
 

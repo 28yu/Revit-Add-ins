@@ -96,14 +96,30 @@
 | `AutoBuild.ps1` | 30 秒間隔で `origin/main` をポーリング。変更検知で `reset --hard` → ビルド → 通知。多重起動は Mutex で防止 |
 | `RestartAutoBuild.ps1` | 停止＋再起動を 1 コマンドで。⚠ `AutoBuild.ps1` 自体を変更したら再起動しないと反映されない |
 | `QuickBuild.ps1` | 単一バージョンのビルド＆デプロイ。vswhere で MSBuild を検索 → `bin\Release\Revit{ver}\` → `%ProgramData%\Autodesk\Revit\Addins\{ver}\28Tools\` へ DLL 一式、ルートへ `.addin` をコピー |
+| `DeployHelpers.ps1` | デプロイ共通処理。**Revit 起動中でロックされた DLL の差し替え**と保留ファイルの適用を担当（`QuickBuild.ps1` / `AutoBuild.ps1` から dot-source） |
+| `AutoBuild.messages.json` | 通知ダイアログの日本語文言。PowerShell 5.1 の文字コード問題を避けるためスクリプト本体から分離 |
 | `BuildAll.ps1` / `CreatePackages.ps1` | 全バージョンビルドと配布 ZIP 作成（リリース時） |
 | `AutoBuild.log` / `AutoBuild_detail.log` | 監視ログ / ビルド詳細ログ。**失敗時にユーザーが貼る情報源** |
 
-ビルド成功判定は終了コードではなく **DLL のタイムスタンプが更新されたか** で行っている
-（`& .\script.ps1` 経由の `$LASTEXITCODE` が信用できないため）。
+ビルド成功判定は `QuickBuild.ps1` が最後に出力する `DEPLOY_STATUS=<状態>` を読んで行う
+（マーカーが取れなかった場合のみ、旧来の DLL タイムスタンプ比較にフォールバックする）。
 
-デプロイ時、CAD が起動中だと DLL がロックされてコピーに失敗する。
-本体 DLL の失敗は致命的エラー、依存 DLL はスキップして続行する作りになっている。
+### Revit を起動したままビルドしたとき
+
+デプロイ先の `Tools28.dll` は起動中の Revit がロックしているため、そのままでは上書きできない。
+以前はここでデプロイが止まり、あとから Revit を再起動しても**古い DLL のまま**だった。
+現在は 3 段構えで必ず新しい DLL が配置される。
+
+| 段階 | 動作 | `DEPLOY_STATUS` |
+|--|--|--|
+| 1. 通常コピー | Revit 未起動 → その場で上書き | `APPLIED` |
+| 2. リネーム差し替え | 旧 DLL を `*.old` にリネームして退避 → 新 DLL を配置。**Revit 再起動で反映** | `RESTART_REQUIRED` |
+| 3. 保留 | 2 も失敗 → `%ProgramData%\Tools28\PendingDeploy\{ver}\` に置き、Revit 終了を検知して自動適用 | `PENDING` |
+
+- Windows は「読み込み中の DLL」でも**別名へのリネームは許可する**ため、段階 2 が成立する。
+  起動中の Revit はメモリ上の旧 DLL を使い続けるので落ちない。
+- `*.old` は Revit 終了後に `AutoBuild.ps1` が自動で掃除する。
+- 通知メッセージはこの状態に応じて出し分けられる（「そのまま反映済み」／「Revit を再起動してください」／「Revit を終了すると自動で適用されます」）。
 
 ### 3-4. ビルド対象バージョンの切り替え
 

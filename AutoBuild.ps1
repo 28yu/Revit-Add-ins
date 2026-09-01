@@ -16,6 +16,9 @@ param(
 # ========================================
 Set-Location $PSScriptRoot
 
+# Shared deploy helpers (handles DLLs locked by a running Revit)
+. (Join-Path $PSScriptRoot "DeployHelpers.ps1")
+
 # ========================================
 # Setup
 # ========================================
@@ -46,10 +49,50 @@ function Show-Notification {
     Start-Process powershell -ArgumentList '-NoProfile', '-WindowStyle', 'Hidden', '-EncodedCommand', $encoded -WindowStyle Hidden
 }
 
+# ----------------------------------------
+# Japanese notification texts
+# ----------------------------------------
+# PowerShell 5.1 reads .ps1 files using the system locale (Shift-JIS), so
+# Japanese literals inside this script can turn into mojibake.
+# The texts therefore live in AutoBuild.messages.json (UTF-8) and are read
+# with an explicit UTF-8 decoder.
+function Get-Msg {
+    param([string]$Key, [string[]]$FormatArgs = @())
+
+    # $PSScriptRoot is empty when the function is dot-sourced from a console,
+    # so fall back to the current directory (AutoBuild sets it to the repo root)
+    $scriptDir = $PSScriptRoot
+    if (-not $scriptDir) { $scriptDir = (Get-Location).Path }
+
+    $messages = $null
+    try {
+        $msgPath = Join-Path $scriptDir "AutoBuild.messages.json"
+        $raw = [System.IO.File]::ReadAllText($msgPath, [System.Text.Encoding]::UTF8)
+        $messages = $raw | ConvertFrom-Json
+    } catch { }
+
+    $text = $null
+    if ($messages) { $text = $messages.$Key }
+    # Fall back to the key name so a missing entry is visible instead of blank
+    if (-not $text) { return $Key }
+
+    # Cast to object[] so PowerShell picks Format(string, params object[])
+    # instead of Format(string, object) (which would print "System.String[]")
+    if ($FormatArgs.Count -gt 0) { return [string]::Format($text, [object[]]$FormatArgs) }
+    return $text
+}
+
 $AllRevitVersions = @("2021", "2022", "2023", "2024", "2025", "2026")
 
 # Versions built by the most recent Run-Build call (for notifications)
 $script:LastBuildVersions = @()
+
+# How the most recent deploy landed (for notifications):
+#   APPLIED          - copied straight in (Revit was not running)
+#   RESTART_REQUIRED - Revit was running; new DLLs are in place, restart to pick them up
+#   PENDING          - could not swap the files; they wait in the pending folder
+#   FAILED           - deploy failed
+$script:LastDeployStatus = "UNKNOWN"
 
 function Get-DefaultRevitVersion {
     $configPath = ".\dev-config.json"
@@ -108,6 +151,10 @@ function Run-Build {
 
     $allSuccess = $true
 
+    # Worst status across all built versions (FAILED > PENDING > RESTART_REQUIRED > APPLIED)
+    $statusRank = @{ "APPLIED" = 0; "RESTART_REQUIRED" = 1; "PENDING" = 2; "UNKNOWN" = 3; "FAILED" = 4 }
+    $worstStatus = "APPLIED"
+
     foreach ($revitVer in $versions) {
         $dllPath = ".\bin\Release\Revit$revitVer\Tools28.dll"
 
@@ -119,20 +166,41 @@ function Run-Build {
 
         # Build the explicitly-requested version (do NOT rely on dev-config default)
         Add-Content -Path $buildLog -Value "===== Revit $revitVer =====" -Encoding UTF8 -ErrorAction SilentlyContinue
-        $output = & .\QuickBuild.ps1 -RevitVersion $revitVer 2>&1
+        # *>&1 captures every stream (including Write-Host / information),
+        # so AutoBuild_detail.log holds the full deploy output as well.
+        $output = & .\QuickBuild.ps1 -RevitVersion $revitVer *>&1
         $exitCode = $LASTEXITCODE
         $output | Out-File -FilePath $buildLog -Encoding UTF8 -Append
 
-        # Check success: DLL exists AND was updated (newer timestamp)
+        # QuickBuild.ps1 prints "DEPLOY_STATUS=<state>" as its last word on the deploy
+        $statusLine = $output |
+            ForEach-Object { "$_" } |
+            Select-String -Pattern '^DEPLOY_STATUS=(\w+)' |
+            Select-Object -Last 1
+        $deployStatus = if ($statusLine) { $statusLine.Matches[0].Groups[1].Value } else { "UNKNOWN" }
+
+        if ($statusRank[$deployStatus] -gt $statusRank[$worstStatus]) { $worstStatus = $deployStatus }
+
         $dllExists = Test-Path $dllPath
         $dllUpdated = $false
         if ($dllExists) {
             $dllTimeAfter = (Get-Item $dllPath).LastWriteTime
             $dllUpdated = ($dllTimeBefore -eq $null) -or ($dllTimeAfter -gt $dllTimeBefore)
         }
-        $success = $dllExists -and $dllUpdated
 
-        Write-Log "Build[$revitVer] result: exitCode=$exitCode, dllExists=$dllExists, dllUpdated=$dllUpdated, success=$success" "Gray"
+        # Success: the deploy reported a state where the new DLL will reach Revit.
+        # PENDING counts as success - the build itself is fine and the files are
+        # applied automatically once Revit is closed.
+        if ($deployStatus -eq "APPLIED" -or $deployStatus -eq "RESTART_REQUIRED" -or $deployStatus -eq "PENDING") {
+            $success = $dllExists
+        } elseif ($deployStatus -eq "UNKNOWN") {
+            # Older fallback: compare the DLL timestamp before/after the build
+            $success = $dllExists -and $dllUpdated
+        } else {
+            $success = $false
+        }
+
+        Write-Log "Build[$revitVer] result: exitCode=$exitCode, dllExists=$dllExists, dllUpdated=$dllUpdated, deploy=$deployStatus, success=$success" "Gray"
 
         # Log build details on failure
         if (-not $success) {
@@ -147,7 +215,65 @@ function Run-Build {
         }
     }
 
+    $script:LastDeployStatus = $worstStatus
+    Write-Log "Deploy status: $worstStatus" "Gray"
+
     return $allSuccess
+}
+
+# ----------------------------------------
+# Build result notification
+# ----------------------------------------
+function Show-BuildResultNotification {
+    param([bool]$Success, [string]$CommitMsg)
+
+    $versionsText = ($script:LastBuildVersions -join ', ')
+
+    if ($Success) {
+        switch ($script:LastDeployStatus) {
+            "APPLIED"          { $detail = Get-Msg "DeployApplied"         @($versionsText) }
+            "RESTART_REQUIRED" { $detail = Get-Msg "DeployRestartRequired" @($versionsText) }
+            "PENDING"          { $detail = Get-Msg "DeployPending"         @($versionsText) }
+            default            { $detail = Get-Msg "DeployApplied"         @($versionsText) }
+        }
+        Show-Notification "$CommitMsg`n`n$detail" (Get-Msg "SuccessTitle") "Information"
+    }
+    elseif ($script:LastDeployStatus -eq "FAILED") {
+        # Compiled fine, but the files could not be placed
+        $detail = Get-Msg "DeployFailed" @($versionsText)
+        Show-Notification "$CommitMsg`n`n$detail" (Get-Msg "FailedTitle") "Error"
+    }
+    else {
+        Show-Notification ((Get-Msg "BuildFailed") + "`n`n$CommitMsg") (Get-Msg "FailedTitle") "Error"
+    }
+}
+
+# ----------------------------------------
+# Apply files that were left pending while Revit was running
+# ----------------------------------------
+# Called on every idle tick of the monitor loop. Once Revit is closed the
+# staged files are copied in and the *.old backups are cleaned up, so the
+# next Revit start picks up the latest build.
+function Invoke-PendingDeployIfPossible {
+    if (Test-RevitRunning) { return }
+
+    $appliedVersions = @()
+    foreach ($ver in $AllRevitVersions) {
+        $targetDir = Get-Tools28TargetDir $ver
+        if (-not (Test-Path $targetDir)) { continue }
+
+        $result = Invoke-Tools28PendingDeploy -RevitVersion $ver
+        if ($result.Applied -gt 0) {
+            Write-Host ""
+            Write-Log "Applied $($result.Applied) pending file(s) for Revit $ver" "Green"
+            $appliedVersions += $ver
+        }
+    }
+
+    if ($appliedVersions.Count -gt 0) {
+        Show-Notification (Get-Msg "PendingAppliedBody" @(($appliedVersions -join ', '))) `
+            (Get-Msg "PendingAppliedTitle") "Information"
+    }
 }
 
 # ========================================
@@ -216,16 +342,11 @@ if ($localHead -ne $remoteLatest) {
     $shortInfo = "$commitMsg ($($localHead.Substring(0,7)))"
 
     if ($buildSuccess) {
-        Write-Log "Startup build OK! Restart Revit to test." "Green"
-        $t = "Tools28 " + (-join([char[]]@(0x30D3,0x30EB,0x30C9,0x6210,0x529F)))
-        $b = (-join([char[]]@(0x30C7,0x30D7,0x30ED,0x30A4,0x5B8C,0x4E86))) + "`n`n$commitMsg`n`nRevit $($script:LastBuildVersions -join ', ') " + (-join([char[]]@(0x3092,0x518D,0x8D77,0x52D5,0x3057,0x3066,0x304F,0x3060,0x3055,0x3044)))
-        Show-Notification $b $t "Information"
+        Write-Log "Startup build OK (deploy: $($script:LastDeployStatus))" "Green"
     } else {
-        Write-Log "Startup build FAILED." "Red"
-        $t = "Tools28 " + (-join([char[]]@(0x30D3,0x30EB,0x30C9,0x5931,0x6557)))
-        $b = (-join([char[]]@(0x30D3,0x30EB,0x30C9,0x5931,0x6557))) + "`n`n$commitMsg"
-        Show-Notification $b $t "Error"
+        Write-Log "Startup build FAILED (deploy: $($script:LastDeployStatus))" "Red"
     }
+    Show-BuildResultNotification $buildSuccess $commitMsg
     Write-Host ""
 } else {
     Write-Log "Local is up to date. Waiting for changes..." "Green"
@@ -284,21 +405,19 @@ while ($true) {
             $shortInfo = "$commitMsg ($shortHash)"
 
             if ($buildSuccess) {
-                Write-Log "Build & Deploy OK! Restart Revit to test." "Green"
-                $t = "Tools28 " + (-join([char[]]@(0x30D3,0x30EB,0x30C9,0x6210,0x529F)))
-                $b = (-join([char[]]@(0x30C7,0x30D7,0x30ED,0x30A4,0x5B8C,0x4E86))) + "`n`n$commitMsg`n`nRevit $($script:LastBuildVersions -join ', ') " + (-join([char[]]@(0x3092,0x518D,0x8D77,0x52D5,0x3057,0x3066,0x304F,0x3060,0x3055,0x3044)))
-                Show-Notification $b $t "Information"
+                Write-Log "Build & Deploy OK (deploy: $($script:LastDeployStatus))" "Green"
             } else {
-                Write-Log "Build FAILED." "Red"
-                $t = "Tools28 " + (-join([char[]]@(0x30D3,0x30EB,0x30C9,0x5931,0x6557)))
-                $b = (-join([char[]]@(0x30D3,0x30EB,0x30C9,0x5931,0x6557))) + "`n`n$commitMsg"
-                Show-Notification $b $t "Error"
+                Write-Log "Build FAILED (deploy: $($script:LastDeployStatus))" "Red"
             }
+            Show-BuildResultNotification $buildSuccess $commitMsg
 
             $lastCommit = $remoteCommit
             Write-Host ""
             Write-Host "Monitoring..." -ForegroundColor Gray
         } else {
+            # No new commit: if Revit has been closed, flush anything that was
+            # left pending while it was running.
+            Invoke-PendingDeployIfPossible
             Write-Host "." -NoNewline -ForegroundColor DarkGray
         }
 

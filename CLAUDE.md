@@ -371,6 +371,17 @@ _buttonTipKeys["FeatureName"] = "Ribbon.FeatureName.Button.Tip";
   - 停止＋再起動を1コマンドで実行。手動の場合はタスクマネージャーで `powershell.exe` を終了 → `StartAutoBuild.vbs` を再実行
   - **⚠️ `AutoBuild.ps1` 自体を変更した場合は、この再起動をしないと新ロジックが反映されない**（起動中プロセスは旧スクリプトをメモリ実行中のため）
 
+#### Revit 起動中でもビルドは通る（Revit 再起動で反映）
+- デプロイ先の DLL は起動中の Revit がロックしているが、**旧 DLL を `*.old` にリネームして退避 →
+  新 DLL を配置**するため、デプロイは失敗しない。**Revit を再起動すれば反映される**
+- 実装は `DeployHelpers.ps1`（`QuickBuild.ps1` / `AutoBuild.ps1` から dot-source）
+- リネームもできなかった場合は `%ProgramData%\Tools28\PendingDeploy\{ver}\` に保留され、
+  Revit を終了したタイミングで `AutoBuild.ps1` が自動適用する
+- 通知メッセージは状態に応じて出し分ける（`AutoBuild.messages.json`）:
+  - そのまま反映済み / Revit を再起動してください / Revit 終了後に自動適用されます
+- ⚠️ `QuickBuild.ps1` が出す `DEPLOY_STATUS=` マーカーは **`Write-Output`** で出すこと
+  （`Write-Host` は情報ストリームなので呼び出し元で拾えない）
+
 #### AutoBuild の対象 Revit バージョン
 - **デフォルト**: `dev-config.json` の `defaultRevitVersion`（通常 **2022**）。指示がなければ常にこれでビルドする
 - **一時的にバージョンを指定する方法**: コミットの **1行目（件名）** に `[build:XXXX]` マーカーを入れる。

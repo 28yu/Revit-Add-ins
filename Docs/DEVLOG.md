@@ -90,7 +90,53 @@
 
 ### ビルド成功判定
 - `& .\QuickBuild.ps1` の `$LASTEXITCODE` は信頼できない（PowerShell スクリプト呼び出しでは正しく伝搬しない）
-- **解決策**: ビルド前後の DLL タイムスタンプを比較して成功判定
+- **旧解決策**: ビルド前後の DLL タイムスタンプを比較して成功判定
+- **現在**: `QuickBuild.ps1` が最後に `DEPLOY_STATUS=<状態>` を出力し、`AutoBuild.ps1` がそれを読む。
+  マーカーが取れなかったときだけ旧来のタイムスタンプ比較にフォールバックする
+- ⚠️ **マーカーは `Write-Output` で出すこと**。PowerShell 5.0 以降の `Write-Host` は
+  「情報ストリーム」に出るため、呼び出し側の `$output = & .\QuickBuild.ps1 ... 2>&1` では拾えない。
+  `AutoBuild.ps1` 側も `*>&1`（全ストリーム）に変更し、`AutoBuild_detail.log` に
+  デプロイの日本語ログまで残るようにした
+
+### Revit 起動中でもビルド＆デプロイが通るようにする（3段構え）
+
+**症状（修正前）**: Revit を起動したまま自動ビルドすると、デプロイ先の
+`%ProgramData%\Autodesk\Revit\Addins\{ver}\28Tools\Tools28.dll` を Revit がロックしているため
+`Copy-Item` が失敗。`QuickBuild.ps1` はそこで `throw` して終了していた。
+さらに `AutoBuild.ps1` の成功判定は **`bin\Release\` 側の DLL タイムスタンプ**だけを見ていたため、
+**デプロイが失敗しているのに「ビルド成功」と通知**され、Revit を再起動しても古い DLL のままだった。
+
+**解決策**: `DeployHelpers.ps1` の `Copy-Tools28File` が 3 段構えで配置する。
+
+| 段階 | 動作 | 結果 |
+|--|--|--|
+| 1 | 通常の `Copy-Item` | `Copied` → その場で反映 |
+| 2 | 旧ファイルを `<名前>.<日時>.old` に **`Rename-Item`** して退避 → 新ファイルを配置 | `Replaced` → Revit 再起動で反映 |
+| 3 | `%ProgramData%\Tools28\PendingDeploy\{ver}\` に保留 | `Pending` → Revit 終了後に自動適用 |
+
+- **要点**: Windows は「読み込み中（メモリマップ中）の DLL」でも **別名へのリネームは許可する**。
+  削除はできないがリネームはできる、という性質を使っている（インストーラが使う定番手法）。
+  起動中の Revit はメモリ上の旧 DLL を使い続けるので落ちない
+- 段階 2 でリネーム後のコピーに失敗したら、退避した旧ファイルを**必ず元の名前に戻す**
+  （戻さないとアドインごと読み込めなくなる）
+- 保留ファイルは `AutoBuild.ps1` の監視ループが毎ティック `Invoke-PendingDeployIfPossible` で
+  チェックし、**Revit が終了していれば適用＋通知**する。`*.old` の掃除も同じタイミング
+- `.old` は Revit のアセンブリ解決（`.dll` / `.exe` のみ探索）に引っかからないので置きっぱなしでも安全
+
+**通知メッセージ**は `DEPLOY_STATUS` に応じて出し分ける（`AutoBuild.messages.json`）:
+- `APPLIED` … 「Revit は起動していなかったため、そのまま反映済みです」
+- `RESTART_REQUIRED` … 「新しい DLL への差し替えは完了しています。Revit を再起動してください」
+- `PENDING` … 「Revit を終了すると自動で適用されます」
+
+### 通知の日本語文言は JSON に分離した
+- `AutoBuild.ps1` 内の日本語は Unicode エスケープ（`-join([char[]]@(0x30D3,...))`）で書かれていて
+  文言追加のたびにコードポイントを調べる必要があった
+- **解決策**: `AutoBuild.messages.json`（UTF-8）に文言を置き、`Get-Msg` が
+  `[System.IO.File]::ReadAllText($path, [Text.Encoding]::UTF8)` で明示的に UTF-8 で読む。
+  スクリプトの文字コードに左右されず、文言の編集も簡単
+- `{0}` は Revit バージョンに置換される。⚠️ `[string]::Format($text, $FormatArgs)` は
+  `$FormatArgs` が `string[]` だと `Format(string, object)` に解決されて `System.String[]` と
+  表示されてしまう。**`[object[]]` にキャストすること**
 
 ### コミット件名マーカーによる対象バージョン切替（`[build:XXXX]`）
 - **目的**: デフォルトは `dev-config.json`（通常 2022）のまま、特定のコミットだけ別バージョンでオートビルドしたい
