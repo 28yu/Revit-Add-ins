@@ -255,12 +255,16 @@ function Show-BuildResultNotification {
 # staged files are copied in and the *.old backups are cleaned up, so the
 # next Revit start picks up the latest build.
 function Invoke-PendingDeployIfPossible {
-    if (Test-RevitRunning) { return }
+    # Cheap pre-check: if no Revit at all is running, skip the per-version lookups
+    $anyRevit = Test-RevitRunning
 
     $appliedVersions = @()
     foreach ($ver in $AllRevitVersions) {
         $targetDir = Get-Tools28TargetDir $ver
         if (-not (Test-Path $targetDir)) { continue }
+
+        # Only skip the version whose Revit is open - other versions still get applied
+        if ($anyRevit -and (Test-RevitRunning -RevitVersion $ver)) { continue }
 
         $result = Invoke-Tools28PendingDeploy -RevitVersion $ver
         if ($result.Applied -gt 0) {

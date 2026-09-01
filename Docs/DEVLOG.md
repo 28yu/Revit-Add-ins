@@ -122,6 +122,12 @@
 - 保留ファイルは `AutoBuild.ps1` の監視ループが毎ティック `Invoke-PendingDeployIfPossible` で
   チェックし、**Revit が終了していれば適用＋通知**する。`*.old` の掃除も同じタイミング
 - `.old` は Revit のアセンブリ解決（`.dll` / `.exe` のみ探索）に引っかからないので置きっぱなしでも安全
+- **バージョン単位で判定する**: Revit のプロセス名は全バージョン共通で `Revit` なので、
+  プロセス名だけでは「どのバージョンが開いているか」が分からない。
+  `Test-RevitRunning -RevitVersion 2024` は実行ファイルのパス
+  （`C:\Program Files\Autodesk\Revit 2024\Revit.exe`）を `Revit[ _]?<年>` で照合する。
+  パスが読めない場合（権限不足等）は安全側に倒して「起動中」とみなす。
+  これにより Revit 2024 を開いたまま 2022 をビルドしても、2022 は普通に上書きされる
 
 **通知メッセージ**は `DEPLOY_STATUS` に応じて出し分ける（`AutoBuild.messages.json`）:
 - `APPLIED` … 「Revit は起動していなかったため、そのまま反映済みです」

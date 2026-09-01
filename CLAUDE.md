@@ -375,6 +375,9 @@ _buttonTipKeys["FeatureName"] = "Ribbon.FeatureName.Button.Tip";
 - デプロイ先の DLL は起動中の Revit がロックしているが、**旧 DLL を `*.old` にリネームして退避 →
   新 DLL を配置**するため、デプロイは失敗しない。**Revit を再起動すれば反映される**
 - 実装は `DeployHelpers.ps1`（`QuickBuild.ps1` / `AutoBuild.ps1` から dot-source）
+- **全バージョン（2021〜2026）共通**。配置先・保留先はバージョン別に分かれており、
+  起動判定も `Test-RevitRunning -RevitVersion 20XX`（プロセスの実行ファイルパスで判別）で
+  バージョン単位に行うため、他バージョンの Revit が開いていても影響を受けない
 - リネームもできなかった場合は `%ProgramData%\Tools28\PendingDeploy\{ver}\` に保留され、
   Revit を終了したタイミングで `AutoBuild.ps1` が自動適用する
 - 通知メッセージは状態に応じて出し分ける（`AutoBuild.messages.json`）:

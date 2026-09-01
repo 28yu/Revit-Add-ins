@@ -47,8 +47,26 @@ function Get-Tools28PendingDir {
 }
 
 # Revit が起動中かどうか
+#
+# Revit のプロセス名は全バージョン共通で "Revit" なので、バージョン指定なしだと
+# 「どれか1つでも起動していれば true」になる。バージョンを渡した場合は実行ファイルの
+# パス（例: C:\Program Files\Autodesk\Revit 2024\Revit.exe）で判別する。
+# 判別できない場合（権限不足でパスが読めない等）は安全側に倒して「起動中」とみなす。
 function Test-RevitRunning {
-    return (@(Get-Process -Name "Revit" -ErrorAction SilentlyContinue).Count -gt 0)
+    param([string]$RevitVersion = "")
+
+    $procs = @(Get-Process -Name "Revit" -ErrorAction SilentlyContinue)
+    if ($procs.Count -eq 0) { return $false }
+    if (-not $RevitVersion) { return $true }
+
+    foreach ($p in $procs) {
+        $path = $null
+        try { $path = $p.Path } catch { }
+        # パスが読めない = 判別不能。触らない方が安全なので「起動中」扱いにする
+        if (-not $path) { return $true }
+        if ($path -match "Revit[ _]?$RevitVersion") { return $true }
+    }
+    return $false
 }
 
 # リネーム退避した *.old を掃除する（まだロック中のものは次回に回す）

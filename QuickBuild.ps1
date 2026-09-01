@@ -132,7 +132,8 @@ foreach ($d in @($targetDir, $targetToolsDir)) {
 }
 
 # Revit の起動状態を確認（メッセージの出し分けに使う）
-$revitRunning = Test-RevitRunning
+# 他バージョンの Revit が開いていても、このバージョンのデプロイには影響しない
+$revitRunning = Test-RevitRunning -RevitVersion $RevitVersion
 if ($revitRunning) {
     Write-Host "Revit が起動中です。" -ForegroundColor Yellow
     Write-Host "ロックされている DLL は旧ファイルを退避してから差し替えます。" -ForegroundColor Yellow
