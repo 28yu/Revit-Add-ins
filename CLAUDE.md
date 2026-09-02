@@ -368,6 +368,9 @@ _buttonTipKeys["FeatureName"] = "Ribbon.FeatureName.Button.Tip";
 - **動作**: 30秒間隔で `origin/main` を監視 → 変更検知 → pull → ビルド → デプロイ → 通知
 - **ファイル構成**: `StartAutoBuild.vbs`（管理者昇格）/ `AutoBuild.ps1`（監視ループ）/ `AutoBuild.log`
 - **再起動**: `powershell -ExecutionPolicy Bypass -File .\RestartAutoBuild.ps1`（UAC で「はい」）
+  - ⚠️ **リポジトリのフォルダで実行すること**（`.\` は現在のフォルダを指すため）
+  - ⚠️ 既知の問題: 「停止だけして起動に失敗」しても画面に残らず気づけないことがある。
+    実行後は AutoBuild が生きているか確認する（詳細は `Docs/DEVLOG.md#AutoBuild 開発知見`）
   - 停止＋再起動を1コマンドで実行。手動の場合はタスクマネージャーで `powershell.exe` を終了 → `StartAutoBuild.vbs` を再実行
   - **⚠️ `AutoBuild.ps1` 自体を変更した場合は、この再起動をしないと新ロジックが反映されない**（起動中プロセスは旧スクリプトをメモリ実行中のため）
 

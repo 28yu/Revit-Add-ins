@@ -134,6 +134,26 @@
 - `RESTART_REQUIRED` … 「新しい DLL への差し替えは完了しています。Revit を再起動してください」
 - `PENDING` … 「Revit を終了すると自動で適用されます」
 
+#### 実機確認 (2026-09-02)
+- 開発 PC で `[build:2024]` を付けて、**Revit 2024 を起動したまま**自動ビルドを実行し、
+  デプロイが通ること・Revit 再起動で反映されることを確認した
+- あわせて分かったこと: **AutoBuild は起動時にメモリへ読み込んだスクリプトで動き続ける**ため、
+  `AutoBuild.ps1` を更新するコミットを pull しても、その回のビルドはまだ**旧ロジック**で動く。
+  ログに `deploy=` が出ているかどうかが、新旧どちらで動いているかの判別材料になる
+  （旧: `Build[2022] result: exitCode=0, dllExists=True, dllUpdated=True, success=True`／
+  　新: `... dllUpdated=True, deploy=RESTART_REQUIRED, success=True` ＋ `Deploy status:` 行）
+
+#### ⚠️ 既知の問題: `RestartAutoBuild.ps1` が「停止だけして起動に失敗」することがある
+- 症状: 右クリック → 「PowerShell で実行」すると窓が一瞬で閉じ、**AutoBuild が停止したまま**になる。
+  一見ただ閉じただけに見えるので、止まっていることに気づけない
+- 一瞬で閉じること自体は仕様（非管理者で起動 → 昇格した別プロセスに引き継いで自分は終了する）。
+  問題は昇格側の「停止 → 2 秒待つ → 起動」のうち**起動が失敗しても画面に残らない**点
+- 暫定の回避策: タスクマネージャー等で停止を確認したあと `StartAutoBuild.vbs` をダブルクリックする
+- 生きているか確認するコマンド（`CommandLine` が空欄なのは昇格プロセスを一般権限で見ているため。異常ではない）:
+  ```powershell
+  Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" | Select-Object ProcessId, CreationDate, CommandLine | Format-List
+  ```
+
 ### 通知の日本語文言は JSON に分離した
 - `AutoBuild.ps1` 内の日本語は Unicode エスケープ（`-join([char[]]@(0x30D3,...))`）で書かれていて
   文言追加のたびにコードポイントを調べる必要があった
