@@ -482,7 +482,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
             }
 
             var range = worksheet.Range(groupRow, 1, groupRow, totalCols);
-            range.Style.Fill.BackgroundColor = XLColor.FromArgb(216, 228, 188);
+            range.Style.Fill.BackgroundColor = XLColor.FromArgb(238, 236, 225);
             range.Style.Font.FontColor = XLColor.FromArgb(51, 51, 51);
             range.Style.Font.FontSize = 10;
             range.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
