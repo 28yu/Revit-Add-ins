@@ -54,9 +54,11 @@ namespace Tools28.Commands.ExcelExportImport.Services
         /// </summary>
         public static ExportSettings CreateFromSelection(
             List<CategoryInfo> selectedCategories,
-            List<ParameterInfo> outputParameters)
+            List<ParameterInfo> outputParameters,
+            bool includeParamGroup = false)
         {
             var settings = new ExportSettings();
+            settings.IncludeParamGroup = includeParamGroup;
 
             settings.SelectedCategories = selectedCategories
                 .Select(c => c.Name)

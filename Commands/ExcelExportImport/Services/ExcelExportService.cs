@@ -21,6 +21,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
         /// <param name="selectedCategories">選択されたカテゴリ一覧</param>
         /// <param name="outputParameters">出力パラメータ一覧（順序付き）</param>
         /// <param name="splitByCategory">trueならカテゴリ毎にシート分割、falseなら1シート</param>
+        /// <param name="includeParamGroup">trueなら見出しの上に1行追加してパラメータグループを書き出す</param>
         /// <returns>エクスポート結果（カテゴリ名, 要素数）</returns>
         public static Dictionary<string, int> Export(
             Document doc,
@@ -30,7 +31,8 @@ namespace Tools28.Commands.ExcelExportImport.Services
             bool splitByCategory = true,
             ExportScope scope = ExportScope.EntireProject,
             View activeView = null,
-            ICollection<ElementId> selectionIds = null)
+            ICollection<ElementId> selectionIds = null,
+            bool includeParamGroup = false)
         {
             var results = new Dictionary<string, int>();
 
@@ -38,11 +40,11 @@ namespace Tools28.Commands.ExcelExportImport.Services
             {
                 if (splitByCategory)
                 {
-                    ExportSplitByCategory(doc, workbook, selectedCategories, outputParameters, results, scope, activeView, selectionIds);
+                    ExportSplitByCategory(doc, workbook, selectedCategories, outputParameters, results, scope, activeView, selectionIds, includeParamGroup);
                 }
                 else
                 {
-                    ExportSingleSheet(doc, workbook, selectedCategories, outputParameters, results, scope, activeView, selectionIds);
+                    ExportSingleSheet(doc, workbook, selectedCategories, outputParameters, results, scope, activeView, selectionIds, includeParamGroup);
                 }
 
                 workbook.SaveAs(filePath);
@@ -62,8 +64,13 @@ namespace Tools28.Commands.ExcelExportImport.Services
             Dictionary<string, int> results,
             ExportScope scope,
             View activeView,
-            ICollection<ElementId> selectionIds)
+            ICollection<ElementId> selectionIds,
+            bool includeParamGroup)
         {
+            // グループ行を出す場合は 1行目=グループ、2行目=見出し、3行目以降=データ
+            int headerRow = includeParamGroup ? 2 : 1;
+            int firstDataRow = headerRow + 1;
+
             foreach (var category in selectedCategories)
             {
                 // このカテゴリに属するパラメータのみ抽出
@@ -83,7 +90,9 @@ namespace Tools28.Commands.ExcelExportImport.Services
                 worksheet.Style.Font.FontName = "ＭＳ 明朝";
 
                 // ヘッダー行を作成（文字値を入れられない列はマーカー＋灰色で明示）
-                WriteHeaderRow(worksheet, categoryParams);
+                if (includeParamGroup)
+                    WriteGroupRow(worksheet, categoryParams);
+                WriteHeaderRow(worksheet, categoryParams, headerRow);
 
                 // データ行を作成
                 var elements = RevitCategoryHelper.GetElementsByCategory(
@@ -93,13 +102,13 @@ namespace Tools28.Commands.ExcelExportImport.Services
                 int totalCols = categoryParams.Count + 2;
                 double[] colWidths = new double[totalCols];
                 for (int c = 0; c < totalCols; c++)
-                    colWidths[c] = CalculateTextWidth(worksheet.Cell(1, c + 1).GetString() ?? "") + 8;
+                    colWidths[c] = CalculateTextWidth(worksheet.Cell(headerRow, c + 1).GetString() ?? "") + 8;
 
                 // タイプパラメータ値のキャッシュ（同一タイプのインスタンスは値が同じ）
                 var typeElemCache = new Dictionary<long, Element>();
                 var typeValueCache = new Dictionary<string, string>();
 
-                int row = 2;
+                int row = firstDataRow;
 
                 foreach (var elem in elements)
                 {
@@ -133,12 +142,12 @@ namespace Tools28.Commands.ExcelExportImport.Services
                 ApplyColumnWidths(worksheet, colWidths);
 
                 // 文字を入れられない列（画像参照/要素参照/変更不可）のデータ値はグレー文字にして目立たなくする
-                ApplyNonEditableColumnStyle(worksheet, categoryParams, row - 1);
+                ApplyNonEditableColumnStyle(worksheet, categoryParams, firstDataRow, row - 1);
 
                 // オートフィルタを設定（全走査を避けるため既知の範囲を直接指定）
-                if (row > 2)
+                if (row > firstDataRow)
                 {
-                    worksheet.Range(1, 1, row - 1, totalCols).SetAutoFilter();
+                    worksheet.Range(headerRow, 1, row - 1, totalCols).SetAutoFilter();
                 }
 
                 results[category.Name] = elements.Count;
@@ -156,8 +165,13 @@ namespace Tools28.Commands.ExcelExportImport.Services
             Dictionary<string, int> results,
             ExportScope scope,
             View activeView,
-            ICollection<ElementId> selectionIds)
+            ICollection<ElementId> selectionIds,
+            bool includeParamGroup)
         {
+            // グループ行を出す場合は 1行目=グループ、2行目=見出し、3行目以降=データ
+            int headerRow = includeParamGroup ? 2 : 1;
+            int firstDataRow = headerRow + 1;
+
             // 全カテゴリ共通のユニークなパラメータリスト（DisplayName順序を維持）
             var allParams = outputParameters
                 .GroupBy(p => p.DisplayName)
@@ -171,19 +185,21 @@ namespace Tools28.Commands.ExcelExportImport.Services
             worksheet.Style.Font.FontName = "ＭＳ 明朝";
 
             // ヘッダー行を作成（文字値を入れられない列はマーカー＋灰色で明示）
-            WriteHeaderRow(worksheet, allParams);
+            if (includeParamGroup)
+                WriteGroupRow(worksheet, allParams);
+            WriteHeaderRow(worksheet, allParams, headerRow);
 
             // 列幅計算用（ヘッダー幅で初期化）
             int totalCols = allParams.Count + 2;
             double[] colWidths = new double[totalCols];
             for (int c = 0; c < totalCols; c++)
-                colWidths[c] = CalculateTextWidth(worksheet.Cell(1, c + 1).GetString() ?? "") + 8;
+                colWidths[c] = CalculateTextWidth(worksheet.Cell(headerRow, c + 1).GetString() ?? "") + 8;
 
             // タイプパラメータ値のキャッシュ（同一タイプのインスタンスは値が同じ）
             var typeElemCache = new Dictionary<long, Element>();
             var typeValueCache = new Dictionary<string, string>();
 
-            int row = 2;
+            int row = firstDataRow;
 
             foreach (var category in selectedCategories)
             {
@@ -242,12 +258,12 @@ namespace Tools28.Commands.ExcelExportImport.Services
             ApplyColumnWidths(worksheet, colWidths);
 
             // 文字を入れられない列（画像参照/要素参照/変更不可）のデータ値はグレー文字にして目立たなくする
-            ApplyNonEditableColumnStyle(worksheet, allParams, row - 1);
+            ApplyNonEditableColumnStyle(worksheet, allParams, firstDataRow, row - 1);
 
             // オートフィルタを設定（全走査を避けるため既知の範囲を直接指定）
-            if (row > 2)
+            if (row > firstDataRow)
             {
-                worksheet.Range(1, 1, row - 1, totalCols).SetAutoFilter();
+                worksheet.Range(headerRow, 1, row - 1, totalCols).SetAutoFilter();
             }
         }
 
@@ -256,9 +272,9 @@ namespace Tools28.Commands.ExcelExportImport.Services
         /// グレーにして目立たなくし、編集可能な列と視覚的に区別する。
         /// </summary>
         private static void ApplyNonEditableColumnStyle(
-            IXLWorksheet worksheet, List<ParameterInfo> headerParams, int lastRow)
+            IXLWorksheet worksheet, List<ParameterInfo> headerParams, int firstDataRow, int lastRow)
         {
-            if (lastRow < 2) return; // データ行が無ければ何もしない
+            if (lastRow < firstDataRow) return; // データ行が無ければ何もしない
 
             for (int i = 0; i < headerParams.Count; i++)
             {
@@ -266,7 +282,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
                     continue;
 
                 int col = i + 3; // 1=要素ID, 2=カテゴリ, 3以降=パラメータ
-                worksheet.Range(2, col, lastRow, col).Style.Font.FontColor = XLColor.FromArgb(150, 150, 150);
+                worksheet.Range(firstDataRow, col, lastRow, col).Style.Font.FontColor = XLColor.FromArgb(150, 150, 150);
             }
         }
 
@@ -390,20 +406,20 @@ namespace Tools28.Commands.ExcelExportImport.Services
         /// 文字値を直接入れられない列（画像参照/要素参照/変更不可）は、見出しにマーカーを付け、
         /// さらにセルを灰色にして「ここは文字を入れても取り込めない」と一目で分かるようにする。
         /// </summary>
-        private static void WriteHeaderRow(IXLWorksheet worksheet, List<ParameterInfo> headerParams)
+        private static void WriteHeaderRow(IXLWorksheet worksheet, List<ParameterInfo> headerParams, int headerRow)
         {
             // 見出しは現在のアドイン言語で書く。読み戻し側（ExportSettingsExcelReader）は
             // 全言語の候補と照合するため、別言語環境で取り込んでも列を特定できる。
-            worksheet.Cell(1, 1).Value = ExcelHeaderNames.ElementId;
-            worksheet.Cell(1, 2).Value = ExcelHeaderNames.Category;
+            worksheet.Cell(headerRow, 1).Value = ExcelHeaderNames.ElementId;
+            worksheet.Cell(headerRow, 2).Value = ExcelHeaderNames.Category;
             for (int i = 0; i < headerParams.Count; i++)
             {
                 var p = headerParams[i];
-                worksheet.Cell(1, i + 3).Value = p.DisplayName + ParameterHeaderMarker.MarkerFor(p);
+                worksheet.Cell(headerRow, i + 3).Value = p.DisplayName + ParameterHeaderMarker.MarkerFor(p);
             }
 
             int totalCols = headerParams.Count + 2;
-            var headerRange = worksheet.Range(1, 1, 1, totalCols);
+            var headerRange = worksheet.Range(headerRow, 1, headerRow, totalCols);
             headerRange.Style.Fill.BackgroundColor = XLColor.FromArgb(155, 187, 89);
             headerRange.Style.Font.FontColor = XLColor.White;
             headerRange.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
@@ -418,7 +434,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
                 if (string.IsNullOrEmpty(marker))
                     continue;
 
-                var cell = worksheet.Cell(1, i + 3);
+                var cell = worksheet.Cell(headerRow, i + 3);
                 cell.Style.Fill.BackgroundColor = XLColor.FromArgb(128, 128, 128);
                 cell.Style.Font.Italic = true;
 
@@ -429,10 +445,54 @@ namespace Tools28.Commands.ExcelExportImport.Services
                 rt.AddText(marker).SetFontSize(8);
             }
 
-            worksheet.Row(1).Height = 25;
+            worksheet.Row(headerRow).Height = 25;
 
-            // ヘッダー行（1行目）を固定してスクロール時も常に表示
-            worksheet.SheetView.FreezeRows(1);
+            // ヘッダー行（グループ行があればそれも含む）を固定してスクロール時も常に表示
+            worksheet.SheetView.FreezeRows(headerRow);
+        }
+
+        /// <summary>
+        /// 見出しの上（1行目）にパラメータグループ行を書き込む。
+        /// 隣り合う列が同じグループならセルを結合して、Revit のプロパティパレットのような
+        /// 「グループ見出し」に見せる。この行は参考表示のみで、読み込み時には使わない。
+        /// </summary>
+        private static void WriteGroupRow(IXLWorksheet worksheet, List<ParameterInfo> headerParams)
+        {
+            const int groupRow = 1;
+            int totalCols = headerParams.Count + 2;
+
+            // 要素ID・カテゴリ列の上は結合して「パラメータグループ」と表示する。
+            // ※ 見出し行の判定は1列目の「要素ID」で行うため、ここに「要素ID」は書かない
+            worksheet.Cell(groupRow, 1).Value = ExcelHeaderNames.ParamGroup;
+            worksheet.Range(groupRow, 1, groupRow, 2).Merge();
+
+            // 同じグループが連続する範囲ごとに結合する
+            int i = 0;
+            while (i < headerParams.Count)
+            {
+                string group = headerParams[i].GroupName ?? "";
+                int j = i;
+                while (j + 1 < headerParams.Count && (headerParams[j + 1].GroupName ?? "") == group)
+                    j++;
+
+                worksheet.Cell(groupRow, i + 3).Value = group;
+                if (j > i)
+                    worksheet.Range(groupRow, i + 3, groupRow, j + 3).Merge();
+                i = j + 1;
+            }
+
+            var range = worksheet.Range(groupRow, 1, groupRow, totalCols);
+            range.Style.Fill.BackgroundColor = XLColor.FromArgb(216, 228, 188);
+            range.Style.Font.FontColor = XLColor.FromArgb(51, 51, 51);
+            range.Style.Font.Bold = true;
+            range.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            range.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+            range.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+            range.Style.Border.InsideBorder = XLBorderStyleValues.Thin;
+            range.Style.Border.OutsideBorderColor = XLColor.White;
+            range.Style.Border.InsideBorderColor = XLColor.White;
+
+            worksheet.Row(groupRow).Height = 20;
         }
 
         /// <summary>

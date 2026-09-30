@@ -54,6 +54,12 @@ namespace Tools28.Commands.ExcelExportImport.Models
         public string CategoryName { get; set; }
 
         /// <summary>
+        /// パラメータグループの表示名（プロパティパレットの見出し。例: 「寸法」「識別情報」）。
+        /// Revit 本体の UI 言語で返る。Excel のグループ行に書き出すだけで、読み込みには使わない。
+        /// </summary>
+        public string GroupName { get; set; } = "";
+
+        /// <summary>
         /// チェック状態（パラメータリスト用）。全選択/選択解除でコードから
         /// 変更した際に CheckBox へ即時反映させるため通知する。
         /// </summary>

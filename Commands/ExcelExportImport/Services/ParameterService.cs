@@ -4,6 +4,7 @@ using System.Linq;
 using Autodesk.Revit.DB;
 using Tools28;
 using Tools28.Commands.ExcelExportImport.Models;
+using Tools28.Localization;
 
 namespace Tools28.Commands.ExcelExportImport.Services
 {
@@ -123,6 +124,9 @@ namespace Tools28.Commands.ExcelExportImport.Services
         {
             if (element == null) return;
 
+            // グループ名は Revit 本体の言語で返るため、「その他」も同じ言語にそろえる
+            string otherGroupLabel = Loc.S("Export.ParamGroup.Other", RevitUiLanguage.Resolve(element.Document));
+
             foreach (Parameter param in element.Parameters)
             {
                 if (param?.Definition == null || string.IsNullOrEmpty(param.Definition.Name))
@@ -142,8 +146,39 @@ namespace Tools28.Commands.ExcelExportImport.Services
                               || bip == BuiltInParameter.ALL_MODEL_TYPE_IMAGE,
                     // 同名パラメータの区別用（識別子＝安定 ID、種別＝組み込み/共有/プロジェクト）
                     ParamId = ParamIdToLong(param.Id),
-                    Kind = ParameterKindHelper.Determine(param)
+                    Kind = ParameterKindHelper.Determine(param),
+                    // Excel のグループ行に書き出す見出し（「寸法」「識別情報」等）
+                    GroupName = GetGroupLabel(param.Definition, otherGroupLabel)
                 });
+            }
+        }
+
+        /// <summary>
+        /// パラメータグループの表示名（プロパティパレットの見出し）を取得する。
+        /// Revit 2022 で API が変わったため、2021 のみ旧 API（BuiltInParameterGroup）を使う。
+        /// グループ未設定（「その他」）や取得失敗時は otherLabel を返す。
+        /// </summary>
+        private static string GetGroupLabel(Definition definition, string otherLabel)
+        {
+            try
+            {
+#if REVIT2021
+                var group = definition.ParameterGroup;
+                if (group == BuiltInParameterGroup.INVALID)
+                    return otherLabel;
+                string label = LabelUtils.GetLabelFor(group);
+#else
+                // 「その他」グループは空の ForgeTypeId で返る
+                var groupId = definition.GetGroupTypeId();
+                if (groupId == null || string.IsNullOrEmpty(groupId.TypeId))
+                    return otherLabel;
+                string label = LabelUtils.GetLabelForGroup(groupId);
+#endif
+                return string.IsNullOrEmpty(label) ? otherLabel : label;
+            }
+            catch
+            {
+                return otherLabel;
             }
         }
 

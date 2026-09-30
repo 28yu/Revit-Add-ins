@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using ClosedXML.Excel;
 using Tools28.Localization;
 
 namespace Tools28.Commands.ExcelExportImport.Services
@@ -23,6 +24,35 @@ namespace Tools28.Commands.ExcelExportImport.Services
 
         /// <summary>2列目の見出し（書き出し用・現在の言語）</summary>
         public static string Category => Loc.S("Export.Header.Category");
+
+        /// <summary>グループ行（見出しの上の行）の左端ラベル（書き出し用・現在の言語）</summary>
+        public static string ParamGroup => Loc.S("Export.Header.ParamGroup");
+
+        /// <summary>
+        /// 見出し行（「要素ID」「カテゴリ」「I-/T-パラメータ」が並ぶ行）の行番号を返す。
+        /// 通常は 1。パラメータグループを書き出した Excel は 1行目がグループ行なので 2 になる。
+        /// 「要素ID」の見出しがある行で判定するため、グループ行の有無に関わらず
+        /// 以前に書き出した Excel（1行目が見出し）もそのまま読める。
+        /// </summary>
+        public static int FindHeaderRow(IXLWorksheet worksheet)
+        {
+            for (int row = 1; row <= 2; row++)
+            {
+                foreach (var cell in worksheet.Row(row).CellsUsed())
+                {
+                    if (IsElementIdHeader(cell.GetString()))
+                        return row;
+                }
+            }
+            return 1;
+        }
+
+        /// <summary>
+        /// 1列目の1行目・2行目の値から見出し行の行番号を返す（COM 経由で開いている Excel 用）。
+        /// 1行目が「要素ID」でなく、2行目が「要素ID」ならグループ行付き（=2）。それ以外は 1。
+        /// </summary>
+        public static int FindHeaderRow(string col1Row1, string col1Row2)
+            => !IsElementIdHeader(col1Row1) && IsElementIdHeader(col1Row2) ? 2 : 1;
 
         /// <summary>1シート統合モードのシート名（書き出し用・現在の言語）</summary>
         public static string MergedSheet => Loc.S("Export.SheetName.Merged");

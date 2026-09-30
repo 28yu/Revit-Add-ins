@@ -48,6 +48,9 @@ namespace Tools28.Commands.ExcelExportImport.Views
         /// <summary>カテゴリ毎にシートを分けるか</summary>
         public bool SplitByCategory { get; private set; } = true;
 
+        /// <summary>見出しの上にパラメータグループ行を書き出すか</summary>
+        public bool IncludeParamGroup { get; private set; }
+
         public ExportDialog(Document doc)
             : this(doc, ExportScope.EntireProject, null, null)
         {
@@ -93,6 +96,8 @@ namespace Tools28.Commands.ExcelExportImport.Views
             btnMoveUp.ToolTip = Loc.S("Export.MoveUp");
             btnMoveDown.ToolTip = Loc.S("Export.MoveDown");
             SplitByCategoryLabel.Text = Loc.S("Export.SeparateSheets");
+            IncludeParamGroupLabel.Text = Loc.S("Export.IncludeParamGroup");
+            IncludeParamGroupCheckBox.ToolTip = Loc.S("Export.IncludeParamGroup.Tip");
             // 設定ボタンはコンパクト表示。説明はホバー時のツールチップで出す。
             btnLoadSettings.Content = Loc.S("Export.LoadSettings");
             btnLoadSettings.ToolTip = Loc.S("Export.LoadSettings.Desc");
@@ -488,7 +493,8 @@ namespace Tools28.Commands.ExcelExportImport.Views
                 try
                 {
                     var checkedCategories = _allCategories.Where(c => c.IsChecked).ToList();
-                    var settings = SettingsService.CreateFromSelection(checkedCategories, _outputParameters);
+                    var settings = SettingsService.CreateFromSelection(
+                        checkedCategories, _outputParameters, IncludeParamGroupCheckBox.IsChecked == true);
                     SettingsService.SaveSettings(dialog.FileName, settings);
                     MessageBox.Show(Loc.S("Export.SettingsSaved"), Loc.S("Export.SettingsSaveTitle"), MessageBoxButton.OK, MessageBoxImage.Information);
                 }
@@ -569,6 +575,10 @@ namespace Tools28.Commands.ExcelExportImport.Views
 
         private void ApplySettings(ExportSettings settings)
         {
+            // グループ行の有無を復元（旧設定ファイル・グループ行なしの Excel では null → 現状維持）
+            if (settings.IncludeParamGroup.HasValue)
+                IncludeParamGroupCheckBox.IsChecked = settings.IncludeParamGroup.Value;
+
             // カテゴリ選択を復元（Contains の O(n) を避けるため HashSet 化）
             var selectedSet = new HashSet<string>(settings.SelectedCategories ?? new List<string>());
             foreach (var cat in _allCategories)
@@ -646,6 +656,7 @@ namespace Tools28.Commands.ExcelExportImport.Views
             }
 
             SplitByCategory = SplitByCategoryCheckBox.IsChecked == true;
+            IncludeParamGroup = IncludeParamGroupCheckBox.IsChecked == true;
             DialogResult = true;
             Close();
         }

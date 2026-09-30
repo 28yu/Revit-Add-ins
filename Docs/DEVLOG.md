@@ -2283,3 +2283,15 @@ Revit API には **Solid の材質を直接差し替える手段がない**。�
 ### 動作確認対象
 
 Revit 2022 / 2024（AutoBuild を `[build:2022,2024]` で実行）
+
+## ExcelExportImport: パラメータグループ行の書き出し（2026-09-30）
+
+- エクスポートダイアログに「パラメータグループも書き出す」（既定オフ）を追加。オン時は
+  1行目=グループ行（同じグループが隣り合う列は結合）、2行目=見出し、3行目以降=データ
+- グループ名取得: 2022+ は `Definition.GetGroupTypeId()` → `LabelUtils.GetLabelForGroup()`、
+  2021 のみ `Definition.ParameterGroup` → `LabelUtils.GetLabelFor()`。「その他」は空の ForgeTypeId
+  （2021 は `INVALID`）で返るため `Export.ParamGroup.Other` を Revit 本体の言語で補う
+- 読み込み側（インポート／プレビュー／セル色付け（ClosedXML・COM）／出力設定の Excel 読込）は
+  `ExcelHeaderNames.FindHeaderRow()` で「要素ID」見出しのある行を判定する。
+  ⚠ グループ行の1列目に「要素ID」を書かないこと（見出し行の判定が壊れる）
+- グループ行は参考表示のみ。読み込みには使わない（Excel で書き換えても Revit には反映しない）

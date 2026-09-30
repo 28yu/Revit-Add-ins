@@ -13,7 +13,8 @@ namespace Tools28.Commands.ExcelExportImport.Services
     /// </summary>
     /// <remarks>
     /// エクスポート形式（<see cref="ExcelExportService"/>）を前提に読み取る:
-    ///  - 1行目がヘッダー。1列目「要素ID」、2列目「カテゴリ」（書き出し時の言語による）、3列目以降が
+    ///  - 1行目がヘッダー（パラメータグループ行付きで書き出した場合は1行目がグループ行、
+    ///    2行目がヘッダー）。1列目「要素ID」、2列目「カテゴリ」（書き出し時の言語による）、3列目以降が
     ///    パラメータ列で、見出しは "I-"/"T-" プレフィックス付き DisplayName
     ///    （読取専用は "(*変更不可)" サフィックス付き）。
     ///  - データ行の2列目には Revit の実カテゴリ名が入る。
@@ -64,13 +65,17 @@ namespace Tools28.Commands.ExcelExportImport.Services
             {
                 foreach (var worksheet in workbook.Worksheets)
                 {
-                    // ヘッダー（1行目）だけを読む（全データ走査は行わない）。
+                    // ヘッダー行だけを読む（全データ走査は行わない）。
+                    // グループ行付きの Excel は見出しが2行目にあるため、行番号を判定してから読む。
                     // 列位置は固定で仮定せず、見出し文字列で「要素ID列」「カテゴリ列」を
                     // 特定し、それ以外で I-/T- プレフィックスを持つ列をパラメータ列とする。
                     // → ユーザーが Excel 上で列を入れ替え・並べ替えても正しく読める。
                     var headerParams = new List<ParsedHeader>();
                     int categoryCol = -1;
-                    foreach (var cell in worksheet.Row(1).CellsUsed())
+                    int headerRow = ExcelHeaderNames.FindHeaderRow(worksheet);
+                    if (headerRow == 2)
+                        settings.IncludeParamGroup = true; // グループ行付きで書き出された Excel
+                    foreach (var cell in worksheet.Row(headerRow).CellsUsed())
                     {
                         string text = cell.GetString();
                         if (ExcelHeaderNames.IsElementIdHeader(text))
@@ -93,13 +98,13 @@ namespace Tools28.Commands.ExcelExportImport.Services
                     // 統合シート（ExportSingleSheet が付けるシート名。言語で変わる）だけは
                     // 複数カテゴリが混在するため列→カテゴリの対応判定が要る。
                     // それ以外（カテゴリ毎シート分割）は 1シート=1カテゴリなので、
-                    // 先頭データ行(2行目)のカテゴリ列からカテゴリ名を1回読むだけで済む。
+                    // 先頭データ行（見出しの次の行）のカテゴリ列からカテゴリ名を1回読むだけで済む。
                     if (!ExcelHeaderNames.IsMergedSheetName(worksheet.Name))
                     {
                         // カテゴリ列が見つかればその値、無ければシート名（サニタイズ済みの実名）を使う
                         string cat = null;
                         if (categoryCol > 0)
-                            cat = worksheet.Cell(2, categoryCol).GetString();
+                            cat = worksheet.Cell(headerRow + 1, categoryCol).GetString();
                         if (string.IsNullOrWhiteSpace(cat))
                             cat = worksheet.Name; // カテゴリ列なし/データ行なし → シート名で代用
                         RegisterCategory(cat);
@@ -110,7 +115,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
                     {
                         // カテゴリ列が見つからない場合のみ従来の2列目にフォールバック
                         int catCol = categoryCol > 0 ? categoryCol : 2;
-                        ReadSingleSheet(worksheet, headerParams, catCol, RegisterCategory, AddEntry);
+                        ReadSingleSheet(worksheet, headerParams, catCol, headerRow + 1, RegisterCategory, AddEntry);
                     }
                 }
             }
@@ -128,6 +133,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
             IXLWorksheet worksheet,
             List<ParsedHeader> headerParams,
             int categoryCol,
+            int firstDataRow,
             System.Action<string> registerCategory,
             System.Action<string, string, bool, string> addEntry)
         {
@@ -138,7 +144,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
             var sheetCatSet = new HashSet<string>();
             var nonEmpty = new HashSet<string>(); // key: "cat|column"
 
-            for (int row = 2; row <= rowCount; row++)
+            for (int row = firstDataRow; row <= rowCount; row++)
             {
                 var r = worksheet.Row(row);
                 string cat = r.Cell(categoryCol).GetString();

@@ -350,6 +350,7 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
                     <Grid Grid.Row="0" Margin="0,4,0,4">
@@ -384,7 +385,13 @@
                                    Text="出力Excelをカテゴリ毎にシートに分ける"
                                    FontSize="11" TextWrapping="Wrap"/>
                     </CheckBox>
-                    <ListBox x:Name="OutputListBox" Grid.Row="3"
+                    <CheckBox x:Name="IncludeParamGroupCheckBox" Grid.Row="3"
+                              IsChecked="False" Margin="0,0,0,4" VerticalContentAlignment="Center">
+                        <TextBlock x:Name="IncludeParamGroupLabel"
+                                   Text="パラメータグループも書き出す"
+                                   FontSize="11" TextWrapping="Wrap"/>
+                    </CheckBox>
+                    <ListBox x:Name="OutputListBox" Grid.Row="4"
                              BorderThickness="1" BorderBrush="#CCCCCC"
                              SelectionMode="Extended"
                              ScrollViewer.CanContentScroll="True"

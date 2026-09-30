@@ -12,6 +12,12 @@ namespace Tools28.Commands.ExcelExportImport.Models
 
         /// <summary>出力パラメータリスト（順序付き）</summary>
         public List<ExportParameterEntry> OutputParameters { get; set; } = new List<ExportParameterEntry>();
+
+        /// <summary>
+        /// パラメータグループ行も書き出すか。
+        /// 旧設定ファイルには存在しない（null）ため、その場合はダイアログの現在の状態を変えない。
+        /// </summary>
+        public bool? IncludeParamGroup { get; set; }
     }
 
     /// <summary>

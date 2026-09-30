@@ -95,19 +95,22 @@ namespace Tools28.Commands.ExcelExportImport.Services
                     int rowCount = lastRow.RowNumber();
                     int colCount = lastCol.ColumnNumber();
 
-                    if (rowCount < 2 || colCount < 3)
+                    // 見出し行（グループ行付きで書き出した Excel は 2行目）
+                    int headerRow = ExcelHeaderNames.FindHeaderRow(worksheet);
+
+                    if (rowCount <= headerRow || colCount < 3)
                         continue;
 
                     // ヘッダーからパラメータ名を取得（(*変更不可)サフィックスは除去）
                     var paramHeaders = new List<string>();
                     for (int col = 3; col <= colCount; col++)
                     {
-                        string header = worksheet.Cell(1, col).GetString();
+                        string header = worksheet.Cell(headerRow, col).GetString();
                         paramHeaders.Add(StripReadOnlySuffix(header));
                     }
 
                     // データ行を処理
-                    for (int row = 2; row <= rowCount; row++)
+                    for (int row = headerRow + 1; row <= rowCount; row++)
                     {
                         string elementIdStr = worksheet.Cell(row, 1).GetString();
                         string categoryName = worksheet.Cell(row, 2).GetString();
@@ -241,19 +244,22 @@ namespace Tools28.Commands.ExcelExportImport.Services
                     int rowCount = lastRow.RowNumber();
                     int colCount = lastCol.ColumnNumber();
 
-                    if (rowCount < 2 || colCount < 3)
+                    // 見出し行（グループ行付きで書き出した Excel は 2行目）
+                    int headerRow = ExcelHeaderNames.FindHeaderRow(worksheet);
+
+                    if (rowCount <= headerRow || colCount < 3)
                         continue;
 
                     // ヘッダーからパラメータ名を取得（(*変更不可)サフィックスは除去）
                     var paramHeaders = new List<string>();
                     for (int col = 3; col <= colCount; col++)
                     {
-                        string header = worksheet.Cell(1, col).GetString();
+                        string header = worksheet.Cell(headerRow, col).GetString();
                         paramHeaders.Add(StripReadOnlySuffix(header));
                     }
 
                     // データ行を処理
-                    for (int row = 2; row <= rowCount; row++)
+                    for (int row = headerRow + 1; row <= rowCount; row++)
                     {
                         string elementIdStr = worksheet.Cell(row, 1).GetString();
 
@@ -645,16 +651,19 @@ namespace Tools28.Commands.ExcelExportImport.Services
                     int rowCount = lastRow.RowNumber();
                     int colCount = lastCol.ColumnNumber();
 
-                    if (rowCount < 2 || colCount < 3)
+                    // 見出し行（グループ行付きで書き出した Excel は 2行目）
+                    int headerRow = ExcelHeaderNames.FindHeaderRow(worksheet);
+
+                    if (rowCount <= headerRow || colCount < 3)
                         continue;
 
                     var paramHeaders = new List<string>();
                     for (int col = 3; col <= colCount; col++)
                     {
-                        paramHeaders.Add(StripReadOnlySuffix(worksheet.Cell(1, col).GetString()));
+                        paramHeaders.Add(StripReadOnlySuffix(worksheet.Cell(headerRow, col).GetString()));
                     }
 
-                    for (int row = 2; row <= rowCount; row++)
+                    for (int row = headerRow + 1; row <= rowCount; row++)
                     {
                         // 要素 Id の解釈は他の経路と同じヘルパーに統一する
                         // （旧実装はここだけ double 経由で int に丸めていた）。
@@ -710,14 +719,14 @@ namespace Tools28.Commands.ExcelExportImport.Services
                 if (!anyMarked)
                     return null;
 
-                // 各シートの1行目（最終列の次）に凡例を追加
+                // 各シートの見出し行（最終列の次）に凡例を追加
                 foreach (var worksheet in workbook.Worksheets)
                 {
                     var lastCol = worksheet.LastColumnUsed();
                     if (lastCol == null) continue;
                     int legendCol = lastCol.ColumnNumber() + 1;
 
-                    var legendCell = worksheet.Cell(1, legendCol);
+                    var legendCell = worksheet.Cell(ExcelHeaderNames.FindHeaderRow(worksheet), legendCol);
                     var richText = legendCell.CreateRichText();
                     richText.AddText("(*");
                     var bluePart = richText.AddText("青字・青セル");

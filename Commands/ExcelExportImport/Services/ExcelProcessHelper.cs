@@ -196,8 +196,14 @@ namespace Tools28.Commands.ExcelExportImport.Services
 
                             // ヘッダー行とID列を「一括」で読み取る（セル単位のCOM往復を回避）
                             // ※ 従来は全セルを1つずつ読んでいたため、大きな表で膨大なCOM呼び出しとなりフリーズしていた
-                            var paramHeaders = ReadRowValues(sheet, 1, 3, colCount);
-                            var idValues = ReadColumnValues(sheet, 2, rowCount, 1);
+                            // ID列は1行目から読み、見出し行（グループ行付きなら2行目）を判定する
+                            var idValues = ReadColumnValues(sheet, 1, rowCount, 1);
+                            int headerRow = ExcelHeaderNames.FindHeaderRow(
+                                Convert.ToString(idValues[0] ?? ""),
+                                Convert.ToString(idValues[1] ?? ""));
+                            if (rowCount <= headerRow)
+                                continue;
+                            var paramHeaders = ReadRowValues(sheet, headerRow, 3, colCount);
 
                             for (int i = 0; i < paramHeaders.Count; i++)
                             {
@@ -206,9 +212,9 @@ namespace Tools28.Commands.ExcelExportImport.Services
                             }
 
                             // データ行を走査（メモリ上で判定し、色付けが必要な行だけCOM操作）
-                            for (int row = 2; row <= rowCount; row++)
+                            for (int row = headerRow + 1; row <= rowCount; row++)
                             {
-                                object idValue = idValues[row - 2];
+                                object idValue = idValues[row - 1];
                                 if (idValue == null)
                                     continue;
 
@@ -284,7 +290,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
                         }
                     }
 
-                    // 各シートの1行目（最終列の次）に凡例を追加
+                    // 各シートの見出し行（最終列の次）に凡例を追加
                     if (anyMarked)
                     {
                         for (int s2 = 1; s2 <= sheetCount; s2++)
@@ -297,7 +303,12 @@ namespace Tools28.Commands.ExcelExportImport.Services
                                 Marshal.ReleaseComObject(usedRange2);
 
                                 int legendCol = lastColNum + 1;
-                                dynamic legendCell = sheet2.Cells[1, legendCol];
+                                // 凡例は見出し行（グループ行付きなら2行目）に置く
+                                var col1Head = ReadColumnValues(sheet2, 1, 2, 1);
+                                int legendRow = ExcelHeaderNames.FindHeaderRow(
+                                    Convert.ToString(col1Head[0] ?? ""),
+                                    Convert.ToString(col1Head[1] ?? ""));
+                                dynamic legendCell = sheet2.Cells[legendRow, legendCol];
                                 string legendText = "(*青字・青セルはインポート成功（青セルは値の削除）、赤字はインポート失敗)";
                                 legendCell.Value = legendText;
 

@@ -68,7 +68,8 @@ namespace Tools28.Commands.ExcelExportImport
                     dialog.SplitByCategory,
                     scope,
                     activeView,
-                    selectionIds);
+                    selectionIds,
+                    dialog.IncludeParamGroup);
 
                 // エクスポートしたExcelファイルを自動で開く
                 Process.Start(new ProcessStartInfo(saveDialog.FileName) { UseShellExecute = true });
