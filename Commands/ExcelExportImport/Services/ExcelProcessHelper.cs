@@ -361,6 +361,60 @@ namespace Tools28.Commands.ExcelExportImport.Services
         }
 
         /// <summary>
+        /// Excel で開いているブック（FullName 一致）の現在の内容を、一時フォルダに複製する（COM 経由）。
+        /// クラウド上のブックで同期フォルダの実ファイルが見つからない場合の読み込み用。
+        /// ファイル名は元のブックと同じにする（インポート後の色付けでブックを名前で探すため）。
+        /// </summary>
+        /// <returns>複製したファイルのパス。失敗した場合は null</returns>
+        public static string SaveOpenWorkbookCopy(string fullName)
+        {
+            dynamic app = null;
+            dynamic workbooks = null;
+            try
+            {
+                app = GetExcelApplication();
+                if (app == null)
+                    return null;
+
+                workbooks = app.Workbooks;
+                int count = workbooks.Count;
+                for (int i = 1; i <= count; i++)
+                {
+                    dynamic wb = workbooks[i];
+                    try
+                    {
+                        string wbFullName = wb.FullName;
+                        if (!string.Equals(wbFullName, fullName, StringComparison.OrdinalIgnoreCase))
+                            continue;
+
+                        string dir = Path.Combine(Path.GetTempPath(), "Tools28", "ExcelImport");
+                        Directory.CreateDirectory(dir);
+                        string copyPath = Path.Combine(dir, (string)wb.Name);
+                        if (File.Exists(copyPath))
+                            File.Delete(copyPath);
+
+                        wb.SaveCopyAs(copyPath);
+                        return File.Exists(copyPath) ? copyPath : null;
+                    }
+                    finally
+                    {
+                        Marshal.ReleaseComObject(wb);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                DiagLog.Write($"[ExcelImport] ブックの複製に失敗: {ex.Message}");
+            }
+            finally
+            {
+                if (workbooks != null) Marshal.ReleaseComObject(workbooks);
+                if (app != null) Marshal.ReleaseComObject(app);
+            }
+            return null;
+        }
+
+        /// <summary>
         /// Excel.Application の COM オブジェクトを取得
         /// oleaut32.dll の GetActiveObject を直接呼び出す
         /// </summary>

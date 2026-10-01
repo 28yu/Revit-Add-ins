@@ -399,6 +399,7 @@ namespace Tools28.Localization
             { "Import.Execute", "インポート実行" },
             { "Import.ResultTitle", "インポート結果" },
             { "Import.NoOpenFile", "開いているExcelファイルが見つかりません。" },
+            { "Import.CloudFileNotResolved", "クラウド上の Excel ファイルを読み込めませんでした。「参照」から OneDrive などの同期フォルダ内のファイルを選んでください。\n{0}" },
             { "Import.ReadFailed", "ファイルの読み込みに失敗しました。\n{0}" },
 
             // === FormworkCalculator Dialog ===

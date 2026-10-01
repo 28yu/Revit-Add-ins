@@ -2311,3 +2311,17 @@ Revit 2022 / 2024（AutoBuild を `[build:2022,2024]` で実行）
   - ダイアログ表示時のカテゴリ件数は `ToList().Count` → `GetElementCount()` に変更
 - 未対応（ログで原因が分かってから判断）: 遅いパラメータの自動除外、ClosedXML のメモリ使用量対策
 
+## ExcelExportImport: ダイアログ位置とクラウド上の Excel（2026-10-01）
+
+- 2画面環境で CenterScreen のダイアログが Revit と別のモニター・他ソフトの背面に出る問題。
+  `RevitDialogHelper.SetRevitOwnerCentered()` を追加し、Revit ウィンドウの中央（GetWindowRect → DIP 変換）に
+  置いて表示後に前面化する。ExcelExport/Import の全ダイアログに適用（他機能は未適用）
+- エクスポートの保存先ダイアログは Owner なしで開いていたため、`ExportDialog` 内で `ShowDialog(this)` に移動。
+  キャンセル時はエクスポートダイアログに戻る
+- インポートの「開いているファイル」: クラウド上のブックは Excel の FullName が https の URL になり、
+  ClosedXML で開けない（「パスの形式はサポートされていません」）。`CloudExcelPathResolver` で
+  1) `HKCU\Software\SyncEngines\Providers\OneDrive\*`（UrlNamespace / MountPoint）と
+  `HKCU\Software\Microsoft\OneDrive\Accounts\*` から同期フォルダ内の実ファイルに変換、
+  2) 見つからなければ `Workbook.SaveCopyAs` で一時フォルダ（%TEMP%\Tools28\ExcelImport）へ複製して読む。
+  複製はブックと同名にする（インポート後の COM 色付けがブック名で一致を取るため）
+

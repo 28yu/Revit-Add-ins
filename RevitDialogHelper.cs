@@ -37,6 +37,102 @@ namespace Tools28
         }
 
         /// <summary>
+        /// <see cref="SetRevitOwner"/> に加えて、ダイアログを <b>Revit のウィンドウの中央</b>に表示し、前面に出す。
+        /// WPF の CenterScreen は Revit と別のモニターに出ることがあり、2画面環境では
+        /// 他のソフトのウィンドウの後ろに隠れて見つけにくくなるため、Revit の位置を基準にする。
+        /// </summary>
+        public static void SetRevitOwnerCentered(this Window dialog, ExternalCommandData commandData)
+        {
+            if (dialog == null) return;
+
+            dialog.SetRevitOwner(commandData);
+            dialog.WindowStartupLocation = WindowStartupLocation.Manual;
+
+            // 表示前（SourceInitialized）に一度合わせ、サイズが確定した Loaded で微調整する
+            dialog.SourceInitialized += (sender, args) => CenterOverRevit(dialog, commandData, measure: true);
+            dialog.Loaded += (sender, args) => CenterOverRevit(dialog, commandData, measure: false);
+
+            // 他のソフトの後ろに隠れないよう、表示されたら一度だけ前面に出す
+            EventHandler onRendered = null;
+            onRendered = (sender, args) =>
+            {
+                dialog.ContentRendered -= onRendered;
+                try
+                {
+                    dialog.Activate();
+                    dialog.Topmost = true;
+                    dialog.Topmost = false;
+                }
+                catch (Exception ex)
+                {
+                    DiagLog.Write($"SetRevitOwnerCentered 前面化 例外: {ex.Message}");
+                }
+            };
+            dialog.ContentRendered += onRendered;
+        }
+
+        private static void CenterOverRevit(Window dialog, ExternalCommandData commandData, bool measure)
+        {
+            try
+            {
+                IntPtr revit = GetRevitMainHandle(commandData);
+                if (revit == IntPtr.Zero || IsIconic(revit) || !GetWindowRect(revit, out RECT r))
+                    return;
+
+                var source = PresentationSource.FromVisual(dialog);
+                if (source?.CompositionTarget == null)
+                    return;
+
+                // Revit の位置（物理ピクセル）を WPF の単位に変換
+                var toDip = source.CompositionTarget.TransformFromDevice;
+                System.Windows.Point topLeft = toDip.Transform(new System.Windows.Point(r.Left, r.Top));
+                System.Windows.Point bottomRight = toDip.Transform(new System.Windows.Point(r.Right, r.Bottom));
+
+                double width = dialog.ActualWidth;
+                double height = dialog.ActualHeight;
+                if (measure || width <= 0 || height <= 0)
+                {
+                    // 表示前はサイズが未確定なので、指定サイズまたは内容から見積もる
+                    double w = double.IsNaN(dialog.Width) ? double.PositiveInfinity : dialog.Width;
+                    double h = double.IsNaN(dialog.Height) ? double.PositiveInfinity : dialog.Height;
+                    dialog.Measure(new System.Windows.Size(w, h));
+                    width = double.IsNaN(dialog.Width) ? dialog.DesiredSize.Width : dialog.Width;
+                    height = double.IsNaN(dialog.Height) ? dialog.DesiredSize.Height : dialog.Height;
+                }
+                if (width <= 0 || height <= 0)
+                    return;
+
+                double left = topLeft.X + (bottomRight.X - topLeft.X - width) / 2;
+                double top = topLeft.Y + (bottomRight.Y - topLeft.Y - height) / 2;
+
+                // Revit より大きいダイアログでも上端・左端が Revit の外へはみ出さないようにする
+                dialog.Left = Math.Max(left, topLeft.X);
+                dialog.Top = Math.Max(top, topLeft.Y);
+            }
+            catch (Exception ex)
+            {
+                DiagLog.Write($"CenterOverRevit 例外: {ex.Message}");
+            }
+        }
+
+        [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+        private struct RECT
+        {
+            public int Left;
+            public int Top;
+            public int Right;
+            public int Bottom;
+        }
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+        private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+        private static extern bool IsIconic(IntPtr hWnd);
+
+        /// <summary>
         /// 削除トランザクションや Revit の TaskDialog 表示後に、WPF ダイアログが
         /// Revit 本体ウィンドウの背面へ隠れるのを防ぐため、前面へ復帰させる。
         /// Revit 側のウィンドウアクティブ化が処理された後に実行されるよう、

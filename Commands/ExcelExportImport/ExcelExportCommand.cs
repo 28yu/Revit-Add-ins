@@ -5,7 +5,6 @@ using System.Linq;
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
-using Microsoft.Win32;
 using Tools28.Commands.ExcelExportImport.Models;
 using Tools28.Commands.ExcelExportImport.Services;
 using Tools28.Commands.ExcelExportImport.Views;
@@ -34,7 +33,7 @@ namespace Tools28.Commands.ExcelExportImport
 
                 // 範囲選択ダイアログ
                 var scopeDialog = new ScopeSelectionDialog(hasActiveView, hasSelection);
-                scopeDialog.SetRevitOwner(commandData);
+                scopeDialog.SetRevitOwnerCentered(commandData);
                 if (scopeDialog.ShowDialog() != true)
                     return Result.Cancelled;
 
@@ -42,28 +41,22 @@ namespace Tools28.Commands.ExcelExportImport
 
                 // エクスポートダイアログを表示（スコープを渡す）
                 var dialog = new ExportDialog(doc, scope, activeView, selectionIds);
-                dialog.SetRevitOwner(commandData);
+                dialog.SetRevitOwnerCentered(commandData);
                 bool? result = dialog.ShowDialog();
 
                 if (result != true)
                     return Result.Cancelled;
 
-                // 保存先を選択
-                var saveDialog = new SaveFileDialog
-                {
-                    Filter = "Excelファイル (*.xlsx)|*.xlsx",
-                    DefaultExt = ".xlsx",
-                    FileName = $"{doc.Title}_パラメータ"
-                };
-
-                if (saveDialog.ShowDialog() != true)
+                // 保存先はエクスポートダイアログ内で選択済み（ダイアログを親にして開くため）
+                string saveFilePath = dialog.SaveFilePath;
+                if (string.IsNullOrEmpty(saveFilePath))
                     return Result.Cancelled;
 
                 // エクスポート実行（スコープを渡す）。
                 // 大容量モデルでは時間がかかるため、進み具合の画面を出してキャンセルできるようにする。
                 var timings = new ParameterTimingTracker();
                 var progressWindow = new ExportProgressWindow();
-                progressWindow.SetRevitOwner(commandData);
+                progressWindow.SetRevitOwnerCentered(commandData);
                 var totalWatch = Stopwatch.StartNew();
                 try
                 {
@@ -73,7 +66,7 @@ namespace Tools28.Commands.ExcelExportImport
                     {
                         ExcelExportService.Export(
                             doc,
-                            saveDialog.FileName,
+                            saveFilePath,
                             dialog.SelectedCategories,
                             dialog.OutputParameters,
                             dialog.SplitByCategory,
@@ -100,7 +93,7 @@ namespace Tools28.Commands.ExcelExportImport
                 LogSlowParameters(timings, totalWatch, "完了");
 
                 // エクスポートしたExcelファイルを自動で開く
-                Process.Start(new ProcessStartInfo(saveDialog.FileName) { UseShellExecute = true });
+                Process.Start(new ProcessStartInfo(saveFilePath) { UseShellExecute = true });
 
                 return Result.Succeeded;
             }

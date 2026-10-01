@@ -59,9 +59,8 @@ namespace Tools28.Commands.ExcelExportImport.Views
                 var openFiles = ExcelProcessHelper.GetOpenExcelFiles();
                 if (openFiles.Count == 1)
                 {
-                    _selectedFilePath = openFiles[0];
-                    FilePathTextBox.Text = _selectedFilePath;
-                    LoadPreview();
+                    // 起動時の自動検出なので、解決できなくてもメッセージは出さない
+                    SelectOpenWorkbook(openFiles[0], showError: false);
                 }
                 else if (openFiles.Count > 1)
                 {
@@ -85,9 +84,7 @@ namespace Tools28.Commands.ExcelExportImport.Views
             }
             else if (openFiles.Count == 1)
             {
-                _selectedFilePath = openFiles[0];
-                FilePathTextBox.Text = _selectedFilePath;
-                LoadPreview();
+                SelectOpenWorkbook(openFiles[0], showError: true);
             }
             else
             {
@@ -126,7 +123,7 @@ namespace Tools28.Commands.ExcelExportImport.Views
             {
                 listBox.Items.Add(new ListBoxItem
                 {
-                    Content = Path.GetFileName(file),
+                    Content = CloudExcelPathResolver.GetDisplayFileName(file),
                     Tag = file,
                     ToolTip = file
                 });
@@ -192,10 +189,31 @@ namespace Tools28.Commands.ExcelExportImport.Views
             selectWindow.Owner = this;
             if (selectWindow.ShowDialog() == true && selectedPath != null)
             {
-                _selectedFilePath = selectedPath;
-                FilePathTextBox.Text = _selectedFilePath;
-                LoadPreview();
+                SelectOpenWorkbook(selectedPath, showError: true);
             }
+        }
+
+        /// <summary>
+        /// Excel で開いているブックを読み込み対象にする。
+        /// クラウド上のブック（URL）は、「参照」で選んだときと同じく同期フォルダ内の実ファイルに置き換える
+        /// （見つからなければ開いている内容の複製を使う）。
+        /// </summary>
+        private void SelectOpenWorkbook(string fullName, bool showError)
+        {
+            string path = CloudExcelPathResolver.Resolve(fullName);
+            if (path == null)
+            {
+                if (showError)
+                {
+                    MessageBox.Show(string.Format(Loc.S("Import.CloudFileNotResolved"), fullName),
+                        Loc.S("Common.Error"), MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+                return;
+            }
+
+            _selectedFilePath = path;
+            FilePathTextBox.Text = _selectedFilePath;
+            LoadPreview();
         }
 
         private void BrowseButton_Click(object sender, RoutedEventArgs e)

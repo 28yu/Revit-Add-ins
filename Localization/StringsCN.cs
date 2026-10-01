@@ -399,6 +399,7 @@ namespace Tools28.Localization
             { "Import.Execute", "执行导入" },
             { "Import.ResultTitle", "导入结果" },
             { "Import.NoOpenFile", "未找到已打开的Excel文件。" },
+            { "Import.CloudFileNotResolved", "无法读取云端的 Excel 文件。请通过“浏览”选择 OneDrive 等同步文件夹中的文件。\n{0}" },
             { "Import.ReadFailed", "读取文件失败。\n{0}" },
 
             // === FormworkCalculator Dialog ===

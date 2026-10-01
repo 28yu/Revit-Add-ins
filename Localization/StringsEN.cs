@@ -400,6 +400,7 @@ namespace Tools28.Localization
             { "Import.Execute", "Import" },
             { "Import.ResultTitle", "Import Result" },
             { "Import.NoOpenFile", "No open Excel file found." },
+            { "Import.CloudFileNotResolved", "Could not read the cloud Excel file. Use \"Browse\" to select the file in your OneDrive (or other) sync folder.\n{0}" },
             { "Import.ReadFailed", "Failed to read the file.\n{0}" },
 
             // === FormworkCalculator Dialog ===

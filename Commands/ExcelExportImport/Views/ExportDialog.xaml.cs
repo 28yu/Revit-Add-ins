@@ -48,6 +48,9 @@ namespace Tools28.Commands.ExcelExportImport.Views
         /// <summary>カテゴリ毎にシートを分けるか</summary>
         public bool SplitByCategory { get; private set; } = true;
 
+        /// <summary>保存先の Excel ファイルパス（エクスポート実行時に選ぶ）</summary>
+        public string SaveFilePath { get; private set; }
+
         /// <summary>見出しの上にパラメータグループ行を書き出すか</summary>
         public bool IncludeParamGroup { get; private set; }
 
@@ -654,6 +657,18 @@ namespace Tools28.Commands.ExcelExportImport.Views
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
+
+            // 保存先を選ぶ。このダイアログを親にして開くことで、Revit と同じモニターの前面に出る。
+            // キャンセルした場合はダイアログに戻る（選択内容は残る）。
+            var saveDialog = new SaveFileDialog
+            {
+                Filter = "Excelファイル (*.xlsx)|*.xlsx",
+                DefaultExt = ".xlsx",
+                FileName = $"{_doc.Title}_パラメータ"
+            };
+            if (saveDialog.ShowDialog(this) != true)
+                return;
+            SaveFilePath = saveDialog.FileName;
 
             SplitByCategory = SplitByCategoryCheckBox.IsChecked == true;
             IncludeParamGroup = IncludeParamGroupCheckBox.IsChecked == true;
