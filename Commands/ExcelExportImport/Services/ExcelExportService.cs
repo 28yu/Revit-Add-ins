@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using Autodesk.Revit.DB;
 using Tools28;
@@ -22,6 +23,9 @@ namespace Tools28.Commands.ExcelExportImport.Services
         /// <param name="outputParameters">出力パラメータ一覧（順序付き）</param>
         /// <param name="splitByCategory">trueならカテゴリ毎にシート分割、falseなら1シート</param>
         /// <param name="includeParamGroup">trueなら見出しの上に1行追加してパラメータグループを書き出す</param>
+        /// <param name="progress">進み具合の表示・キャンセル受付（null なら表示しない）</param>
+        /// <param name="timings">パラメータごとの読み取り時間の集計先（null なら集計しない）</param>
+        /// <exception cref="OperationCanceledException">キャンセルされた場合（ファイルは保存されない）</exception>
         /// <returns>エクスポート結果（カテゴリ名, 要素数）</returns>
         public static Dictionary<string, int> Export(
             Document doc,
@@ -32,7 +36,9 @@ namespace Tools28.Commands.ExcelExportImport.Services
             ExportScope scope = ExportScope.EntireProject,
             View activeView = null,
             ICollection<ElementId> selectionIds = null,
-            bool includeParamGroup = false)
+            bool includeParamGroup = false,
+            IExportProgress progress = null,
+            ParameterTimingTracker timings = null)
         {
             var results = new Dictionary<string, int>();
 
@@ -40,14 +46,17 @@ namespace Tools28.Commands.ExcelExportImport.Services
             {
                 if (splitByCategory)
                 {
-                    ExportSplitByCategory(doc, workbook, selectedCategories, outputParameters, results, scope, activeView, selectionIds, includeParamGroup);
+                    ExportSplitByCategory(doc, workbook, selectedCategories, outputParameters, results, scope, activeView, selectionIds, includeParamGroup, progress, timings);
                 }
                 else
                 {
-                    ExportSingleSheet(doc, workbook, selectedCategories, outputParameters, results, scope, activeView, selectionIds, includeParamGroup);
+                    ExportSingleSheet(doc, workbook, selectedCategories, outputParameters, results, scope, activeView, selectionIds, includeParamGroup, progress, timings);
                 }
 
+                progress?.BeginSaving();
+                var saveWatch = Stopwatch.StartNew();
                 workbook.SaveAs(filePath);
+                DiagLog.Write($"[ExcelExport] 保存 {saveWatch.ElapsedMilliseconds} ms");
             }
 
             return results;
@@ -65,14 +74,19 @@ namespace Tools28.Commands.ExcelExportImport.Services
             ExportScope scope,
             View activeView,
             ICollection<ElementId> selectionIds,
-            bool includeParamGroup)
+            bool includeParamGroup,
+            IExportProgress progress,
+            ParameterTimingTracker timings)
         {
             // グループ行を出す場合は 1行目=グループ、2行目=見出し、3行目以降=データ
             int headerRow = includeParamGroup ? 2 : 1;
             int firstDataRow = headerRow + 1;
 
+            int catIndex = 0;
             foreach (var category in selectedCategories)
             {
+                catIndex++;
+
                 // このカテゴリに属するパラメータのみ抽出
                 var categoryParams = outputParameters
                     .Where(p => p.CategoryName == category.Name)
@@ -95,8 +109,10 @@ namespace Tools28.Commands.ExcelExportImport.Services
                 WriteHeaderRow(worksheet, categoryParams, headerRow);
 
                 // データ行を作成
+                var catWatch = Stopwatch.StartNew();
                 var elements = RevitCategoryHelper.GetElementsByCategory(
                     doc, category.BuiltInCategory, scope, activeView, selectionIds);
+                progress?.BeginCategory(catIndex, selectedCategories.Count, category.Name, elements.Count);
 
                 // 列幅計算用（ヘッダー幅で初期化。2回目の全走査を避けるため書き込みと同時に集計）
                 int totalCols = categoryParams.Count + 2;
@@ -122,8 +138,8 @@ namespace Tools28.Commands.ExcelExportImport.Services
                     for (int i = 0; i < categoryParams.Count; i++)
                     {
                         var paramInfo = categoryParams[i];
-                        string value = ResolveParameterValue(
-                            elem, paramInfo, doc, typeElemCache, typeValueCache);
+                        string value = ReadValueTimed(
+                            elem, paramInfo, doc, typeElemCache, typeValueCache, progress, timings);
 
                         if (double.TryParse(value, out double numValue))
                         {
@@ -137,7 +153,10 @@ namespace Tools28.Commands.ExcelExportImport.Services
                     }
 
                     row++;
+                    progress?.ElementDone();
                 }
+
+                DiagLog.Write($"[ExcelExport] {category.Name}: 要素 {elements.Count} 件 × パラメータ {categoryParams.Count} 列, {catWatch.ElapsedMilliseconds} ms");
 
                 ApplyColumnWidths(worksheet, colWidths);
 
@@ -166,7 +185,9 @@ namespace Tools28.Commands.ExcelExportImport.Services
             ExportScope scope,
             View activeView,
             ICollection<ElementId> selectionIds,
-            bool includeParamGroup)
+            bool includeParamGroup,
+            IExportProgress progress,
+            ParameterTimingTracker timings)
         {
             // グループ行を出す場合は 1行目=グループ、2行目=見出し、3行目以降=データ
             int headerRow = includeParamGroup ? 2 : 1;
@@ -201,8 +222,10 @@ namespace Tools28.Commands.ExcelExportImport.Services
 
             int row = firstDataRow;
 
+            int catIndex = 0;
             foreach (var category in selectedCategories)
             {
+                catIndex++;
                 var categoryParams = outputParameters
                     .Where(p => p.CategoryName == category.Name)
                     .ToList();
@@ -216,8 +239,10 @@ namespace Tools28.Commands.ExcelExportImport.Services
                     if (!paramByDisplay.ContainsKey(p.DisplayName))
                         paramByDisplay[p.DisplayName] = p;
 
+                var catWatch = Stopwatch.StartNew();
                 var elements = RevitCategoryHelper.GetElementsByCategory(
                     doc, category.BuiltInCategory, scope, activeView, selectionIds);
+                progress?.BeginCategory(catIndex, selectedCategories.Count, category.Name, elements.Count);
 
                 foreach (var elem in elements)
                 {
@@ -235,8 +260,8 @@ namespace Tools28.Commands.ExcelExportImport.Services
                         if (!paramByDisplay.TryGetValue(allParams[i].DisplayName, out var matchParam))
                             continue;
 
-                        string value = ResolveParameterValue(
-                            elem, matchParam, doc, typeElemCache, typeValueCache);
+                        string value = ReadValueTimed(
+                            elem, matchParam, doc, typeElemCache, typeValueCache, progress, timings);
 
                         if (double.TryParse(value, out double numValue))
                         {
@@ -250,8 +275,10 @@ namespace Tools28.Commands.ExcelExportImport.Services
                     }
 
                     row++;
+                    progress?.ElementDone();
                 }
 
+                DiagLog.Write($"[ExcelExport] {category.Name}: 要素 {elements.Count} 件 × パラメータ {categoryParams.Count} 列, {catWatch.ElapsedMilliseconds} ms");
                 results[category.Name] = elements.Count;
             }
 
@@ -347,6 +374,38 @@ namespace Tools28.Commands.ExcelExportImport.Services
                 var p = ResolveLiveParameter(elem, paramInfo);
                 return ParameterService.GetParameterValueAsString(p);
             }
+        }
+
+        /// <summary>
+        /// パラメータ値を読み取り、かかった時間を集計する。あわせてキャンセル要求を確認し、
+        /// 一定時間ごとに進み具合の表示を更新する（1セルごとに呼ぶので、遅いパラメータが
+        /// 並んでいても画面が固まらず、キャンセルがすぐ効く）。
+        /// </summary>
+        private static string ReadValueTimed(
+            Element elem,
+            ParameterInfo paramInfo,
+            Document doc,
+            Dictionary<long, Element> typeElemCache,
+            Dictionary<string, string> typeValueCache,
+            IExportProgress progress,
+            ParameterTimingTracker timings)
+        {
+            if (progress != null && progress.IsCancelRequested)
+                throw new OperationCanceledException();
+
+            long start = Stopwatch.GetTimestamp();
+            string value = ResolveParameterValue(elem, paramInfo, doc, typeElemCache, typeValueCache);
+
+            if (timings != null)
+            {
+                timings.Add(paramInfo, Stopwatch.GetTimestamp() - start);
+                var slowest = timings.Slowest;
+                if (progress != null && slowest != null)
+                    progress.SetSlowest(slowest.Label, slowest.AverageMs);
+            }
+
+            progress?.Tick();
+            return value;
         }
 
         /// <summary>

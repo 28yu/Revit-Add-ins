@@ -2295,3 +2295,19 @@ Revit 2022 / 2024（AutoBuild を `[build:2022,2024]` で実行）
   `ExcelHeaderNames.FindHeaderRow()` で「要素ID」見出しのある行を判定する。
   ⚠ グループ行の1列目に「要素ID」を書かないこと（見出し行の判定が壊れる）
 - グループ行は参考表示のみ。読み込みには使わない（Excel で書き換えても Revit には反映しない）
+
+## ExcelExportImport: 大容量モデルでのエクスポート対策（2026-10-01）
+
+- 報告: 大容量 .rvt で「エクスポート実行」後に応答なしのまま一晩終わらない。
+  遅いだけでなく、特定パラメータの読み取りが極端に重い（設備系の計算値など、読むたびに再計算される）可能性が高い
+- 対策（原因特定と脱出手段を優先）:
+  - `ExportProgressWindow`（モードレス）で進み具合・経過時間・最も遅いパラメータを表示し、キャンセル可能にした。
+    Revit API は UI スレッド専用なので別スレッド化はせず、1セルごとに `IExportProgress.Tick()` を呼び、
+    200ms ごとに `Dispatcher.Invoke(DispatcherPriority.Background, ...)` で画面メッセージを処理する
+  - 処理中は `BlockRevitInput()` で Revit 本体を無効化（再入防止）
+  - `ParameterTimingTracker` でパラメータ別の読み取り時間を集計。キャンセル時のダイアログと
+    `C:\temp\Tools28_debug.txt`（`[ExcelExport]`）に上位を出す
+  - キャンセルは `OperationCanceledException` で抜ける。`SaveAs` 前なのでファイルは作られない
+  - ダイアログ表示時のカテゴリ件数は `ToList().Count` → `GetElementCount()` に変更
+- 未対応（ログで原因が分かってから判断）: 遅いパラメータの自動除外、ClosedXML のメモリ使用量対策
+

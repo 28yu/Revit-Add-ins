@@ -68,7 +68,8 @@ namespace Tools28.Commands.ExcelExportImport.Services
                 int count;
                 try
                 {
-                    count = GetElements(doc, builtInCat, scope, activeView, selectionIds).Count;
+                    // 件数だけ必要なので要素を読み込まずに数える（大容量モデルで画面表示が遅くなるのを防ぐ）
+                    count = CountElements(doc, builtInCat, scope, activeView, selectionIds);
                 }
                 catch
                 {
@@ -104,19 +105,42 @@ namespace Tools28.Commands.ExcelExportImport.Services
             View activeView,
             ICollection<ElementId> selectionIds)
         {
+            var collector = CreateCollector(doc, category, scope, activeView, selectionIds);
+            return collector == null ? new List<Element>() : collector.ToList();
+        }
+
+        private static int CountElements(
+            Document doc,
+            BuiltInCategory category,
+            ExportScope scope,
+            View activeView,
+            ICollection<ElementId> selectionIds)
+        {
+            var collector = CreateCollector(doc, category, scope, activeView, selectionIds);
+            return collector == null ? 0 : collector.GetElementCount();
+        }
+
+        /// <summary>スコープに応じた要素の検索条件を作る。対象が無い場合は null。</summary>
+        private static FilteredElementCollector CreateCollector(
+            Document doc,
+            BuiltInCategory category,
+            ExportScope scope,
+            View activeView,
+            ICollection<ElementId> selectionIds)
+        {
             FilteredElementCollector collector;
 
             switch (scope)
             {
                 case ExportScope.ActiveView:
                     if (activeView == null)
-                        return new List<Element>();
+                        return null;
                     collector = new FilteredElementCollector(doc, activeView.Id);
                     break;
 
                 case ExportScope.Selection:
                     if (selectionIds == null || selectionIds.Count == 0)
-                        return new List<Element>();
+                        return null;
                     collector = new FilteredElementCollector(doc, selectionIds);
                     break;
 
@@ -128,8 +152,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
 
             return collector
                 .OfCategory(category)
-                .WhereElementIsNotElementType()
-                .ToList();
+                .WhereElementIsNotElementType();
         }
 
         /// <summary>
