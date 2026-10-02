@@ -2324,4 +2324,8 @@ Revit 2022 / 2024（AutoBuild を `[build:2022,2024]` で実行）
   `HKCU\Software\Microsoft\OneDrive\Accounts\*` から同期フォルダ内の実ファイルに変換、
   2) 見つからなければ `Workbook.SaveCopyAs` で一時フォルダ（%TEMP%\Tools28\ExcelImport）へ複製して読む。
   複製はブックと同名にする（インポート後の COM 色付けがブック名で一致を取るため）
+- 追記（2026-10-02）: ユーザー確認で「まだ読めない」。原因未特定のため、
+  同期フォルダの実ファイルで読めなければ `SaveCopyAs` の複製で自動的に読み直すようにし、
+  開いているブック一覧・選択・読み込み失敗（例外の詳細）を `[ExcelImport]` でログに残すようにした。
+  拡張子判定は FullName（URL 末尾に `?web=1` 等が付く場合がある）ではなく `Workbook.Name` で行う
 

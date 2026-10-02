@@ -49,8 +49,12 @@ namespace Tools28.Commands.ExcelExportImport.Services
                         try
                         {
                             string fullName = wb.FullName;
-                            if (fullName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase) ||
-                                fullName.EndsWith(".xls", StringComparison.OrdinalIgnoreCase))
+                            // 拡張子はブック名で判定する（クラウド上のブックは FullName が URL で、
+                            // 末尾に "?web=1" などが付くことがあるため）
+                            string wbName = wb.Name;
+                            DiagLog.Write($"[ExcelImport] 開いているブック: {wbName} / {fullName}");
+                            if (wbName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase) ||
+                                wbName.EndsWith(".xls", StringComparison.OrdinalIgnoreCase))
                             {
                                 result.Add(fullName);
                             }

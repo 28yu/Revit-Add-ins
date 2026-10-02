@@ -200,20 +200,39 @@ namespace Tools28.Commands.ExcelExportImport.Views
         /// </summary>
         private void SelectOpenWorkbook(string fullName, bool showError)
         {
-            string path = CloudExcelPathResolver.Resolve(fullName);
-            if (path == null)
+            DiagLog.Write($"[ExcelImport] 開いているブックを選択: {fullName}");
+
+            if (!CloudExcelPathResolver.IsCloudPath(fullName))
             {
-                if (showError)
-                {
-                    MessageBox.Show(string.Format(Loc.S("Import.CloudFileNotResolved"), fullName),
-                        Loc.S("Common.Error"), MessageBoxButton.OK, MessageBoxImage.Error);
-                }
+                LoadPreview(fullName, showError);
                 return;
             }
 
-            _selectedFilePath = path;
-            FilePathTextBox.Text = _selectedFilePath;
-            LoadPreview();
+            // クラウド上のブック: まず同期フォルダの実ファイル（「参照」と同じファイル）で読む。
+            // 見つからない／読めない場合は、Excel で開いている内容の複製で読み直す。
+            string path = CloudExcelPathResolver.Resolve(fullName);
+            if (path != null && LoadPreview(path, showError: false))
+                return;
+
+            string copy = ExcelProcessHelper.SaveOpenWorkbookCopy(fullName);
+            if (copy != null && !string.Equals(copy, path, StringComparison.OrdinalIgnoreCase))
+            {
+                DiagLog.Write($"[ExcelImport] 複製で読み直し: {copy}");
+                if (LoadPreview(copy, showError))
+                    return;
+            }
+            else if (path != null && showError)
+            {
+                // 複製もできない → 最初の読み込みエラーを表示する
+                LoadPreview(path, showError: true);
+                return;
+            }
+
+            if (copy == null && showError)
+            {
+                MessageBox.Show(string.Format(Loc.S("Import.CloudFileNotResolved"), fullName),
+                    Loc.S("Common.Error"), MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         private void BrowseButton_Click(object sender, RoutedEventArgs e)
@@ -234,10 +253,21 @@ namespace Tools28.Commands.ExcelExportImport.Views
 
         private void LoadPreview()
         {
+            LoadPreview(_selectedFilePath, showError: true);
+        }
+
+        /// <summary>
+        /// 指定ファイルを読み込んでプレビューを表示する。成功した場合だけ選択ファイルとして確定する。
+        /// </summary>
+        /// <returns>読み込めた場合 true</returns>
+        private bool LoadPreview(string path, bool showError)
+        {
             try
             {
                 // プレビューを生成
-                _previewRows = ExcelImportService.GeneratePreview(_doc, _selectedFilePath);
+                _previewRows = ExcelImportService.GeneratePreview(_doc, path);
+                _selectedFilePath = path;
+                FilePathTextBox.Text = path;
 
                 // 書き込み可能な変更のみ表示（読み取り専用パラメータは除外）
                 var changedRows = _previewRows
@@ -259,12 +289,19 @@ namespace Tools28.Commands.ExcelExportImport.Views
                 SummaryText.Text = summary;
 
                 ImportButton.IsEnabled = writableChangeCount > 0;
+                return true;
             }
             catch (Exception ex)
             {
-                MessageBox.Show(string.Format(Loc.S("Import.ReadFailed"), ex.Message),
-                    Loc.S("Common.Error"), MessageBoxButton.OK, MessageBoxImage.Error);
+                // 原因調査用に、読もうとした場所と例外の詳細を残す
+                DiagLog.Write($"[ExcelImport] 読み込み失敗: {path}\n{ex}");
+                if (showError)
+                {
+                    MessageBox.Show(string.Format(Loc.S("Import.ReadFailed"), ex.Message),
+                        Loc.S("Common.Error"), MessageBoxButton.OK, MessageBoxImage.Error);
+                }
                 ImportButton.IsEnabled = false;
+                return false;
             }
         }
 
