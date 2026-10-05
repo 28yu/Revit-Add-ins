@@ -99,12 +99,21 @@ namespace Tools28.Commands.ExcelExportImport.Services
             var typeCurrentCache = new Dictionary<string, string>();
             var typeReadOnlyCache = new Dictionary<string, bool>();
 
+            // 変更判定の診断ログ（「変更していないのに出る／変更したのに出ない」の原因調査用）
+            var diag = new PreviewDiagnostics();
+            DiagLog.Write($"[ImportPreview] 開始: {filePath}");
+
             using (var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
             using (var workbook = new XLWorkbook(stream))
             {
                 foreach (var worksheet in workbook.Worksheets)
                 {
                     sheetNames.Add(worksheet.Name);
+
+                    // 1シート統合モードのシートでは、他カテゴリ用の列も同じ行に並び、
+                    // その要素に関係ない列は空欄で書き出される。空欄を「値の削除」と解釈すると
+                    // 触っていない値が消えてしまうため、統合シートでは空欄を常にスキップする。
+                    bool isMergedSheet = ExcelHeaderNames.IsMergedSheetName(worksheet.Name);
 
                     var lastRow = worksheet.LastRowUsed();
                     var lastCol = worksheet.LastColumnUsed();
@@ -116,6 +125,8 @@ namespace Tools28.Commands.ExcelExportImport.Services
 
                     // 見出し行（グループ行付きで書き出した Excel は 2行目）
                     int headerRow = ExcelHeaderNames.FindHeaderRow(worksheet);
+
+                    DiagLog.Write($"[ImportPreview] シート「{worksheet.Name}」 見出し行={headerRow} 最終行={rowCount} 最終列={colCount} 統合シート={isMergedSheet}");
 
                     if (rowCount <= headerRow || colCount < 3)
                         continue;
@@ -174,13 +185,28 @@ namespace Tools28.Commands.ExcelExportImport.Services
                             //    （数値・ElementId 型は Revit 上で空にできないためスキップ）
                             if (string.IsNullOrEmpty(newValue))
                             {
+                                if (isMergedSheet)
+                                {
+                                    diag.BlankSkipped++;
+                                    continue;
+                                }
+
                                 var clearParam = ParameterService.FindParameter(elem, rawName, isTypeParam, parsed.Kind, parsed.Index, doc);
                                 if (clearParam == null || clearParam.StorageType != StorageType.String)
+                                {
+                                    diag.BlankSkipped++;
                                     continue;
+                                }
 
                                 string clearCurrent = ParameterService.GetParameterValueAsString(clearParam);
                                 if (string.IsNullOrEmpty(clearCurrent))
+                                {
+                                    diag.BlankSkipped++;
                                     continue; // 既に空 → 変更なし
+                                }
+
+                                diag.LogChange(worksheet.Name, row, elementIdInt, headerName,
+                                    worksheet.Cell(row, i + 3), clearCurrent, "", clearParam, "空欄=値の削除");
 
                                 preview.Add(new ImportPreviewRow
                                 {
@@ -197,6 +223,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
 
                             string currentValue;
                             bool isReadOnly;
+                            Parameter foundParam = null;   // 診断ログ用（タイプのキャッシュ命中時は null）
                             if (isTypeParam)
                             {
                                 // タイプパラメータ: (タイプID|表示名) でキャッシュ（同名区別のため表示名を使う）
@@ -204,6 +231,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
                                 if (!typeCurrentCache.TryGetValue(tkey, out currentValue))
                                 {
                                     var tp = ParameterService.FindParameter(elem, rawName, true, parsed.Kind, parsed.Index, doc);
+                                    foundParam = tp;
                                     currentValue = ParameterService.GetParameterValueAsString(tp);
                                     isReadOnly = tp == null
                                         || (tp.IsReadOnly && !ParameterService.IsTypeChangeParameter(tp));
@@ -218,12 +246,28 @@ namespace Tools28.Commands.ExcelExportImport.Services
                             else
                             {
                                 var param = ParameterService.FindParameter(elem, rawName, false, parsed.Kind, parsed.Index, doc);
+                                foundParam = param;
                                 currentValue = ParameterService.GetParameterValueAsString(param);
                                 // タイプ変更パラメータはIsReadOnlyでもChangeTypeIdで変更可能
                                 isReadOnly = param == null
                                     || (param.IsReadOnly && !ParameterService.IsTypeChangeParameter(param));
                             }
                             bool hasChange = !ValuesAreEqual(currentValue, newValue);
+
+                            if (hasChange)
+                            {
+                                string reason = !isReadOnly ? "表示"
+                                    : (foundParam == null && !isTypeParam) ? "パラメータが見つからない→非表示"
+                                    : "読み取り専用→非表示";
+                                diag.LogChange(worksheet.Name, row, elementIdInt, headerName,
+                                    worksheet.Cell(row, i + 3), currentValue, newValue, foundParam, reason);
+                            }
+                            else if (currentValue != newValue)
+                            {
+                                // 文字としては違うが「同じ」と判定した（数値比較で一致 等）→「変更したのに出ない」原因の候補
+                                diag.LogEqualButDifferent(worksheet.Name, row, elementIdInt, headerName,
+                                    worksheet.Cell(row, i + 3), currentValue, newValue);
+                            }
 
                             preview.Add(new ImportPreviewRow
                             {
@@ -240,7 +284,64 @@ namespace Tools28.Commands.ExcelExportImport.Services
                 }
             }
 
+            diag.WriteSummary(preview);
             return preview;
+        }
+
+        /// <summary>
+        /// 変更プレビューの判定内容を診断ログ（C:\temp\Tools28_debug.txt）に残す。
+        /// ログが肥大化しないよう、種類ごとに出力件数の上限を設ける。
+        /// </summary>
+        private class PreviewDiagnostics
+        {
+            private const int MaxChangeLogs = 300;
+            private const int MaxEqualLogs = 100;
+
+            private int _changeLogs;
+            private int _equalLogs;
+            public int BlankSkipped;
+
+            public void LogChange(string sheet, int row, long elementId, string header,
+                IXLCell cell, string current, string newValue, Parameter param, string reason)
+            {
+                if (++_changeLogs > MaxChangeLogs) return;
+                string storage = param != null ? param.StorageType.ToString() : "-";
+                string paramId = param != null ? param.Id.IntValue().ToString() : "-";
+                DiagLog.Write($"[ImportPreview] 変更判定 [{reason}] シート={sheet} 行={row} 要素={elementId} 列='{header}' " +
+                    $"セル型={cell.DataType} セル生値='{RawCellText(cell)}' 新しい値='{Escape(newValue)}' 現在値='{Escape(current)}' " +
+                    $"格納型={storage} パラメータID={paramId}");
+            }
+
+            public void LogEqualButDifferent(string sheet, int row, long elementId, string header,
+                IXLCell cell, string current, string newValue)
+            {
+                if (++_equalLogs > MaxEqualLogs) return;
+                DiagLog.Write($"[ImportPreview] 同値扱い（文字は不一致） シート={sheet} 行={row} 要素={elementId} 列='{header}' " +
+                    $"セル型={cell.DataType} セル生値='{RawCellText(cell)}' 新しい値='{Escape(newValue)}' 現在値='{Escape(current)}'");
+            }
+
+            public void WriteSummary(List<ImportPreviewRow> preview)
+            {
+                int changed = preview.Count(r => r.HasChange && !r.IsReadOnly);
+                int changedRo = preview.Count(r => r.HasChange && r.IsReadOnly);
+                DiagLog.Write($"[ImportPreview] 完了: 判定 {preview.Count} 件 / 変更あり(表示) {changed} 件 / " +
+                    $"変更あり(読み取り専用・非表示) {changedRo} 件 / 空欄スキップ {BlankSkipped} 件 / " +
+                    $"同値扱い(文字不一致) {_equalLogs} 件" +
+                    (_changeLogs > MaxChangeLogs ? $"（変更判定ログは先頭 {MaxChangeLogs} 件のみ出力）" : ""));
+            }
+
+            private static string RawCellText(IXLCell cell)
+            {
+                try { return Escape(cell.Value.ToString()); }
+                catch { return "?"; }
+            }
+
+            /// <summary>改行・タブを見える形にする（見た目では分からない違いを確認するため）</summary>
+            private static string Escape(string s)
+            {
+                if (s == null) return "(null)";
+                return s.Replace("\r", "\\r").Replace("\n", "\\n").Replace("\t", "\\t");
+            }
         }
 
         /// <summary>
