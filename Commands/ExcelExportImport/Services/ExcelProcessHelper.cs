@@ -80,6 +80,17 @@ namespace Tools28.Commands.ExcelExportImport.Services
             return result;
         }
 
+        /// <summary>凡例セルの中の指定文字列部分を、指定色の太字にする（COM 経由）</summary>
+        private static void ColorLegendPart(dynamic legendCell, string legendText, string part, int color)
+        {
+            int idx = legendText.IndexOf(part, StringComparison.Ordinal);
+            if (idx < 0) return;
+            dynamic chars = legendCell.Characters[idx + 1, part.Length];
+            chars.Font.Color = color;
+            chars.Font.Bold = true;
+            Marshal.ReleaseComObject(chars);
+        }
+
         /// <summary>
         /// 開いているExcelブックの指定セルに背景色を設定する（COM経由）
         /// </summary>
@@ -88,11 +99,12 @@ namespace Tools28.Commands.ExcelExportImport.Services
         /// <param name="clearedSet">値を削除（空欄化）して成功したセルのキー → 青塗り</param>
         /// <param name="failedSet">失敗したセルのキー → 赤字</param>
         /// <returns>色付けに成功した場合true</returns>
-        public static bool MarkCellsViaCom(string filePath, HashSet<string> changedSet, HashSet<string> clearedSet = null, HashSet<string> failedSet = null)
+        public static bool MarkCellsViaCom(string filePath, HashSet<string> changedSet, HashSet<string> clearedSet = null, HashSet<string> failedSet = null, HashSet<string> skippedSet = null)
         {
             if ((changedSet == null || changedSet.Count == 0)
                 && (clearedSet == null || clearedSet.Count == 0)
-                && (failedSet == null || failedSet.Count == 0))
+                && (failedSet == null || failedSet.Count == 0)
+                && (skippedSet == null || skippedSet.Count == 0))
                 return false;
 
             dynamic app = null;
@@ -180,6 +192,10 @@ namespace Tools28.Commands.ExcelExportImport.Services
                     int blueColor = 79 + 129 * 256 + 189 * 256 * 256;
                     // 赤色: R=255, G=0, B=0（失敗セル用）
                     int redColor = 255 + 0 * 256 + 0 * 256 * 256;
+                    // オレンジ（取り込めなかったセル用。ClosedXML 側と同じ色）
+                    int orangeColor = ExcelImportService.SkippedR
+                                      + ExcelImportService.SkippedG * 256
+                                      + ExcelImportService.SkippedB * 256 * 256;
 
                     int sheetCount = targetWb.Sheets.Count;
                     for (int s = 1; s <= sheetCount; s++)
@@ -238,6 +254,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
                                 var successCols = new List<int>();
                                 var clearedCols = new List<int>();
                                 var failedCols = new List<int>();
+                                var skippedCols = new List<int>();
                                 for (int i = 0; i < paramHeaders.Count; i++)
                                 {
                                     string key = elementIdStr + "|" + paramHeaders[i];
@@ -247,9 +264,11 @@ namespace Tools28.Commands.ExcelExportImport.Services
                                         successCols.Add(i + 3);
                                     else if (failedSet != null && failedSet.Contains(key))
                                         failedCols.Add(i + 3);
+                                    else if (skippedSet != null && skippedSet.Contains(key))
+                                        skippedCols.Add(i + 3);
                                 }
 
-                                if (successCols.Count == 0 && clearedCols.Count == 0 && failedCols.Count == 0)
+                                if (successCols.Count == 0 && clearedCols.Count == 0 && failedCols.Count == 0 && skippedCols.Count == 0)
                                     continue;
 
                                 try
@@ -285,6 +304,13 @@ namespace Tools28.Commands.ExcelExportImport.Services
                                         cell.Font.Bold = true;
                                         Marshal.ReleaseComObject(cell);
                                     }
+                                    // 取り込めなかったセル（読み取り専用・パラメータなし・値の食い違い）はオレンジで塗る
+                                    foreach (int col in skippedCols)
+                                    {
+                                        dynamic cell = sheet.Cells[row, col];
+                                        cell.Interior.Color = orangeColor;
+                                        Marshal.ReleaseComObject(cell);
+                                    }
                                     anyMarked = true;
                                 }
                                 catch
@@ -307,6 +333,9 @@ namespace Tools28.Commands.ExcelExportImport.Services
                             dynamic sheet2 = targetWb.Sheets[s2];
                             try
                             {
+                                if (ParameterIdSheet.IsMetaSheetName(Convert.ToString((object)sheet2.Name)))
+                                    continue; // 識別番号の隠しシートには凡例を付けない
+
                                 dynamic usedRange2 = sheet2.UsedRange;
                                 int lastColNum = (int)usedRange2.Column + (int)usedRange2.Columns.Count - 1;
                                 Marshal.ReleaseComObject(usedRange2);
@@ -318,20 +347,14 @@ namespace Tools28.Commands.ExcelExportImport.Services
                                     Convert.ToString(col1Head[0] ?? ""),
                                     Convert.ToString(col1Head[1] ?? ""));
                                 dynamic legendCell = sheet2.Cells[legendRow, legendCol];
-                                string legendText = "(*青字・青セルはインポート成功（青セルは値の削除）、赤字はインポート失敗)";
+                                string legendText = "(*青字・青セルはインポート成功（青セルは値の削除）、赤字はインポート失敗、" +
+                                                    "オレンジのセルは取り込めなかった値（読み取り専用・パラメータなし・同名列の値の食い違い）)";
                                 legendCell.Value = legendText;
 
-                                // "青字・青セル" 部分 (3文字目から6文字) を青色太字に
-                                dynamic blueChars = legendCell.Characters[3, 6];
-                                blueChars.Font.Color = blueColor;
-                                blueChars.Font.Bold = true;
-                                Marshal.ReleaseComObject(blueChars);
-
-                                // "赤字" 部分 (28文字目から2文字) を赤色太字に
-                                dynamic redChars = legendCell.Characters[28, 2];
-                                redChars.Font.Color = redColor;
-                                redChars.Font.Bold = true;
-                                Marshal.ReleaseComObject(redChars);
+                                // 色の説明部分を、その色の太字にする（Characters の開始位置は 1 始まり）
+                                ColorLegendPart(legendCell, legendText, "青字・青セル", blueColor);
+                                ColorLegendPart(legendCell, legendText, "赤字", redColor);
+                                ColorLegendPart(legendCell, legendText, "オレンジのセル", orangeColor);
 
                                 Marshal.ReleaseComObject(legendCell);
                             }

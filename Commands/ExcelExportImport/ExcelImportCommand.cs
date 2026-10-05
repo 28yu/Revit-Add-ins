@@ -154,10 +154,13 @@ namespace Tools28.Commands.ExcelExportImport
                 {
                     // スキップの理由の内訳（大量スキップの原因がすぐ分かるように）
                     sb.AppendLine(string.Format(Loc.S("Import.SkipBreakdown"),
-                        importResult.SkipReadOnly, importResult.SkipNotFound, importResult.SkipUnchanged));
+                        importResult.SkipReadOnly, importResult.SkipNotFound, importResult.SkipUnchanged,
+                        importResult.SkipConflict));
+                    sb.AppendLine(Loc.S("Import.SkipColorNote"));
                 }
                 DiagLog.Write($"[ImportCmd] スキップ内訳 読み取り専用={importResult.SkipReadOnly} " +
-                    $"パラメータなし={importResult.SkipNotFound} 既に同じ値={importResult.SkipUnchanged}");
+                    $"パラメータなし={importResult.SkipNotFound} 既に同じ値={importResult.SkipUnchanged} " +
+                    $"同名列の値の食い違い={importResult.SkipConflict}");
 
                 // 色付け結果を表示
                 if (markedFilePath != null)

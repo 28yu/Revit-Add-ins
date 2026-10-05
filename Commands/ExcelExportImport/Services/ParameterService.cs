@@ -494,6 +494,28 @@ namespace Tools28.Commands.ExcelExportImport.Services
             return null;
         }
 
+        /// <summary>
+        /// 要素（タイプパラメータならタイプ要素）が持つ、指定名・指定種別のパラメータをすべて返す（識別番号の昇順）。
+        /// 同名パラメータ（GUID 違いの共有パラメータ等）を要素がいくつ持っているかの判定に使う。
+        /// </summary>
+        public static List<Parameter> FindSameNameParameters(
+            Element elem, string paramName, bool isTypeParameter, Models.ParameterKind kind, Document doc)
+        {
+            var result = new List<Parameter>();
+            var container = GetParameterContainer(elem, isTypeParameter, doc);
+            if (container == null) return result;
+
+            foreach (Parameter p in container.Parameters)
+            {
+                if (p?.Definition == null || p.Definition.Name != paramName)
+                    continue;
+                if (ParameterKindHelper.Determine(p) == kind)
+                    result.Add(p);
+            }
+            result.Sort((a, b) => ParamIdToLong(a.Id).CompareTo(ParamIdToLong(b.Id)));
+            return result;
+        }
+
         /// <summary>インスタンス/タイプに応じたパラメータの入れ物（要素本体 or タイプ要素）を返す。</summary>
         private static Element GetParameterContainer(Element elem, bool isTypeParameter, Document doc)
         {

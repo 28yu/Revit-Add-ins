@@ -26,6 +26,8 @@ namespace Tools28.Commands.ExcelExportImport.Services
         public int SkipNotFound { get; set; }
         /// <summary>書き込み時点で既に同じ値だった</summary>
         public int SkipUnchanged { get; set; }
+        /// <summary>同名パラメータの複数の列に違う値が入っていて、どれを書くか決められない</summary>
+        public int SkipConflict { get; set; }
         public List<string> Errors { get; set; } = new List<string>();
         public List<string> Warnings { get; set; } = new List<string>();
         /// <summary>インポートに失敗したセルのキー（"ElementId|ParameterName"）</summary>
@@ -76,6 +78,11 @@ namespace Tools28.Commands.ExcelExportImport.Services
 
         /// <summary>この要素にパラメータが無い（IsReadOnly も true になる）。スキップ内訳の集計用。</summary>
         public bool ParamMissing { get; set; }
+
+        /// <summary>
+        /// 同名パラメータの複数の列（【共有#1】【共有#2】等）に違う値が入っていて書き込めない（IsReadOnly も true）。
+        /// </summary>
+        public bool Conflict { get; set; }
     }
 
     /// <summary>
@@ -165,6 +172,10 @@ namespace Tools28.Commands.ExcelExportImport.Services
                         paramHeaders.Add(StripReadOnlySuffix(header));
                     }
 
+                    // 同名パラメータの列グループ（例: 「I-用途【共有#1】」「【共有#2】」「【共有#4】」）。
+                    // 要素は普通そのうち1つしか持たないため、行ごとにグループ単位でまとめて判定する。
+                    var sameNameGroups = BuildSameNameGroups(paramHeaders);
+
                     // データ行を処理
                     for (int row = headerRow + 1; row <= rowCount; row++)
                     {
@@ -195,8 +206,23 @@ namespace Tools28.Commands.ExcelExportImport.Services
                             continue;
                         }
 
+                        // 同名パラメータの列グループを先に処理（要素が持つ同名パラメータが1つ以下の場合）
+                        HashSet<int> handledCols = null;
+                        foreach (var group in sameNameGroups)
+                        {
+                            if (TryProcessSameNameGroup(doc, elem, worksheet, row, elementIdInt, categoryName,
+                                    paramHeaders, group, isMergedSheet, preview, diag))
+                            {
+                                if (handledCols == null) handledCols = new HashSet<int>();
+                                foreach (int c in group) handledCols.Add(c);
+                            }
+                        }
+
                         for (int i = 0; i < paramHeaders.Count; i++)
                         {
+                            if (handledCols != null && handledCols.Contains(i))
+                                continue;   // 同名列グループとして処理済み
+
                             string headerName = paramHeaders[i];
                             string newValue = GetCellValueAsString(worksheet.Cell(row, i + 3));
 
@@ -328,6 +354,145 @@ namespace Tools28.Commands.ExcelExportImport.Services
         }
 
         /// <summary>
+        /// 見出しから「同名パラメータの列グループ」を作る（同じ I-/T-・同じ名前・同じ種別で、番号だけ違う列）。
+        /// 2列以上あるものだけを返す。各要素は列番号（paramHeaders の添字）のリスト。
+        /// </summary>
+        private static List<List<int>> BuildSameNameGroups(List<string> paramHeaders)
+        {
+            var byKey = new Dictionary<string, List<int>>();
+            var order = new List<string>();
+            for (int i = 0; i < paramHeaders.Count; i++)
+            {
+                var parsed = ParameterService.ParseDisplayName(paramHeaders[i]);
+                if (parsed.Kind == null) continue;   // 番号付きの列だけが対象
+                string key = (parsed.IsTypeParameter ? "T" : "I") + "|" + parsed.RawName + "|" + parsed.Kind.Value;
+                if (!byKey.TryGetValue(key, out var list))
+                {
+                    list = new List<int>();
+                    byKey[key] = list;
+                    order.Add(key);
+                }
+                list.Add(i);
+            }
+            return order.Select(k => byKey[k]).Where(l => l.Count >= 2).ToList();
+        }
+
+        /// <summary>
+        /// 同名パラメータの列グループを1行分まとめて判定する。
+        ///
+        /// 【背景】同じ名前の共有パラメータが GUID 違いで複数あると、見出しは【共有#1】【共有#2】…と分かれるが、
+        /// 1つの要素が持つのは普通そのうち1つだけ。利用者が Excel 上で値を別の番号の列へ移動・統合しても、
+        /// Revit 上の書き込み先はその要素が持つ1つしか無い。列ごとに判定すると
+        /// 「移動元の空欄で値が消え、移動先は“パラメータなし”で書けない」＝値が失われる。
+        ///
+        /// 【判定】要素が持つ同名パラメータが
+        ///  - 0個 → 値の入った列はすべて「パラメータなし」
+        ///  - 1個 → グループ内の値を1つにまとめてそのパラメータへ書く
+        ///          （値が1種類ならその値、全部空欄なら削除、違う値が混在すれば「食い違い」で書かない）
+        ///  - 2個以上 → 列ごとの通常判定に任せる（false を返す）
+        /// </summary>
+        /// <returns>このグループを処理した（＝列ごとの通常判定は不要）なら true</returns>
+        private static bool TryProcessSameNameGroup(
+            Document doc, Element elem, IXLWorksheet worksheet, int row, long elementId, string categoryName,
+            List<string> paramHeaders, List<int> group, bool isMergedSheet,
+            List<ImportPreviewRow> preview, PreviewDiagnostics diag)
+        {
+            var first = ParameterService.ParseDisplayName(paramHeaders[group[0]]);
+            var candidates = ParameterService.FindSameNameParameters(
+                elem, first.RawName, first.IsTypeParameter, first.Kind.Value, doc);
+            if (candidates.Count >= 2)
+                return false;
+
+            var cells = group
+                .Select(c => new { Col = c, Header = paramHeaders[c], Value = GetCellValueAsString(worksheet.Cell(row, c + 3)) })
+                .ToList();
+            var nonEmpty = cells.Where(c => !string.IsNullOrEmpty(c.Value)).ToList();
+
+            if (candidates.Count == 0)
+            {
+                // どの番号のパラメータも持っていない → 値の入った列はすべて「パラメータなし」
+                foreach (var c in nonEmpty)
+                {
+                    preview.Add(new ImportPreviewRow
+                    {
+                        ElementId = elementId, CategoryName = categoryName, ParameterName = c.Header,
+                        CurrentValue = "", NewValue = c.Value,
+                        HasChange = true, IsReadOnly = true, ParamMissing = true
+                    });
+                    diag.LogChange(worksheet.Name, row, elementId, c.Header, worksheet.Cell(row, c.Col + 3),
+                        "", c.Value, null, "同名列: 要素にパラメータなし→非表示");
+                }
+                diag.BlankSkipped += cells.Count - nonEmpty.Count;
+                return true;
+            }
+
+            var param = candidates[0];
+            long paramId = ParameterService.ParamIdToLong(param.Id);
+            string current = ParameterService.GetParameterValueAsString(param);
+            bool readOnly = param.IsReadOnly && !ParameterService.IsTypeChangeParameter(param);
+
+            // 入っている値の種類（数値として同じものは同じ値とみなす）
+            var distinct = new List<string>();
+            foreach (var c in nonEmpty)
+                if (!distinct.Any(d => ValuesAreEqual(d, c.Value)))
+                    distinct.Add(c.Value);
+
+            if (distinct.Count > 1)
+            {
+                // 違う値が混在 → どれを書くか決められないので書かない（値を失わない側に倒す）
+                foreach (var c in nonEmpty)
+                {
+                    preview.Add(new ImportPreviewRow
+                    {
+                        ElementId = elementId, CategoryName = categoryName, ParameterName = c.Header,
+                        CurrentValue = current, NewValue = c.Value,
+                        HasChange = true, IsReadOnly = true, Conflict = true, ParamId = paramId
+                    });
+                    diag.LogChange(worksheet.Name, row, elementId, c.Header, worksheet.Cell(row, c.Col + 3),
+                        current, c.Value, param, "同名列で値が食い違い→スキップ");
+                }
+                return true;
+            }
+
+            string desired;
+            string targetHeader;
+            int targetCol;
+            if (distinct.Count == 1)
+            {
+                desired = distinct[0];
+                var hit = nonEmpty.First(c => ValuesAreEqual(c.Value, desired));
+                targetHeader = hit.Header;
+                targetCol = hit.Col;
+            }
+            else
+            {
+                // グループの列がすべて空欄 → 値の削除（文字のパラメータのみ。統合シートでは削除しない）
+                if (isMergedSheet || param.StorageType != StorageType.String || string.IsNullOrEmpty(current))
+                {
+                    diag.BlankSkipped += cells.Count;
+                    return true;
+                }
+                desired = "";
+                targetHeader = cells[0].Header;
+                targetCol = cells[0].Col;
+            }
+
+            bool hasChange = !ValuesAreEqual(current, desired);
+            preview.Add(new ImportPreviewRow
+            {
+                ElementId = elementId, CategoryName = categoryName, ParameterName = targetHeader,
+                CurrentValue = current, NewValue = desired,
+                HasChange = hasChange, IsReadOnly = readOnly, ParamId = paramId
+            });
+            if (hasChange)
+            {
+                diag.LogChange(worksheet.Name, row, elementId, targetHeader, worksheet.Cell(row, targetCol + 3),
+                    current, desired, param, readOnly ? "同名列: 読み取り専用→非表示" : (desired.Length == 0 ? "同名列: 値の削除" : "同名列: 表示"));
+            }
+            return true;
+        }
+
+        /// <summary>
         /// 変更プレビューの判定内容を診断ログ（C:\temp\Tools28_debug.txt）に残す。
         /// ログが肥大化しないよう、種類ごとに出力件数の上限を設ける。
         /// </summary>
@@ -362,10 +527,11 @@ namespace Tools28.Commands.ExcelExportImport.Services
             public void WriteSummary(List<ImportPreviewRow> preview)
             {
                 int changed = preview.Count(r => r.HasChange && !r.IsReadOnly);
-                int changedRo = preview.Count(r => r.HasChange && r.IsReadOnly && !r.ParamMissing);
+                int changedRo = preview.Count(r => r.HasChange && r.IsReadOnly && !r.ParamMissing && !r.Conflict);
                 int changedMissing = preview.Count(r => r.HasChange && r.ParamMissing);
+                int changedConflict = preview.Count(r => r.HasChange && r.Conflict);
                 DiagLog.Write($"[ImportPreview] 完了: 判定 {preview.Count} 件 / 変更あり(表示) {changed} 件 / " +
-                    $"変更あり(読み取り専用・非表示) {changedRo} 件 / 変更あり(パラメータなし・非表示) {changedMissing} 件 / 空欄スキップ {BlankSkipped} 件 / " +
+                    $"変更あり(読み取り専用・非表示) {changedRo} 件 / 変更あり(パラメータなし・非表示) {changedMissing} 件 / 同名列の値の食い違い {changedConflict} 件 / 空欄スキップ {BlankSkipped} 件 / " +
                     $"同値扱い(文字不一致) {_equalLogs} 件" +
                     (_changeLogs > MaxChangeLogs ? $"（変更判定ログは先頭 {MaxChangeLogs} 件のみ出力）" : ""));
             }
@@ -533,8 +699,9 @@ namespace Tools28.Commands.ExcelExportImport.Services
                 return result;
 
             // 読み取り専用で変更できないセル・パラメータが無いセルはスキップ扱いで集計
-            result.SkipReadOnly = previewRows.Count(r => r.HasChange && r.IsReadOnly && !r.ParamMissing);
+            result.SkipReadOnly = previewRows.Count(r => r.HasChange && r.IsReadOnly && !r.ParamMissing && !r.Conflict);
             result.SkipNotFound = previewRows.Count(r => r.HasChange && r.ParamMissing);
+            result.SkipConflict = previewRows.Count(r => r.HasChange && r.Conflict);
 
             // 実際に書き込む対象（変更あり かつ 書込み可能、除外指定を除く）だけを処理
             foreach (var pr in previewRows.Where(r => r.HasChange && !r.IsReadOnly
@@ -604,9 +771,12 @@ namespace Tools28.Commands.ExcelExportImport.Services
                 }
             }
 
-            result.SkipCount = result.SkipReadOnly + result.SkipNotFound + result.SkipUnchanged;
+            result.SkipCount = result.SkipReadOnly + result.SkipNotFound + result.SkipUnchanged + result.SkipConflict;
             return result;
         }
+
+        /// <summary>取り込めなかったセルの塗りつぶし色（オレンジ）。COM 経由の色付けと共通。</summary>
+        internal const int SkippedR = 255, SkippedG = 192, SkippedB = 120;
 
         /// <summary>
         /// インポートで変更されたセルにExcelファイル上で色を付ける
@@ -636,11 +806,19 @@ namespace Tools28.Commands.ExcelExportImport.Services
                 clearedSet.ExceptWith(failedSet);
             }
 
-            if (changedSet.Count == 0 && clearedSet.Count == 0 && (failedSet == null || failedSet.Count == 0))
+            // 取り込めなかったセル（読み取り専用・パラメータなし・同名列の値の食い違い）→ オレンジで塗りつぶす。
+            // 色が付かないと「反映されたのか分からない」ため、取り込まなかったことを Excel 上で見えるようにする。
+            var skippedSet = new HashSet<string>(
+                previewRows
+                    .Where(r => r.HasChange && r.IsReadOnly)
+                    .Select(r => r.ElementId.ToString() + "|" + r.ParameterName));
+
+            if (changedSet.Count == 0 && clearedSet.Count == 0 && skippedSet.Count == 0
+                && (failedSet == null || failedSet.Count == 0))
                 return null;
 
             // まずCOM経由（開いているExcelに直接色付け）を試行
-            if (ExcelProcessHelper.MarkCellsViaCom(filePath, changedSet, clearedSet, failedSet))
+            if (ExcelProcessHelper.MarkCellsViaCom(filePath, changedSet, clearedSet, failedSet, skippedSet))
             {
                 colorMethod = "COM";
                 return filePath;
@@ -648,7 +826,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
 
             // Excelが開いていない or COM失敗の場合、ClosedXMLでファイルを直接編集
             colorMethod = "ClosedXML";
-            return MarkCellsViaClosedXml(filePath, changedSet, clearedSet, failedSet);
+            return MarkCellsViaClosedXml(filePath, changedSet, clearedSet, failedSet, skippedSet);
         }
 
         /// <summary>
@@ -790,7 +968,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
         /// <summary>
         /// ClosedXMLを使用してExcelファイルのセルに色を付ける（Excelが閉じている場合のフォールバック）
         /// </summary>
-        private static string MarkCellsViaClosedXml(string filePath, HashSet<string> changedSet, HashSet<string> clearedSet = null, HashSet<string> failedSet = null)
+        private static string MarkCellsViaClosedXml(string filePath, HashSet<string> changedSet, HashSet<string> clearedSet = null, HashSet<string> failedSet = null, HashSet<string> skippedSet = null)
         {
             byte[] fileBytes;
             try
@@ -807,8 +985,9 @@ namespace Tools28.Commands.ExcelExportImport.Services
                 return null;
             }
 
-            // 成功セル: 青(R79,G129,B189)/太字、失敗セル: 赤/太字
+            // 成功セル: 青(R79,G129,B189)/太字、失敗セル: 赤/太字、取り込めなかったセル: オレンジ塗り
             var blueColor = XLColor.FromArgb(79, 129, 189);
+            var orangeColor = XLColor.FromArgb(SkippedR, SkippedG, SkippedB);
 
             using (var memStream = new MemoryStream(fileBytes))
             using (var workbook = new XLWorkbook(memStream))
@@ -851,6 +1030,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
                         var successCols = new HashSet<int>();
                         var clearedCols = new HashSet<int>();
                         var failedCols = new HashSet<int>();
+                        var skippedCols = new HashSet<int>();
                         for (int i = 0; i < paramHeaders.Count; i++)
                         {
                             string key = elementIdStr + "|" + paramHeaders[i];
@@ -860,10 +1040,12 @@ namespace Tools28.Commands.ExcelExportImport.Services
                                 successCols.Add(i + 3);
                             else if (failedSet != null && failedSet.Contains(key))
                                 failedCols.Add(i + 3);
+                            else if (skippedSet != null && skippedSet.Contains(key))
+                                skippedCols.Add(i + 3);
                         }
 
-                        // 変更・削除・失敗がある行は全列に背景色、セル単位で色分け
-                        if (successCols.Count > 0 || clearedCols.Count > 0 || failedCols.Count > 0)
+                        // 変更・削除・失敗・取り込めなかったセルがある行は全列に背景色、セル単位で色分け
+                        if (successCols.Count > 0 || clearedCols.Count > 0 || failedCols.Count > 0 || skippedCols.Count > 0)
                         {
                             for (int col = 1; col <= colCount; col++)
                             {
@@ -884,6 +1066,10 @@ namespace Tools28.Commands.ExcelExportImport.Services
                             {
                                 worksheet.Cell(row, col).Style.Font.FontColor = XLColor.Red;
                                 worksheet.Cell(row, col).Style.Font.Bold = true;
+                            }
+                            foreach (int col in skippedCols)
+                            {
+                                worksheet.Cell(row, col).Style.Fill.BackgroundColor = orangeColor;
                             }
                             anyMarked = true;
                         }
@@ -913,7 +1099,11 @@ namespace Tools28.Commands.ExcelExportImport.Services
                     var redPart = richText.AddText("赤字");
                     redPart.SetFontColor(XLColor.Red);
                     redPart.SetBold(true);
-                    richText.AddText("はインポート失敗)");
+                    richText.AddText("はインポート失敗、");
+                    var orangePart = richText.AddText("オレンジのセル");
+                    orangePart.SetFontColor(orangeColor);
+                    orangePart.SetBold(true);
+                    richText.AddText("は取り込めなかった値（読み取り専用・パラメータなし・同名列の値の食い違い）)");
                 }
 
                 using (var saveStream = new MemoryStream())
