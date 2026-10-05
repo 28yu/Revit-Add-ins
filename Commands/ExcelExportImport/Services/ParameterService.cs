@@ -27,7 +27,8 @@ namespace Tools28.Commands.ExcelExportImport.Services
             var parameters = new HashSet<ParameterInfo>();
             var seenTypeIds = new HashSet<ElementId>();
 
-            var elements = RevitCategoryHelper.GetElementsByCategory(
+            // 全要素をリスト化すると大容量モデルでメモリを大量に使うため、1件ずつ列挙する
+            var elements = RevitCategoryHelper.EnumerateElementsByCategory(
                 doc, category, scope, activeView, selectionIds);
 
             // 各タイプにつき先頭インスタンス1件だけ調べる

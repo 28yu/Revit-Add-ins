@@ -1,10 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
+using System.Windows.Threading;
 using Autodesk.Revit.DB;
 using Microsoft.Win32;
 using Tools28.Commands.ExcelExportImport.Models;
@@ -43,6 +46,17 @@ namespace Tools28.Commands.ExcelExportImport.Views
 
         // グループ絞り込みの候補をコードから入れ替える間、SelectionChanged での再描画を抑制するフラグ
         private bool _suppressGroupFilterUpdate;
+
+        // カテゴリ未選択時のパラメータ名検索は全カテゴリが対象で重いため、入力が止まってから実行する。
+        // （日本語入力の変換中も1文字ごとに TextChanged が発生するため、その都度は処理しない）
+        private readonly DispatcherTimer _searchTimer;
+        private const int SearchDelayMs = 400;
+
+        // 全カテゴリのパラメータを読み込み中か（読み込みは非同期で行い、その間も画面は応答する）
+        private bool _loadingAll;
+
+        // ダイアログが閉じられたか（読み込み途中で閉じた場合に処理を打ち切る）
+        private bool _closed;
 
         /// <summary>エクスポート対象カテゴリ</summary>
         public List<CategoryInfo> SelectedCategories { get; private set; }
@@ -83,6 +97,36 @@ namespace Tools28.Commands.ExcelExportImport.Views
             CategoryListBox.ItemsSource = _allCategories;
 
             RefreshGroupFilterItems();
+
+            _searchTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(SearchDelayMs) };
+            _searchTimer.Tick += (s, e) =>
+            {
+                _searchTimer.Stop();
+                SafeRun(RefreshParameterListForSearch);
+            };
+            Closed += (s, e) =>
+            {
+                _closed = true;
+                _searchTimer.Stop();
+            };
+        }
+
+        /// <summary>
+        /// 画面操作の処理を例外から守る。ダイアログ内の例外が処理されないまま残ると
+        /// Revit ごと強制終了するため、ログに残してメッセージを表示するだけにとどめる。
+        /// </summary>
+        private void SafeRun(Action action)
+        {
+            try
+            {
+                action();
+            }
+            catch (Exception ex)
+            {
+                DiagLog.Write($"[ExcelExport] ダイアログ操作でエラー: {ex}");
+                MessageBox.Show(string.Format(Loc.S("Export.ParamLoadFailed"), ex.Message),
+                    Loc.S("Common.Error"), MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         private void ApplyLocalization()
@@ -133,7 +177,7 @@ namespace Tools28.Commands.ExcelExportImport.Views
         {
             // 全選択/選択解除による一括変更中は個別更新を抑制（最後に1回だけ更新する）
             if (_suppressCategoryUpdate) return;
-            UpdateParameterList();
+            SafeRun(UpdateParameterList);
         }
 
         private void CategorySearchBox_TextChanged(object sender, TextChangedEventArgs e)
@@ -183,7 +227,7 @@ namespace Tools28.Commands.ExcelExportImport.Views
             _suppressCategoryUpdate = false;
 
             // 一括変更後にパラメータ一覧を1回だけ更新
-            UpdateParameterList();
+            SafeRun(UpdateParameterList);
         }
 
         #endregion
@@ -201,7 +245,18 @@ namespace Tools28.Commands.ExcelExportImport.Views
 
             List<CategoryInfo> sources = _allCategories.Where(c => c.IsChecked).ToList();
             if (sources.Count == 0 && HasParameterFilter())
+            {
+                if (!IsAllCategoriesLoaded)
+                {
+                    // 全カテゴリ分が未取得なら、画面を止めないよう非同期で読み込む。
+                    // 読み込み完了後にこのメソッドが改めて呼ばれ、その時点の検索条件で表示する。
+                    RefreshGroupFilterItems();
+                    FilterParameterList(null);
+                    _ = LoadAllCategoriesAsync();
+                    return;
+                }
                 sources = _allCategories;
+            }
 
             foreach (var parameters in LoadCategoryParameters(sources))
                 _allParameters.AddRange(parameters);
@@ -220,9 +275,12 @@ namespace Tools28.Commands.ExcelExportImport.Views
                 || GetSelectedGroupFilter() != null;
         }
 
+        /// <summary>全カテゴリのパラメータを取得済みか</summary>
+        private bool IsAllCategoriesLoaded => _allCategories.All(c => _paramCache.ContainsKey(c.Name));
+
         /// <summary>
-        /// 指定カテゴリのパラメータ一覧を返す。未取得のカテゴリだけ Revit から取得してキャッシュする。
-        /// 全カテゴリ分を初めて取得するときは時間がかかるため、待機カーソルを表示する。
+        /// 指定カテゴリのパラメータ一覧を返す（チェックしたカテゴリ用・同期）。
+        /// 未取得のカテゴリだけ Revit から取得してキャッシュする。
         /// </summary>
         private List<List<ParameterInfo>> LoadCategoryParameters(IEnumerable<CategoryInfo> categories)
         {
@@ -235,10 +293,7 @@ namespace Tools28.Commands.ExcelExportImport.Views
             try
             {
                 foreach (var cat in missing)
-                {
-                    _paramCache[cat.Name] = ParameterService.GetParametersForCategory(
-                        _doc, cat.BuiltInCategory, cat.Name, _scope, _activeView, _selectionIds);
-                }
+                    LoadOneCategory(cat);
             }
             finally
             {
@@ -248,6 +303,98 @@ namespace Tools28.Commands.ExcelExportImport.Views
             foreach (var cat in categories)
                 result.Add(_paramCache[cat.Name]);
             return result;
+        }
+
+        /// <summary>
+        /// 1カテゴリ分のパラメータを Revit から取得してキャッシュする。
+        /// 特定のカテゴリで取得に失敗しても全体を止めないよう、そのカテゴリは空として扱いログに残す。
+        /// </summary>
+        private void LoadOneCategory(CategoryInfo cat)
+        {
+            try
+            {
+                _paramCache[cat.Name] = ParameterService.GetParametersForCategory(
+                    _doc, cat.BuiltInCategory, cat.Name, _scope, _activeView, _selectionIds);
+            }
+            catch (Exception ex)
+            {
+                DiagLog.Write($"[ExcelExport] パラメータ取得に失敗: {cat.Name} {ex.GetType().Name}: {ex.Message}");
+                _paramCache[cat.Name] = new List<ParameterInfo>();
+            }
+        }
+
+        /// <summary>
+        /// カテゴリ未選択の検索用に、全カテゴリのパラメータを読み込む。
+        /// Revit API は画面と同じスレッドでしか呼べないため、1カテゴリ読むごとに少しだけ
+        /// 画面へ制御を返す（パラメータ整理と同じ方式）。これで読み込み中も「応答なし」にならず、
+        /// 進み具合の表示・キャンセルボタンが効く。完了したらその時点の検索条件で一覧を作り直す。
+        /// </summary>
+        private async Task LoadAllCategoriesAsync()
+        {
+            if (_loadingAll) return;
+            _loadingAll = true;
+
+            var missing = _allCategories.Where(c => !_paramCache.ContainsKey(c.Name)).ToList();
+            var totalWatch = Stopwatch.StartNew();
+            SetLoadingState(true, 0, missing.Count);
+            try
+            {
+                // 「読み込み中」の表示を先に描画させる
+                await Task.Delay(1);
+                if (_closed) return;
+
+                var sw = Stopwatch.StartNew();
+                for (int i = 0; i < missing.Count; i++)
+                {
+                    LoadOneCategory(missing[i]);
+                    SetLoadingState(true, i + 1, missing.Count);
+
+                    if (sw.ElapsedMilliseconds >= 50)
+                    {
+                        await Task.Delay(1);   // 画面へ制御を返す（描画更新・キャンセル受付）
+                        if (_closed) return;
+                        sw.Restart();
+                    }
+                }
+                DiagLog.Write($"[ExcelExport] 全カテゴリのパラメータ読込: {missing.Count}カテゴリ {totalWatch.ElapsedMilliseconds}ms");
+            }
+            finally
+            {
+                _loadingAll = false;
+                if (!_closed)
+                    SetLoadingState(false, 0, 0);
+            }
+
+            if (_closed) return;
+            SafeRun(UpdateParameterList);
+        }
+
+        /// <summary>
+        /// 全カテゴリ読み込み中の表示と操作制限を切り替える。
+        /// 読み込み中はカテゴリ選択・出力欄への追加・エクスポート実行などを止め、
+        /// 検索欄・グループ欄・キャンセルは使えるままにする（入力内容は読み込み完了後に反映）。
+        /// </summary>
+        private void SetLoadingState(bool loading, int done, int total)
+        {
+            ParamLoadPanel.Visibility = loading ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+            if (loading)
+            {
+                ParamLoadProgress.Maximum = Math.Max(1, total);
+                ParamLoadProgress.Value = done;
+                ParamLoadStatus.Text = string.Format(Loc.S("Export.ParamLoading"), done, total);
+            }
+
+            bool enabled = !loading;
+            CategoryListBox.IsEnabled = enabled;
+            btnCatSelectAll.IsEnabled = enabled;
+            btnCatSelectNone.IsEnabled = enabled;
+            btnAddToOutput.IsEnabled = enabled;
+            btnRemoveFromOutput.IsEnabled = enabled;
+            btnClearOutput.IsEnabled = enabled;
+            btnLoadSettings.IsEnabled = enabled;
+            btnLoadSettingsFromExcel.IsEnabled = enabled;
+            btnSaveSettings.IsEnabled = enabled;
+            btnOK.IsEnabled = enabled;
         }
 
         /// <summary>
@@ -290,10 +437,13 @@ namespace Tools28.Commands.ExcelExportImport.Views
             if (_suppressGroupFilterUpdate) return;
 
             // カテゴリ未選択時は、絞り込みの有無で対象（全カテゴリ／なし）が変わるため元データから作り直す
-            if (NoCategoryChecked)
-                UpdateParameterList();
-            else
-                FilterParameterList(null);
+            SafeRun(() =>
+            {
+                if (NoCategoryChecked)
+                    UpdateParameterList();
+                else
+                    FilterParameterList(null);
+            });
         }
 
         /// <summary>
@@ -302,11 +452,11 @@ namespace Tools28.Commands.ExcelExportImport.Views
         /// </summary>
         private void ParamGroupFilterComboBox_DropDownOpened(object sender, EventArgs e)
         {
-            if (!NoCategoryChecked) return;
-            if (_allCategories.All(c => _paramCache.ContainsKey(c.Name))) return;
+            if (!NoCategoryChecked || IsAllCategoriesLoaded) return;
 
-            LoadCategoryParameters(_allCategories);
-            RefreshGroupFilterItems();
+            // 候補が揃うまで時間がかかるため一旦閉じ、読み込み完了後に候補を更新する
+            ParamGroupFilterComboBox.IsDropDownOpen = false;
+            _ = LoadAllCategoriesAsync();
         }
 
         /// <summary>
@@ -342,12 +492,25 @@ namespace Tools28.Commands.ExcelExportImport.Views
 
         private void ParameterSearchBox_TextChanged(object sender, TextChangedEventArgs e)
         {
-            RefreshParameterListForSearch();
+            if (_searchTimer == null) return;   // 初期化中
+
+            if (NoCategoryChecked)
+            {
+                // 全カテゴリが対象で重いため、入力が止まってから実行する（打つたびに作り直さない）
+                _searchTimer.Stop();
+                _searchTimer.Start();
+            }
+            else
+            {
+                // チェックしたカテゴリ内の絞り込みは軽いので即時反映
+                SafeRun(() => FilterParameterList(null));
+            }
         }
 
         private void ParameterSearchButton_Click(object sender, RoutedEventArgs e)
         {
-            RefreshParameterListForSearch();
+            _searchTimer.Stop();
+            SafeRun(RefreshParameterListForSearch);
         }
 
         /// <summary>
@@ -435,7 +598,7 @@ namespace Tools28.Commands.ExcelExportImport.Views
             }
 
             RefreshOutputList();
-            UpdateParameterList();
+            SafeRun(UpdateParameterList);
         }
 
         private void RemoveFromOutputButton_Click(object sender, RoutedEventArgs e)
@@ -446,7 +609,7 @@ namespace Tools28.Commands.ExcelExportImport.Views
             foreach (var p in selected)
                 _outputParameters.Remove(p);
             RefreshOutputList();
-            UpdateParameterList();
+            SafeRun(UpdateParameterList);
         }
 
         private void ClearOutputButton_Click(object sender, RoutedEventArgs e)
@@ -463,7 +626,7 @@ namespace Tools28.Commands.ExcelExportImport.Views
             RefreshOutputList();
 
             // クリアした分を選択中カテゴリのパラメータ欄へ戻す
-            UpdateParameterList();
+            SafeRun(UpdateParameterList);
         }
 
         private void MoveUpButton_Click(object sender, RoutedEventArgs e)

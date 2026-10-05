@@ -98,6 +98,22 @@ namespace Tools28.Commands.ExcelExportImport.Services
             return GetElements(doc, category, scope, activeView, selectionIds);
         }
 
+        /// <summary>
+        /// 指定カテゴリの要素を1件ずつ列挙する（スコープ対応）。
+        /// GetElementsByCategory と違い全要素をリストに溜め込まないため、
+        /// 大容量モデルでもメモリを圧迫しない（パラメータ一覧の収集用）。
+        /// </summary>
+        public static IEnumerable<Element> EnumerateElementsByCategory(
+            Document doc,
+            BuiltInCategory category,
+            ExportScope scope = ExportScope.EntireProject,
+            View activeView = null,
+            ICollection<ElementId> selectionIds = null)
+        {
+            var collector = CreateCollector(doc, category, scope, activeView, selectionIds);
+            return collector ?? Enumerable.Empty<Element>();
+        }
+
         private static List<Element> GetElements(
             Document doc,
             BuiltInCategory category,

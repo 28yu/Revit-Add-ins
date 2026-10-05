@@ -272,6 +272,7 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
                     <Grid Grid.Row="0" Margin="0,4,0,4">
                         <Grid.ColumnDefinitions>
@@ -349,6 +350,11 @@
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
+                    <!-- 全カテゴリのパラメータ読み込み中の表示（カテゴリ未選択で検索したとき） -->
+                    <StackPanel x:Name="ParamLoadPanel" Grid.Row="4" Margin="0,4,0,0" Visibility="Collapsed">
+                        <TextBlock x:Name="ParamLoadStatus" FontSize="11" Foreground="#0066CC" TextWrapping="Wrap"/>
+                        <ProgressBar x:Name="ParamLoadProgress" Height="6" Margin="0,2,0,0" Minimum="0" Maximum="1"/>
+                    </StackPanel>
                 </Grid>
             </GroupBox>
 
