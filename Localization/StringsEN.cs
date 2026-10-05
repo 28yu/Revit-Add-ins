@@ -414,6 +414,7 @@ namespace Tools28.Localization
             { "Import.SkipColorNote", "  * Cells that could not be imported are filled orange in Excel." },
             { "Import.SummaryMissing", "  Parameter not on element: {0}" },
             { "Import.SummaryConflict", "  Conflicting values in same-name columns: {0}" },
+            { "Import.SummaryUnsaved", "  * Loaded including unsaved edits in Excel" },
             { "Import.RefCandidates", " Similar names: {0}" },
             { "Import.Execute", "Import" },
             { "Import.ResultTitle", "Import Result" },

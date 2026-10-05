@@ -413,6 +413,7 @@ namespace Tools28.Localization
             { "Import.SkipColorNote", "  ※ 取り込めなかったセルは Excel 上でオレンジに塗られます。" },
             { "Import.SummaryMissing", "  パラメータが無い要素: {0}件" },
             { "Import.SummaryConflict", "  同名列の値の食い違い: {0}件" },
+            { "Import.SummaryUnsaved", "  ※ Excel 上の未保存の編集を含めて読み込みました" },
             { "Import.RefCandidates", " 似た名前の候補: {0}" },
             { "Import.Execute", "インポート実行" },
             { "Import.ResultTitle", "インポート結果" },

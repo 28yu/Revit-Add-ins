@@ -399,6 +399,64 @@ namespace Tools28.Commands.ExcelExportImport.Services
         /// </summary>
         /// <returns>複製したファイルのパス。失敗した場合は null</returns>
         public static string SaveOpenWorkbookCopy(string fullName)
+            => SaveOpenWorkbookCopy(fullName, matchByPath: false);
+
+        /// <summary>
+        /// 指定ファイルが Excel で開かれていて、保存されていない変更があるかを調べる（COM 経由）。
+        /// インポートはディスク上のファイルを読むため、未保存の編集はそのままでは取り込まれない。
+        /// </summary>
+        /// <returns>開いていて未保存の変更がある場合 true（開いていない・判定できない場合は false）</returns>
+        public static bool HasUnsavedChanges(string filePath)
+        {
+            dynamic app = null;
+            dynamic workbooks = null;
+            try
+            {
+                app = GetExcelApplication();
+                if (app == null)
+                    return false;
+
+                string target = NormalizePath(filePath);
+                workbooks = app.Workbooks;
+                int count = workbooks.Count;
+                for (int i = 1; i <= count; i++)
+                {
+                    dynamic wb = workbooks[i];
+                    try
+                    {
+                        string fullName = wb.FullName;
+                        if (!string.Equals(NormalizePath(fullName), target, StringComparison.OrdinalIgnoreCase))
+                            continue;
+                        bool saved = wb.Saved;
+                        return !saved;
+                    }
+                    catch
+                    {
+                        // クラウド上のブック等で判定できない場合は次へ
+                    }
+                    finally
+                    {
+                        Marshal.ReleaseComObject(wb);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                DiagLog.Write($"[ExcelImport] 未保存の判定に失敗: {ex.Message}");
+            }
+            finally
+            {
+                if (workbooks != null) Marshal.ReleaseComObject(workbooks);
+                if (app != null) Marshal.ReleaseComObject(app);
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Excel で開いているブックの現在の内容（未保存の編集を含む）を一時フォルダに複製する。
+        /// matchByPath=true ならローカルパスを正規化して照合する（FullName の表記ゆれ対策）。
+        /// </summary>
+        public static string SaveOpenWorkbookCopy(string fullName, bool matchByPath)
         {
             dynamic app = null;
             dynamic workbooks = null;
@@ -416,7 +474,10 @@ namespace Tools28.Commands.ExcelExportImport.Services
                     try
                     {
                         string wbFullName = wb.FullName;
-                        if (!string.Equals(wbFullName, fullName, StringComparison.OrdinalIgnoreCase))
+                        bool match = matchByPath
+                            ? string.Equals(NormalizePath(wbFullName), NormalizePath(fullName), StringComparison.OrdinalIgnoreCase)
+                            : string.Equals(wbFullName, fullName, StringComparison.OrdinalIgnoreCase);
+                        if (!match)
                             continue;
 
                         string dir = Path.Combine(Path.GetTempPath(), "Tools28", "ExcelImport");

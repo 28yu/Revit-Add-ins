@@ -44,6 +44,9 @@ namespace Tools28.Commands.ExcelExportImport.Views
         private int _missingChangeCount;
         private int _conflictChangeCount;
 
+        // Excel 上の未保存の内容を読み込んだか（サマリーに注記する）
+        private bool _readUnsavedContents;
+
         /// <summary>インポートが実行されたかどうか</summary>
         public bool ImportExecuted { get; private set; }
 
@@ -293,8 +296,29 @@ namespace Tools28.Commands.ExcelExportImport.Views
         {
             try
             {
+                // Excel で開いたまま保存していない編集がある場合、ディスク上のファイルには
+                // その編集が入っていない（例: 大量に値を消したのに保存前だと、消す前の内容で判定される）。
+                // その場合は Excel 上の現在の内容を一時ファイルに複製して読む。
+                // 色付け（COM）は開いているブックに直接行うため、選択ファイルは元のパスのままにする。
+                string readPath = path;
+                _readUnsavedContents = false;
+                if (!CloudExcelPathResolver.IsCloudPath(path) && ExcelProcessHelper.HasUnsavedChanges(path))
+                {
+                    string copy = ExcelProcessHelper.SaveOpenWorkbookCopy(path, matchByPath: true);
+                    if (copy != null)
+                    {
+                        readPath = copy;
+                        _readUnsavedContents = true;
+                        DiagLog.Write($"[ExcelImport] 未保存の編集があるため、Excel 上の現在の内容を複製して読み込み: {copy}");
+                    }
+                    else
+                    {
+                        DiagLog.Write($"[ExcelImport] 未保存の編集があるが複製に失敗。保存済みの内容で読み込み: {path}");
+                    }
+                }
+
                 // プレビューを生成
-                _previewRows = ExcelImportService.GeneratePreview(_doc, path);
+                _previewRows = ExcelImportService.GeneratePreview(_doc, readPath);
                 _selectedFilePath = path;
                 FilePathTextBox.Text = path;
 
@@ -366,6 +390,8 @@ namespace Tools28.Commands.ExcelExportImport.Views
                 summary += string.Format(Loc.S("Import.SummaryMissing"), _missingChangeCount);
             if (_conflictChangeCount > 0)
                 summary += string.Format(Loc.S("Import.SummaryConflict"), _conflictChangeCount);
+            if (_readUnsavedContents)
+                summary += Loc.S("Import.SummaryUnsaved");
             SummaryText.Text = summary;
 
             ImportButton.IsEnabled = targets > 0;

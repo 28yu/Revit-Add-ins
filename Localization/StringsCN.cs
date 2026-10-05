@@ -413,6 +413,7 @@ namespace Tools28.Localization
             { "Import.SkipColorNote", "  ※ 未能导入的单元格将在 Excel 中以橙色填充。" },
             { "Import.SummaryMissing", "  图元无此参数: {0}项" },
             { "Import.SummaryConflict", "  同名列的值不一致: {0}项" },
+            { "Import.SummaryUnsaved", "  ※ 已包含 Excel 中未保存的编辑内容进行读取" },
             { "Import.RefCandidates", " 相似名称候选: {0}" },
             { "Import.Execute", "执行导入" },
             { "Import.ResultTitle", "导入结果" },

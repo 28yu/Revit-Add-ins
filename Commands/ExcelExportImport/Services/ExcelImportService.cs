@@ -245,6 +245,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
                                 if (isMergedSheet)
                                 {
                                     diag.BlankSkipped++;
+                                    diag.BlankMerged++;
                                     continue;
                                 }
 
@@ -252,6 +253,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
                                 if (clearParam == null || clearParam.StorageType != StorageType.String)
                                 {
                                     diag.BlankSkipped++;
+                                    if (clearParam == null) diag.BlankNoParam++; else diag.BlankNotText++;
                                     continue;
                                 }
 
@@ -259,6 +261,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
                                 if (string.IsNullOrEmpty(clearCurrent))
                                 {
                                     diag.BlankSkipped++;
+                                    diag.BlankAlreadyEmpty++;
                                     continue; // 既に空 → 変更なし
                                 }
 
@@ -423,6 +426,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
                         "", c.Value, null, "同名列: 要素にパラメータなし→非表示");
                 }
                 diag.BlankSkipped += cells.Count - nonEmpty.Count;
+                diag.BlankInGroup += cells.Count - nonEmpty.Count;
                 return true;
             }
 
@@ -470,6 +474,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
                 if (isMergedSheet || param.StorageType != StorageType.String || string.IsNullOrEmpty(current))
                 {
                     diag.BlankSkipped += cells.Count;
+                    diag.BlankInGroup += cells.Count;
                     return true;
                 }
                 desired = "";
@@ -504,6 +509,8 @@ namespace Tools28.Commands.ExcelExportImport.Services
             private int _changeLogs;
             private int _equalLogs;
             public int BlankSkipped;
+            // 空欄スキップの内訳
+            public int BlankMerged, BlankNoParam, BlankNotText, BlankAlreadyEmpty, BlankInGroup;
 
             public void LogChange(string sheet, int row, long elementId, string header,
                 IXLCell cell, string current, string newValue, Parameter param, string reason)
@@ -534,6 +541,8 @@ namespace Tools28.Commands.ExcelExportImport.Services
                     $"変更あり(読み取り専用・非表示) {changedRo} 件 / 変更あり(パラメータなし・非表示) {changedMissing} 件 / 同名列の値の食い違い {changedConflict} 件 / 空欄スキップ {BlankSkipped} 件 / " +
                     $"同値扱い(文字不一致) {_equalLogs} 件" +
                     (_changeLogs > MaxChangeLogs ? $"（変更判定ログは先頭 {MaxChangeLogs} 件のみ出力）" : ""));
+                DiagLog.Write($"[ImportPreview] 空欄スキップの内訳: 統合シート {BlankMerged} / パラメータなし {BlankNoParam} / " +
+                    $"文字以外(数値・要素参照) {BlankNotText} / もともと空 {BlankAlreadyEmpty} / 同名列グループ {BlankInGroup}");
             }
 
             private static string RawCellText(IXLCell cell)
