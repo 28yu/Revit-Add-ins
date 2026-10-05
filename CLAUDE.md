@@ -49,7 +49,8 @@ string sheetName = string.Format(Loc.S("Sheet.NewSheetName", modelLang), sheetNu
 - `Commands/FireProtection/` — `LegendManager.LegendViewName`、`FilledRegionCreator.TypePrefix`
 - `Commands/Room3DColor/` — `RoomColorLegendManager.TypePrefix`、DirectShape の識別マーカー
 - `Commands/ExcelExportImport/` — `ExportSettingsExcelReader` の `"要素ID"` / `"カテゴリ"`、
-  `ParameterHeaderMarker.*`（書き出した Excel を読み戻すときの目印）
+  `ParameterHeaderMarker.*`（書き出した Excel を読み戻すときの目印）、
+  `ParameterIdSheet.SheetName`（`Tools28_ParamIds`：列→パラメータ識別番号の隠しシート）とその見出し
 - `Commands/GenericModelMerge/` — 生成した DirectShape の識別マーカー
   `ApplicationId = "Tools28"` / `ApplicationDataId = "GenericModelMerge"`
 

@@ -65,6 +65,9 @@ namespace Tools28.Commands.ExcelExportImport.Services
             {
                 foreach (var worksheet in workbook.Worksheets)
                 {
+                    if (ParameterIdSheet.IsMetaSheet(worksheet))
+                        continue; // パラメータ識別番号の隠しシート（設定ではない）
+
                     // ヘッダー行だけを読む（全データ走査は行わない）。
                     // グループ行付きの Excel は見出しが2行目にあるため、行番号を判定してから読む。
                     // 列位置は固定で仮定せず、見出し文字列で「要素ID列」「カテゴリ列」を

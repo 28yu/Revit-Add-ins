@@ -41,6 +41,7 @@ namespace Tools28.Commands.ExcelExportImport.Views
         // 読み込み結果のサマリー（再計算用）
         private int _totalCount;
         private int _readOnlyChangeCount;
+        private int _missingChangeCount;
 
         /// <summary>インポートが実行されたかどうか</summary>
         public bool ImportExecuted { get; private set; }
@@ -319,7 +320,8 @@ namespace Tools28.Commands.ExcelExportImport.Views
                 PreviewDataGrid.ItemsSource = _view;
 
                 _totalCount = _previewRows.Count;
-                _readOnlyChangeCount = _previewRows.Count(r => r.HasChange && r.IsReadOnly);
+                _readOnlyChangeCount = _previewRows.Count(r => r.HasChange && r.IsReadOnly && !r.ParamMissing);
+                _missingChangeCount = _previewRows.Count(r => r.HasChange && r.ParamMissing);
                 UpdateSummary();
                 return true;
             }
@@ -358,6 +360,8 @@ namespace Tools28.Commands.ExcelExportImport.Views
             string summary = string.Format(Loc.S("Import.Summary"), _totalCount, changed, shown, targets);
             if (_readOnlyChangeCount > 0)
                 summary += string.Format(Loc.S("Import.SummaryReadOnly"), _readOnlyChangeCount);
+            if (_missingChangeCount > 0)
+                summary += string.Format(Loc.S("Import.SummaryMissing"), _missingChangeCount);
             SummaryText.Text = summary;
 
             ImportButton.IsEnabled = targets > 0;

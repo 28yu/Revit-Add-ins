@@ -53,6 +53,9 @@ namespace Tools28.Commands.ExcelExportImport.Services
                     ExportSingleSheet(doc, workbook, selectedCategories, outputParameters, results, scope, activeView, selectionIds, includeParamGroup, progress, timings);
                 }
 
+                // 各列がどのパラメータかを識別番号で記録（同名パラメータの取り違え防止。インポートで使う）
+                ParameterIdSheet.Write(workbook, outputParameters);
+
                 progress?.BeginSaving();
                 var saveWatch = Stopwatch.StartNew();
                 workbook.SaveAs(filePath);

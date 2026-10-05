@@ -150,6 +150,14 @@ namespace Tools28.Commands.ExcelExportImport
                 sb.AppendLine($"成功: {importResult.SuccessCount}件");
                 sb.AppendLine($"失敗: {importResult.FailCount}件");
                 sb.AppendLine($"スキップ: {importResult.SkipCount}件");
+                if (importResult.SkipCount > 0)
+                {
+                    // スキップの理由の内訳（大量スキップの原因がすぐ分かるように）
+                    sb.AppendLine(string.Format(Loc.S("Import.SkipBreakdown"),
+                        importResult.SkipReadOnly, importResult.SkipNotFound, importResult.SkipUnchanged));
+                }
+                DiagLog.Write($"[ImportCmd] スキップ内訳 読み取り専用={importResult.SkipReadOnly} " +
+                    $"パラメータなし={importResult.SkipNotFound} 既に同じ値={importResult.SkipUnchanged}");
 
                 // 色付け結果を表示
                 if (markedFilePath != null)

@@ -6,6 +6,7 @@ using Autodesk.Revit.DB;
 using ClosedXML.Excel;
 using Tools28;
 using Tools28.Commands.ExcelExportImport.Models;
+using Tools28.Localization;
 
 namespace Tools28.Commands.ExcelExportImport.Services
 {
@@ -17,6 +18,14 @@ namespace Tools28.Commands.ExcelExportImport.Services
         public int SuccessCount { get; set; }
         public int FailCount { get; set; }
         public int SkipCount { get; set; }
+
+        // --- スキップの内訳（SkipCount = 3つの合計）---
+        /// <summary>読み取り専用（長さ・面積などの計算値）で書き込めない</summary>
+        public int SkipReadOnly { get; set; }
+        /// <summary>その要素にパラメータが無い</summary>
+        public int SkipNotFound { get; set; }
+        /// <summary>書き込み時点で既に同じ値だった</summary>
+        public int SkipUnchanged { get; set; }
         public List<string> Errors { get; set; } = new List<string>();
         public List<string> Warnings { get; set; } = new List<string>();
         /// <summary>インポートに失敗したセルのキー（"ElementId|ParameterName"）</summary>
@@ -58,6 +67,15 @@ namespace Tools28.Commands.ExcelExportImport.Services
         public string NewValue { get; set; }
         public bool HasChange { get; set; }
         public bool IsReadOnly { get; set; }
+
+        /// <summary>
+        /// 書き出し時に記録したパラメータの識別番号（隠しシートから取得。0 = 不明）。
+        /// 同名パラメータを取り違えないよう、書き込み時もこの番号でパラメータを特定する。
+        /// </summary>
+        public long ParamId { get; set; }
+
+        /// <summary>この要素にパラメータが無い（IsReadOnly も true になる）。スキップ内訳の集計用。</summary>
+        public bool ParamMissing { get; set; }
     }
 
     /// <summary>
@@ -98,6 +116,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
             // プレビューは読み取りのみなので (タイプID|パラメータ名) 単位でキャッシュして再計算を避ける。
             var typeCurrentCache = new Dictionary<string, string>();
             var typeReadOnlyCache = new Dictionary<string, bool>();
+            var typeMissingCache = new Dictionary<string, bool>();
 
             // 変更判定の診断ログ（「変更していないのに出る／変更したのに出ない」の原因調査用）
             var diag = new PreviewDiagnostics();
@@ -106,8 +125,15 @@ namespace Tools28.Commands.ExcelExportImport.Services
             using (var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
             using (var workbook = new XLWorkbook(stream))
             {
+                // 列ごとのパラメータ識別番号（このアドインの新しい版で書き出した Excel のみ。無ければ空）
+                var paramIdMap = ParameterIdSheet.Read(workbook);
+                DiagLog.Write($"[ImportPreview] パラメータ識別番号の記録: {paramIdMap.Count} 件");
+
                 foreach (var worksheet in workbook.Worksheets)
                 {
+                    if (ParameterIdSheet.IsMetaSheet(worksheet))
+                        continue; // 識別番号の隠しシート（データではない）
+
                     sheetNames.Add(worksheet.Name);
 
                     // 1シート統合モードのシートでは、他カテゴリ用の列も同じ行に並び、
@@ -179,6 +205,11 @@ namespace Tools28.Commands.ExcelExportImport.Services
                             bool isTypeParam = parsed.IsTypeParameter;
                             string rawName = parsed.RawName;
 
+                            // 同名パラメータ（【共有#2】等）は書き出し時の識別番号で正確に特定する
+                            long paramId = 0;
+                            if (parsed.Kind != null)
+                                paramIdMap.TryGetValue(ParameterIdSheet.Key(categoryName, headerName), out paramId);
+
                             // 空セルの扱い:
                             //  - パラメータが要素に存在しない → N/A（シート統合モードの他カテゴリ列など）→ スキップ
                             //  - 文字列パラメータで現在値が空でない → 「値の削除（クリア）」として取り込む
@@ -191,7 +222,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
                                     continue;
                                 }
 
-                                var clearParam = ParameterService.FindParameter(elem, rawName, isTypeParam, parsed.Kind, parsed.Index, doc);
+                                var clearParam = ParameterService.FindParameter(elem, rawName, isTypeParam, parsed.Kind, parsed.Index, paramId, doc);
                                 if (clearParam == null || clearParam.StorageType != StorageType.String)
                                 {
                                     diag.BlankSkipped++;
@@ -216,13 +247,15 @@ namespace Tools28.Commands.ExcelExportImport.Services
                                     CurrentValue = clearCurrent,
                                     NewValue = "",
                                     HasChange = true,
-                                    IsReadOnly = clearParam.IsReadOnly && !ParameterService.IsTypeChangeParameter(clearParam)
+                                    IsReadOnly = clearParam.IsReadOnly && !ParameterService.IsTypeChangeParameter(clearParam),
+                                    ParamId = paramId
                                 });
                                 continue;
                             }
 
                             string currentValue;
                             bool isReadOnly;
+                            bool paramMissing;
                             Parameter foundParam = null;   // 診断ログ用（タイプのキャッシュ命中時は null）
                             if (isTypeParam)
                             {
@@ -230,24 +263,28 @@ namespace Tools28.Commands.ExcelExportImport.Services
                                 string tkey = ElementIdToLong(elem.GetTypeId()) + "|" + headerName;
                                 if (!typeCurrentCache.TryGetValue(tkey, out currentValue))
                                 {
-                                    var tp = ParameterService.FindParameter(elem, rawName, true, parsed.Kind, parsed.Index, doc);
+                                    var tp = ParameterService.FindParameter(elem, rawName, true, parsed.Kind, parsed.Index, paramId, doc);
                                     foundParam = tp;
                                     currentValue = ParameterService.GetParameterValueAsString(tp);
+                                    paramMissing = tp == null;
                                     isReadOnly = tp == null
                                         || (tp.IsReadOnly && !ParameterService.IsTypeChangeParameter(tp));
                                     typeCurrentCache[tkey] = currentValue;
                                     typeReadOnlyCache[tkey] = isReadOnly;
+                                    typeMissingCache[tkey] = paramMissing;
                                 }
                                 else
                                 {
                                     isReadOnly = typeReadOnlyCache[tkey];
+                                    paramMissing = typeMissingCache[tkey];
                                 }
                             }
                             else
                             {
-                                var param = ParameterService.FindParameter(elem, rawName, false, parsed.Kind, parsed.Index, doc);
+                                var param = ParameterService.FindParameter(elem, rawName, false, parsed.Kind, parsed.Index, paramId, doc);
                                 foundParam = param;
                                 currentValue = ParameterService.GetParameterValueAsString(param);
+                                paramMissing = param == null;
                                 // タイプ変更パラメータはIsReadOnlyでもChangeTypeIdで変更可能
                                 isReadOnly = param == null
                                     || (param.IsReadOnly && !ParameterService.IsTypeChangeParameter(param));
@@ -257,7 +294,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
                             if (hasChange)
                             {
                                 string reason = !isReadOnly ? "表示"
-                                    : (foundParam == null && !isTypeParam) ? "パラメータが見つからない→非表示"
+                                    : paramMissing ? "パラメータが見つからない→非表示"
                                     : "読み取り専用→非表示";
                                 diag.LogChange(worksheet.Name, row, elementIdInt, headerName,
                                     worksheet.Cell(row, i + 3), currentValue, newValue, foundParam, reason);
@@ -277,7 +314,9 @@ namespace Tools28.Commands.ExcelExportImport.Services
                                 CurrentValue = currentValue,
                                 NewValue = newValue,
                                 HasChange = hasChange,
-                                IsReadOnly = isReadOnly
+                                IsReadOnly = isReadOnly,
+                                ParamId = paramId,
+                                ParamMissing = paramMissing
                             });
                         }
                     }
@@ -323,9 +362,10 @@ namespace Tools28.Commands.ExcelExportImport.Services
             public void WriteSummary(List<ImportPreviewRow> preview)
             {
                 int changed = preview.Count(r => r.HasChange && !r.IsReadOnly);
-                int changedRo = preview.Count(r => r.HasChange && r.IsReadOnly);
+                int changedRo = preview.Count(r => r.HasChange && r.IsReadOnly && !r.ParamMissing);
+                int changedMissing = preview.Count(r => r.HasChange && r.ParamMissing);
                 DiagLog.Write($"[ImportPreview] 完了: 判定 {preview.Count} 件 / 変更あり(表示) {changed} 件 / " +
-                    $"変更あり(読み取り専用・非表示) {changedRo} 件 / 空欄スキップ {BlankSkipped} 件 / " +
+                    $"変更あり(読み取り専用・非表示) {changedRo} 件 / 変更あり(パラメータなし・非表示) {changedMissing} 件 / 空欄スキップ {BlankSkipped} 件 / " +
                     $"同値扱い(文字不一致) {_equalLogs} 件" +
                     (_changeLogs > MaxChangeLogs ? $"（変更判定ログは先頭 {MaxChangeLogs} 件のみ出力）" : ""));
             }
@@ -492,8 +532,9 @@ namespace Tools28.Commands.ExcelExportImport.Services
             if (previewRows == null)
                 return result;
 
-            // 読み取り専用で変更できないセルはスキップ扱いで集計
-            result.SkipCount = previewRows.Count(r => r.HasChange && r.IsReadOnly);
+            // 読み取り専用で変更できないセル・パラメータが無いセルはスキップ扱いで集計
+            result.SkipReadOnly = previewRows.Count(r => r.HasChange && r.IsReadOnly && !r.ParamMissing);
+            result.SkipNotFound = previewRows.Count(r => r.HasChange && r.ParamMissing);
 
             // 実際に書き込む対象（変更あり かつ 書込み可能、除外指定を除く）だけを処理
             foreach (var pr in previewRows.Where(r => r.HasChange && !r.IsReadOnly
@@ -512,26 +553,29 @@ namespace Tools28.Commands.ExcelExportImport.Services
                 bool isTypeParam = parsed.IsTypeParameter;
                 string rawName = parsed.RawName;
 
-                var param = ParameterService.FindParameter(elem, rawName, isTypeParam, parsed.Kind, parsed.Index, doc);
+                // プレビューと同じく、書き出し時の識別番号があればそれでパラメータを特定する
+                var param = ParameterService.FindParameter(elem, rawName, isTypeParam, parsed.Kind, parsed.Index, pr.ParamId, doc);
                 if (param == null)
                 {
                     result.Warnings.Add($"パラメータ '{headerName}' が見つかりません（要素 {pr.ElementId}）");
-                    result.SkipCount++;
+                    result.SkipNotFound++;
                     continue;
                 }
 
                 // 読み取り専用（タイプ変更パラメータは除く）は書込み不可
                 if (param.IsReadOnly && !ParameterService.IsTypeChangeParameter(param))
                 {
-                    result.SkipCount++;
+                    result.SkipReadOnly++;
                     continue;
                 }
 
                 // プレビュー生成後にモデルが変わった場合に備えて現在値を再確認
+                // （同じタイプの複数行で同じタイプパラメータを変えた場合、2行目以降はここでスキップになる）
                 string currentValue = ParameterService.GetParameterValueAsString(param);
                 if (ValuesAreEqual(currentValue, pr.NewValue))
                 {
-                    result.SkipCount++;
+                    result.SkipUnchanged++;
+                    DiagLog.Write($"[Import] skip(既に同じ値) elem={pr.ElementId} param='{headerName}' current='{currentValue}'");
                     continue;
                 }
 
@@ -556,10 +600,11 @@ namespace Tools28.Commands.ExcelExportImport.Services
                 {
                     result.FailCount++;
                     result.FailedCells.Add(pr.ElementId.ToString() + "|" + headerName);
-                    result.Errors.Add(BuildSetFailureMessage(param, headerName, pr.ElementId, pr.NewValue));
+                    result.Errors.Add(BuildSetFailureMessage(param, headerName, pr.ElementId, pr.NewValue, doc));
                 }
             }
 
+            result.SkipCount = result.SkipReadOnly + result.SkipNotFound + result.SkipUnchanged;
             return result;
         }
 
@@ -665,7 +710,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
         /// 値設定に失敗した理由を、パラメータ型に応じて分かりやすいメッセージにする。
         /// 特に ElementId（要素参照）型は文字値を直接設定できないことを明示する。
         /// </summary>
-        private static string BuildSetFailureMessage(Parameter param, string headerName, long elementId, string value)
+        private static string BuildSetFailureMessage(Parameter param, string headerName, long elementId, string value, Document doc)
         {
             if (ParameterService.IsTypeChangeParameter(param))
                 return $"タイプ変更に失敗（要素 {elementId}, 値: '{value}'）— 一致するタイプが見つかりません";
@@ -685,8 +730,17 @@ namespace Tools28.Commands.ExcelExportImport.Services
                     return $"パラメータ '{headerName}' は画像参照（イメージ）型のため文字値 '{value}' は設定できません" +
                            $"（要素 {elementId}）。設定するにはその名前の画像がプロジェクトに存在する必要があります。";
 
-                return $"パラメータ '{headerName}' は要素参照型のため文字値 '{value}' は設定できません" +
-                       $"（要素 {elementId}）。'{value}' という名前の要素が見つかりません。";
+                string msg = $"パラメータ '{headerName}' は要素参照型のため文字値 '{value}' は設定できません" +
+                             $"（要素 {elementId}）。'{value}' という名前の要素が見つかりません。";
+
+                // 似た名前の候補（例: 「7FL」→「6階(7FL)」）を添える。自動では置き換えない
+                var candidates = ParameterService.SuggestReferenceNames(param, value, doc);
+                if (candidates.Count > 0)
+                {
+                    msg += string.Format(Loc.S("Import.RefCandidates"), string.Join(" / ", candidates));
+                    DiagLog.Write($"[Import] 名前の候補 '{value}' -> {string.Join(" / ", candidates)}");
+                }
+                return msg;
             }
 
             return $"パラメータ '{headerName}' の値設定に失敗（要素 {elementId}, 値: '{value}'）";
@@ -842,6 +896,9 @@ namespace Tools28.Commands.ExcelExportImport.Services
                 // 各シートの見出し行（最終列の次）に凡例を追加
                 foreach (var worksheet in workbook.Worksheets)
                 {
+                    if (ParameterIdSheet.IsMetaSheet(worksheet))
+                        continue; // 識別番号の隠しシートには凡例を付けない
+
                     var lastCol = worksheet.LastColumnUsed();
                     if (lastCol == null) continue;
                     int legendCol = lastCol.ColumnNumber() + 1;

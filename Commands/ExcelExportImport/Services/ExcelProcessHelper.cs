@@ -187,6 +187,11 @@ namespace Tools28.Commands.ExcelExportImport.Services
                         dynamic sheet = targetWb.Sheets[s];
                         try
                         {
+                            // パラメータ識別番号の隠しシートは色付け対象外
+                            string sheetName = Convert.ToString((object)sheet.Name);
+                            if (ParameterIdSheet.IsMetaSheetName(sheetName))
+                                continue;
+
                             // 使用範囲を取得（開始行・列も考慮）
                             dynamic usedRange = sheet.UsedRange;
                             int startRow = (int)usedRange.Row;

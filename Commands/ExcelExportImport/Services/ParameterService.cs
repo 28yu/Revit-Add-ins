@@ -292,6 +292,63 @@ namespace Tools28.Commands.ExcelExportImport.Services
             if (doc == null || string.IsNullOrEmpty(name))
                 return ElementId.InvalidElementId;
 
+            foreach (var cls in GetReferenceCandidateClasses(param, doc))
+            {
+                try
+                {
+                    var hit = new FilteredElementCollector(doc)
+                        .OfClass(cls)
+                        .FirstOrDefault(e => SafeName(e) == name);
+                    if (hit != null)
+                        return hit.Id;
+                }
+                catch { }
+            }
+
+            return ElementId.InvalidElementId;
+        }
+
+        /// <summary>
+        /// 要素参照パラメータに入れようとした名前に似た、実在する要素名の候補を返す
+        /// （例: 「7FL」→「6階(7FL)」）。名前が見つからなかったときのエラー詳細に表示する。
+        /// 自動では置き換えない（「7FL」は「16階(17FL)」にも含まれるため、判断は利用者に任せる）。
+        /// </summary>
+        public static List<string> SuggestReferenceNames(Parameter param, string name, Document doc, int max = 3)
+        {
+            var result = new List<string>();
+            if (param == null || doc == null || string.IsNullOrWhiteSpace(name))
+                return result;
+
+            string key = name.Trim();
+            var names = new HashSet<string>();
+            foreach (var cls in GetReferenceCandidateClasses(param, doc))
+            {
+                try
+                {
+                    foreach (var e in new FilteredElementCollector(doc).OfClass(cls))
+                    {
+                        string n = SafeName(e);
+                        if (string.IsNullOrEmpty(n)) continue;
+                        if (n.IndexOf(key, StringComparison.OrdinalIgnoreCase) >= 0
+                            || key.IndexOf(n, StringComparison.OrdinalIgnoreCase) >= 0)
+                            names.Add(n);
+                    }
+                }
+                catch { }
+                if (names.Count > 0)
+                    break;   // 優先度の高いクラス（現在値と同じ種類）で見つかればそれだけ使う
+            }
+
+            result.AddRange(names.OrderBy(n => n.Length).ThenBy(n => n, StringComparer.CurrentCulture).Take(max));
+            return result;
+        }
+
+        /// <summary>
+        /// 要素参照パラメータの値として探す要素クラスを優先順に返す:
+        /// 現在値の要素クラス → パラメータ種別から推定（イメージ=ImageType 等）→ Level/Material。
+        /// </summary>
+        private static List<Type> GetReferenceCandidateClasses(Parameter param, Document doc)
+        {
             var candidateClasses = new List<Type>();
 
             // 1) 現在値の要素と同じクラス（値の入れ替えで最も確実）
@@ -316,20 +373,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
             candidateClasses.Add(typeof(Level));
             candidateClasses.Add(typeof(Material));
 
-            foreach (var cls in candidateClasses.Distinct())
-            {
-                try
-                {
-                    var hit = new FilteredElementCollector(doc)
-                        .OfClass(cls)
-                        .FirstOrDefault(e => SafeName(e) == name);
-                    if (hit != null)
-                        return hit.Id;
-                }
-                catch { }
-            }
-
-            return ElementId.InvalidElementId;
+            return candidateClasses.Distinct().ToList();
         }
 
         /// <summary>Parameter.Id を long 化（バージョン差異を吸収）。同名パラメータの識別子に使う。</summary>
@@ -400,33 +444,54 @@ namespace Tools28.Commands.ExcelExportImport.Services
 
             if (matches.Count == 0)
                 return FindParameterByName(container, paramName); // 種別一致なし → 名前引きにフォールバック
-            if (matches.Count == 1)
-                return matches[0];
 
             matches.Sort((a, b) => ParamIdToLong(a.Id).CompareTo(ParamIdToLong(b.Id)));
+            if (index <= 1)
+                return matches[0];
+
+            // 「#2」等が指す番号の同名パラメータをこの要素が持っていない場合は「該当なし」。
+            // 以前は先頭の1件を返していたため、同名パラメータを片方しか持たない要素では
+            // #1 列と #2 列が同じパラメータを指し、値の消去・上書きの取り違えが起きていた。
             int i = index - 1;
-            return (i >= 0 && i < matches.Count) ? matches[i] : matches[0];
+            return i < matches.Count ? matches[i] : null;
         }
 
         /// <summary>
-        /// エクスポート用: ParameterInfo が保持する安定 ID で、要素上の該当パラメータを厳密に特定する。
-        /// 同名パラメータがあっても正しい方の値を書き出せる。ID 不一致時は同名の先頭にフォールバック。
+        /// 要素からパラメータを検索する（識別番号指定版）。
+        /// paramId（書き出し時に Excel の隠しシートへ記録したパラメータの識別番号）が分かっている場合は、
+        /// その番号と完全に一致するパラメータだけを返す（要素が持っていなければ null）。
+        /// 同名パラメータが複数あっても取り違えない。paramId が 0（不明）なら従来の方法で探す。
+        /// </summary>
+        public static Parameter FindParameter(
+            Element elem, string paramName, bool isTypeParameter,
+            Models.ParameterKind? kind, int index, long paramId, Document doc)
+        {
+            // 0 = 不明（隠しシートの無い旧 Excel 等）。組み込みパラメータの識別番号は負の値なので 0 だけで判定する
+            if (paramId == 0)
+                return FindParameter(elem, paramName, isTypeParameter, kind, index, doc);
+
+            var container = GetParameterContainer(elem, isTypeParameter, doc);
+            return FindByIdentity(container, paramName, paramId);
+        }
+
+        /// <summary>
+        /// ParameterInfo が保持する安定 ID で、要素上の該当パラメータを厳密に特定する。
+        /// 同名パラメータがあっても正しい方を返す。ID が一致するものが無ければ null（＝この要素には無い）。
+        /// ⚠ 以前は ID 不一致時に同名の先頭を返していたため、同名パラメータを片方しか持たない要素では
+        ///    別のパラメータの値を書き出し・上書きしてしまっていた。
         /// </summary>
         public static Parameter FindByIdentity(Element container, string rawName, long paramId)
         {
             if (container == null) return null;
 
-            Parameter fallback = null;
             foreach (Parameter p in container.Parameters)
             {
                 if (p?.Definition == null || p.Definition.Name != rawName)
                     continue;
                 if (ParamIdToLong(p.Id) == paramId)
                     return p;
-                if (fallback == null)
-                    fallback = p;
             }
-            return fallback;
+            return null;
         }
 
         /// <summary>インスタンス/タイプに応じたパラメータの入れ物（要素本体 or タイプ要素）を返す。</summary>
