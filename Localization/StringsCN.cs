@@ -347,6 +347,7 @@ namespace Tools28.Localization
             { "Export.ParamGroupFilter", "参数组:" },
             { "Export.ParamGroupFilter.All", "（全部参数组）" },
             { "Export.ParamGroupFilter.Tip", "按参数组（尺寸标注、标识数据等）筛选列表。可与参数名称搜索组合使用。" },
+            { "Export.ParamSearch.Tip", "按参数名称搜索。未选择类别时，将在所有类别中搜索，并仅显示包含匹配参数的类别。" },
             { "Export.Progress.Category", "类别 {0}/{1}: {2}" },
             { "Export.Progress.Elements", "图元 {0} / {1}" },
             { "Export.Progress.Elapsed", "已用时间 {0}" },

@@ -27,6 +27,8 @@ namespace Tools28.Commands.ExcelExportImport.Views
         private List<CategoryInfo> _allCategories;
         // 全パラメータ一覧（カテゴリ選択に応じて更新）
         private List<ParameterInfo> _allParameters = new List<ParameterInfo>();
+        // カテゴリ名 -> そのカテゴリのパラメータ一覧（Revit からの取得は重いため、1カテゴリにつき1回だけ取得して使い回す）
+        private readonly Dictionary<string, List<ParameterInfo>> _paramCache = new Dictionary<string, List<ParameterInfo>>();
         // 出力パラメータリスト（エクスポート順の情報源）
         private List<ParameterInfo> _outputParameters = new List<ParameterInfo>();
 
@@ -96,6 +98,7 @@ namespace Tools28.Commands.ExcelExportImport.Views
             btnParamSelectNone.Content = Loc.S("Common.SelectNone");
             ParamGroupFilterLabel.Text = Loc.S("Export.ParamGroupFilter");
             ParamGroupFilterComboBox.ToolTip = Loc.S("Export.ParamGroupFilter.Tip");
+            ParameterSearchBox.ToolTip = Loc.S("Export.ParamSearch.Tip");
             ParamPrefixLegend.Text = Loc.S("Export.ParamPrefixLegend");
             btnAddToOutput.ToolTip = Loc.S("Export.AddToOutput");
             btnRemoveFromOutput.ToolTip = Loc.S("Export.RemoveFromOutput");
@@ -187,21 +190,64 @@ namespace Tools28.Commands.ExcelExportImport.Views
 
         #region パラメータ一覧
 
+        /// <summary>
+        /// パラメータ欄の元データ（_allParameters）を作り直す。
+        /// カテゴリにチェックがあればそのカテゴリだけ、チェックが無くてもパラメータ名の検索や
+        /// グループの絞り込みが指定されていれば、全カテゴリを対象にする（該当するカテゴリだけが表示される）。
+        /// </summary>
         private void UpdateParameterList()
         {
             _allParameters.Clear();
 
-            var checkedCategories = _allCategories.Where(c => c.IsChecked).ToList();
+            List<CategoryInfo> sources = _allCategories.Where(c => c.IsChecked).ToList();
+            if (sources.Count == 0 && HasParameterFilter())
+                sources = _allCategories;
 
-            foreach (var cat in checkedCategories)
-            {
-                var parameters = ParameterService.GetParametersForCategory(
-                    _doc, cat.BuiltInCategory, cat.Name, _scope, _activeView, _selectionIds);
+            foreach (var parameters in LoadCategoryParameters(sources))
                 _allParameters.AddRange(parameters);
-            }
 
             RefreshGroupFilterItems();
             FilterParameterList(null);
+        }
+
+        /// <summary>カテゴリのチェックが1つも無い状態か</summary>
+        private bool NoCategoryChecked => !_allCategories.Any(c => c.IsChecked);
+
+        /// <summary>パラメータ名の検索、またはグループの絞り込みが指定されているか</summary>
+        private bool HasParameterFilter()
+        {
+            return !string.IsNullOrEmpty(ParameterSearchBox.Text.Trim())
+                || GetSelectedGroupFilter() != null;
+        }
+
+        /// <summary>
+        /// 指定カテゴリのパラメータ一覧を返す。未取得のカテゴリだけ Revit から取得してキャッシュする。
+        /// 全カテゴリ分を初めて取得するときは時間がかかるため、待機カーソルを表示する。
+        /// </summary>
+        private List<List<ParameterInfo>> LoadCategoryParameters(IEnumerable<CategoryInfo> categories)
+        {
+            var result = new List<List<ParameterInfo>>();
+            var missing = categories.Where(c => !_paramCache.ContainsKey(c.Name)).ToList();
+
+            var prevCursor = System.Windows.Input.Mouse.OverrideCursor;
+            if (missing.Count > 1)
+                System.Windows.Input.Mouse.OverrideCursor = System.Windows.Input.Cursors.Wait;
+            try
+            {
+                foreach (var cat in missing)
+                {
+                    _paramCache[cat.Name] = ParameterService.GetParametersForCategory(
+                        _doc, cat.BuiltInCategory, cat.Name, _scope, _activeView, _selectionIds);
+                }
+            }
+            finally
+            {
+                System.Windows.Input.Mouse.OverrideCursor = prevCursor;
+            }
+
+            foreach (var cat in categories)
+                result.Add(_paramCache[cat.Name]);
+            return result;
         }
 
         /// <summary>
@@ -212,8 +258,13 @@ namespace Tools28.Commands.ExcelExportImport.Views
         {
             string current = GetSelectedGroupFilter();
 
+            // カテゴリ未選択時は、取得済みの全カテゴリのパラメータからグループ候補を作る
+            IEnumerable<ParameterInfo> groupSource = NoCategoryChecked
+                ? _paramCache.Values.SelectMany(l => l)
+                : _allParameters;
+
             var items = new List<string> { Loc.S("Export.ParamGroupFilter.All") };
-            items.AddRange(_allParameters
+            items.AddRange(groupSource
                 .Select(p => p.GroupName ?? "")
                 .Where(g => !string.IsNullOrEmpty(g))
                 .Distinct()
@@ -237,7 +288,25 @@ namespace Tools28.Commands.ExcelExportImport.Views
         private void ParamGroupFilterComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (_suppressGroupFilterUpdate) return;
-            FilterParameterList(null);
+
+            // カテゴリ未選択時は、絞り込みの有無で対象（全カテゴリ／なし）が変わるため元データから作り直す
+            if (NoCategoryChecked)
+                UpdateParameterList();
+            else
+                FilterParameterList(null);
+        }
+
+        /// <summary>
+        /// カテゴリ未選択のままグループ欄を開いたときは、全カテゴリのパラメータを取得して
+        /// グループ候補を用意する（カテゴリを選ばずにグループだけで絞り込めるようにする）。
+        /// </summary>
+        private void ParamGroupFilterComboBox_DropDownOpened(object sender, EventArgs e)
+        {
+            if (!NoCategoryChecked) return;
+            if (_allCategories.All(c => _paramCache.ContainsKey(c.Name))) return;
+
+            LoadCategoryParameters(_allCategories);
+            RefreshGroupFilterItems();
         }
 
         /// <summary>
@@ -273,12 +342,36 @@ namespace Tools28.Commands.ExcelExportImport.Views
 
         private void ParameterSearchBox_TextChanged(object sender, TextChangedEventArgs e)
         {
-            FilterParameterList(null);
+            RefreshParameterListForSearch();
         }
 
         private void ParameterSearchButton_Click(object sender, RoutedEventArgs e)
         {
-            FilterParameterList(null);
+            RefreshParameterListForSearch();
+        }
+
+        /// <summary>
+        /// 検索文字の変更を反映する。カテゴリ未選択時は全カテゴリが検索対象になるため元データから作り直す
+        /// （2回目以降はキャッシュ済みなので軽い）。
+        /// </summary>
+        private void RefreshParameterListForSearch()
+        {
+            if (NoCategoryChecked)
+                UpdateParameterList();
+            else
+                FilterParameterList(null);
+        }
+
+        /// <summary>
+        /// エクスポート・設定保存の対象カテゴリ。チェックしたカテゴリに加え、
+        /// カテゴリ未選択の検索で出力欄に追加したパラメータのカテゴリも含める。
+        /// </summary>
+        private List<CategoryInfo> GetEffectiveCategories()
+        {
+            var outputCategoryNames = new HashSet<string>(_outputParameters.Select(p => p.CategoryName));
+            return _allCategories
+                .Where(c => c.IsChecked || outputCategoryNames.Contains(c.Name))
+                .ToList();
         }
 
         private void FilterParameterList(List<ParameterInfo> source)
@@ -543,9 +636,8 @@ namespace Tools28.Commands.ExcelExportImport.Views
             {
                 try
                 {
-                    var checkedCategories = _allCategories.Where(c => c.IsChecked).ToList();
                     var settings = SettingsService.CreateFromSelection(
-                        checkedCategories, _outputParameters, IncludeParamGroupCheckBox.IsChecked == true);
+                        GetEffectiveCategories(), _outputParameters, IncludeParamGroupCheckBox.IsChecked == true);
                     SettingsService.SaveSettings(dialog.FileName, settings);
                     MessageBox.Show(Loc.S("Export.SettingsSaved"), Loc.S("Export.SettingsSaveTitle"), MessageBoxButton.OK, MessageBoxImage.Information);
                 }
@@ -640,7 +732,7 @@ namespace Tools28.Commands.ExcelExportImport.Views
             CategoryListBox.ItemsSource = null;
             CategoryListBox.ItemsSource = _allCategories;
 
-            // パラメータ一覧を更新（Revitからのパラメータ取得はここで1回だけ実行）
+            // パラメータ一覧を更新（未取得のカテゴリだけ Revit から取得する）
             UpdateParameterList();
 
             // 出力パラメータの照合用に辞書を構築（線形探索の繰り返しを回避）。
@@ -698,7 +790,7 @@ namespace Tools28.Commands.ExcelExportImport.Views
                 return;
             }
 
-            SelectedCategories = _allCategories.Where(c => c.IsChecked).ToList();
+            SelectedCategories = GetEffectiveCategories();
             if (SelectedCategories.Count == 0)
             {
                 MessageBox.Show(Loc.S("Export.SelectCategory"), Loc.S("Common.Confirm"),

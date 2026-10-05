@@ -347,6 +347,7 @@ namespace Tools28.Localization
             { "Export.ParamGroupFilter", "グループ:" },
             { "Export.ParamGroupFilter.All", "（すべてのグループ）" },
             { "Export.ParamGroupFilter.Tip", "パラメータグループ（寸法・識別情報など）で一覧を絞り込みます。検索欄のパラメータ名と組み合わせて使えます。" },
+            { "Export.ParamSearch.Tip", "パラメータ名で検索します。カテゴリを選択していない場合は、すべてのカテゴリから検索し、該当するカテゴリだけを表示します。" },
             { "Export.Progress.Category", "カテゴリ {0}/{1}: {2}" },
             { "Export.Progress.Elements", "要素 {0} / {1}" },
             { "Export.Progress.Elapsed", "経過 {0}" },

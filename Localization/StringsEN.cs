@@ -347,6 +347,7 @@ namespace Tools28.Localization
             { "Export.ParamGroupFilter", "Group:" },
             { "Export.ParamGroupFilter.All", "(All groups)" },
             { "Export.ParamGroupFilter.Tip", "Filter the list by parameter group (Dimensions, Identity Data, etc.). Can be combined with the parameter name search." },
+            { "Export.ParamSearch.Tip", "Search by parameter name. If no category is selected, all categories are searched and only matching categories are shown." },
             { "Export.Progress.Category", "Category {0}/{1}: {2}" },
             { "Export.Progress.Elements", "Elements {0} / {1}" },
             { "Export.Progress.Elapsed", "Elapsed {0}" },
