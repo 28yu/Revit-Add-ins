@@ -39,6 +39,9 @@ namespace Tools28.Commands.ExcelExportImport.Views
         // CheckBox の Checked/Unchecked からの UpdateParameterList を抑制するフラグ
         private bool _suppressCategoryUpdate;
 
+        // グループ絞り込みの候補をコードから入れ替える間、SelectionChanged での再描画を抑制するフラグ
+        private bool _suppressGroupFilterUpdate;
+
         /// <summary>エクスポート対象カテゴリ</summary>
         public List<CategoryInfo> SelectedCategories { get; private set; }
 
@@ -76,6 +79,8 @@ namespace Tools28.Commands.ExcelExportImport.Views
             _allCategories = RevitCategoryHelper.GetCategoriesWithElements(
                 doc, _scope, _activeView, _selectionIds);
             CategoryListBox.ItemsSource = _allCategories;
+
+            RefreshGroupFilterItems();
         }
 
         private void ApplyLocalization()
@@ -89,6 +94,8 @@ namespace Tools28.Commands.ExcelExportImport.Views
             btnCatSelectNone.Content = Loc.S("Common.SelectNone");
             btnParamSelectAll.Content = Loc.S("Common.SelectAll");
             btnParamSelectNone.Content = Loc.S("Common.SelectNone");
+            ParamGroupFilterLabel.Text = Loc.S("Export.ParamGroupFilter");
+            ParamGroupFilterComboBox.ToolTip = Loc.S("Export.ParamGroupFilter.Tip");
             ParamPrefixLegend.Text = Loc.S("Export.ParamPrefixLegend");
             btnAddToOutput.ToolTip = Loc.S("Export.AddToOutput");
             btnRemoveFromOutput.ToolTip = Loc.S("Export.RemoveFromOutput");
@@ -193,6 +200,43 @@ namespace Tools28.Commands.ExcelExportImport.Views
                 _allParameters.AddRange(parameters);
             }
 
+            RefreshGroupFilterItems();
+            FilterParameterList(null);
+        }
+
+        /// <summary>
+        /// グループ絞り込みの候補を、現在のパラメータ一覧に含まれるグループから作り直す。
+        /// 先頭は「すべてのグループ」。選択中のグループが候補に残っていれば選択を維持する。
+        /// </summary>
+        private void RefreshGroupFilterItems()
+        {
+            string current = GetSelectedGroupFilter();
+
+            var items = new List<string> { Loc.S("Export.ParamGroupFilter.All") };
+            items.AddRange(_allParameters
+                .Select(p => p.GroupName ?? "")
+                .Where(g => !string.IsNullOrEmpty(g))
+                .Distinct()
+                .OrderBy(g => g, StringComparer.CurrentCulture));
+
+            _suppressGroupFilterUpdate = true;
+            ParamGroupFilterComboBox.ItemsSource = items;
+            int index = current == null ? 0 : items.IndexOf(current, 1);
+            ParamGroupFilterComboBox.SelectedIndex = index > 0 ? index : 0;
+            _suppressGroupFilterUpdate = false;
+        }
+
+        /// <summary>選択中の絞り込みグループ名。「すべてのグループ」なら null。</summary>
+        private string GetSelectedGroupFilter()
+        {
+            if (ParamGroupFilterComboBox.SelectedIndex <= 0)
+                return null;
+            return ParamGroupFilterComboBox.SelectedItem as string;
+        }
+
+        private void ParamGroupFilterComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_suppressGroupFilterUpdate) return;
             FilterParameterList(null);
         }
 
@@ -210,17 +254,21 @@ namespace Tools28.Commands.ExcelExportImport.Views
         }
 
         /// <summary>
-        /// テキスト検索を適用した表示対象を返す。
+        /// テキスト検索（パラメータ名）とパラメータグループの絞り込みを適用した表示対象を返す。
         /// </summary>
         private List<ParameterInfo> ApplyParameterFilters(List<ParameterInfo> source)
         {
-            string filter = ParameterSearchBox.Text.Trim();
-            if (string.IsNullOrEmpty(filter))
-                return source;
+            IEnumerable<ParameterInfo> result = source;
 
-            return source
-                .Where(p => p.DisplayName.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0)
-                .ToList();
+            string group = GetSelectedGroupFilter();
+            if (group != null)
+                result = result.Where(p => p.GroupName == group);
+
+            string filter = ParameterSearchBox.Text.Trim();
+            if (!string.IsNullOrEmpty(filter))
+                result = result.Where(p => p.DisplayName.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0);
+
+            return result.ToList();
         }
 
         private void ParameterSearchBox_TextChanged(object sender, TextChangedEventArgs e)

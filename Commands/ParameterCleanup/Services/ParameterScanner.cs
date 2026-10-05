@@ -87,6 +87,9 @@ namespace Tools28.Commands.ParameterCleanup.Services
             }
             catch { }
 
+            // パラメータグループ名は Revit 本体の言語で返るため、「その他」も同じ言語にそろえる
+            string otherGroupLabel = Loc.S("Export.ParamGroup.Other", RevitUiLanguage.Resolve(doc));
+
             // --- 集計表（スケジュール）での参照を先に構築（軽量：集計表を舐めるだけ）---
             var scheduleRefs = BuildScheduleReferences(doc);
 
@@ -107,7 +110,8 @@ namespace Tools28.Commands.ParameterCleanup.Services
                     Name = def.Name,
                     Id = pe.Id,
                     Definition = def,
-                    Kind = (pe is SharedParameterElement) ? ParamKind.Shared : ParamKind.Project
+                    Kind = (pe is SharedParameterElement) ? ParamKind.Shared : ParamKind.Project,
+                    GroupText = ParameterGroupHelper.GetGroupLabel(def, otherGroupLabel)
                 };
 
                 var spe = pe as SharedParameterElement;
@@ -154,11 +158,17 @@ namespace Tools28.Commands.ParameterCleanup.Services
                     {
                         var gp = doc.GetElement(gid) as GlobalParameter;
                         if (gp == null) continue;
+
+                        Definition gdef;
+                        try { gdef = gp.GetDefinition(); }
+                        catch { gdef = null; }
+
                         rows.Add(new ParamRow
                         {
                             Name = gp.Name,
                             Id = gp.Id,
                             Kind = ParamKind.Global,
+                            GroupText = ParameterGroupHelper.GetGroupLabel(gdef, otherGroupLabel),
                             IsTypeBinding = null,
                             State = ValueState.NotApplicable,
                             GlobalValueText = FormatGlobalValue(gp)

@@ -54,6 +54,12 @@ namespace Tools28.Commands.ParameterCleanup.Models
         /// <summary>プロジェクトパラメータとしてのバインド先カテゴリ。バインド無しは空。</summary>
         public List<Category> BoundCategories { get; set; } = new List<Category>();
 
+        /// <summary>
+        /// パラメータグループの表示名（プロパティパレットの見出し。例: 「寸法」「識別情報」）。
+        /// Revit 本体の UI 言語で返る。
+        /// </summary>
+        public string GroupText { get; set; } = "";
+
         /// <summary>バインド先カテゴリの表示文字列</summary>
         public string CategoriesText { get; set; } = "";
 

@@ -270,6 +270,7 @@
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
                     <Grid Grid.Row="0" Margin="0,4,0,4">
@@ -284,7 +285,19 @@
                                 Style="{StaticResource SecondaryButtonStyle}"
                                 Click="ParameterSearchButton_Click"/>
                     </Grid>
-                    <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,4">
+                    <!-- パラメータグループで絞り込み -->
+                    <Grid Grid.Row="1" Margin="0,0,0,4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="ParamGroupFilterLabel" Grid.Column="0" Text="グループ:"
+                                   FontSize="11" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                        <ComboBox x:Name="ParamGroupFilterComboBox" Grid.Column="1" Height="24" FontSize="11"
+                                  VerticalContentAlignment="Center"
+                                  SelectionChanged="ParamGroupFilterComboBox_SelectionChanged"/>
+                    </Grid>
+                    <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,4">
                         <Button x:Name="btnParamSelectAll" Content="全選択"
                                 Style="{StaticResource SmallButtonStyle}"
                                 Click="ParameterSelectAllButton_Click"/>
@@ -292,7 +305,7 @@
                                 Style="{StaticResource SmallButtonStyle}"
                                 Click="ParameterSelectNoneButton_Click"/>
                     </StackPanel>
-                    <ListBox x:Name="ParameterListBox" Grid.Row="2"
+                    <ListBox x:Name="ParameterListBox" Grid.Row="3"
                              BorderThickness="1" BorderBrush="#CCCCCC"
                              SelectionMode="Extended"
                              ScrollViewer.CanContentScroll="True"
@@ -325,7 +338,12 @@
                             <DataTemplate>
                                 <CheckBox IsChecked="{Binding IsChecked}"
                                           FontSize="11" Margin="2,1">
-                                    <TextBlock Text="{Binding DisplayName}"/>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="{Binding DisplayName}"/>
+                                        <!-- パラメータグループ（例: 寸法・識別情報）を薄字で併記 -->
+                                        <TextBlock Text="{Binding GroupName, StringFormat='[{0}]'}"
+                                                   Foreground="#888888" Margin="6,0,0,0"/>
+                                    </StackPanel>
                                 </CheckBox>
                             </DataTemplate>
                         </ListBox.ItemTemplate>

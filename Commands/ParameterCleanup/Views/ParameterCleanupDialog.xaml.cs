@@ -97,8 +97,10 @@ namespace Tools28.Commands.ParameterCleanup.Views
             if (!(o is ParamRow r)) return false;
 
             string q = SearchBox?.Text?.Trim();
+            // 検索はパラメータ名とパラメータグループ名の両方を対象にする
             if (!string.IsNullOrEmpty(q) &&
-                (r.Name == null || r.Name.IndexOf(q, StringComparison.CurrentCultureIgnoreCase) < 0))
+                (r.Name == null || r.Name.IndexOf(q, StringComparison.CurrentCultureIgnoreCase) < 0) &&
+                (r.GroupText == null || r.GroupText.IndexOf(q, StringComparison.CurrentCultureIgnoreCase) < 0))
                 return false;
 
             if (chkDuplicateOnly?.IsChecked == true && !r.IsDuplicateName)
@@ -143,6 +145,7 @@ namespace Tools28.Commands.ParameterCleanup.Views
         private void SetupFilterableColumns()
         {
             RegisterColumn("Name", colName, "ParamCleanup.Col.Name", "Name", r => r.Name ?? "");
+            RegisterColumn("Group", colGroup, "ParamCleanup.Col.Group", "GroupText", r => r.GroupText ?? "");
             RegisterColumn("Kind", colKind, "ParamCleanup.Col.Kind", "KindText", r => r.KindText ?? "");
             RegisterColumn("Scope", colScope, "ParamCleanup.Col.Scope", "ScopeText", r => r.ScopeText ?? "");
             RegisterColumn("Categories", colCategories, "ParamCleanup.Col.Categories", "CategoriesText", r => r.CategoriesText ?? "");
