@@ -26,8 +26,27 @@ namespace Tools28.Commands.ExcelExportImport.Services
     /// <summary>
     /// インポートプレビュー行
     /// </summary>
-    public class ImportPreviewRow
+    public class ImportPreviewRow : System.ComponentModel.INotifyPropertyChanged
     {
+        public event System.ComponentModel.PropertyChangedEventHandler PropertyChanged;
+
+        private bool _isSelected = true;
+
+        /// <summary>
+        /// 変更プレビューで「取り込む」にチェックされているか（既定はチェックあり）。
+        /// インポートダイアログで外した行は書き込み・Excel の色付けの対象外になる。
+        /// </summary>
+        public bool IsSelected
+        {
+            get => _isSelected;
+            set
+            {
+                if (_isSelected == value) return;
+                _isSelected = value;
+                PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(IsSelected)));
+            }
+        }
+
         /// <summary>
         /// 要素 Id。Revit 2026 で要素 Id が 64bit 化されたため long で保持する
         /// （書き出し側も long。int だと大きな Id の行が読み込めない）。
