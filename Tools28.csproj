@@ -90,6 +90,8 @@
     <Resource Include="Resources\Icons\parameter_cleanup_16.png" />
     <Resource Include="Resources\Icons\parameter_value_replace.png" />
     <Resource Include="Resources\Icons\parameter_value_replace_16.png" />
+    <Resource Include="Resources\Icons\parameter_value_move.png" />
+    <Resource Include="Resources\Icons\parameter_value_move_16.png" />
     <Resource Include="Resources\Icons\auto_backup.png" />
     <Resource Include="Resources\Icons\auto_backup_16.png" />
     <Resource Include="Resources\Icons\filter_management.png" />

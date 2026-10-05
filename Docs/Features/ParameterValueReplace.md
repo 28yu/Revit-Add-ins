@@ -76,5 +76,6 @@ Excel への書き出し・読み込みを使わずに Revit 上で直接変更�
 
 ## 関連機能
 
+- [パラメータ値の移動](./ParameterValueMove.md) — 同じ名前でグループ違いのパラメータ間で値を移す
 - [パラメータ整理](./ParameterCleanup.md) — 未使用パラメータの削除
 - [EXCELエクスポート](./ExcelExport.md) / [EXCELインポート](./ExcelImport.md) — 要素ごとに違う値をまとめて編集する場合
