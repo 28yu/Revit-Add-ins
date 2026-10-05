@@ -195,6 +195,18 @@
       }
     },
     {
+      "id": "ParameterValueReplace",
+      "category": "data",
+      "icon": "icons/features/parameter_value_replace.png",
+      "manual": "Features/ParameterValueReplace.md",
+      "added_in": "2.6",
+      "names": {
+        "ja": "パラメータ値の一括置換",
+        "en": "Replace Parameter Values",
+        "zh": "参数值批量替换"
+      }
+    },
+    {
       "id": "FilterManagement",
       "category": "view",
       "icon": "icons/features/filter_management.png",

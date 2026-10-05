@@ -49,6 +49,7 @@ namespace Tools28
             { "ExcelExport", "Ribbon.Excel.Export" },
             { "ExcelImport", "Ribbon.Excel.Import" },
             { "ParameterCleanup", "Ribbon.ParamCleanup" },
+            { "ParameterValueReplace", "Ribbon.ValueReplace" },
             { "FilterManagement", "Ribbon.FilterMgmt" },
             { "ViewTemplateManagement", "Ribbon.TemplateMgmt" },
             { "DwgLayerTransfer", "Ribbon.DwgVg" },
@@ -83,6 +84,7 @@ namespace Tools28
             { "ExcelExport", "Ribbon.Excel.Export.Tip" },
             { "ExcelImport", "Ribbon.Excel.Import.Tip" },
             { "ParameterCleanup", "Ribbon.ParamCleanup.Tip" },
+            { "ParameterValueReplace", "Ribbon.ValueReplace.Tip" },
             { "FilterManagement", "Ribbon.FilterMgmt.Tip" },
             { "ViewTemplateManagement", "Ribbon.TemplateMgmt.Tip" },
             { "DwgLayerTransfer", "Ribbon.DwgVg.Tip" },
@@ -506,6 +508,12 @@ namespace Tools28
             cleanupData.Image = LoadImage("parameter_cleanup_16.png");
             cleanupData.LargeImage = LoadImage("parameter_cleanup.png");
             AddButton(panel, cleanupData);
+
+            var replaceData = new PushButtonData("ParameterValueReplace", Loc.S("Ribbon.ValueReplace"), assemblyPath, "Tools28.Commands.ParameterValueReplace.ParameterValueReplaceCommand");
+            replaceData.ToolTip = Loc.S("Ribbon.ValueReplace.Tip");
+            replaceData.Image = LoadImage("parameter_value_replace_16.png");
+            replaceData.LargeImage = LoadImage("parameter_value_replace.png");
+            AddButton(panel, replaceData);
         }
 
         private void CreateSettingsPanel(UIControlledApplication application, string tabName, string assemblyPath)

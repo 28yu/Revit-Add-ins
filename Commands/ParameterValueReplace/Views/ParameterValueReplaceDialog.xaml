@@ -1,0 +1,200 @@
+<Window x:Class="Tools28.Commands.ParameterValueReplace.Views.ParameterValueReplaceDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="パラメータ値の一括置換"
+        Width="900"
+        Height="620"
+        MinWidth="760"
+        MinHeight="460"
+        WindowStartupLocation="CenterScreen"
+        Background="#F5F5F5">
+
+    <Window.Resources>
+        <SolidColorBrush x:Key="RevitBlue" Color="#0066CC"/>
+        <SolidColorBrush x:Key="RevitHoverBlue" Color="#0052A3"/>
+        <SolidColorBrush x:Key="RevitDarkGray" Color="#333333"/>
+
+        <Style x:Key="PrimaryButtonStyle" TargetType="Button">
+            <Setter Property="MinWidth" Value="120"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="Margin" Value="4,0,0,0"/>
+            <Setter Property="Background" Value="{StaticResource RevitBlue}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="{StaticResource RevitBlue}"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="2" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{StaticResource RevitHoverBlue}"/>
+                    <Setter Property="BorderBrush" Value="{StaticResource RevitHoverBlue}"/>
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Background" Value="#CCCCCC"/>
+                    <Setter Property="BorderBrush" Value="#CCCCCC"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="DangerButtonStyle" TargetType="Button" BasedOn="{StaticResource PrimaryButtonStyle}">
+            <Setter Property="Background" Value="#C0392B"/>
+            <Setter Property="BorderBrush" Value="#C0392B"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#A93226"/>
+                    <Setter Property="BorderBrush" Value="#A93226"/>
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Background" Value="#CCCCCC"/>
+                    <Setter Property="BorderBrush" Value="#CCCCCC"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="SecondaryButtonStyle" TargetType="Button">
+            <Setter Property="MinWidth" Value="90"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="Padding" Value="8,0"/>
+            <Setter Property="Margin" Value="4,0,0,0"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="Foreground" Value="{StaticResource RevitDarkGray}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="#CCCCCC"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="2" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#F0F0F0"/>
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Foreground" Value="#AAAAAA"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- 説明 -->
+        <TextBlock x:Name="txtDescription" Grid.Row="0" TextWrapping="Wrap" FontSize="12"
+                   Foreground="#333333" Margin="0,0,0,8"
+                   Text="モデル内の文字パラメータから指定した値を探し、別の値に置き換えます。置換後の値を空欄にすると値を削除します。"/>
+
+        <!-- 検索する値 / 置換後の値 -->
+        <Grid Grid.Row="1" Margin="0,0,0,6">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock x:Name="lblFind" Grid.Column="0" Text="検索する値:" VerticalAlignment="Center" FontSize="12" Margin="0,0,6,0"/>
+            <TextBox x:Name="txtFind" Grid.Column="1" Height="26" FontSize="12" VerticalContentAlignment="Center" BorderBrush="#CCCCCC"/>
+            <TextBlock x:Name="lblReplace" Grid.Column="2" Text="置換後の値:" VerticalAlignment="Center" FontSize="12" Margin="12,0,6,0"/>
+            <TextBox x:Name="txtReplace" Grid.Column="3" Height="26" FontSize="12" VerticalContentAlignment="Center" BorderBrush="#CCCCCC"/>
+        </Grid>
+
+        <!-- 条件 -->
+        <WrapPanel Grid.Row="2" Margin="0,0,0,6" VerticalAlignment="Center">
+            <RadioButton x:Name="rbExact" Content="値全体が一致" GroupName="Match" IsChecked="True"
+                         VerticalAlignment="Center" FontSize="12" Margin="0,0,14,0"/>
+            <RadioButton x:Name="rbContains" Content="値の一部に含む" GroupName="Match"
+                         VerticalAlignment="Center" FontSize="12" Margin="0,0,20,0"/>
+            <CheckBox x:Name="chkIncludeTypes" Content="タイプパラメータも対象" IsChecked="True"
+                      VerticalAlignment="Center" FontSize="12" Margin="0,0,20,0"/>
+            <TextBlock x:Name="lblScope" Text="範囲:" VerticalAlignment="Center" FontSize="12" Margin="0,0,6,0"/>
+            <ComboBox x:Name="cmbScope" Width="160" Height="24" FontSize="12" Margin="0,0,12,0"/>
+            <Button x:Name="btnSearch" Content="検索" Style="{StaticResource PrimaryButtonStyle}" MinWidth="100"
+                    Click="Search_Click"/>
+        </WrapPanel>
+
+        <!-- 結果（カテゴリ × パラメータごと） -->
+        <DataGrid x:Name="ResultGrid" Grid.Row="3"
+                  AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
+                  HeadersVisibility="Column" GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#ECECEC"
+                  RowHeaderWidth="0" IsReadOnly="False" BorderBrush="#CCCCCC" BorderThickness="1" FontSize="12">
+            <DataGrid.Columns>
+                <DataGridTemplateColumn x:Name="colSelect" Header="置換" Width="46" CanUserSort="False">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <CheckBox IsChecked="{Binding IsSelected, UpdateSourceTrigger=PropertyChanged}"
+                                      HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTextColumn x:Name="colCategory" Header="カテゴリ" Binding="{Binding CategoryName}" Width="1.2*" IsReadOnly="True"/>
+                <DataGridTextColumn x:Name="colParameter" Header="パラメータ" Binding="{Binding ParameterName}" Width="1.6*" IsReadOnly="True"/>
+                <DataGridTextColumn x:Name="colKind" Header="種別" Binding="{Binding KindText}" Width="Auto" MinWidth="70" IsReadOnly="True"/>
+                <DataGridTextColumn x:Name="colScope" Header="インスタンス/タイプ" Binding="{Binding ScopeText}" Width="Auto" MinWidth="90" IsReadOnly="True"/>
+                <DataGridTextColumn x:Name="colCount" Header="件数" Binding="{Binding Count}" Width="Auto" MinWidth="70" IsReadOnly="True">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="HorizontalAlignment" Value="Right"/>
+                            <Setter Property="Margin" Value="4,0"/>
+                        </Style>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+                <DataGridTextColumn x:Name="colSample" Header="値の例" Binding="{Binding SampleValue}" Width="1.4*" IsReadOnly="True"/>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <!-- 進捗・件数 -->
+        <Grid Grid.Row="4" Margin="0,8,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="0" Orientation="Horizontal">
+                <Button x:Name="btnSelectAll" Content="全選択" Style="{StaticResource SecondaryButtonStyle}"
+                        Margin="0,0,4,0" Click="SelectAll_Click"/>
+                <Button x:Name="btnDeselectAll" Content="選択解除" Style="{StaticResource SecondaryButtonStyle}"
+                        Margin="0,0,12,0" Click="DeselectAll_Click"/>
+                <ProgressBar x:Name="Progress" Width="220" Height="16" Minimum="0" Maximum="100"
+                             Visibility="Collapsed" VerticalAlignment="Center"/>
+                <TextBlock x:Name="txtStatus" Text="" FontSize="11" Foreground="#555555"
+                           VerticalAlignment="Center" Margin="8,0,0,0" TextTrimming="CharacterEllipsis"/>
+            </StackPanel>
+            <TextBlock x:Name="txtCount" Grid.Column="1" Text="" FontSize="11" Foreground="#555555" VerticalAlignment="Center"/>
+        </Grid>
+
+        <!-- ボタン行 -->
+        <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+            <Button x:Name="btnReplace" Content="置換を実行" Style="{StaticResource DangerButtonStyle}"
+                    MinWidth="140" IsEnabled="False" Click="Replace_Click"/>
+            <Button x:Name="btnClose" Content="閉じる" Style="{StaticResource SecondaryButtonStyle}" Click="Close_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>
