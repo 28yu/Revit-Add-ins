@@ -414,6 +414,8 @@ namespace Tools28.Localization
             { "Import.SummaryMissing", "  パラメータが無い要素: {0}件" },
             { "Import.SummaryConflict", "  同名列の値の食い違い: {0}件" },
             { "Import.SummaryUnsaved", "  ※ Excel 上の未保存の編集を含めて読み込みました" },
+            { "Import.SummaryElementMissing", "  ／ Excel の要素 {0}件中 モデルに無い: {1}件・カテゴリ不一致: {2}件（取り込みません）" },
+            { "Import.DifferentModelWarning", "Excel に含まれる要素 {0} 件のうち、{1} 件が開いているモデルに見つからず、{2} 件はカテゴリが一致しません。\n\n書き出し元と別のモデルを開いている可能性があります。要素IDがたまたま一致した別の要素に値を書き込むおそれがあるため、書き出したモデルを開いてからインポートしてください。\n\n（見つからない要素・カテゴリが違う要素は取り込みません）" },
             { "Import.RefCandidates", " 似た名前の候補: {0}" },
             { "Import.Execute", "インポート実行" },
             { "Import.ResultTitle", "インポート結果" },

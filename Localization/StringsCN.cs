@@ -414,6 +414,8 @@ namespace Tools28.Localization
             { "Import.SummaryMissing", "  图元无此参数: {0}项" },
             { "Import.SummaryConflict", "  同名列的值不一致: {0}项" },
             { "Import.SummaryUnsaved", "  ※ 已包含 Excel 中未保存的编辑内容进行读取" },
+            { "Import.SummaryElementMissing", "  ／ Excel 中 {0} 个图元: 模型中不存在 {1} 个・类别不一致 {2} 个（不导入）" },
+            { "Import.DifferentModelWarning", "Excel 中的 {0} 个图元中，有 {1} 个在当前打开的模型中找不到，{2} 个类别不一致。\n\n可能打开了与导出来源不同的模型。为避免把值写入恰好图元ID相同的其他图元，请打开导出时的模型后再导入。\n\n（找不到的图元及类别不一致的图元不会导入）" },
             { "Import.RefCandidates", " 相似名称候选: {0}" },
             { "Import.Execute", "执行导入" },
             { "Import.ResultTitle", "导入结果" },

@@ -415,6 +415,8 @@ namespace Tools28.Localization
             { "Import.SummaryMissing", "  Parameter not on element: {0}" },
             { "Import.SummaryConflict", "  Conflicting values in same-name columns: {0}" },
             { "Import.SummaryUnsaved", "  * Loaded including unsaved edits in Excel" },
+            { "Import.SummaryElementMissing", "  / Of {0} elements in Excel: not in model {1}, category mismatch {2} (not imported)" },
+            { "Import.DifferentModelWarning", "Of the {0} elements in the Excel file, {1} were not found in the open model and {2} have a different category.\n\nYou may have a different model open than the one you exported from. To avoid writing values to unrelated elements that happen to share an element ID, open the exported model before importing.\n\n(Elements that are not found or have a different category are not imported.)" },
             { "Import.RefCandidates", " Similar names: {0}" },
             { "Import.Execute", "Import" },
             { "Import.ResultTitle", "Import Result" },

@@ -83,6 +83,15 @@ namespace Tools28.Commands.ExcelExportImport.Services
         /// 同名パラメータの複数の列（【共有#1】【共有#2】等）に違う値が入っていて書き込めない（IsReadOnly も true）。
         /// </summary>
         public bool Conflict { get; set; }
+
+        /// <summary>
+        /// Excel の要素IDの要素が開いているモデルに無い（または別カテゴリの要素だった）ことを示す目印の行。
+        /// 要素1つにつき1行だけ作る（以前は列の数だけ作っていたため、件数が膨大になり内訳も分からなかった）。
+        /// </summary>
+        public bool ElementMissing { get; set; }
+
+        /// <summary>要素IDは見つかったが、Excel のカテゴリと実際のカテゴリが違う（別モデルの可能性）</summary>
+        public bool CategoryMismatch { get; set; }
     }
 
     /// <summary>
@@ -189,20 +198,42 @@ namespace Tools28.Commands.ExcelExportImport.Services
                         var elem = doc.GetElement(elementId);
                         if (elem == null)
                         {
-                            // 要素が見つからない場合もプレビューに追加
-                            for (int i = 0; i < paramHeaders.Count; i++)
+                            // 要素が見つからない（書き出し元と別のモデル、または削除済み）→ 要素ごとに1行だけ目印を残す
+                            preview.Add(new ImportPreviewRow
                             {
-                                preview.Add(new ImportPreviewRow
-                                {
-                                    ElementId = elementIdInt,
-                                    CategoryName = categoryName,
-                                    ParameterName = paramHeaders[i],
-                                    CurrentValue = "（要素が見つかりません）",
-                                    NewValue = GetCellValueAsString(worksheet.Cell(row, i + 3)),
-                                    HasChange = false,
-                                    IsReadOnly = true
-                                });
-                            }
+                                ElementId = elementIdInt,
+                                CategoryName = categoryName,
+                                ParameterName = "",
+                                CurrentValue = "（要素が見つかりません）",
+                                NewValue = "",
+                                HasChange = false,
+                                IsReadOnly = true,
+                                ElementMissing = true
+                            });
+                            diag.ElementNotFound++;
+                            continue;
+                        }
+
+                        // 同じ要素IDでもカテゴリが違えば別の要素（別モデルで IDがたまたま一致した等）。
+                        // 誤って別の要素に書き込まないよう、この行は取り込まない。
+                        string actualCategory = null;
+                        try { actualCategory = elem.Category?.Name; } catch { }
+                        if (!string.IsNullOrEmpty(categoryName) && !string.IsNullOrEmpty(actualCategory)
+                            && actualCategory != categoryName)
+                        {
+                            preview.Add(new ImportPreviewRow
+                            {
+                                ElementId = elementIdInt,
+                                CategoryName = categoryName,
+                                ParameterName = "",
+                                CurrentValue = actualCategory,
+                                NewValue = "",
+                                HasChange = false,
+                                IsReadOnly = true,
+                                ElementMissing = true,
+                                CategoryMismatch = true
+                            });
+                            diag.LogCategoryMismatch(worksheet.Name, row, elementIdInt, categoryName, actualCategory);
                             continue;
                         }
 
@@ -509,6 +540,16 @@ namespace Tools28.Commands.ExcelExportImport.Services
             private int _changeLogs;
             private int _equalLogs;
             public int BlankSkipped;
+            public int ElementNotFound;
+            public int CategoryMismatch;
+            private const int MaxMismatchLogs = 30;
+
+            public void LogCategoryMismatch(string sheet, int row, long elementId, string excelCategory, string actualCategory)
+            {
+                if (++CategoryMismatch > MaxMismatchLogs) return;
+                DiagLog.Write($"[ImportPreview] カテゴリ不一致→取り込まない シート={sheet} 行={row} 要素={elementId} " +
+                              $"Excel='{excelCategory}' モデル='{actualCategory}'");
+            }
             // 空欄スキップの内訳
             public int BlankMerged, BlankNoParam, BlankNotText, BlankAlreadyEmpty, BlankInGroup;
 
@@ -541,6 +582,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
                     $"変更あり(読み取り専用・非表示) {changedRo} 件 / 変更あり(パラメータなし・非表示) {changedMissing} 件 / 同名列の値の食い違い {changedConflict} 件 / 空欄スキップ {BlankSkipped} 件 / " +
                     $"同値扱い(文字不一致) {_equalLogs} 件" +
                     (_changeLogs > MaxChangeLogs ? $"（変更判定ログは先頭 {MaxChangeLogs} 件のみ出力）" : ""));
+                DiagLog.Write($"[ImportPreview] 要素が見つからない {ElementNotFound} 要素 / カテゴリ不一致 {CategoryMismatch} 要素");
                 DiagLog.Write($"[ImportPreview] 空欄スキップの内訳: 統合シート {BlankMerged} / パラメータなし {BlankNoParam} / " +
                     $"文字以外(数値・要素参照) {BlankNotText} / もともと空 {BlankAlreadyEmpty} / 同名列グループ {BlankInGroup}");
             }

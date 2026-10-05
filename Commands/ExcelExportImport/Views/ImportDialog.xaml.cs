@@ -47,6 +47,14 @@ namespace Tools28.Commands.ExcelExportImport.Views
         // Excel 上の未保存の内容を読み込んだか（サマリーに注記する）
         private bool _readUnsavedContents;
 
+        // 要素の照合結果（Excel の要素数 / モデルに無い要素数 / カテゴリが違う要素数）
+        private int _elementCount;
+        private int _missingElementCount;
+        private int _categoryMismatchCount;
+
+        /// <summary>この割合以上の要素がモデルに無ければ「別のモデルでは？」と警告する</summary>
+        private const double MissingWarnRatio = 0.3;
+
         /// <summary>インポートが実行されたかどうか</summary>
         public bool ImportExecuted { get; private set; }
 
@@ -345,10 +353,14 @@ namespace Tools28.Commands.ExcelExportImport.Views
                 PreviewDataGrid.ItemsSource = _view;
 
                 _totalCount = _previewRows.Count;
+                _elementCount = _previewRows.Select(r => r.ElementId).Distinct().Count();
+                _missingElementCount = _previewRows.Count(r => r.ElementMissing && !r.CategoryMismatch);
+                _categoryMismatchCount = _previewRows.Count(r => r.CategoryMismatch);
                 _readOnlyChangeCount = _previewRows.Count(r => r.HasChange && r.IsReadOnly && !r.ParamMissing && !r.Conflict);
                 _missingChangeCount = _previewRows.Count(r => r.HasChange && r.ParamMissing);
                 _conflictChangeCount = _previewRows.Count(r => r.HasChange && r.Conflict);
                 UpdateSummary();
+                WarnIfDifferentModel();
                 return true;
             }
             catch (Exception ex)
@@ -392,9 +404,29 @@ namespace Tools28.Commands.ExcelExportImport.Views
                 summary += string.Format(Loc.S("Import.SummaryConflict"), _conflictChangeCount);
             if (_readUnsavedContents)
                 summary += Loc.S("Import.SummaryUnsaved");
+            if (_missingElementCount > 0 || _categoryMismatchCount > 0)
+                summary += string.Format(Loc.S("Import.SummaryElementMissing"),
+                    _elementCount, _missingElementCount, _categoryMismatchCount);
             SummaryText.Text = summary;
 
             ImportButton.IsEnabled = targets > 0;
+        }
+
+        /// <summary>
+        /// Excel の要素の多くが開いているモデルに無い（またはカテゴリが違う）場合、
+        /// 書き出し元と別のモデルを開いている可能性が高いので警告する。
+        /// 要素IDがたまたま一致した別の要素に値を書き込む事故を防ぐため。
+        /// </summary>
+        private void WarnIfDifferentModel()
+        {
+            if (_elementCount == 0) return;
+            int bad = _missingElementCount + _categoryMismatchCount;
+            if (bad == 0 || (double)bad / _elementCount < MissingWarnRatio) return;
+
+            DiagLog.Write($"[ExcelImport] 別モデルの可能性: 要素 {_elementCount} 中 見つからない {_missingElementCount} / カテゴリ不一致 {_categoryMismatchCount}");
+            MessageBox.Show(
+                string.Format(Loc.S("Import.DifferentModelWarning"), _elementCount, _missingElementCount, _categoryMismatchCount),
+                Loc.S("Common.Warning"), MessageBoxButton.OK, MessageBoxImage.Warning);
         }
 
         private void Row_PropertyChanged(object sender, PropertyChangedEventArgs e)
