@@ -5,6 +5,45 @@
 
 ---
 
+## v2.6 リリースとインストーラ化（2026-10-14）
+
+### 配布形式の変更
+- バージョン別 ZIP 6本（install.bat を「管理者として実行」）→ **全バージョン共通の Inno Setup インストーラ1本**。
+  初心者が迷う「どの ZIP」「管理者として実行」「黒い画面」「uninstall.bat の保管」を解消するため
+- アンインストールは Windows「設定 → アプリ」の「28 Tools (Revit Add-in)」。AppId（GUID）は絶対に変えない
+- サイト（28tools-download）の `js/main.js` は `^28Tools_Setup_v([\d.]+)\.exe$` でアセットを探す。名前を変えるとボタンが壊れる
+
+### 署名なしアドインダイアログの日時が9時間ずれる
+- 原因①: Inno Setup の既定 `TimeStampsInUTC=no` は、ビルド機（CI＝UTC）の時刻を「インストール先の現地時刻」として書き込む
+  → 日本では実際より9時間前。**`TimeStampsInUTC=yes` で解消**（ファイルの更新日時は正しい日本時間になる）
+- 原因②: Revit の「署名なしのアドイン」ダイアログは**ファイル日時を UTC で表示**する（Revit 側の仕様、変更不可）。
+  修正後も時刻だけは9時間前に見えるが正常。実機で「エクスプローラー＝13時台、ダイアログ＝4時台」を確認済み
+
+### ダウンロード時の「ウイルスやマルウェアが含まれています」
+- テストビルドの Artifacts（`productionresultssa*.blob.core.windows.net`）から落とすと Edge が警告した。
+  Defender の保護の履歴には検出なし → ブラウザ側（SmartScreen）の評判判定
+- 本番リリース（GitHub Releases）からのダウンロードでは警告は出なかった
+- 誤検知が出た場合は exe ごとに Microsoft へ報告（ファイル単位の判定なので、版ごとに報告し直し）
+
+### リリースは下書きで作る
+- `build-and-release.yml` の softprops に `draft: true`。下書きは `releases/latest` に出ないので、
+  確認が終わるまでサイトは旧版のまま。公開は GitHub の画面で「Publish release」（**Claude のセッションからはリリースの編集が 403 で不可**）
+- ⚠️ YAML の**重複キー**は `yaml.safe_load` では検出できず、GitHub 側でワークフローが即失敗する（実行名がファイルパスになる）。
+  重複キー検出付きのローダーで確認すること
+
+### Windows CI で日本語 print が落ちる
+- `scripts/check-expiry.py` が cp1252 の標準出力に日本語を出して `UnicodeEncodeError`。
+  `sys.stdout.reconfigure(encoding="utf-8")` で解消。Windows ランナーで Python を使う場合は同様に注意
+
+### 96px アイコンが Revit のリボンからはみ出さない条件（再確認）
+- PNG に **288 DPI（pHYs）** を入れる。96 ÷ (288/96) = 32 論理ピクセルで表示される（既存知見の再確認）
+
+### claude/* ブランチの自動マージ衝突
+- squash マージ後に同じブランチへ追加コミットすると、main と履歴が分かれて衝突しマージ失敗する。
+  **push 前に `git checkout -B <branch> origin/main` で main に合わせてから**変更を載せ直す
+
+---
+
 ## 28tools-download 連携自動化（2026-05-15）
 
 ### 改善前の課題
