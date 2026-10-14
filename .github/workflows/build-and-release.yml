@@ -259,6 +259,14 @@ jobs:
           files: dist/*.exe
           tag_name: v${{ needs.version.outputs.version }}
           generate_release_notes: false
+          # 下書き。サイトのダウンロードボタンは releases/latest（公開済みの最新）を読むため、
+          # 公開ボタンを押すまでサイトには反映されない
+          draft: true
+          # 下書きで作る（一般公開しない）。SmartScreen の誤検知確認・報告が済んでから
+          # GitHub のリリース画面で「Publish release」を押して公開する。
+          # 下書きの間はタグが作られないため、公開時の対象コミットをここで固定しておく
+          draft: true
+          target_commitish: ${{ github.sha }}
 
       - name: Upload to download site (28tools-download)
         uses: softprops/action-gh-release@v2

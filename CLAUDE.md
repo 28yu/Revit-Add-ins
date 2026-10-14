@@ -358,6 +358,10 @@ _buttonTipKeys["FeatureName"] = "Ribbon.FeatureName.Button.Tip";
 
 ### 自動リリース
 - `release/v*` ブランチ push → 全6バージョンビルド → インストーラ exe 作成 → GitHub Releases
+- ⚠️ Release は **下書き（Draft）** で作られる。exe を実機でダウンロードして SmartScreen の警告を確認し、
+  誤検知なら Microsoft に報告（https://www.microsoft.com/wdsi/filesubmission）してから、
+  **Revit-Add-ins と 28tools-download の両方**のリリース画面で「Publish release」を押して公開する。
+  サイトのボタンは公開済みの最新リリースを読むため、公開するまでサイトには反映されない
 - タグ push (`v*`) でも同様
 - GitHub → Actions → "Build and Release" → Run workflow で手動実行可能
 
