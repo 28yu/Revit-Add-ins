@@ -62,6 +62,9 @@ Uninstallable=yes
 UsePreviousTasks=no
 ; Revit は CloseApplications では確実に閉じられないため、[Code] で独自に確認する
 CloseApplications=no
+; ファイルの日時を UTC で記録する。既定(no)だとビルド機(CI=UTC)の時刻を
+; 「インストール先 PC の現地時刻」として書き込むため、日本では 9 時間前の日時になる
+TimeStampsInUTC=yes
 ShowLanguageDialog=auto
 OutputDir=Output
 OutputBaseFilename=28Tools_Setup_v{#AppVersion}
