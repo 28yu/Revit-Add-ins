@@ -19,6 +19,9 @@ PATTERN = re.compile(r"ExpiryDate\s*=\s*new\s+DateTime\(\s*(\d+)\s*,\s*(\d+)\s*,
 
 
 def main():
+    # Windows の CI ランナーは標準出力が cp1252 のため、日本語を print すると落ちる
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser()
     parser.add_argument("--warn-days", type=int, default=180)
     parser.add_argument("--fail-days", type=int, default=30)
