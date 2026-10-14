@@ -16,7 +16,7 @@ namespace Tools28.Licensing
         /// 現バージョンの有効期限。リリース時に1年後の日付を設定する。
         /// 新バージョンリリース時にこの値を更新する。
         /// </summary>
-        public static readonly DateTime ExpiryDate = new DateTime(2027, 6, 1);
+        public static readonly DateTime ExpiryDate = new DateTime(2027, 10, 31);
 
         /// <summary>期限切れ前に警告を表示し始める日数。</summary>
         private const int WarningDays = 30;
