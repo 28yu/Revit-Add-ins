@@ -89,21 +89,19 @@ Revit-Add-ins/
 │   └── StringsCN.cs            # 中国語（簡体字）文字列辞書
 ├── Resources/Icons/            # 32x32アイコン (12個)
 ├── Properties/                 # AssemblyInfo.cs
-├── Packages/                   # 配布パッケージテンプレート (バージョン別)
-│   ├── 2021/ ~ 2026/           # 各バージョン用
-│   │   ├── 28Tools/            #   Tools28.addin (DLLはビルド時にコピー)
-│   │   ├── install.bat         #   自動インストール
-│   │   ├── uninstall.bat       #   アンインストール
-│   │   └── README.txt          #   インストール手順
+├── Packages/                   # .addin マニフェスト (バージョン別)
+│   └── 2021/ ~ 2026/28Tools/Tools28.addin
+├── Installer/
+│   └── 28Tools.iss             # 全バージョン一括インストーラ定義 (Inno Setup 6)
 ├── .github/workflows/          # GitHub Actions
-│   ├── build-and-release.yml   #   タグ push or 手動実行で配布ZIP生成
+│   ├── build-and-release.yml   #   タグ push or 手動実行でインストーラ exe 生成
 │   ├── auto-merge-claude.yml   #   claude/* ブランチの自動PR・マージ
 │   └── deploy-pages.yml        #   Docs/ を GitHub Pages にデプロイ
-├── Dist/                       # 配布ZIP出力先 (git管理外)
+├── Dist/                       # インストーラ出力先 (git管理外)
 ├── QuickBuild.ps1              # 高速ビルド＆デプロイ（開発用）
 ├── BuildAll.ps1                # 全バージョン一括ビルド（リリース用）
 ├── GenerateAddins.ps1          # .addinマニフェスト生成
-├── CreatePackages.ps1          # 配布ZIP作成
+├── CreatePackages.ps1          # インストーラ作成 (ローカル, ISCC 使用)
 ├── Docs/                       # GitHub Pages (ワークフロー図等)
 │   ├── workflow-diagram.html   #   開発ワークフロー図
 │   └── icons/workflow/         #   ワークフロー図用アイコン
@@ -135,16 +133,31 @@ msbuild Tools28.csproj /p:Configuration=Release /p:RevitVersion=2024
 
 ## 配布パッケージ
 
-### 配布ZIP作成手順
+配布物は **全6バージョン入りのインストーラ `28Tools_Setup_v<VERSION>.exe` 1 本**（Inno Setup 6・署名なし）。
+v2.6 でバージョン別 ZIP（install.bat / uninstall.bat / README.txt 同梱）から切り替えた。
+
+- 定義: `Installer/28Tools.iss`（UTF-8 BOM 付きで保存すること）
+- インストール先: `C:\ProgramData\Autodesk\Revit\Addins\<ver>\Tools28.addin` と `...\<ver>\28Tools\*.dll`
+- インストールする Revit は画面のチェックボックスで選ぶ（インストール済みの Revit に既定でチェック）
+- Revit 起動中はインストールを止め、終了を求める（再試行／キャンセル）
+- アンインストールは Windows の「設定 > アプリ」から（全バージョン分を削除）
+- ⚠ `AppId`（GUID）は絶対に変更しない。変えると旧版と別アプリ扱いになり二重登録される
+- 中国語の画面は Inno Setup 6.5 以降の `ChineseSimplified.isl` を使う。無いコンパイラでは日英のみで作る
+- サイレントインストール: `28Tools_Setup_v2.6.exe /VERYSILENT /TASKS="rvt2024,rvt2025"`
+
+### インストーラ作成手順（ローカル）
 ```powershell
 # 1. 全バージョンをビルド
 .\BuildAll.ps1
 
-# 2. 配布ZIPを作成 (バージョン番号を指定)
-.\CreatePackages.ps1 -Version "2.0"
+# 2. インストーラを作成 (Inno Setup 6 の ISCC.exe が必要)
+.\CreatePackages.ps1 -Version "2.6"
 
-# 出力先: .\Dist\28Tools_Revit20XX_v2.0.zip
+# 出力先: .\Dist\28Tools_Setup_v2.6.exe
 ```
+
+リリース物は CI（`build-and-release.yml` の `installer` ジョブ）が作る。
+`build/*` ブランチのテストビルドでも exe が Artifacts（`28Tools_Setup`）に出るので、リリース前に実機で試せる。
 
 ### ⚠️ リリース時の配布パッケージ更新チェックリスト
 
@@ -154,22 +167,13 @@ msbuild Tools28.csproj /p:Configuration=Release /p:RevitVersion=2024
    - 新機能のUI文字列（ボタン名、ツールチップ、ダイアログ文字列、エラーメッセージ等）
    - 3ファイル全てに同じキーを追加（キー不一致は禁止）
 
-2. **`Packages/{VERSION}/README.txt`** (全6バージョン)
-   - **タイトル行のバージョン番号は CI が自動で書き換える**（手作業不要）
-   - **リリースノート本文（「【vX 修正点】」以下）は手で追記する**
-   - ⚠ 全文一括 sed は禁止。README 下部には過去バージョンの履歴が載っており、
-     一括置換すると履歴まで書き換わる
-
-3. **`Packages/{VERSION}/install.bat`** (全6バージョン)
-   - **バージョン番号は CI が自動で書き換える**（手作業不要）
-
-4. **`Docs/features.json`**（Release body は**自動生成**）
+2. **`Docs/features.json`**（Release body は**自動生成**）
    - Release body の「⭐新機能」「全機能一覧」は `scripts/generate-release-body.py` が
      `Docs/features.json` から生成する。**workflow ファイルを手で編集する必要はない**
    - 新機能のエントリに `added_in` をそのリリースバージョンで入れておくこと（詳細は「6. features.json に追加」）
    - 確認: `python3 scripts/generate-release-body.py --version 2.5 --features Docs/features.json`
 
-5. **`Application.cs`**
+3. **`Application.cs`**
    - リボンに新しいボタンを登録
    - `_buttonTextKeys` / `_buttonTipKeys` にマッピングを追加（言語切替時の動的更新用）
 
@@ -178,7 +182,8 @@ msbuild Tools28.csproj /p:Configuration=Release /p:RevitVersion=2024
 `Properties/AssemblyInfo.cs` は `GenerateAssemblyInfo=false` のため MSBuild の
 `/p:Version` が効かない。そのため **`build-and-release.yml` の `version` ジョブで
 バージョンを1回だけ決め、`build` ジョブが `Stamp version into sources` ステップで
-AssemblyInfo.cs / README.txt / install.bat に書き込む**。
+AssemblyInfo.cs に書き込む**。インストーラのバージョンは `installer` ジョブが
+`ISCC /DAppVersion=<version>` で渡す（`.iss` を書き換える必要はない）。
 
 - リポジトリ上の `AssemblyInfo.cs` の値はローカルビルド用。リリース物には CI の値が入る
 - 反映に失敗した場合はビルドが失敗する（取り残し防止のガードあり）
@@ -352,7 +357,7 @@ _buttonTipKeys["FeatureName"] = "Ribbon.FeatureName.Button.Tip";
 ## CI/CD (GitHub Actions)
 
 ### 自動リリース
-- `release/v*` ブランチ push → 全6バージョンビルド → 配布ZIP作成 → GitHub Releases
+- `release/v*` ブランチ push → 全6バージョンビルド → インストーラ exe 作成 → GitHub Releases
 - タグ push (`v*`) でも同様
 - GitHub → Actions → "Build and Release" → Run workflow で手動実行可能
 

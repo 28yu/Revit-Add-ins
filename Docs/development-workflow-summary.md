@@ -165,29 +165,25 @@
 
 1. **全バージョンをビルド**
    - `.\BuildAll.ps1` を実行 → 6バージョン分の DLL が `bin\Release\Revit{VERSION}\` に出力
-2. **配布パッケージを作成**
-   - `.\CreatePackages.ps1 -Version "X.X"` を実行
-   - 出力: `Dist\28Tools_Revit{VERSION}_vX.X.zip`（各バージョン用 ZIP）
+2. **インストーラを作成**
+   - `.\CreatePackages.ps1 -Version "X.X"` を実行（Inno Setup 6 の ISCC.exe が必要）
+   - 出力: `Dist\28Tools_Setup_vX.X.exe`（全バージョン入りの 1 本）
 3. **動作確認**
    - 必要に応じて複数バージョンの Revit で検証
 4. **コミット & プッシュ**
    - `git add .` → `git commit -m "..."` → `git push`
 5. **GitHub Releases で公開**
    - `git tag vX.X` → `git push --tags`
-   - GitHub Actions が自動で全バージョンのビルド → ZIP 作成 → Releases にアップロード
+   - GitHub Actions が自動で全バージョンのビルド → インストーラ作成 → Releases にアップロード
 
 ---
 
 ## 配布パッケージの構成
 
-- ZIP ファイル名: `28Tools_Revit{VERSION}_vX.X.zip`
-- 内容:
-  - `28Tools/Tools28.dll` — メイン DLL
-  - `28Tools/Tools28.addin` — マニフェストファイル
-  - `install.bat` — ワンクリックインストール（管理者実行）
-  - `uninstall.bat` — アンインストール
-  - `README.txt` — インストール手順
-- インストール先: `C:\ProgramData\Autodesk\Revit\Addins\{VERSION}\`
+- ファイル名: `28Tools_Setup_vX.X.exe`（Revit 2021〜2026 を 1 本にまとめた Inno Setup インストーラ。定義は `Installer/28Tools.iss`）
+- インストールする Revit はインストーラの画面で選ぶ（インストール済みの Revit に既定でチェック）
+- インストール先: `C:\ProgramData\Autodesk\Revit\Addins\{VERSION}\Tools28.addin` と `...\{VERSION}\28Tools\*.dll`
+- アンインストール: Windows の「設定 > アプリ」から
 
 ---
 
@@ -195,7 +191,7 @@
 
 - **自動リリース**: タグ push (`git tag vX.X` → `git push --tags`) で起動
   - 全6バージョン (2021-2026) を自動ビルド
-  - 配布 ZIP を作成し GitHub Releases にアップロード
+  - インストーラ exe を作成し GitHub Releases にアップロード
 - **手動実行**: GitHub Actions 画面 → "Build and Release" → Run workflow → バージョン番号を入力
 
 ---
@@ -206,7 +202,7 @@
 |---|---|
 | `QuickBuild.ps1` | 開発用: 単一バージョンのビルド & Addins フォルダへデプロイ |
 | `BuildAll.ps1` | リリース用: 全6バージョン一括ビルド |
-| `CreatePackages.ps1` | 配布 ZIP 作成 |
+| `CreatePackages.ps1` | インストーラ exe 作成（ISCC） |
 | `GenerateAddins.ps1` | `.addin` マニフェストファイル生成 |
 | `Deploy-For-Testing.ps1` | テスト用手動デプロイ |
 

@@ -86,8 +86,8 @@ jobs:
         uses: microsoft/setup-msbuild@v2
 
       # AssemblyInfo.cs は GenerateAssemblyInfo=false のため MSBuild の /p:Version が効かない。
-      # 配布物のバージョン表記（バージョン情報ダイアログ・README・install.bat）が
-      # 取り残されないよう、ビルド直前にリリースバージョンを書き込む。
+      # バージョン情報ダイアログの表記が取り残されないよう、ビルド直前にリリースバージョンを書き込む。
+      # （インストーラ側のバージョンは installer ジョブが ISCC の /DAppVersion で渡す）
       - name: Stamp version into sources
         if: needs.version.outputs.version != ''
         shell: bash
@@ -98,17 +98,8 @@ jobs:
           sed -i "s/AssemblyVersion(\"[^\"]*\")/AssemblyVersion(\"${V}.0\")/"         Properties/AssemblyInfo.cs
           sed -i "s/AssemblyFileVersion(\"[^\"]*\")/AssemblyFileVersion(\"${V}.0\")/" Properties/AssemblyInfo.cs
 
-          # README / install.bat は「28 Tools vX for Revit YYYY」のタイトル行だけを書き換える。
-          # README 下部のリリースノート履歴（過去バージョンの記載）は書き換えない。
-          for ver in 2021 2022 2023 2024 2025 2026; do
-            sed -i "s/\(28 Tools \)v[0-9][0-9.]*\( for Revit\)/\1v${V}\2/" \
-              "Packages/$ver/README.txt" "Packages/$ver/install.bat"
-          done
-
           grep -q "AssemblyVersion(\"${V}.0\")" Properties/AssemblyInfo.cs \
             || { echo "::error::AssemblyInfo へのバージョン反映に失敗しました"; exit 1; }
-          grep -q "28 Tools v${V} for Revit" Packages/2024/README.txt \
-            || { echo "::error::README.txt へのバージョン反映に失敗しました"; exit 1; }
           echo "スタンプ完了: v${V}"
 
       # 期限切れ間近のビルドを配布してしまわないためのガード（CLAUDE.md のリリース手順）。
@@ -123,25 +114,18 @@ jobs:
             -c Release `
             /p:RevitVersion=${{ matrix.revit-version }}
 
-      - name: Create package
+      # インストーラ（installer ジョブ）の材料。手動インストール用にもそのまま使える構成:
+      #   28Tools/*.dll + 28Tools/Tools28.addin
+      - name: Collect build output
         shell: pwsh
         run: |
           $ver = "${{ matrix.revit-version }}"
-          $outDir = "artifact"
-          $tools28Dir = "$outDir/28Tools"
-
+          $tools28Dir = "artifact/28Tools"
           New-Item -ItemType Directory -Path $tools28Dir -Force | Out-Null
 
-          # 全DLL を 28Tools/ にコピー（Tools28.dll + ClosedXML等の依存ライブラリ）
+          # 全DLL（Tools28.dll + ClosedXML等の依存ライブラリ）
           Copy-Item "bin/Release/Revit$ver/*.dll" "$tools28Dir/"
-
-          # .addin を 28Tools/ にコピー
           Copy-Item "Packages/$ver/28Tools/Tools28.addin" "$tools28Dir/Tools28.addin"
-
-          # install.bat, uninstall.bat, README.txt をルートにコピー
-          Copy-Item "Packages/$ver/install.bat" "$outDir/install.bat"
-          Copy-Item "Packages/$ver/uninstall.bat" "$outDir/uninstall.bat"
-          Copy-Item "Packages/$ver/README.txt" "$outDir/README.txt"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -149,8 +133,89 @@ jobs:
           name: 28Tools_Revit${{ matrix.revit-version }}
           path: artifact/
 
-  release:
+  # 全6バージョンを 1 本のインストーラ（28Tools_Setup_v<ver>.exe）にまとめる。
+  # build/* のテストビルドでも作るので、リリース前に exe を Actions の Artifacts から試せる。
+  installer:
     needs: [version, build]
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: 28Tools_Revit*
+          path: artifacts
+
+      # Installer/28Tools.iss は <BinRoot>\Revit<ver>\*.dll を取り込む。その形に並べ直す。
+      - name: Stage files
+        shell: pwsh
+        run: |
+          foreach ($ver in 2021..2026) {
+            $src = "artifacts/28Tools_Revit$ver/28Tools"
+            $dst = "stage/Revit$ver"
+            if (-not (Test-Path "$src/Tools28.dll")) {
+              Write-Error "Revit $ver のビルド成果物がありません: $src"
+              exit 1
+            }
+            New-Item -ItemType Directory -Path $dst -Force | Out-Null
+            Copy-Item "$src/*.dll" "$dst/"
+          }
+          Get-ChildItem stage -Recurse -Filter Tools28.dll | ForEach-Object { $_.FullName }
+
+      # windows-latest には Inno Setup 6 が入っている想定。無い場合・中国語の言語ファイル
+      # （Inno Setup 6.5 以降で同梱）が無い場合は choco で入れる／更新する。
+      # 更新に失敗しても .iss 側が中国語を省いてビルドを続けるので、ここでは止めない。
+      - name: Setup Inno Setup
+        id: inno
+        shell: pwsh
+        run: |
+          function Find-Iscc {
+            $cmd = Get-Command iscc -ErrorAction SilentlyContinue
+            if ($cmd) { return $cmd.Source }
+            foreach ($p in @("${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe", "$env:ProgramFiles\Inno Setup 6\ISCC.exe")) {
+              if (Test-Path $p) { return $p }
+            }
+            return $null
+          }
+          $iscc = Find-Iscc
+          $hasZh = $iscc -and (Test-Path (Join-Path (Split-Path $iscc) "Languages\ChineseSimplified.isl"))
+          if (-not $iscc -or -not $hasZh) {
+            Write-Host "Inno Setup をインストール／更新します（ISCC=$iscc, 中国語=$hasZh）"
+            choco upgrade innosetup -y --no-progress
+            if ($LASTEXITCODE -ne 0) { Write-Warning "choco が失敗しました ($LASTEXITCODE)。既存の Inno Setup で続行します" }
+            $global:LASTEXITCODE = 0
+            $iscc = Find-Iscc
+          }
+          if (-not $iscc) { Write-Error "ISCC.exe が見つかりません"; exit 1 }
+          Write-Host "ISCC: $iscc"
+          "iscc=$iscc" >> $env:GITHUB_OUTPUT
+
+      - name: Compile installer
+        shell: pwsh
+        run: |
+          $v = "${{ needs.version.outputs.version }}"
+          if (-not $v) { $v = "0.0-test" }   # build/* のテストビルド
+          & "${{ steps.inno.outputs.iscc }}" "/DAppVersion=$v" "/DBinRoot=$PWD\stage" "Installer\28Tools.iss"
+          if ($LASTEXITCODE -ne 0) { Write-Error "ISCC が失敗しました ($LASTEXITCODE)"; exit 1 }
+
+          $exe = "Installer/Output/28Tools_Setup_v$v.exe"
+          if (-not (Test-Path $exe)) { Write-Error "インストーラが生成されていません: $exe"; exit 1 }
+          New-Item -ItemType Directory -Path dist -Force | Out-Null
+          Copy-Item $exe dist/
+          $size = [math]::Round((Get-Item $exe).Length / 1MB, 2)
+          Write-Host "作成: $exe ($size MB)"
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: 28Tools_Setup
+          path: dist/*.exe
+
+  release:
+    needs: [version, installer]
     runs-on: ubuntu-latest
     if: (startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/heads/release/v') || github.event_name == 'workflow_dispatch') && github.event.inputs.test_only != 'true'
     permissions:
@@ -173,33 +238,25 @@ jobs:
             > release-body.md
           cat release-body.md
 
-      - name: Download all artifacts
+      # 配布物はインストーラ exe 1 本だけ（バージョン別 ZIP は廃止）
+      - name: Download installer
         uses: actions/download-artifact@v4
         with:
-          path: artifacts
+          name: 28Tools_Setup
+          path: dist
 
-      - name: Create ZIP packages
+      - name: Check installer
         run: |
-          VERSION="${{ needs.version.outputs.version }}"
-          mkdir -p dist
-
-          for dir in artifacts/28Tools_Revit*/; do
-            REVIT_VER=$(basename "$dir" | sed 's/28Tools_Revit//')
-            ZIP_NAME="28Tools_Revit${REVIT_VER}_v${VERSION}.zip"
-            cd "$dir"
-            zip -r "../../dist/$ZIP_NAME" .
-            cd ../..
-            echo "Created: $ZIP_NAME"
-          done
-
           ls -la dist/
+          test -f "dist/28Tools_Setup_v${{ needs.version.outputs.version }}.exe" \
+            || { echo "::error::インストーラ exe がありません"; exit 1; }
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           name: "28 Tools v${{ needs.version.outputs.version }}"
           body_path: release-body.md
-          files: dist/*.zip
+          files: dist/*.exe
           tag_name: v${{ needs.version.outputs.version }}
           generate_release_notes: false
 
@@ -210,7 +267,7 @@ jobs:
           repository: 28yu/28tools-download
           name: "28 Tools v${{ needs.version.outputs.version }}"
           body_path: release-body.md
-          files: dist/*.zip
+          files: dist/*.exe
           tag_name: v${{ needs.version.outputs.version }}
           generate_release_notes: false
 

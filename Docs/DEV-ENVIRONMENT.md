@@ -98,7 +98,7 @@
 | `QuickBuild.ps1` | 単一バージョンのビルド＆デプロイ。vswhere で MSBuild を検索 → `bin\Release\Revit{ver}\` → `%ProgramData%\Autodesk\Revit\Addins\{ver}\28Tools\` へ DLL 一式、ルートへ `.addin` をコピー |
 | `DeployHelpers.ps1` | デプロイ共通処理。**Revit 起動中でロックされた DLL の差し替え**と保留ファイルの適用を担当（`QuickBuild.ps1` / `AutoBuild.ps1` から dot-source） |
 | `AutoBuild.messages.json` | 通知ダイアログの日本語文言。PowerShell 5.1 の文字コード問題を避けるためスクリプト本体から分離 |
-| `BuildAll.ps1` / `CreatePackages.ps1` | 全バージョンビルドと配布 ZIP 作成（リリース時） |
+| `BuildAll.ps1` / `CreatePackages.ps1` | 全バージョンビルドとインストーラ exe 作成（リリース時。定義は `Installer/28Tools.iss`） |
 | `AutoBuild.log` / `AutoBuild_detail.log` | 監視ログ / ビルド詳細ログ。**失敗時にユーザーが貼る情報源** |
 
 ビルド成功判定は `QuickBuild.ps1` が最後に出力する `DEPLOY_STATUS=<状態>` を読んで行う
@@ -186,7 +186,7 @@ Claude が実機を見られない代わりの唯一の目になる。
 | 起動時ロード | `.addin` XML | ARES のロード方法（起動時自動 or コマンドでロード） |
 | 実行時ログ | `C:\temp\Tools28_debug.txt` | ログ出力先のパスを決めて固定する |
 | 多言語化 | JP/US/CN の 3 言語必須（`Loc.S()`） | 必要か。必要なら同じ 3 分類ルールを移植する |
-| 配布 | GitHub Releases + ZIP + install.bat | 配布形態（インストーラ／ZIP／不要） |
+| 配布 | GitHub Releases + Inno Setup インストーラ（全バージョン 1 本の exe） | 配布形態（インストーラ／ZIP／不要） |
 
 その他、このリポジトリから**そのまま持っていける汎用ルール**:
 

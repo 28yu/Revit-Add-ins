@@ -57,7 +57,7 @@ namespace Tools28.Localization
         /// <summary>
         /// 言語設定の保存先。%AppData%\Tools28\ に置く。
         /// 旧版は DLL と同じフォルダ（C:\ProgramData\Autodesk\Revit\Addins\...）に保存していたが、
-        /// このフォルダは管理者権限の install.bat が作るため一般ユーザーの Revit からは書き込めず、
+        /// このフォルダは管理者権限のインストーラ（旧 install.bat）が作るため一般ユーザーの Revit からは書き込めず、
         /// 言語切替が再起動のたびに失われていた。
         /// AutoBackup / ExcelExportImport の設定と同じ per-user の場所に統一する。
         /// </summary>

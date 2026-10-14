@@ -51,8 +51,8 @@ powershell -ExecutionPolicy Bypass -File .\BuildAll.ps1
 # .addinファイルを生成
 powershell -ExecutionPolicy Bypass -File .\GenerateAddins.ps1
 
-# 配布パッケージを作成
-powershell -ExecutionPolicy Bypass -File .\CreatePackages.ps1
+# インストーラ（全バージョン入りの exe）を作成（Inno Setup 6 が必要）
+powershell -ExecutionPolicy Bypass -File .\CreatePackages.ps1 -Version "2.6"
 ```
 
 ### 単一バージョンのビルド

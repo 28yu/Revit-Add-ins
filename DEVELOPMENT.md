@@ -229,7 +229,7 @@ Revit-Add-ins/
 │
 ├── QuickBuild.ps1              # 高速ビルド＆デプロイ（新規）
 ├── BuildAll.ps1                # 全バージョンビルド
-├── CreatePackages.ps1          # 配布ZIP作成
+├── CreatePackages.ps1          # インストーラ作成（Installer/28Tools.iss を ISCC でビルド）
 └── Deploy-For-Testing.ps1      # 手動デプロイ
 ```
 
@@ -319,20 +319,15 @@ bin\Release\Revit2025\Tools28.dll
 bin\Release\Revit2026\Tools28.dll
 ```
 
-### 2. 配布パッケージ作成
+### 2. インストーラ作成
 
 ```powershell
-.\CreatePackages.ps1 -Version "1.1"
+.\CreatePackages.ps1 -Version "1.1"   # Inno Setup 6 の ISCC.exe が必要
 ```
 
-**出力先:**
+**出力先:**（全6バージョン入りの 1 本）
 ```
-Dist\28Tools_Revit2021_v1.1.zip
-Dist\28Tools_Revit2022_v1.1.zip
-Dist\28Tools_Revit2023_v1.1.zip
-Dist\28Tools_Revit2024_v1.1.zip
-Dist\28Tools_Revit2025_v1.1.zip
-Dist\28Tools_Revit2026_v1.1.zip
+Dist\28Tools_Setup_v1.1.exe
 ```
 
 ### 3. コミット＆プッシュ

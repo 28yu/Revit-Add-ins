@@ -22,13 +22,13 @@
 |--|--|--|--|--|--|--|--|
 | A-1 | ビルド成功（警告のみ・エラー0） | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
 | A-2 | `bin\Release\Revit{ver}\Tools28.dll` が生成される | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| A-3 | 配布ZIP作成（`CreatePackages.ps1 -Version "2.6"`） | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| A-4 | `install.bat` でインストールできる（管理者不要の想定パス） | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| A-3 | インストーラ作成（CI の `28Tools_Setup` Artifact、またはローカル `CreatePackages.ps1 -Version "2.6"`） | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| A-4 | `28Tools_Setup_v2.6.exe` でインストールできる（このバージョンにチェックが付いている／Revit 起動中は止まる） | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
 | A-5 | Revit 起動時にエラーダイアログが出ない | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
 | A-6 | リボン「28Tools」タブが表示される | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
 | A-7 | パネル9つが左から正しい順で並ぶ（※下記参照） | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
 | A-8 | 全ボタンのアイコンが表示される（欠け・白抜けなし） | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| A-9 | `uninstall.bat` で完全に削除できる | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| A-9 | 「設定 > アプリ」の 28 Tools からアンインストールで完全に削除できる | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
 
 **ターゲットフレームワーク**: 2021–2024 = `net48` / 2025–2026 = `net8.0-windows`
 → A-1 は 2024→2025 の境目でランタイムが変わるため、**2024 と 2025 は特に注意**
@@ -208,11 +208,11 @@
 | # | 項目 | 状態 |
 |--|--|--|
 | E-1 | `Licensing/ExpiryManager.cs` の `ExpiryDate` を**リリース日の1年後**に更新（現在 2027-06-01） | [ ] |
-| E-2 | `Packages/{2021..2026}/README.txt` に `【v2.6 修正点】` を手で追記（※全文一括 sed 禁止・履歴を壊す） | [ ] |
+| E-2 | 配布サイト（28tools-download）の `js/main.js` がインストーラ exe（`28Tools_Setup_v*.exe`）を拾うよう更新済み | [ ] |
 | E-3 | `Docs/features.json` の `added_in` が全て正しい（最新は 2.6） | [ ] |
 | E-4 | リリース本文の生成確認<br>`python3 scripts/generate-release-body.py --version 2.6 --since 2.1.2 --features Docs/features.json` | [ ] |
 | E-5 | `scripts/check-expiry.py` が通る（残り30日以下でビルド失敗） | [ ] |
-| E-6 | バージョン番号は CI が stamp する（AssemblyInfo.cs / README.txt / install.bat は手作業不要） | [ ] |
+| E-6 | バージョン番号は CI が反映する（AssemblyInfo.cs は stamp、インストーラは `/DAppVersion`。手作業不要） | [ ] |
 | E-7 | Notion リリースDBに `対象=アドイン (Revit-Add-ins)` で記録 | [ ] |
 
 ---

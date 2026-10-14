@@ -107,8 +107,8 @@ v2.1.2 以降、未リリースのまま 2.2〜2.6 の5世代分が溜まって�
 ⚠️ リリース実行前に必要な作業:
 - Licensing/ExpiryManager.cs の ExpiryDate をリリース日の1年後に更新
   （現在 2027-06-01。CI が残り30日以下で失敗、180日以下で警告）
-- Packages/*/README.txt のリリースノート本文を手で追記
-  （タイトル行のバージョンは CI が自動で書き換える）
+- 配布はインストーラ exe（Installer/28Tools.iss）に一本化済み。
+  build/* でテストビルドし、Artifacts の 28Tools_Setup を実機でインストール確認する
 ## 前回セッション: 2026-08-28 03:18
 変更ファイル: Application.cs,CLAUDE.md,Commands/GenericModelMerge/GenericModelMergeCommand.cs,Commands/GenericModelMerge/Models/MergeCategoryRow.cs,Commands/GenericModelMerge/Models/MergeOptions.cs
 

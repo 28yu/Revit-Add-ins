@@ -2,8 +2,9 @@
 bin/
 obj/
 
-# 配布ZIP出力
+# 配布物の出力（インストーラ exe）
 Dist/
+Installer/Output/
 
 # GenerateAddins.ps1 の出力
 Addins/

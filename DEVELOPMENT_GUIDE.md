@@ -267,26 +267,14 @@ Write-Host "✓ Revit $RevitVersion にデプロイしました" -ForegroundColo
 
 これにより、`Addins/`フォルダに各バージョン用の.addinファイルが作成されます。
 
-#### 2. 配布パッケージの作成
+#### 2. インストーラの作成
 
 ```powershell
-.\CreatePackages.ps1
+.\CreatePackages.ps1 -Version "2.6"
 ```
 
-これにより、`Packages/`フォルダに以下が作成されます：
-
-```
-Packages/
-├── Tools28_Revit2022/
-│   ├── Tools28.dll
-│   ├── Tools28.addin
-│   └── README.txt
-├── Tools28_Revit2022.zip
-├── Tools28_Revit2023.zip
-├── Tools28_Revit2024.zip
-├── Tools28_Revit2025.zip
-└── Tools28_Revit2026.zip
-```
+これにより、`Dist/28Tools_Setup_v2.6.exe`（Revit 2021〜2026 を 1 本にまとめた
+Inno Setup インストーラ）が作成されます。定義は `Installer/28Tools.iss`。
 
 #### 3. 配布
 
