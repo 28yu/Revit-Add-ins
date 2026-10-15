@@ -106,4 +106,8 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host ""
 Write-Host "完成しました: $outHtml" -ForegroundColor Green
-Invoke-Item $outHtml
+try {
+    Invoke-Item $outHtml  # 既定のブラウザで開く
+} catch {
+    Write-Host "（ブラウザを自動で開けませんでした。上のファイルをダブルクリックしてください）"
+}

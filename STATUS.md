@@ -1,5 +1,6 @@
-## 最終セッション: 2026-10-15 23:24
-変更ファイル: CLAUDE.md,RenderKit/MakePanorama.bat,RenderKit/MakePanorama.ps1,RenderKit/MakePanorama_Draft.bat,RenderKit/README.md
+## 最終セッション: 2026-10-15 23:28
+変更ファイル: RenderKit/MakePanorama.ps1,RenderKit/viewer/panorama_viewer.html
+
 
 - **v2.6 をリリース**（v2.1.2 → v2.6。2.2〜2.5 は未リリースのまま番号だけ進んでいたため 2.6 を採用）。
   新機能10個（部屋3D色分け／塗潰しパターン入出力／パラメータ整理／値の一括置換／値の移動／フィルタ整理／

@@ -19,7 +19,8 @@
   .btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
   .scenes { display: flex; gap: 6px; flex-wrap: wrap; flex: 1; }
   .hint { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--panel);
-    padding: 12px 18px; border-radius: 10px; font-size: 15px; transition: opacity 0.6s; pointer-events: none; }
+    padding: 12px 18px; border-radius: 10px; font-size: 15px; transition: opacity 0.6s; pointer-events: none;
+    width: max-content; max-width: calc(100vw - 48px); text-align: center; line-height: 1.6; white-space: pre-line; }
   .title { position: fixed; top: 12px; left: 12px; background: var(--panel); padding: 6px 12px; border-radius: 8px;
     font-size: 14px; max-width: calc(100vw - 24px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .error { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; padding: 24px;
@@ -43,9 +44,9 @@
 const PANORAMAS = /*__PANORAMAS__*/[];
 
 const TEXT = {
-  ja: { hint: "ドラッグで見回す ／ ホイール・ピンチで拡大縮小", fullscreen: "全画面", noWebGL: "このブラウザは WebGL に対応していないため表示できません。<br>Chrome / Edge / Safari / Firefox の最新版で開いてください。", noData: "パノラマ画像が入っていません。" },
-  en: { hint: "Drag to look around / Scroll or pinch to zoom", fullscreen: "Fullscreen", noWebGL: "This browser does not support WebGL.<br>Please open this file in a recent version of Chrome, Edge, Safari or Firefox.", noData: "No panorama image is embedded." },
-  zh: { hint: "拖动查看四周 ／ 滚轮或双指缩放", fullscreen: "全屏", noWebGL: "此浏览器不支持 WebGL，无法显示。<br>请使用最新版 Chrome / Edge / Safari / Firefox 打开。", noData: "未包含全景图像。" },
+  ja: { hint: "ドラッグで見回す\nホイール・ピンチで拡大縮小", fullscreen: "全画面", noWebGL: "このブラウザは WebGL に対応していないため表示できません。<br>Chrome / Edge / Safari / Firefox の最新版で開いてください。", noData: "パノラマ画像が入っていません。" },
+  en: { hint: "Drag to look around\nScroll or pinch to zoom", fullscreen: "Fullscreen", noWebGL: "This browser does not support WebGL.<br>Please open this file in a recent version of Chrome, Edge, Safari or Firefox.", noData: "No panorama image is embedded." },
+  zh: { hint: "拖动查看四周\n滚轮或双指缩放", fullscreen: "全屏", noWebGL: "此浏览器不支持 WebGL，无法显示。<br>请使用最新版 Chrome / Edge / Safari / Firefox 打开。", noData: "未包含全景图像。" },
 };
 const lang = (navigator.language || "ja").toLowerCase().startsWith("zh") ? "zh"
            : (navigator.language || "ja").toLowerCase().startsWith("ja") ? "ja" : "en";
@@ -326,7 +327,7 @@ function start() {
       const b = document.createElement("button");
       b.className = "btn";
       b.textContent = p.name || String(i + 1);
-      b.addEventListener("click", () => selectScene(i));
+      b.addEventListener("click", () => { hideHint(); selectScene(i); });
       scenesEl.appendChild(b);
     });
   }
