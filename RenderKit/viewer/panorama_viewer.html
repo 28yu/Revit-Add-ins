@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>__TITLE__</title>
+<style>
+  :root { --bg: #111; --panel: rgba(20, 20, 20, 0.72); --text: #f2f2f2; --accent: #4da3ff; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", "Hiragino Sans", "Yu Gothic UI", "Microsoft YaHei", sans-serif; }
+  canvas { display: block; width: 100vw; height: 100vh; cursor: grab; touch-action: none; }
+  canvas.dragging { cursor: grabbing; }
+  .bar { position: fixed; left: 12px; right: 12px; bottom: 12px; display: flex; gap: 8px; align-items: center;
+    flex-wrap: wrap; pointer-events: none; }
+  .bar > * { pointer-events: auto; }
+  .btn { background: var(--panel); color: var(--text); border: 1px solid rgba(255,255,255,0.18); border-radius: 8px;
+    padding: 8px 12px; font-size: 14px; cursor: pointer; backdrop-filter: blur(6px); }
+  .btn:hover { border-color: var(--accent); }
+  .btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .scenes { display: flex; gap: 6px; flex-wrap: wrap; flex: 1; }
+  .hint { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--panel);
+    padding: 12px 18px; border-radius: 10px; font-size: 15px; transition: opacity 0.6s; pointer-events: none; }
+  .title { position: fixed; top: 12px; left: 12px; background: var(--panel); padding: 6px 12px; border-radius: 8px;
+    font-size: 14px; max-width: calc(100vw - 24px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .error { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; padding: 24px;
+    text-align: center; line-height: 1.7; }
+</style>
+</head>
+<body>
+<canvas id="view"></canvas>
+<div class="title" id="title"></div>
+<div class="hint" id="hint"></div>
+<div class="error" id="error"></div>
+<div class="bar">
+  <div class="scenes" id="scenes"></div>
+  <button class="btn" id="fullscreen"></button>
+</div>
+
+<script>
+// 360°パノラマ（正距円筒図法の画像）をブラウザで見回すビューア。
+// 外部ライブラリを使わず WebGL だけで描画するので、このファイル1つでオフラインでも開ける。
+// 画像データは make_viewer.py がこの下の PANORAMAS に埋め込む。
+const PANORAMAS = /*__PANORAMAS__*/[];
+
+const TEXT = {
+  ja: { hint: "ドラッグで見回す ／ ホイール・ピンチで拡大縮小", fullscreen: "全画面", noWebGL: "このブラウザは WebGL に対応していないため表示できません。<br>Chrome / Edge / Safari / Firefox の最新版で開いてください。", noData: "パノラマ画像が入っていません。" },
+  en: { hint: "Drag to look around / Scroll or pinch to zoom", fullscreen: "Fullscreen", noWebGL: "This browser does not support WebGL.<br>Please open this file in a recent version of Chrome, Edge, Safari or Firefox.", noData: "No panorama image is embedded." },
+  zh: { hint: "拖动查看四周 ／ 滚轮或双指缩放", fullscreen: "全屏", noWebGL: "此浏览器不支持 WebGL，无法显示。<br>请使用最新版 Chrome / Edge / Safari / Firefox 打开。", noData: "未包含全景图像。" },
+};
+const lang = (navigator.language || "ja").toLowerCase().startsWith("zh") ? "zh"
+           : (navigator.language || "ja").toLowerCase().startsWith("ja") ? "ja" : "en";
+const T = TEXT[lang];
+document.documentElement.lang = lang;
+
+const canvas = document.getElementById("view");
+const hintEl = document.getElementById("hint");
+const errorEl = document.getElementById("error");
+document.getElementById("title").textContent = document.title;
+document.getElementById("fullscreen").textContent = T.fullscreen;
+hintEl.textContent = T.hint;
+
+function showError(html) {
+  errorEl.innerHTML = html;
+  errorEl.style.display = "flex";
+}
+
+// --- WebGL の準備 ---------------------------------------------------------
+// WebGL2 が使えるときはミップマップ（縮小表示用の画像）を使い、遠景のちらつきを抑える。
+let gl = canvas.getContext("webgl2", { antialias: false });
+const isGL2 = !!gl;
+if (!gl) gl = canvas.getContext("webgl", { antialias: false });
+
+const VERT = `
+attribute vec2 aPos;
+varying vec2 vNdc;
+void main() { vNdc = aPos; gl_Position = vec4(aPos, 0.0, 1.0); }`;
+
+// 画面の各ピクセルについて「どの方向を見ているか」を計算し、
+// その方向に対応するパノラマ画像の位置（経度・緯度）の色を取り出す。
+const FRAG_COMMON = `
+uniform mat3 uRot;
+uniform vec2 uScale;
+const float PI = 3.141592653589793;
+vec2 dirToUv(vec3 d) {
+  float lon = atan(d.x, -d.z);            // -PI..PI（0 が画像の中央）
+  float lat = asin(clamp(d.y, -1.0, 1.0)); // -PI/2..PI/2
+  return vec2(lon / (2.0 * PI) + 0.5, 0.5 - lat / PI);
+}
+vec3 viewDir(vec2 ndc) { return normalize(uRot * vec3(ndc * uScale, -1.0)); }`;
+
+const FRAG_GL1 = `
+precision highp float;
+varying vec2 vNdc;
+uniform sampler2D uTex;
+${FRAG_COMMON}
+void main() { gl_FragColor = texture2D(uTex, dirToUv(viewDir(vNdc))); }`;
+
+// 画像の左右の端（経度 ±180°）の継ぎ目では uv が 1→0 に飛ぶため、そのまま微分すると
+// 継ぎ目に1本の線が出る。半周ずらした u でも微分して小さい方を使い、線を消す。
+const FRAG_GL2 = `#version 300 es
+precision highp float;
+in vec2 vNdc;
+out vec4 outColor;
+uniform sampler2D uTex;
+${FRAG_COMMON}
+void main() {
+  vec2 uv = dirToUv(viewDir(vNdc));
+  float u2 = fract(uv.x + 0.5);
+  vec2 dx = dFdx(uv), dy = dFdy(uv);
+  float dx2 = dFdx(u2), dy2 = dFdy(u2);
+  if (abs(dx2) < abs(dx.x)) dx.x = dx2;
+  if (abs(dy2) < abs(dy.x)) dy.x = dy2;
+  outColor = textureGrad(uTex, uv, dx, dy);
+}`;
+
+const VERT_GL2 = `#version 300 es
+in vec2 aPos;
+out vec2 vNdc;
+void main() { vNdc = aPos; gl_Position = vec4(aPos, 0.0, 1.0); }`;
+
+function compile(type, src) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src);
+  gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+  return s;
+}
+
+let program, uRot, uScale;
+function initGL() {
+  program = gl.createProgram();
+  gl.attachShader(program, compile(gl.VERTEX_SHADER, isGL2 ? VERT_GL2 : VERT));
+  gl.attachShader(program, compile(gl.FRAGMENT_SHADER, isGL2 ? FRAG_GL2 : FRAG_GL1));
+  gl.linkProgram(program);
+  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(program));
+  gl.useProgram(program);
+
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+  const loc = gl.getAttribLocation(program, "aPos");
+  gl.enableVertexAttribArray(loc);
+  gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+
+  uRot = gl.getUniformLocation(program, "uRot");
+  uScale = gl.getUniformLocation(program, "uScale");
+  gl.uniform1i(gl.getUniformLocation(program, "uTex"), 0);
+}
+
+// --- 画像の読み込み -------------------------------------------------------
+// スマホなどは扱える画像サイズの上限（MAX_TEXTURE_SIZE）が小さいため、超える画像は縮小してから使う。
+const textures = new Map();
+function loadTexture(index) {
+  if (textures.has(index)) return textures.get(index);
+  const p = new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const max = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+      let source = img;
+      if (img.width > max || img.height > max) {
+        const s = Math.min(max / img.width, max / img.height);
+        const c = document.createElement("canvas");
+        c.width = Math.floor(img.width * s);
+        c.height = Math.floor(img.height * s);
+        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+        source = c;
+      }
+      const tex = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      if (isGL2) {
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+        gl.generateMipmap(gl.TEXTURE_2D);
+      } else {
+        // WebGL1 は 2 のべき乗でない画像に REPEAT・ミップマップを使えない
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      }
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      resolve(tex);
+    };
+    img.onerror = reject;
+    img.src = PANORAMAS[index].src;
+  });
+  textures.set(index, p);
+  return p;
+}
+
+// --- 視点の操作 -----------------------------------------------------------
+const view = { yaw: 0, pitch: 0, fov: 75 };  // 単位は度。fov は縦方向の画角
+const FOV_MIN = 25, FOV_MAX = 110;
+let current = -1;
+let needsDraw = false;  // 描画の予約が入っているか（同じフレームで何度も描かないため）
+
+function rotationMatrix(yawDeg, pitchDeg) {
+  // yaw は右回りを正、pitch は上向きを正とする
+  const y = -yawDeg * Math.PI / 180, p = pitchDeg * Math.PI / 180;
+  const cy = Math.cos(y), sy = Math.sin(y), cp = Math.cos(p), sp = Math.sin(p);
+  // 右方向・上方向・後ろ方向を列に並べた行列（列優先で WebGL に渡す）
+  return new Float32Array([
+    cy, 0, -sy,
+    sy * sp, cp, cy * sp,
+    sy * cp, -sp, cy * cp,
+  ]);
+}
+
+function draw() {
+  needsDraw = false;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const w = Math.floor(canvas.clientWidth * dpr), h = Math.floor(canvas.clientHeight * dpr);
+  if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+  gl.viewport(0, 0, w, h);
+  const t = Math.tan(view.fov * Math.PI / 360);
+  gl.uniform2f(uScale, t * w / h, t);
+  gl.uniformMatrix3fv(uRot, false, rotationMatrix(view.yaw, view.pitch));
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+}
+
+function requestDraw() {
+  if (needsDraw) return;
+  needsDraw = true;
+  requestAnimationFrame(draw);
+}
+
+function clampView() {
+  view.pitch = Math.max(-89, Math.min(89, view.pitch));
+  view.fov = Math.max(FOV_MIN, Math.min(FOV_MAX, view.fov));
+  view.yaw = ((view.yaw % 360) + 540) % 360 - 180;
+}
+
+function hideHint() { hintEl.style.opacity = "0"; }
+
+// ポインタ（マウス・指）で見回す。指2本はピンチで拡大縮小。
+const pointers = new Map();
+let pinchStart = null;
+canvas.addEventListener("pointerdown", e => {
+  canvas.setPointerCapture(e.pointerId);
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  canvas.classList.add("dragging");
+  hideHint();
+  if (pointers.size === 2) {
+    const [a, b] = [...pointers.values()];
+    pinchStart = { dist: Math.hypot(a.x - b.x, a.y - b.y), fov: view.fov };
+  }
+});
+canvas.addEventListener("pointermove", e => {
+  const prev = pointers.get(e.pointerId);
+  if (!prev) return;
+  const cur = { x: e.clientX, y: e.clientY };
+  pointers.set(e.pointerId, cur);
+  if (pointers.size === 2 && pinchStart) {
+    const [a, b] = [...pointers.values()];
+    const dist = Math.hypot(a.x - b.x, a.y - b.y);
+    view.fov = pinchStart.fov * pinchStart.dist / Math.max(dist, 1);
+  } else if (pointers.size === 1) {
+    // 画面の高さ分ドラッグすると、ちょうど画角1つ分回る（拡大中ほどゆっくり動く）
+    const degPerPx = view.fov / canvas.clientHeight;
+    view.yaw -= (cur.x - prev.x) * degPerPx;
+    view.pitch += (cur.y - prev.y) * degPerPx;
+  }
+  clampView();
+  requestDraw();
+});
+function endPointer(e) {
+  pointers.delete(e.pointerId);
+  if (pointers.size < 2) pinchStart = null;
+  if (pointers.size === 0) canvas.classList.remove("dragging");
+}
+canvas.addEventListener("pointerup", endPointer);
+canvas.addEventListener("pointercancel", endPointer);
+
+canvas.addEventListener("wheel", e => {
+  e.preventDefault();
+  hideHint();
+  view.fov *= Math.exp(e.deltaY * 0.001);
+  clampView();
+  requestDraw();
+}, { passive: false });
+
+window.addEventListener("keydown", e => {
+  const step = view.fov / 15;
+  if (e.key === "ArrowLeft") view.yaw -= step;
+  else if (e.key === "ArrowRight") view.yaw += step;
+  else if (e.key === "ArrowUp") view.pitch += step;
+  else if (e.key === "ArrowDown") view.pitch -= step;
+  else if (e.key === "+" || e.key === "=") view.fov /= 1.1;
+  else if (e.key === "-") view.fov *= 1.1;
+  else return;
+  hideHint();
+  clampView();
+  requestDraw();
+});
+
+window.addEventListener("resize", requestDraw);
+
+document.getElementById("fullscreen").addEventListener("click", () => {
+  if (document.fullscreenElement) document.exitFullscreen();
+  else document.documentElement.requestFullscreen?.();
+});
+
+// --- 複数のパノラマの切り替え ---------------------------------------------
+const scenesEl = document.getElementById("scenes");
+function selectScene(index) {
+  if (index === current) return;
+  current = index;
+  [...scenesEl.children].forEach((b, i) => b.classList.toggle("active", i === index));
+  view.yaw = PANORAMAS[index].yaw || 0;
+  view.pitch = PANORAMAS[index].pitch || 0;
+  loadTexture(index).then(tex => {
+    if (current !== index) return;
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    requestDraw();
+  });
+}
+
+function start() {
+  if (!gl) { showError(T.noWebGL); return; }
+  if (PANORAMAS.length === 0) { showError(T.noData); return; }
+  try { initGL(); } catch (err) { showError(T.noWebGL + "<br><small>" + err.message + "</small>"); return; }
+  if (PANORAMAS.length > 1) {
+    PANORAMAS.forEach((p, i) => {
+      const b = document.createElement("button");
+      b.className = "btn";
+      b.textContent = p.name || String(i + 1);
+      b.addEventListener("click", () => selectScene(i));
+      scenesEl.appendChild(b);
+    });
+  }
+  selectScene(0);
+  setTimeout(hideHint, 4000);
+}
+start();
+</script>
+</body>
+</html>

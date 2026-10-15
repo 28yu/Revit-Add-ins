@@ -1,4 +1,6 @@
-## 最終セッション: 2026-10-14（v2.6 リリース・配布をインストーラ1本に変更）
+## 最終セッション: 2026-10-15 23:24
+変更ファイル: CLAUDE.md,RenderKit/MakePanorama.bat,RenderKit/MakePanorama.ps1,RenderKit/MakePanorama_Draft.bat,RenderKit/README.md
+
 - **v2.6 をリリース**（v2.1.2 → v2.6。2.2〜2.5 は未リリースのまま番号だけ進んでいたため 2.6 を採用）。
   新機能10個（部屋3D色分け／塗潰しパターン入出力／パラメータ整理／値の一括置換／値の移動／フィルタ整理／
   テンプレート整理／DWGレイヤ表示移行／一般モデル化／自動バックアップ）＋Excel 連携の大幅改善
@@ -125,7 +127,6 @@ v2.1.2 以降、未リリースのまま 2.2〜2.6 の5世代分が溜まって�
 - 配布はインストーラ exe（Installer/28Tools.iss）に一本化済み。
   build/* でテストビルドし、Artifacts の 28Tools_Setup を実機でインストール確認する
 ## 前回セッション: 2026-08-28 03:18
-変更ファイル: Application.cs,CLAUDE.md,Commands/GenericModelMerge/GenericModelMergeCommand.cs,Commands/GenericModelMerge/Models/MergeCategoryRow.cs,Commands/GenericModelMerge/Models/MergeOptions.cs
 
 **GenericModelMerge（一般モデル化）** を新規追加。3Dビューに表示されている複数カテゴリの
 要素から形状を読み取り、一つの一般モデルのかたまりを作成する。出力はダイレクトシェイプと

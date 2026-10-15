@@ -102,6 +102,7 @@ Revit-Add-ins/
 ├── BuildAll.ps1                # 全バージョン一括ビルド（リリース用）
 ├── GenerateAddins.ps1          # .addinマニフェスト生成
 ├── CreatePackages.ps1          # インストーラ作成 (ローカル, ISCC 使用)
+├── RenderKit/                  # 個人用: Revit の FBX → Blender で 360°パノラマ → HTML1つ（アドインとは別。README.md 参照）
 ├── Docs/                       # GitHub Pages (ワークフロー図等)
 │   ├── workflow-diagram.html   #   開発ワークフロー図
 │   └── icons/workflow/         #   ワークフロー図用アイコン
