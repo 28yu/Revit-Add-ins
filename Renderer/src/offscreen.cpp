@@ -11,6 +11,30 @@
 
 namespace t28 {
 
+std::vector<uint8_t> readImageRgba(VkContext& ctx, const Image& image) {
+    const uint32_t w = image.width, h = image.height;
+    Buffer readback = ctx.createBuffer(static_cast<VkDeviceSize>(w) * h * 4, VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                                       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    VkCommandBuffer copy = ctx.beginOneShot();
+    transitionImage(copy, image.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                    VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                    VK_ACCESS_TRANSFER_READ_BIT);
+    VkBufferImageCopy region{};
+    region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    region.imageExtent = {w, h, 1};
+    vkCmdCopyImageToBuffer(copy, image.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, readback.buffer, 1, &region);
+    transitionImage(copy, image.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL,
+                    VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                    VK_ACCESS_SHADER_WRITE_BIT);
+    ctx.endOneShot(copy);
+    std::vector<uint8_t> rgba(static_cast<const uint8_t*>(readback.mapped),
+                              static_cast<const uint8_t*>(readback.mapped) + static_cast<size_t>(w) * h * 4);
+    ctx.destroyBuffer(readback);
+    // 透明にならないよう、不透明度はすべて 255 にする
+    for (size_t i = 3; i < rgba.size(); i += 4) rgba[i] = 255;
+    return rgba;
+}
+
 int runOffscreen(const Options& opt, Scene& scene) {
     VkContext ctx;
     ctx.init({}, nullptr, opt.gpu, !opt.forceSoftware);
@@ -69,21 +93,9 @@ int runOffscreen(const Options& opt, Scene& scene) {
     logInfo("Rendered %d samples in %.1f s (exposure x%.2f)", opt.samples, seconds, exposure.current);
 
     // GPU の画像を CPU 側に写して PNG に保存する
-    Buffer readback = ctx.createBuffer(static_cast<VkDeviceSize>(w) * h * 4, VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-                                       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-    VkCommandBuffer copy = ctx.beginOneShot();
-    transitionImage(copy, renderer.output().image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                    VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                    VK_ACCESS_TRANSFER_READ_BIT);
-    VkBufferImageCopy region{};
-    region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-    region.imageExtent = {w, h, 1};
-    vkCmdCopyImageToBuffer(copy, renderer.output().image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, readback.buffer, 1, &region);
-    ctx.endOneShot(copy);
-
-    int ok = stbi_write_png(opt.outputPath.c_str(), static_cast<int>(w), static_cast<int>(h), 4, readback.mapped,
+    std::vector<uint8_t> rgba = readImageRgba(ctx, renderer.output());
+    int ok = stbi_write_png(opt.outputPath.c_str(), static_cast<int>(w), static_cast<int>(h), 4, rgba.data(),
                             static_cast<int>(w) * 4);
-    ctx.destroyBuffer(readback);
     vkDestroyFence(ctx.device, fence, nullptr);
     renderer.destroy();
     ctx.destroy();

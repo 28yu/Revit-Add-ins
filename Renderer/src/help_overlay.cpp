@@ -437,4 +437,112 @@ HelpImage buildHelpImage(bool expanded, float s) {
     return img;
 }
 
+namespace {
+
+// ボタンの絵: カメラ（画像を保存）
+void cameraIcon(Canvas& c, float cx, float cy, float s, const Color& col) {
+    auto body = [&](float x, float y) { return sdRoundBox(x, y, cx, cy + 1.5f * s, 10 * s, 7 * s, 2.5f * s); };
+    c.stroke(body, 1.5f * s, cx - 11 * s, cy - 6 * s, cx + 11 * s, cy + 9 * s, col);
+    auto top = [&](float x, float y) { return sdRoundBox(x, y, cx - 3 * s, cy - 6.5f * s, 4 * s, 1.8f * s, 1 * s); };
+    c.fill(top, cx - 8 * s, cy - 9 * s, cx + 2 * s, cy - 4 * s, col);
+    auto lens = [&](float x, float y) { return std::hypot(x - cx, y - (cy + 1.5f * s)) - 3.8f * s; };
+    c.stroke(lens, 1.5f * s, cx - 5 * s, cy - 3 * s, cx + 5 * s, cy + 6 * s, col);
+}
+
+// ボタンの絵: 地球儀（360°）
+void globeIcon(Canvas& c, float cx, float cy, float s, const Color& col) {
+    float r = 8.5f * s;
+    auto outer = [&](float x, float y) { return std::hypot(x - cx, y - cy) - r; };
+    c.stroke(outer, 1.5f * s, cx - r, cy - r, cx + r, cy + r, col);
+    // 縦の楕円（経線）と横の線（赤道）
+    auto meridian = [&](float x, float y) {
+        float dx = (x - cx) / (r * 0.45f), dy = (y - cy) / r;
+        return (std::sqrt(dx * dx + dy * dy) - 1.0f) * r * 0.45f;
+    };
+    c.stroke(meridian, 1.2f * s, cx - r, cy - r, cx + r, cy + r, col);
+    c.stroke([&](float x, float y) { return sdSegment(x, y, cx - r, cy, cx + r, cy); }, 1.2f * s, cx - r, cy, cx + r, cy, col);
+}
+
+// ボタンの絵: 画面と矢印（ビューアを書き出す）
+void viewerIcon(Canvas& c, float cx, float cy, float s, const Color& col) {
+    auto screen = [&](float x, float y) { return sdRoundBox(x, y, cx, cy - 1.5f * s, 10 * s, 7 * s, 1.5f * s); };
+    c.stroke(screen, 1.5f * s, cx - 11 * s, cy - 9 * s, cx + 11 * s, cy + 6 * s, col);
+    c.stroke([&](float x, float y) { return sdSegment(x, y, cx - 4 * s, cy + 8.5f * s, cx + 4 * s, cy + 8.5f * s); }, 1.5f * s,
+             cx - 4 * s, cy + 8 * s, cx + 4 * s, cy + 9 * s, col);
+    // 再生の三角（中で動かせる）
+    float v[6] = {cx - 2.5f * s, cy - 5 * s, cx - 2.5f * s, cy + 2 * s, cx + 3.5f * s, cy - 1.5f * s};
+    c.fill([&](float x, float y) { return sdTriangle(x, y, v); }, cx - 4 * s, cy - 6 * s, cx + 5 * s, cy + 3 * s, col);
+}
+
+}  // namespace
+
+ToolbarImage buildToolbarImage(float s, int hover) {
+    const char* labels[kButtonCount] = {"ExportImage", "ExportPanorama", "ExportViewer"};
+    const float pad = 6 * s, iconH = 24 * s, labelPx = 11 * s, labelH = 14 * s, gap = 2 * s;
+    std::vector<float> widths;
+    float total = pad;
+    for (const char* key : labels) {
+        float w = std::max(40 * s, textWidth(tr(key), labelPx) + 14 * s);
+        widths.push_back(w);
+        total += w + gap;
+    }
+    total += pad - gap;
+    int width = static_cast<int>(std::ceil(total));
+    int height = static_cast<int>(std::ceil(pad * 2 + iconH + labelH + 4 * s));
+    Canvas c(width, height);
+    auto panel = [&](float x, float y) { return sdRoundBox(x, y, width / 2.0f, height / 2.0f, width / 2.0f, height / 2.0f, 8 * s); };
+    c.fill(panel, 0, 0, static_cast<float>(width), static_cast<float>(height), kPanel);
+
+    ToolbarImage tb;
+    float x = pad;
+    for (int i = 0; i < kButtonCount; ++i) {
+        float w = widths[i];
+        float bx0 = x, by0 = pad, bx1 = x + w, by1 = height - pad;
+        if (i == hover) {
+            auto hl = [&](float px, float py) {
+                return sdRoundBox(px, py, (bx0 + bx1) / 2, (by0 + by1) / 2, w / 2, (by1 - by0) / 2, 5 * s);
+            };
+            c.fill(hl, bx0, by0, bx1, by1, Color{1, 1, 1, 0.16f});
+        }
+        const Color& col = i == hover ? kAccent : kWhite;
+        float cx = x + w / 2, cy = pad + 2 * s + iconH / 2;
+        if (i == kButtonImage) cameraIcon(c, cx, cy, s, col);
+        else if (i == kButtonPanorama) globeIcon(c, cx, cy, s, col);
+        else viewerIcon(c, cx, cy, s, col);
+        c.textCentered(tr(labels[i]), cx, pad + 2 * s + iconH + labelH / 2 + 1 * s, labelPx, kWhite);
+        tb.buttons.push_back({static_cast<int>(bx0), static_cast<int>(by0), static_cast<int>(w), static_cast<int>(by1 - by0)});
+        x += w + gap;
+    }
+    tb.image = finish(c);
+    return tb;
+}
+
+HelpImage buildStatusImage(const std::vector<std::string>& lines, float progress, float s) {
+    const float pad = 10 * s, linePx = 13 * s, lineH = 19 * s, barH = 6 * s, barGap = 8 * s;
+    float textW = 0;
+    for (const auto& l : lines) textW = std::max(textW, textWidth(l, linePx));
+    bool bar = progress >= 0;
+    int width = static_cast<int>(std::ceil(std::max(textW, bar ? 260 * s : 0.0f) + pad * 2 + 8 * s));
+    int height = static_cast<int>(std::ceil(pad * 2 + lineH * lines.size() + (bar ? barGap + barH : 0)));
+    Canvas c(width, height);
+    auto panel = [&](float x, float y) { return sdRoundBox(x, y, width / 2.0f, height / 2.0f, width / 2.0f, height / 2.0f, 8 * s); };
+    c.fill(panel, 0, 0, static_cast<float>(width), static_cast<float>(height), Color{0, 0, 0, 0.7f});
+    float y = pad;
+    for (const auto& l : lines) {
+        c.textCentered(l, width / 2.0f, y + lineH / 2, linePx, kWhite);
+        y += lineH;
+    }
+    if (bar) {
+        float x0 = pad + 4 * s, x1 = width - pad - 4 * s, by = y + barGap + barH / 2;
+        auto track = [&](float px, float py) { return sdRoundBox(px, py, (x0 + x1) / 2, by, (x1 - x0) / 2, barH / 2, barH / 2); };
+        c.fill(track, x0, by - barH, x1, by + barH, Color{1, 1, 1, 0.18f});
+        float xe = x0 + (x1 - x0) * std::clamp(progress, 0.0f, 1.0f);
+        if (xe > x0 + barH * 0.5f) {
+            auto fillBar = [&](float px, float py) { return sdRoundBox(px, py, (x0 + xe) / 2, by, (xe - x0) / 2, barH / 2, barH / 2); };
+            c.fill(fillBar, x0, by - barH, xe, by + barH, kAccent);
+        }
+    }
+    return finish(c);
+}
+
 }  // namespace t28

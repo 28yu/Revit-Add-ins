@@ -11,6 +11,8 @@ Revit の「リアルタイムレンダリング」ボタン（`Commands/Realtim
 - **マテリアルの外観**（Revit の外観タブ）の色・イメージ（テクスチャ）・反射率・粗さ・透明度を使う。
   テクスチャは遠くほど縮小した段（ミップマップ）を使うので、遠くの模様がちらつかない
 - 速い GPU では 1 フレームで複数回（1〜4 回、約 30 fps を目安に自動調整）計算して、動いている間の画質を上げる
+- **書き出し**（ウィンドウ右上のボタン）: 画像（PNG）／360°画像（ブラウザで見回せる HTML ＋ JPEG）／
+  ビューア（シーンを中に入れた exe。Revit の無い PC でもダブルクリックで歩き回れる）
 - 描画は Revit とは別のプログラムで行うので、ここで問題が起きても Revit は止まらない
 
 ## 仕組み
@@ -27,7 +29,8 @@ Revit（Tools28.dll）                       Tools28Render.exe
                                                renderer.cpp    加速構造の作成・1フレームの描画・案内の重ね合わせ
                                                shaders/        光の計算（GPU 上で動く）※下の表
                                                window_app.cpp  ウィンドウ・操作 / offscreen.cpp 画像の書き出し
-                                               help_overlay.cpp 操作の案内（マウス・キーの絵と文字。Windows のフォントを使う）
+                                               help_overlay.cpp 操作の案内・ツールバー・お知らせの絵（Windows のフォントを使う）
+                                               export.cpp      書き出し（保存先の画面・PNG・360°の HTML・ビューアの exe）
 ```
 
 シーンファイル（`.t28s`）の形式は `src/scene.cpp` の先頭に書いてあります。
@@ -71,7 +74,22 @@ Revit の 3D ビューと同じ操作を基本にし、Enscape のような歩�
 | F | 自動露出の切り替え |
 | R | 最初の視点に戻る |
 | H | 操作の案内を隠す / 出す |
+| P | 今の視点を画像で保存（右上の「画像」ボタンと同じ） |
 | Esc | 閉じる |
+
+## 書き出し
+
+| ボタン | 保存するもの | 大きさ・回数 |
+|--|--|--|
+| 画像 | PNG（今の視点） | 画面と同じ縦横比で長い辺 1920〜3840 画素。RT コアあり 512 回・なし 128 回足し合わせ |
+| 360° | HTML（画像入り。ブラウザで開くとドラッグで見回せる）と同じ名前の JPEG | 4096×2048（GPU のメモリ 5GB 以上・RT コアあり）または 2048×1024 |
+| ビューア | exe（この exe ＋ シーン） | 今の視点が最初の視点になる |
+
+- 画像・360°は、ウィンドウの描画を一時的に書き出す大きさに切り替えて足し合わせる（進み具合を表示。Esc で中止）。
+  明るさは書き出しを始めたときのまま
+- ビューアの exe の形式は `src/export.h` の先頭に書いてある（exe の後ろにシーンを付け足し、最後の 16 バイトで位置を示す）。
+  起動時に `--scene` が無ければ自分の exe を調べる。言語は Windows の表示言語に合わせる
+- ビューアは署名の無い exe なので、受け取った PC で Windows の警告が出ることがある（「詳細情報」→「実行」）
 
 ログ: `%LOCALAPPDATA%\Tools28\Render\render.log`（どの GPU・方式を使ったか、速さ（10 秒ごとの fps）、エラーの内容が残る）
 
@@ -105,7 +123,8 @@ Tools28Render --scene model.t28s [--lang JP|US|CN]     ウィンドウで表示
 Tools28Render --test-scene                              確認用の部屋
 Tools28Render --scene model.t28s --output out.png       画像を作って終わる
     [--width 1280 --height 720 --samples 256 --panorama]
-その他: --log ファイル / --gpu 番号 / --bounces 回数 / --exposure EV / --no-auto-exposure
+その他: --title 題名（ウィンドウと書き出すファイルの名前）/ --export-samples 回数（書き出しを短くする。動作確認用）
+        --log ファイル / --gpu 番号 / --bounces 回数 / --exposure EV / --no-auto-exposure
         --render-scale 倍率（小さく描いて拡大＝速い。既定は RT コアあり 1.0・なし 0.5）
         --software（RT コアがあっても予備の方式で描く） / --exit-after フレーム数（動作確認用）
 ```

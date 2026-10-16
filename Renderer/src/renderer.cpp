@@ -488,7 +488,7 @@ void Renderer::createPasses() {
 
     composite_ = createPass(dev, {{0, IMG}, {1, IMG}, {2, IMG}, {3, IMG}, {4, BUF}}, 2, sizeof(CompositePush),
                             kCompositeSpv, sizeof(kCompositeSpv), "composite");
-    overlayPass_ = createPass(dev, {{0, IMG}, {1, IMG}}, 1, sizeof(OverlayPush), kOverlaySpv, sizeof(kOverlaySpv), "overlay");
+    overlayPass_ = createPass(dev, {{0, IMG}, {1, IMG}}, kOverlaySlots, sizeof(OverlayPush), kOverlaySpv, sizeof(kOverlaySpv), "overlay");
 }
 
 void Renderer::writeDescriptors() {
@@ -531,8 +531,9 @@ void Renderer::writeDescriptors() {
 }
 
 void Renderer::writeOverlayDescriptors() {
-    if (!overlay_.view || !overlayTargetView_) return;
-    writeSet(ctx_->device, overlayPass_.sets[0], {{0, overlayTargetView_}, {1, overlay_.view}});
+    if (!overlayTargetView_) return;
+    for (uint32_t i = 0; i < kOverlaySlots; ++i)
+        if (overlay_[i].view) writeSet(ctx_->device, overlayPass_.sets[i], {{0, overlayTargetView_}, {1, overlay_[i].view}});
 }
 
 void Renderer::setOverlayTarget(const Image& target) {
@@ -540,23 +541,25 @@ void Renderer::setOverlayTarget(const Image& target) {
     writeOverlayDescriptors();
 }
 
-void Renderer::setOverlay(const std::vector<uint8_t>& rgba, uint32_t width, uint32_t height) {
+void Renderer::setOverlay(uint32_t slot, const std::vector<uint8_t>& rgba, uint32_t width, uint32_t height) {
+    if (slot >= kOverlaySlots) return;
     vkDeviceWaitIdle(ctx_->device);
-    ctx_->destroyImage(overlay_);
-    if (width == 0 || height == 0) return;
-    overlay_ = ctx_->createImage(width, height, VK_FORMAT_R8G8B8A8_UNORM,
+    Image& overlay = overlay_[slot];
+    ctx_->destroyImage(overlay);
+    if (width == 0 || height == 0 || rgba.size() < static_cast<size_t>(width) * height * 4) return;
+    overlay = ctx_->createImage(width, height, VK_FORMAT_R8G8B8A8_UNORM,
                                  VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
     Buffer staging = ctx_->createBuffer(rgba.size(), VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                                         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
     memcpy(staging.mapped, rgba.data(), rgba.size());
     VkCommandBuffer cmd = ctx_->beginOneShot();
-    transitionImage(cmd, overlay_.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+    transitionImage(cmd, overlay.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                     VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT);
     VkBufferImageCopy region{};
     region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
     region.imageExtent = {width, height, 1};
-    vkCmdCopyBufferToImage(cmd, staging.buffer, overlay_.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
-    transitionImage(cmd, overlay_.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL,
+    vkCmdCopyBufferToImage(cmd, staging.buffer, overlay.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+    transitionImage(cmd, overlay.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL,
                     VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
                     VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT);
     ctx_->endOneShot(cmd);
@@ -564,11 +567,13 @@ void Renderer::setOverlay(const std::vector<uint8_t>& rgba, uint32_t width, uint
     writeOverlayDescriptors();
 }
 
-void Renderer::recordOverlay(VkCommandBuffer cmd, int x, int y, float opacity) {
-    if (!overlay_.view || !overlayTargetView_) return;
-    // target は GENERAL レイアウトで、書き込みが終わっている前提（呼び出し側で切り替える）
+void Renderer::recordOverlay(VkCommandBuffer cmd, uint32_t slot, int x, int y, float opacity) {
+    if (slot >= kOverlaySlots || !overlay_[slot].view || !overlayTargetView_) return;
+    // target は GENERAL レイアウトで、書き込みが終わっている前提（呼び出し側で切り替える）。
+    // 続けて重ねるときは、前の重ね合わせの書き込みを待つ
+    computeBarrier(cmd);
     OverlayPush pc{{x, y}, opacity};
-    dispatch(cmd, overlayPass_, 0, &pc, sizeof(pc), overlay_.width, overlay_.height);
+    dispatch(cmd, overlayPass_, slot, &pc, sizeof(pc), overlay_[slot].width, overlay_[slot].height);
 }
 
 void Renderer::resize(uint32_t width, uint32_t height) {
@@ -686,7 +691,7 @@ void Renderer::destroy() {
     vkDeviceWaitIdle(dev);
     for (ComputePass* p : {&pathTrace_, &temporal_, &atrous_, &composite_, &overlayPass_}) destroyPass(dev, *p);
     Image* all[] = {&noisy_, &gpos_[0], &gpos_[1], &gnormal_[0], &gnormal_[1], &galbedo_, &history_[0], &history_[1],
-                    &moments_[0], &moments_[1], &filtered_[0], &filtered_[1], &albedoHist_[0], &albedoHist_[1], &output_, &overlay_};
+                    &moments_[0], &moments_[1], &filtered_[0], &filtered_[1], &albedoHist_[0], &albedoHist_[1], &output_, &overlay_[0], &overlay_[1], &overlay_[2]};
     for (Image* img : all) ctx_->destroyImage(*img);
     destroyAccel(tlas_);
     destroyAccel(blasOpaque_);

@@ -46,13 +46,12 @@ public:
 
     const Image& output() const { return output_; }
 
-    // 操作の案内（RGBA の画像）を設定し、recordOverlay で target に重ねる。
+    // 画面に重ねる絵（操作の案内・ツールバー・進み具合）。slot ごとに 1 枚の RGBA の画像を持ち、recordOverlay で target に重ねる。
     // target は画面と同じ大きさの画像（小さく描いて拡大するときも、文字がぼやけないように拡大後に重ねる）
-    void setOverlay(const std::vector<uint8_t>& rgba, uint32_t width, uint32_t height);
+    static const uint32_t kOverlaySlots = 3;
+    void setOverlay(uint32_t slot, const std::vector<uint8_t>& rgba, uint32_t width, uint32_t height);
     void setOverlayTarget(const Image& target);
-    void recordOverlay(VkCommandBuffer cmd, int x, int y, float opacity);
-    uint32_t overlayWidth() const { return overlay_.width; }
-    uint32_t overlayHeight() const { return overlay_.height; }
+    void recordOverlay(VkCommandBuffer cmd, uint32_t slot, int x, int y, float opacity);
 
     // シェーダー1つ分（入出力の一覧・パイプライン）
     struct ComputePass {
@@ -103,7 +102,7 @@ private:
     ComputePass pathTrace_, temporal_, atrous_, composite_, overlayPass_;
 
     // 操作の案内
-    Image overlay_;
+    Image overlay_[kOverlaySlots];
     VkImageView overlayTargetView_ = VK_NULL_HANDLE;
 };
 

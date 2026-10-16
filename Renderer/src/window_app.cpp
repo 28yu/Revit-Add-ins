@@ -7,16 +7,24 @@
 #include <vector>
 
 #include "app.h"
+#include "export.h"
 #include "i18n.h"
 #include "log.h"
 #include "help_overlay.h"
 
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
+#ifdef _WIN32
+#define GLFW_EXPOSE_NATIVE_WIN32
+#include <GLFW/glfw3native.h>
+#endif
 
 namespace t28 {
 
 namespace {
+
+// 画面に重ねる絵の置き場所（Renderer の overlay の番号）
+const uint32_t kHelpSlot = 0, kToolbarSlot = 1, kStatusSlot = 2;
 
 struct Swapchain {
     VkSwapchainKHR handle = VK_NULL_HANDLE;
@@ -119,6 +127,32 @@ struct Navigator {
     // 案内の切り替えの記号の位置（画面の画素）。クリックで開く / 閉じる
     int toggleX = 0, toggleY = 0, toggleW = 0, toggleH = 0;
 
+    // 右上のツールバー（書き出しのボタン）。位置は画面の画素
+    std::vector<ToolbarImage::Rect> buttons;
+    int hoverButton = -1;
+    bool toolbarChanged = false;
+    int clickedButton = -1;   // 押されたボタン（描画の繰り返しの中で処理する）
+    bool exporting = false;   // 書き出し中（カメラの操作を止め、Esc で中止）
+    bool cancelExport = false;
+
+    // ウィンドウの座標 → 画面の画素（高 DPI の画面では違う）
+    void toFramebuffer(double mx, double my, double& fx, double& fy) const {
+        int ww = 1, wh = 1, fw = 1, fh = 1;
+        glfwGetWindowSize(window, &ww, &wh);
+        glfwGetFramebufferSize(window, &fw, &fh);
+        fx = mx * fw / std::max(1, ww);
+        fy = my * fh / std::max(1, wh);
+    }
+    int buttonAt(double mx, double my) const {
+        double fx, fy;
+        toFramebuffer(mx, my, fx, fy);
+        for (size_t i = 0; i < buttons.size(); ++i) {
+            const auto& b = buttons[i];
+            if (fx >= b.x && fx < b.x + b.w && fy >= b.y && fy < b.y + b.h) return static_cast<int>(i);
+        }
+        return -1;
+    }
+
     Vec3 sceneCenter() const {
         Vec3 mn = bvh->boundsMin(), mx = bvh->boundsMax();
         return {(mn.x + mx.x) / 2, (mn.y + mx.y) / 2, (mn.z + mx.z) / 2};
@@ -152,6 +186,7 @@ struct Navigator {
     }
 
     void onScroll(double dy) {
+        if (exporting) return;
         double mx, my;
         glfwGetCursorPos(window, &mx, &my);
         float d;
@@ -171,12 +206,17 @@ struct Navigator {
             drag = Drag::None;
             return;
         }
+        if (exporting) return;
         if (button == GLFW_MOUSE_BUTTON_LEFT) {
+            int b = buttonAt(mx, my);
+            if (b >= 0) {
+                clickedButton = b;
+                drag = Drag::None;
+                return;
+            }
             // 案内の記号（× / ?）の上なら、案内を開く / 閉じる（画面の画素とウィンドウの座標の比をそろえて比べる）
-            int ww = 1, wh = 1, fw = 1, fh = 1;
-            glfwGetWindowSize(window, &ww, &wh);
-            glfwGetFramebufferSize(window, &fw, &fh);
-            double fx = mx * fw / std::max(1, ww), fy = my * fh / std::max(1, wh);
+            double fx, fy;
+            toFramebuffer(mx, my, fx, fy);
             if (fx >= toggleX && fx < toggleX + toggleW && fy >= toggleY && fy < toggleY + toggleH) {
                 showHelp = !showHelp;
                 helpChanged = true;
@@ -206,6 +246,12 @@ struct Navigator {
         float dx = static_cast<float>(mx - lastX), dy = static_cast<float>(my - lastY);
         lastX = mx;
         lastY = my;
+        int hover = drag == Drag::None && !exporting ? buttonAt(mx, my) : -1;
+        if (hover != hoverButton) {
+            hoverButton = hover;
+            toolbarChanged = true;
+        }
+        if (exporting) return;
         if (drag == Drag::None || (dx == 0 && dy == 0)) return;
         int ww = 1, wh = 1;
         glfwGetWindowSize(window, &ww, &wh);
@@ -238,8 +284,13 @@ struct Navigator {
     }
 
     void onKey(int key) {
+        if (exporting) {
+            if (key == GLFW_KEY_ESCAPE) cancelExport = true;
+            return;
+        }
         switch (key) {
             case GLFW_KEY_ESCAPE: glfwSetWindowShouldClose(window, GLFW_TRUE); break;
+            case GLFW_KEY_P: clickedButton = kButtonImage; break;
             case GLFW_KEY_EQUAL: case GLFW_KEY_KP_ADD: evOffset += 0.5f; changed = true; break;
             case GLFW_KEY_MINUS: case GLFW_KEY_KP_SUBTRACT: evOffset -= 0.5f; changed = true; break;
             case GLFW_KEY_F: autoExposure = !autoExposure; changed = true; break;
@@ -257,7 +308,8 @@ Navigator* nav(GLFWwindow* w) { return static_cast<Navigator*>(glfwGetWindowUser
 int runWindow(const Options& opt, Scene& scene) {
     if (!glfwInit()) fatal("glfwInit failed");
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    GLFWwindow* window = glfwCreateWindow(opt.width, opt.height, tr("WindowTitle"), nullptr, nullptr);
+    std::string windowTitle = opt.title.empty() ? tr("WindowTitle") : opt.title + " - " + tr("WindowTitle");
+    GLFWwindow* window = glfwCreateWindow(opt.width, opt.height, windowTitle.c_str(), nullptr, nullptr);
     if (!window) fatal("glfwCreateWindow failed");
 
     uint32_t extCount = 0;
@@ -327,9 +379,137 @@ int runWindow(const Options& opt, Scene& scene) {
         int available = static_cast<int>(sc.extent.width) - static_cast<int>(24 * contentScale);
         if (static_cast<int>(help.width) > available && available > 100)
             help = buildHelpImage(nv.showHelp, contentScale * available / static_cast<float>(help.width));
-        renderer.setOverlay(help.rgba, help.width, help.height);
+        renderer.setOverlay(kHelpSlot, help.rgba, help.width, help.height);
     };
     updateHelp();
+
+    AutoExposure exposure;
+    ToolbarImage toolbar;
+    auto updateToolbar = [&]() {
+        toolbar = buildToolbarImage(contentScale, nv.hoverButton);
+        renderer.setOverlay(kToolbarSlot, toolbar.image.rgba, toolbar.image.width, toolbar.image.height);
+    };
+    updateToolbar();
+
+    // 上の中央のお知らせ（ボタンの説明・書き出しの進み具合・保存しました）
+    HelpImage status;
+    std::vector<std::string> statusLines;
+    float statusProgress = -1;
+    double toastUntil = 0;  // この時刻まで「保存しました」などを出す
+    auto setStatus = [&](const std::vector<std::string>& lines, float progress) {
+        if (lines == statusLines && progress == statusProgress) return;
+        statusLines = lines;
+        statusProgress = progress;
+        status = lines.empty() ? HelpImage{} : buildStatusImage(lines, progress, contentScale);
+        renderer.setOverlay(kStatusSlot, status.rgba, status.width, status.height);
+    };
+    auto toast = [&](const std::vector<std::string>& lines) {
+        setStatus(lines, -1);
+        toastUntil = glfwGetTime() + 6.0;
+    };
+
+    // --- 書き出し -------------------------------------------------------------
+    // 画像・360°は、ウィンドウの描画を一時的に書き出す大きさに切り替え、決めた回数だけ足し合わせてから保存する
+    // （進み具合を画面に出しながら。Esc で中止）。ビューアはシーンを exe に付け足すだけ
+    struct ExportJob {
+        ExportKind kind = ExportKind::Image;
+        std::string path;
+        ViewParams view;
+        uint32_t width = 0, height = 0;
+        int samples = 0, done = 0, lastPercent = -1;
+    } job;
+    VkPhysicalDeviceMemoryProperties memProps;
+    vkGetPhysicalDeviceMemoryProperties(ctx.physical, &memProps);
+    VkDeviceSize gpuMemory = 0;
+    for (uint32_t i = 0; i < memProps.memoryHeapCount; ++i)
+        if (memProps.memoryHeaps[i].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT)
+            gpuMemory = std::max(gpuMemory, memProps.memoryHeaps[i].size);
+    void* nativeWindow = nullptr;
+#ifdef _WIN32
+    nativeWindow = glfwGetWin32Window(window);
+#endif
+    const char* tipKeys[kButtonCount] = {"TipImage", "TipPanorama", "TipViewer"};
+
+    auto startExport = [&](int button) {
+        ExportKind kind = button == kButtonImage ? ExportKind::Image
+                        : button == kButtonPanorama ? ExportKind::Panorama : ExportKind::Viewer;
+        std::string path = chooseSavePath(nativeWindow, kind, defaultExportName(opt.title, kind));
+        if (path.empty()) return;
+        if (kind == ExportKind::Viewer) {
+            // 今の視点を最初の視点にして、シーンを exe に付け足す
+            Camera saved = scene.camera;
+            scene.camera.eye = cam.eye;
+            scene.camera.forward = cam.forward();
+            scene.camera.up = cam.up();
+            scene.camera.fovY = cam.fovY;
+            std::string error;
+            bool ok = writeViewerExe(path, scene, opt.title, error);
+            scene.camera = saved;
+            if (ok) {
+                logInfo("Viewer exported: %s", path.c_str());
+                toast({std::string(tr("Saved")) + fileNameOf(path), tr("SavedViewerNote")});
+            } else {
+                logError("Viewer export failed: %s", error.c_str());
+                toast({std::string(tr("ExportFailed")) + fileNameOf(path)});
+            }
+            return;
+        }
+        job = ExportJob{};
+        job.kind = kind;
+        job.path = path;
+        job.view = cam.view();
+        job.view.maxBounces = opt.bounces;
+        job.view.exposure = nv.autoExposure ? exposure.current : std::exp2(nv.evOffset);
+        job.view.samplesPerFrame = ctx.hardwareRt ? 4 : 1;
+        if (kind == ExportKind::Panorama) {
+            // パノラマは水平に構える（見上げ・見下ろしは見る人が操作する）
+            CameraController flat = cam;
+            flat.pitch = 0;
+            ViewParams fv = flat.view();
+            job.view.forward = fv.forward;
+            job.view.right = fv.right;
+            job.view.up = fv.up;
+            job.view.panorama = true;
+            // 大きいほどきれいだが GPU のメモリを多く使う（4096×2048 で約 1.7 GB）
+            bool large = ctx.hardwareRt && gpuMemory >= (5ull << 30);
+            job.width = large ? 4096 : 2048;
+            job.height = job.width / 2;
+            job.samples = ctx.hardwareRt ? 256 : 64;
+        } else {
+            // 画面と同じ縦横比で、長い辺が 1920 画素以上（最大 3840）
+            uint32_t longSide = std::max(sc.extent.width, sc.extent.height);
+            float k = std::clamp(1920.0f / longSide, 1.0f, 3840.0f / longSide);
+            job.width = static_cast<uint32_t>(sc.extent.width * k);
+            job.height = static_cast<uint32_t>(sc.extent.height * k);
+            job.samples = ctx.hardwareRt ? 512 : 128;
+        }
+        if (opt.exportSamples > 0) job.samples = opt.exportSamples;
+        logInfo("Export start: %s %ux%u, %d samples", path.c_str(), job.width, job.height, job.samples);
+        renderer.resize(job.width, job.height);
+        nv.exporting = true;
+        nv.cancelExport = false;
+        nv.hoverButton = -1;
+        nv.drag = Drag::None;
+    };
+    auto finishExport = [&](bool cancelled) {
+        if (!cancelled) {
+            std::vector<uint8_t> rgba = readImageRgba(ctx, renderer.output());
+            bool ok = job.kind == ExportKind::Image ? writePng(job.path, rgba, job.width, job.height)
+                                                    : writePanoramaHtml(job.path, rgba, job.width, job.height, opt.title);
+            logInfo("Export %s: %s", ok ? "done" : "FAILED", job.path.c_str());
+            if (!ok) toast({std::string(tr("ExportFailed")) + fileNameOf(job.path)});
+            else if (job.kind == ExportKind::Panorama)
+                toast({std::string(tr("Saved")) + fileNameOf(job.path), tr("SavedPanoramaNote")});
+            else toast({std::string(tr("Saved")) + fileNameOf(job.path)});
+        } else {
+            logInfo("Export cancelled");
+            toast({tr("ExportCancelled")});
+        }
+        nv.exporting = false;
+        nv.cancelExport = false;
+        renderer.resize(rs.width, rs.height);
+        nv.toolbarChanged = true;
+    };
 
     VkCommandBufferAllocateInfo ai{VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
     ai.commandPool = ctx.commandPool;
@@ -344,7 +524,6 @@ int runWindow(const Options& opt, Scene& scene) {
     VkFence fence;
     vkCheck(vkCreateFence(ctx.device, &fci, nullptr, &fence), "vkCreateFence");
 
-    AutoExposure exposure;
     bool needResize = false;
     // 1 フレームで計算する回数。GPU の速さに合わせて 1〜4 回の間で自動で調整する（目安 30 fps）
     uint32_t samplesPerFrame = 1;
@@ -373,7 +552,7 @@ int runWindow(const Options& opt, Scene& scene) {
         if (key(GLFW_KEY_A) || key(GLFW_KEY_LEFT)) move = add(move, r, -1);
         if (key(GLFW_KEY_E)) move.z += 1;
         if (key(GLFW_KEY_Q)) move.z -= 1;
-        if (move.x != 0 || move.y != 0 || move.z != 0) {
+        if ((move.x != 0 || move.y != 0 || move.z != 0) && !nv.exporting) {
             cam.eye = add(cam.eye, move, step);
             nv.changed = true;
         }
@@ -382,6 +561,32 @@ int runWindow(const Options& opt, Scene& scene) {
         if (nv.helpChanged) {
             updateHelp();
             nv.helpChanged = false;
+        }
+        if (nv.clickedButton >= 0) {
+            int b = nv.clickedButton;
+            nv.clickedButton = -1;
+            startExport(b);
+            last = std::chrono::steady_clock::now();  // 保存先を選ぶ画面で止まっていた時間は数えない
+        }
+        if (nv.toolbarChanged) {
+            updateToolbar();
+            nv.toolbarChanged = false;
+        }
+        // お知らせ: 書き出し中は進み具合、ボタンの上ではその説明、保存した後はしばらく結果
+        if (nv.exporting) {
+            int percent = job.samples > 0 ? job.done * 100 / job.samples : 0;
+            if (percent != job.lastPercent) {
+                job.lastPercent = percent;
+                const char* key = job.kind == ExportKind::Image ? "ExportingImage" : "ExportingPanorama";
+                setStatus({std::string(tr(key)) + "  " + std::to_string(percent) + "%", tr("ExportCancelHint")},
+                          percent / 100.0f);
+            }
+        } else if (glfwGetTime() < toastUntil) {
+            // 「保存しました」などはボタンの説明より優先して、しばらく出したままにする
+        } else if (nv.hoverButton >= 0) {
+            setStatus({tr(tipKeys[nv.hoverButton])}, -1);
+        } else {
+            setStatus({}, -1);
         }
 
         // --- 描画 ---------------------------------------------------------
@@ -393,6 +598,7 @@ int runWindow(const Options& opt, Scene& scene) {
         }
         if (needResize || static_cast<uint32_t>(fbw) != sc.extent.width || static_cast<uint32_t>(fbh) != sc.extent.height) {
             recreate();
+            if (nv.exporting) renderer.resize(job.width, job.height);  // 書き出し中は書き出す大きさのまま
             updateHelp();
             needResize = false;
         }
@@ -406,6 +612,8 @@ int runWindow(const Options& opt, Scene& scene) {
         view.maxBounces = opt.bounces;
         view.samplesPerFrame = samplesPerFrame;
         view.exposure = nv.autoExposure ? exposure.current : std::exp2(nv.evOffset);
+        if (nv.exporting) view = job.view;
+        const uint32_t srcW = nv.exporting ? job.width : rs.width, srcH = nv.exporting ? job.height : rs.height;
 
         VkCommandBufferBeginInfo bi{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
         bi.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
@@ -421,9 +629,24 @@ int runWindow(const Options& opt, Scene& scene) {
                         VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT);
         VkImageBlit blit{};
         blit.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-        blit.srcOffsets[1] = {static_cast<int32_t>(rs.width), static_cast<int32_t>(rs.height), 1};
+        blit.srcOffsets[1] = {static_cast<int32_t>(srcW), static_cast<int32_t>(srcH), 1};
         blit.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
         blit.dstOffsets[1] = {static_cast<int32_t>(sc.extent.width), static_cast<int32_t>(sc.extent.height), 1};
+        if (nv.exporting) {
+            // 書き出し中は、書き出す画像の全体が入るように縮めて真ん中に出す（周りは暗い色）
+            VkClearColorValue dark{{0.08f, 0.08f, 0.08f, 1.0f}};
+            VkImageSubresourceRange range{VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+            vkCmdClearColorImage(cmd, display.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &dark, 1, &range);
+            VkMemoryBarrier mb{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
+            mb.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            mb.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 1, &mb, 0, nullptr, 0, nullptr);
+            float k = std::min(static_cast<float>(sc.extent.width) / srcW, static_cast<float>(sc.extent.height) / srcH);
+            int32_t dw = std::max(1, static_cast<int32_t>(srcW * k)), dh = std::max(1, static_cast<int32_t>(srcH * k));
+            int32_t ox = (static_cast<int32_t>(sc.extent.width) - dw) / 2, oy = (static_cast<int32_t>(sc.extent.height) - dh) / 2;
+            blit.dstOffsets[0] = {ox, oy, 0};
+            blit.dstOffsets[1] = {ox + dw, oy + dh, 1};
+        }
         vkCmdBlitImage(cmd, renderer.output().image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, display.image,
                        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR);
 
@@ -433,10 +656,21 @@ int runWindow(const Options& opt, Scene& scene) {
                         VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
         int margin = static_cast<int>(12 * contentScale);
         int helpX = margin, helpY = static_cast<int>(sc.extent.height) - static_cast<int>(help.height) - margin;
-        renderer.recordOverlay(cmd, helpX, helpY, nv.showHelp ? 0.95f : 0.8f);
+        int barX = static_cast<int>(sc.extent.width) - static_cast<int>(toolbar.image.width) - margin, barY = margin;
+        nv.buttons.clear();
+        if (!nv.exporting) {
+            renderer.recordOverlay(cmd, kHelpSlot, helpX, helpY, nv.showHelp ? 0.95f : 0.8f);
+            renderer.recordOverlay(cmd, kToolbarSlot, barX, barY, 0.95f);
+            for (const auto& b : toolbar.buttons) nv.buttons.push_back({barX + b.x, barY + b.y, b.w, b.h});
+        }
+        if (status.width > 0) {
+            int statusX = (static_cast<int>(sc.extent.width) - static_cast<int>(status.width)) / 2;
+            int statusY = nv.exporting ? margin : margin * 2 + static_cast<int>(toolbar.image.height);
+            renderer.recordOverlay(cmd, kStatusSlot, statusX, statusY, 1.0f);
+        }
         nv.toggleX = helpX + help.toggleX;
         nv.toggleY = helpY + help.toggleY;
-        nv.toggleW = help.toggleW;
+        nv.toggleW = nv.exporting ? 0 : help.toggleW;
         nv.toggleH = help.toggleH;
 
         // 3. 画面に写す（形式の違い BGRA / RGBA も blit が吸収する）
@@ -485,6 +719,14 @@ int runWindow(const Options& opt, Scene& scene) {
 
         vkWaitForFences(ctx.device, 1, &fence, VK_TRUE, UINT64_MAX);
         vkResetFences(ctx.device, 1, &fence);
+        if (nv.exporting) {
+            // 書き出し中は明るさを変えない（書き出しを始めたときの明るさのまま）
+            renderer.finishFrame();
+            job.done += static_cast<int>(job.view.samplesPerFrame);
+            if (nv.cancelExport) finishExport(true);
+            else if (job.done >= job.samples) finishExport(false);
+            continue;
+        }
         // 動いている間はゆっくり、止まった直後に素早く合わせると目が疲れにくい
         exposure.update(renderer.finishFrame(), nv.evOffset, 0.9f);
 

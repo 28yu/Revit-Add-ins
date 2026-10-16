@@ -57,8 +57,11 @@ struct Scene {
     size_t triangleCount() const { return indices.size() / 3; }
 };
 
-// Revit 側（Tools28）が書き出すシーンファイル（.t28s）を読む
-bool loadScene(const std::string& path, Scene& scene, std::string& error);
+// Revit 側（Tools28）が書き出すシーンファイル（.t28s）を読む。
+// offset: ファイルの途中から読む（ビューアの exe に埋め込んだシーンを読むとき）
+bool loadScene(const std::string& path, Scene& scene, std::string& error, long offset = 0);
+// シーンを同じ形式で書き出す（ビューアの exe に埋め込むときに使う）
+void saveScene(const Scene& scene, std::vector<uint8_t>& out);
 // 動作確認用の部屋（窓・柱・ガラス・鏡）
 Scene makeTestScene();
 

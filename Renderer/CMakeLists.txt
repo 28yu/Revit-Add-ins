@@ -64,6 +64,7 @@ endif()
 add_executable(Tools28Render
   src/main.cpp
   src/bvh.cpp
+  src/export.cpp
   src/help_overlay.cpp
   src/log.cpp
   src/i18n.cpp
@@ -88,7 +89,7 @@ if(WIN32)
     set_target_properties(Tools28Render PROPERTIES WIN32_EXECUTABLE ON
       MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
   endif()
-  target_link_libraries(Tools28Render PRIVATE shell32)
+  target_link_libraries(Tools28Render PRIVATE shell32 comdlg32)
 else()
   target_link_libraries(Tools28Render PRIVATE ${CMAKE_DL_LIBS} pthread)
 endif()

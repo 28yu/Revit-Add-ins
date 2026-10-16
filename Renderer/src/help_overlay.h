@@ -5,6 +5,7 @@
 // 記号はクリックでも H キーでも切り替えられる。
 // 文字は Windows に入っているフォント（言語ごとに選ぶ）で描くので、exe にフォントを入れなくてよい。
 #include <cstdint>
+#include <string>
 #include <vector>
 
 namespace t28 {
@@ -19,5 +20,19 @@ struct HelpImage {
 // expanded: 開いた状態か。scale: 画面の拡大率（高 DPI の画面では 1.5 など）
 // フォントが見つからなくても絵だけは作る（文字が欠けるだけ）
 HelpImage buildHelpImage(bool expanded, float scale);
+
+// 右上のツールバー（書き出しのボタン）。ボタンは左から「画像」「360°」「ビューア（exe）」
+struct ToolbarImage {
+    HelpImage image;
+    struct Rect { int x, y, w, h; };
+    std::vector<Rect> buttons;  // 画像の左上からの画素
+};
+enum ToolbarButton { kButtonImage = 0, kButtonPanorama = 1, kButtonViewer = 2, kButtonCount = 3 };
+// hover: カーソルが乗っているボタン（-1 = 無し）
+ToolbarImage buildToolbarImage(float scale, int hover);
+
+// 画面の上の中央に出すお知らせ（ボタンの説明・書き出しの進み具合・保存しました 等）。
+// progress: 0〜1 なら進み具合の棒を出す（負なら出さない）。lines は 1〜2 行
+HelpImage buildStatusImage(const std::vector<std::string>& lines, float progress, float scale);
 
 }  // namespace t28

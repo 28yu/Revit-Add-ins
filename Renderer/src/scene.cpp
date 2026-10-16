@@ -37,10 +37,15 @@ private:
 };
 }  // namespace
 
-bool loadScene(const std::string& path, Scene& scene, std::string& error) {
+bool loadScene(const std::string& path, Scene& scene, std::string& error, long offset) {
     FILE* f = openFile(path, "rb");
     if (!f) {
         error = "cannot open file: " + path;
+        return false;
+    }
+    if (offset > 0 && fseek(f, offset, SEEK_SET) != 0) {
+        fclose(f);
+        error = "cannot seek: " + path;
         return false;
     }
     Reader r(f);
@@ -125,6 +130,43 @@ bool loadScene(const std::string& path, Scene& scene, std::string& error) {
         return false;
     }
     return true;
+}
+
+namespace {
+template <typename T>
+void put(std::vector<uint8_t>& out, const T& v) {
+    const uint8_t* p = reinterpret_cast<const uint8_t*>(&v);
+    out.insert(out.end(), p, p + sizeof(T));
+}
+}  // namespace
+
+void saveScene(const Scene& scene, std::vector<uint8_t>& out) {
+    out.insert(out.end(), {'T', '2', '8', 'S'});
+    put(out, kVersion);
+    const Camera& c = scene.camera;
+    for (float v : {c.eye.x, c.eye.y, c.eye.z, c.forward.x, c.forward.y, c.forward.z, c.up.x, c.up.y, c.up.z, c.fovY}) put(out, v);
+    for (float v : {scene.sunDir.x, scene.sunDir.y, scene.sunDir.z, scene.sunIntensity, scene.skyIntensity}) put(out, v);
+    put(out, static_cast<uint32_t>(scene.materials.size()));
+    for (const Material& m : scene.materials) {
+        for (float v : {m.r, m.g, m.b, m.opacity, m.roughness, m.metallic, m.emissive, m.f0}) put(out, v);
+        put(out, m.texture);
+        put(out, static_cast<uint32_t>(m.name.size()));
+        out.insert(out.end(), m.name.begin(), m.name.end());
+    }
+    put(out, static_cast<uint32_t>(scene.vertices.size()));
+    for (const Vertex& v : scene.vertices)
+        for (float x : {v.px, v.py, v.pz, v.nx, v.ny, v.nz, v.u, v.v}) put(out, x);
+    put(out, static_cast<uint32_t>(scene.triangleCount()));
+    for (size_t t = 0; t < scene.triangleCount(); ++t) {
+        for (int k = 0; k < 3; ++k) put(out, scene.indices[t * 3 + k]);
+        put(out, scene.triMaterials[t]);
+    }
+    put(out, static_cast<uint32_t>(scene.textures.size()));
+    for (const Texture& t : scene.textures) {
+        put(out, t.width);
+        put(out, t.height);
+        out.insert(out.end(), t.rgba.begin(), t.rgba.end());
+    }
 }
 
 uint32_t Scene::sortGlassLast() {

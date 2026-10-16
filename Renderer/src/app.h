@@ -2,6 +2,7 @@
 // 起動時の設定と、カメラ・自動露出の共通処理。
 #include <cmath>
 #include <string>
+#include <vector>
 
 #include "bvh.h"
 #include "renderer.h"
@@ -13,6 +14,7 @@ struct Options {
     std::string scenePath;         // 空なら確認用の部屋
     std::string outputPath;        // 指定があれば画像だけ作って終わる
     std::string logPath;
+    std::string title;             // モデル名・ビュー名（ウィンドウの題名と、書き出すファイルの名前に使う）
     int width = 1280, height = 720;
     int samples = 256;             // 画像だけ作るときの足し合わせ回数
     bool panorama = false;
@@ -22,6 +24,7 @@ struct Options {
     bool autoExposure = true;
     float renderScale = 0.0f;      // ウィンドウより小さく描いて拡大する（速さ優先）。0 = 自動
     bool forceSoftware = false;    // RT コアがあっても予備の方式で描く（動作確認用）
+    int exportSamples = 0;         // 書き出しの足し合わせ回数（0 = 自動。動作確認で短くするとき用）
     int exitAfterFrames = 0;       // 動作確認用: このフレーム数を描いたら自動で閉じる（0 = 閉じない）
 };
 
@@ -101,6 +104,9 @@ inline uint32_t prepareScene(Scene& scene, Bvh& bvh) {
     bvh.build(scene);
     return glassStart;
 }
+
+// GPU の画像（RGBA8、GENERAL レイアウト）を CPU 側に写す。終わると GENERAL に戻す
+std::vector<uint8_t> readImageRgba(VkContext& ctx, const Image& image);
 
 int runOffscreen(const Options& opt, Scene& scene);
 int runWindow(const Options& opt, Scene& scene);

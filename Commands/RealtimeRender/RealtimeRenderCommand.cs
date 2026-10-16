@@ -70,7 +70,7 @@ namespace Tools28.Commands.RealtimeRender
                 var psi = new ProcessStartInfo
                 {
                     FileName = exePath,
-                    Arguments = $"--scene \"{scenePath}\" --lang {Loc.CurrentLang}",
+                    Arguments = $"--scene \"{scenePath}\" --lang {Loc.CurrentLang} --title \"{MakeTitle(doc, view)}\"",
                     UseShellExecute = false,
                     WorkingDirectory = Path.GetDirectoryName(exePath) ?? "",
                 };
@@ -176,7 +176,17 @@ namespace Tools28.Commands.RealtimeRender
             }
         }
 
-        private static float[] ToFloats(XYZ v, double scale = 1.0) =>
+        /// <summary>
+        /// 描画ウィンドウの題名・書き出すファイルの名前に使う「モデル名 - ビュー名」。
+        /// コマンドラインの引数に入れるので、引用符は使わない文字に置き換える。
+        /// </summary>
+        private static string MakeTitle(Document doc, View view)
+        {
+            string title = $"{doc.Title} - {view.Name}";
+            return title.Replace('"', '\'').Replace("\\", "_").Trim();
+        }
+
+                private static float[] ToFloats(XYZ v, double scale = 1.0) =>
             new[] { (float)(v.X * scale), (float)(v.Y * scale), (float)(v.Z * scale) };
     }
 }
