@@ -25,6 +25,9 @@ namespace Tools28.Commands.AutoBackup.Services
         private const string BackupSubFolder = "Tools28_Backups";
         private const string BackupMarker = "_backup_";
 
+        // バックアップ間隔の上限（分）。Timer.Interval は約 35,000 分を超えると例外になる
+        internal const int MaxIntervalMinutes = 1440;
+
         private ExternalEvent _externalEvent;
         private Timer _timer;
         private bool _isBackingUp;
@@ -188,7 +191,7 @@ namespace Tools28.Commands.AutoBackup.Services
             _timer.Stop();
             if (_settings.Enabled)
             {
-                int minutes = Math.Max(1, _settings.IntervalMinutes);
+                int minutes = Math.Min(MaxIntervalMinutes, Math.Max(1, _settings.IntervalMinutes));
                 _timer.Interval = minutes * 60_000.0;
                 _timer.Start();
             }
@@ -271,6 +274,14 @@ namespace Tools28.Commands.AutoBackup.Services
                 string destName = $"{baseName}{BackupMarker}{stamp}{ext}";
                 string destPath = Path.Combine(backupFolder, destName);
 
+                // 前回のバックアップから変わっていなければコピーしない。
+                // 放置中に同じ内容のコピーが増えると、世代数の上限で古い（異なる）世代が消えてしまうため
+                if (IsSameAsLatestBackup(sourcePath, backupFolder, baseName, ext))
+                {
+                    SetStatus(true, Loc.S("AutoBackup.Status.Unchanged"), updateTime: false);
+                    return;
+                }
+
                 File.Copy(sourcePath, destPath, overwrite: true);
 
                 RotateBackups(backupFolder, baseName, ext);
@@ -348,6 +359,33 @@ namespace Tools28.Commands.AutoBackup.Services
                 return Path.Combine(modelDir, BackupSubFolder);
             }
             return _settings.BackupFolder;
+        }
+
+        /// <summary>
+        /// 最新のバックアップがモデルファイルと同じ内容か（更新日時とサイズで判定）。
+        /// File.Copy はコピー元の更新日時を引き継ぐため、モデルが保存されていなければ一致する。
+        /// </summary>
+        private static bool IsSameAsLatestBackup(string sourcePath, string folder, string baseName, string ext)
+        {
+            try
+            {
+                if (!Directory.Exists(folder)) return false;
+
+                var latest = new DirectoryInfo(folder)
+                    .GetFiles($"{baseName}{BackupMarker}*{ext}")
+                    .OrderByDescending(f => ExtractBackupStamp(f.Name), StringComparer.Ordinal)
+                    .FirstOrDefault();
+                if (latest == null) return false;
+
+                var source = new FileInfo(sourcePath);
+                return latest.Length == source.Length
+                    && latest.LastWriteTimeUtc == source.LastWriteTimeUtc;
+            }
+            catch (Exception ex)
+            {
+                DiagLog.Write($"AutoBackup 前回との比較に失敗: {ex.Message}");
+                return false;
+            }
         }
 
         /// <summary>

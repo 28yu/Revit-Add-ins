@@ -76,13 +76,16 @@ namespace Tools28.Commands.FilledRegionSplitMerge
                                 .Where(fr => fr.GetBoundaries().Count > 1)
                                 .ToList();
 
+                            // 穴があるだけの領域は分割されない（0 が返る）ため、実際に分割した数を数える
+                            int splitRegionCount = 0;
                             foreach (var fr in regionsToSplit)
                             {
                                 int count = FilledRegionHelper.SplitFilledRegion(doc, fr);
                                 processedCount += count;
+                                if (count > 0) splitRegionCount++;
                             }
 
-                            resultMessage = string.Format(Loc.S("FilledRegion.SplitResult"), regionsToSplit.Count, processedCount);
+                            resultMessage = string.Format(Loc.S("FilledRegion.SplitResult"), splitRegionCount, processedCount);
                         }
                         else // Merge
                         {

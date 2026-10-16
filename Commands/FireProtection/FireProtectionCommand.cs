@@ -232,12 +232,8 @@ namespace Tools28.Commands.FireProtection
 
                     try
                     {
-                        // Type削除は全ビュー処理前に1回だけ
-                        if (settings.OverwriteExisting)
-                        {
-                            FilledRegionCreator.CleanupExistingTypes(doc);
-                        }
-
+                        // 上書き時もタイプは削除しない（削除すると他のビュー・シートの
+                        // 塗潰領域まで消えるため）。対象ビューの領域だけを各ビューで作り直す
                         foreach (var view in targetViews)
                         {
                             // このビューの要素を収集

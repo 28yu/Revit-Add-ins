@@ -51,14 +51,19 @@ namespace Tools28.Commands.FilledRegionSplitMerge
             if (analysis.FilledRegions.Count == 0)
                 return analysis;
 
-            // 分割可能かチェック（複数エリアを持つ領域があるか）
+            // 分割可能かチェック（離れた複数のエリアを持つ領域があるか）
+            // 穴のループは独立したエリアではないため、境界ループ数ではなくエリア数で判定する
             foreach (var fr in analysis.FilledRegions)
             {
                 var boundaries = fr.GetBoundaries();
                 if (boundaries.Count > 1)
                 {
-                    analysis.CanSplit = true;
-                    break;
+                    var islands = GetIslands(boundaries);
+                    if (islands != null && islands.Count > 1)
+                    {
+                        analysis.CanSplit = true;
+                        break;
+                    }
                 }
             }
 
@@ -114,13 +119,18 @@ namespace Tools28.Commands.FilledRegionSplitMerge
                 throw new InvalidOperationException("ビューが見つかりません");
             }
 
+            // 外形ループとその穴をまとめて1エリアとする（穴を別の領域にしない）
+            var islands = GetIslands(boundaries);
+            if (islands == null || islands.Count <= 1)
+            {
+                return 0; // 分割不可（穴があるだけの1エリア、または形状を解析できない）
+            }
+
             int createdCount = 0;
 
-            // 各境界線に対して新しい領域を作成
-            foreach (var curveLoop in boundaries)
+            foreach (var islandLoops in islands)
             {
-                var loops = new List<CurveLoop> { curveLoop };
-                FilledRegion.Create(doc, typeId, view.Id, loops);
+                FilledRegion.Create(doc, typeId, view.Id, islandLoops);
                 createdCount++;
             }
 
@@ -183,50 +193,28 @@ namespace Tools28.Commands.FilledRegionSplitMerge
             return filledRegions.Count;
         }
 
+        // 領域の形状を薄い板として押し出して扱うときの厚さ（feet）
+        private const double ExtrusionThickness = 1.0;
+
         /// <summary>
         /// 複数の CurveLoop 群をブーリアン和で統合する
         /// （重なり合う領域を1つの輪郭に統合、離れている領域は複数ループとして残る）
+        /// 1つでも押し出し・和集合に失敗した領域があれば null を返す
+        /// （その領域を黙って捨てると、元の領域を削除したときに消えてしまうため）
         /// </summary>
         private static List<CurveLoop> UnionRegionLoops(List<IList<CurveLoop>> regionLoops)
         {
-            // 共通の基準平面（最初の外形ループから法線を決定）
-            XYZ normal = null;
-            foreach (var loops in regionLoops)
-            {
-                if (loops.Count == 0) continue;
-                try
-                {
-                    var plane = loops[0].GetPlane();
-                    if (plane != null)
-                    {
-                        normal = plane.Normal.Normalize();
-                        break;
-                    }
-                }
-                catch { }
-            }
-
+            XYZ normal = GetNormal(regionLoops);
             if (normal == null)
                 return null;
-
-            const double thickness = 1.0; // 1 feet の薄板として押し出し
 
             Solid unionSolid = null;
 
             foreach (var loops in regionLoops)
             {
-                Solid solid;
-                try
-                {
-                    solid = GeometryCreationUtilities.CreateExtrusionGeometry(loops, normal, thickness);
-                }
-                catch
-                {
-                    continue;
-                }
-
-                if (solid == null || solid.Volume < 1e-9)
-                    continue;
+                Solid solid = Extrude(loops, normal);
+                if (solid == null)
+                    return null;
 
                 if (unionSolid == null)
                 {
@@ -238,49 +226,128 @@ namespace Tools28.Commands.FilledRegionSplitMerge
                 {
                     var combined = BooleanOperationsUtils.ExecuteBooleanOperation(
                         unionSolid, solid, BooleanOperationsType.Union);
-                    if (combined != null && combined.Volume > 1e-9)
-                        unionSolid = combined;
+                    // 和集合は元のどちらよりも小さくならない。小さければ失敗とみなす
+                    double minVolume = Math.Max(unionSolid.Volume, solid.Volume) * 0.999;
+                    if (combined == null || combined.Volume < minVolume)
+                        return null;
+                    unionSolid = combined;
                 }
                 catch
                 {
-                    // 和集合に失敗した場合はその領域を無視して続行
+                    return null;
                 }
             }
 
-            if (unionSolid == null)
+            return GetTopFaceLoops(unionSolid, normal);
+        }
+
+        /// <summary>
+        /// 境界ループを、離れたエリアごと（外形ループ＋その穴）にまとめる。
+        /// 形状を解析できない場合は null を返す
+        /// </summary>
+        private static List<List<CurveLoop>> GetIslands(IList<CurveLoop> boundaries)
+        {
+            XYZ normal = GetNormal(new List<IList<CurveLoop>> { boundaries });
+            if (normal == null)
                 return null;
 
-            // 押し出し方向の"上面"となる平面（法線が +normal と一致する PlanarFace）を取得
-            PlanarFace topFace = null;
-            foreach (Face face in unionSolid.Faces)
-            {
-                if (face is PlanarFace pf
-                    && pf.FaceNormal.IsAlmostEqualTo(normal))
-                {
-                    topFace = pf;
-                    break;
-                }
-            }
-
-            if (topFace == null)
+            Solid solid = Extrude(boundaries, normal);
+            if (solid == null)
                 return null;
 
             try
             {
-                var rawLoops = topFace.GetEdgesAsCurveLoops();
-                if (rawLoops == null || rawLoops.Count == 0)
+                var islands = new List<List<CurveLoop>>();
+                foreach (Solid part in SolidUtils.SplitVolumes(solid))
+                {
+                    var loops = GetTopFaceLoops(part, normal);
+                    if (loops == null)
+                        return null;
+                    islands.Add(loops);
+                }
+
+                // 取りこぼしが無いこと（ループ数の合計が元と一致）を確認する
+                if (islands.Sum(i => i.Count) != boundaries.Count)
                     return null;
 
-                // 上面は押し出し方向へ thickness ぶんオフセットしているので元平面へ戻す
-                var back = Transform.CreateTranslation(-thickness * normal);
-                var result = new List<CurveLoop>();
-                foreach (var loop in rawLoops)
+                return islands;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        // 共通の基準平面の法線（最初に取得できたループの平面から決定）
+        private static XYZ GetNormal(List<IList<CurveLoop>> regionLoops)
+        {
+            foreach (var loops in regionLoops)
+            {
+                if (loops.Count == 0) continue;
+                try
                 {
-                    var moved = new CurveLoop();
-                    foreach (Curve c in loop)
-                        moved.Append(c.CreateTransformed(back));
-                    result.Add(moved);
+                    var plane = loops[0].GetPlane();
+                    if (plane != null)
+                        return plane.Normal.Normalize();
                 }
+                catch { }
+            }
+            return null;
+        }
+
+        private static Solid Extrude(IList<CurveLoop> loops, XYZ normal)
+        {
+            try
+            {
+                var solid = GeometryCreationUtilities.CreateExtrusionGeometry(loops, normal, ExtrusionThickness);
+                if (solid == null || solid.Volume < 1e-9)
+                    return null;
+                return solid;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// 押し出したソリッドの"上面"（法線が +normal の PlanarFace）すべてのループを、
+        /// 元の平面に戻して返す。離れたエリアは上面が複数になるため、すべて集める。
+        /// 上面の合計面積が体積/厚さと一致しない（取りこぼしがある）場合は null を返す
+        /// </summary>
+        private static List<CurveLoop> GetTopFaceLoops(Solid solid, XYZ normal)
+        {
+            if (solid == null)
+                return null;
+
+            try
+            {
+                var back = Transform.CreateTranslation(-ExtrusionThickness * normal);
+                var result = new List<CurveLoop>();
+                double topArea = 0;
+
+                foreach (Face face in solid.Faces)
+                {
+                    if (!(face is PlanarFace pf) || !pf.FaceNormal.IsAlmostEqualTo(normal))
+                        continue;
+
+                    topArea += pf.Area;
+                    foreach (var loop in pf.GetEdgesAsCurveLoops())
+                    {
+                        var moved = new CurveLoop();
+                        foreach (Curve c in loop)
+                            moved.Append(c.CreateTransformed(back));
+                        result.Add(moved);
+                    }
+                }
+
+                if (result.Count == 0)
+                    return null;
+
+                double expectedArea = solid.Volume / ExtrusionThickness;
+                if (Math.Abs(topArea - expectedArea) > expectedArea * 0.001)
+                    return null;
+
                 return result;
             }
             catch

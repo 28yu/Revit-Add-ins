@@ -57,7 +57,8 @@ namespace Tools28.Commands.AutoBackup.Views
         /// <summary>UI から設定を構築する。検証エラー時は null を返す。</summary>
         private AutoBackupSettings BuildSettings()
         {
-            if (!int.TryParse(TxtInterval.Text.Trim(), out int interval) || interval < 1)
+            if (!int.TryParse(TxtInterval.Text.Trim(), out int interval)
+                || interval < 1 || interval > AutoBackupService.MaxIntervalMinutes)
             {
                 TaskDialog.Show(Loc.S("Common.InputError"), Loc.S("AutoBackup.Error.Interval"));
                 return null;

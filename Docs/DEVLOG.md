@@ -2549,3 +2549,28 @@ Revit 2022 / 2024（AutoBuild を `[build:2022,2024]` で実行）
   開いているブック一覧・選択・読み込み失敗（例外の詳細）を `[ExcelImport]` でログに残すようにした。
   拡張子判定は FullName（URL 末尾に `?web=1` 等が付く場合がある）ではなく `Workbook.Name` で行う
 
+
+## 全機能レビュー（2026-10-16）
+
+v2.6/v2.7 公開後、RealtimeRender 以外の全機能を6系統に分けて読み、指摘はコードで再現経路を確認した。
+クラッシュ・バージョン差・辞書不整合はほぼ無し。多かったのは「上書き・統合・削除が対象外まで巻き込む」型。
+
+### 修正済み
+- **耐火被覆** `FilledRegionCreator.CleanupExistingTypes` が「耐火被覆_」タイプを削除 → Revit はタイプ削除でそのタイプの全領域（他ビュー・シート）を消す。
+  タイプは削除せず `ApplyAppearance` で色・模様を更新。領域削除は `CleanupExistingRegions`（対象ビューのみ）に限定
+- **塗潰し領域 統合** `UnionRegionLoops` が上面（PlanarFace）を最初の1枚しか拾わず、離れた領域が消えていた。
+  押し出し・和集合失敗も `continue` で捨てて元を削除していた → 全上面を集め、面積＝体積/厚さで取りこぼし検査、失敗時は null（単純連結へ）
+- **塗潰し領域 分割** 穴ループも別領域にしていた → 押し出し＋`SolidUtils.SplitVolumes` でエリア（外形＋穴）単位に分ける。`CanSplit` もエリア数で判定
+- **自動バックアップ** 変更が無くても毎回コピー → `IsSameAsLatestBackup`（更新日時・サイズが最新バックアップと一致ならスキップ。File.Copy は更新日時を引き継ぐ）。
+  間隔は 1〜1440 分（Timer.Interval は約 35,791 分超で例外 → 設定保存後に永久停止していた）
+
+### 未修正（TASKS.md 参照）
+- 型枠 `FormworkCalculatorCommand.cs` 256-438: ビュー処理の Transaction がロールバックしても `perViewAnalysisViewIds` / `allMainScheduleIds` が残り、
+  `haveAnyOutput` が真のまま既存シートを削除→空シート作成。Commit 戻り値も未確認
+- 梁 `FilterManager.cs` 52-71: フィルタ名がレベル名基準で全ドキュメント検索 → 同レベルの別ビューで上書き時は削除、非上書き時は現ビューに追加されない
+- 部屋3D: `Room3D.DefaultViewName` / `WorksetName` / `LegendViewName` を Loc.S で生成し検索キーに使用（分類C違反）。`SetWorksetVisibility(false)` を既存ワークセットにも適用
+- 値の一括置換/移動: `RunBusyAsync` が例外を握って戻るため呼び出し側が `Assimilate`。最終バッチ中の中止は `Cancelled` が立たない
+- Excel: `ExcelExportService.cs:146` 文字パラメータも数値セル化（先頭0消失）。`ExcelImportService.cs:997` `numVal.ToString()` が .NET 8 で最短往復表記。
+  `ParameterService.cs:261` 数字を先に ElementId と解釈。`ExcelImportCommand.cs:115` 未コミットでも「他の要素は反映しました」
+- 型枠「1ビュー空白」: `FormworkVisualizer.EnableSectionBox` は DirectShape 作成（558行〜）より前（294行）に、全収集要素（切断ボックス無しのソースではリンク全体）から BB を計算 → 大きすぎて空白に見える仮説。
+  座標系（ワールド vs ローカル）説は可能性低。ログの `EnableSectionBox: set BB` と DirectShape の BB を比較して確認する

@@ -348,7 +348,7 @@ namespace Tools28.Commands.FireProtection
         private static void CleanupLegendRegionTypes(Document doc)
         {
             // ビュー用タイプと共有のため、凡例独自のクリーンアップは不要
-            // （FilledRegionCreatorのCleanupで処理済み）
+            // （タイプは削除せず、上書き時は FilledRegionCreator で色・模様を更新する）
         }
     }
 }

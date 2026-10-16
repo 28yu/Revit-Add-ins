@@ -52,7 +52,8 @@ namespace Tools28.Commands.FireProtection
                 string regionTypeName = TypePrefix + typeName;
                 ElementId regionTypeId = GetOrCreateFilledRegionType(
                     doc, regionTypeName, fillPatternId, fgColor,
-                    typeEntry.ForegroundVisible, bgColor, typeEntry.BackgroundVisible);
+                    typeEntry.ForegroundVisible, bgColor, typeEntry.BackgroundVisible,
+                    updateExisting: overwriteExisting);
                 if (regionTypeId == null) continue;
 
                 // 各要素のアウトラインを生成
@@ -238,7 +239,8 @@ namespace Tools28.Commands.FireProtection
                 Color colBgColor = new Color(typeEntry.ColBgColorR, typeEntry.ColBgColorG, typeEntry.ColBgColorB);
                 ElementId colTypeId = GetOrCreateFilledRegionType(
                     doc, colTypeName, fillPatternId, colFgColor,
-                    typeEntry.ColForegroundVisible, colBgColor, typeEntry.ColBackgroundVisible);
+                    typeEntry.ColForegroundVisible, colBgColor, typeEntry.ColBackgroundVisible,
+                    updateExisting: overwriteExisting);
                 if (colTypeId != null)
                     colTypeIds[typeEntry.Name] = colTypeId;
             }
@@ -333,16 +335,22 @@ namespace Tools28.Commands.FireProtection
 
         private static ElementId GetOrCreateFilledRegionType(
             Document doc, string typeName, ElementId fillPatternId, Color fgColor,
-            bool fgVisible = true, Color bgColor = null, bool bgVisible = false)
+            bool fgVisible = true, Color bgColor = null, bool bgVisible = false,
+            bool updateExisting = false)
         {
-            // 既存タイプがあれば再利用（複数ビュー処理時に削除しない）
+            // 既存タイプがあれば再利用する（タイプを削除すると、そのタイプを使う
+            // 全ビューの塗潰領域まで消えるため、上書き時も削除せず見た目だけ更新する）
             var existing = new FilteredElementCollector(doc)
                 .OfClass(typeof(FilledRegionType))
                 .Cast<FilledRegionType>()
                 .FirstOrDefault(t => t.Name == typeName);
 
             if (existing != null)
+            {
+                if (updateExisting)
+                    ApplyAppearance(existing, fillPatternId, fgColor, fgVisible, bgColor, bgVisible);
                 return existing.Id;
+            }
 
             var baseType = new FilteredElementCollector(doc)
                 .OfClass(typeof(FilledRegionType))
@@ -354,6 +362,14 @@ namespace Tools28.Commands.FireProtection
             var newType = baseType.Duplicate(typeName) as FilledRegionType;
             if (newType == null) return null;
 
+            ApplyAppearance(newType, fillPatternId, fgColor, fgVisible, bgColor, bgVisible);
+            return newType.Id;
+        }
+
+        private static void ApplyAppearance(
+            FilledRegionType newType, ElementId fillPatternId, Color fgColor,
+            bool fgVisible, Color bgColor, bool bgVisible)
+        {
             // 前景
             if (fgVisible && fillPatternId != null && fillPatternId != ElementId.InvalidElementId)
             {
@@ -378,26 +394,6 @@ namespace Tools28.Commands.FireProtection
             }
 
             newType.IsMasking = false;
-
-            return newType.Id;
-        }
-
-        /// <summary>
-        /// 全ビューの処理前に1回だけ呼ぶ: 既存のFilledRegionTypeを削除
-        /// </summary>
-        public static void CleanupExistingTypes(Document doc)
-        {
-            var existingTypes = new FilteredElementCollector(doc)
-                .OfClass(typeof(FilledRegionType))
-                .Cast<FilledRegionType>()
-                .Where(t => t.Name.StartsWith(TypePrefix))
-                .Select(t => t.Id)
-                .ToList();
-
-            foreach (var id in existingTypes)
-            {
-                try { doc.Delete(id); } catch { }
-            }
         }
 
         private static void CleanupExistingRegions(Document doc, View view)
