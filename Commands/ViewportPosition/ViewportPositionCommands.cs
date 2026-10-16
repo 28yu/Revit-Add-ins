@@ -542,7 +542,7 @@ namespace Tools28.Commands.ViewportPosition
                         }
                         else
                         {
-                            return ExecuteMultiSheetPasteImpl(doc, selectedSheets);
+                            return ExecuteSingleSheetPasteImpl(doc, selectedSheets[0], ref message);
                         }
                     }
 
@@ -555,6 +555,12 @@ namespace Tools28.Commands.ViewportPosition
                     {
                         return ExecuteViewBasedPasteImpl(doc, selectedViews);
                     }
+                }
+
+                // パターン3: シートを開いて何も選択していない場合は、開いているシートが対象（マニュアルの手順）
+                if (activeSheet != null && selectedIds.Count == 0)
+                {
+                    return ExecuteSingleSheetPasteImpl(doc, activeSheet, ref message);
                 }
 
                 // どれでもない場合はエラー
@@ -667,57 +673,43 @@ namespace Tools28.Commands.ViewportPosition
             return ApplyPositionToViewportsImpl(doc, viewports, Loc.S("ViewportPos.Op.DirectViewport"), null);
         }
 
-        private Result ExecuteMultiSheetPasteImpl(Document doc, List<ViewSheet> sheets)
+        // シート1枚が対象のとき。以前はシート上の全ビューポートを同じ位置へ動かしていたため、
+        // 複数あると全部が1か所に重なった。動かすのは「どれか特定できる1つ」だけにする。
+        private Result ExecuteSingleSheetPasteImpl(Document doc, ViewSheet sheet, ref string message)
         {
-            var sheetInfo = new List<(ViewSheet sheet, List<Viewport> viewports)>();
-            int totalViewports = 0;
+            var viewports = new FilteredElementCollector(doc)
+                .OfClass(typeof(Viewport))
+                .WhereElementIsNotElementType()
+                .Cast<Viewport>()
+                .Where(vp => vp.SheetId == sheet.Id)
+                .ToList();
 
-            foreach (var sheet in sheets)
+            if (viewports.Count == 0)
             {
-                var viewports = new FilteredElementCollector(doc)
-                    .OfClass(typeof(Viewport))
-                    .WhereElementIsNotElementType()
-                    .Cast<Viewport>()
-                    .Where(vp => vp.SheetId == sheet.Id)
-                    .ToList();
-
-                sheetInfo.Add((sheet, viewports));
-                totalViewports += viewports.Count;
-            }
-
-            if (totalViewports == 0)
-            {
+                message = Loc.S("ViewportPos.NoViewportOnSheet");
                 return Result.Failed;
             }
 
-            using (Transaction trans = new Transaction(doc, Loc.S("ViewportPos.Txn.Paste")))
+            // 1つだけならそれを動かす
+            if (viewports.Count == 1)
             {
-                trans.Start();
-
-                int successCount = 0;
-                int totalProcessed = 0;
-
-                foreach (var (sheet, viewports) in sheetInfo)
-                {
-                    foreach (Viewport viewport in viewports)
-                    {
-                        totalProcessed++;
-                        try
-                        {
-                            viewport.SetBoxCenter(ViewportPositionClipboard.CopiedPosition);
-                            successCount++;
-                        }
-                        catch
-                        {
-                            // エラーは無視して続行
-                        }
-                    }
-                }
-
-                trans.Commit();
+                return ApplyPositionToViewportsImpl(doc, viewports, Loc.S("ViewportPos.Op.Sheet"), null);
             }
 
-            return Result.Succeeded;
+            // 複数あるときは、コピー元とビュー名が同じもの（凡例など複数シートに置けるビュー）が1つに決まる場合だけ動かす
+            string sourceName = ViewportPositionClipboard.SourceViewportInfo;
+            var sameName = viewports
+                .Where(vp => (doc.GetElement(vp.ViewId) as View)?.Name is string name
+                             && string.Equals(name, sourceName, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            if (sameName.Count == 1)
+            {
+                return ApplyPositionToViewportsImpl(doc, sameName, Loc.S("ViewportPos.Op.Sheet"), null);
+            }
+
+            // どれを動かすか決められないので何も動かさず、ビューポートを選ぶよう案内する
+            message = Loc.S("ViewportPos.SheetHasMultiple");
+            return Result.Failed;
         }
 
         private Result ExecuteViewBasedPasteImpl(Document doc, List<View> selectedViews)

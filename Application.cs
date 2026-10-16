@@ -548,6 +548,7 @@ namespace Tools28
             backupData.ToolTip = Loc.S("Ribbon.AutoBackup.Tip");
             backupData.Image = LoadImage("auto_backup_16.png");
             backupData.LargeImage = LoadImage("auto_backup.png");
+            backupData.AvailabilityClassName = AlwaysAvailable.ClassName;
             AddButton(panel, backupData);
 
             string currentLang = Loc.CurrentLang;
@@ -561,10 +562,12 @@ namespace Tools28
             var aboutData = new PushButtonData("About", Loc.S("Ribbon.Settings.About"), assemblyPath, "Tools28.Commands.LanguageSwitch.AboutCommand");
             aboutData.ToolTip = Loc.S("Ribbon.Settings.About.Tip");
             aboutData.Image = LoadImage("ver_16.png");
+            aboutData.AvailabilityClassName = AlwaysAvailable.ClassName;
 
             var manualData = new PushButtonData("Manual", Loc.S("Ribbon.Settings.Manual"), assemblyPath, "Tools28.Commands.LanguageSwitch.ManualCommand");
             manualData.ToolTip = Loc.S("Ribbon.Settings.Manual.Tip");
             manualData.Image = LoadImage("manual_16.png");
+            manualData.AvailabilityClassName = AlwaysAvailable.ClassName;
 
             var stackedItems = panel.AddStackedItems(langData, aboutData, manualData);
 
@@ -576,6 +579,7 @@ namespace Tools28
             {
                 var jpData = new PushButtonData("LangJP", "JP", assemblyPath, "Tools28.Commands.LanguageSwitch.SwitchToJapaneseCommand");
                 jpData.Image = LoadImage("flag_jp_16.png");
+                jpData.AvailabilityClassName = AlwaysAvailable.ClassName;
                 jpData.LargeImage = LoadImage("flag_jp_32.png");
                 jpData.ToolTip = Loc.S("Ribbon.Settings.Lang.JP.Tip");
                 // 戻り値を保持しないと UpdateRibbonLanguage() の対象外になり、
@@ -584,12 +588,14 @@ namespace Tools28
 
                 var enData = new PushButtonData("LangUS", "US", assemblyPath, "Tools28.Commands.LanguageSwitch.SwitchToEnglishCommand");
                 enData.Image = LoadImage("flag_us_16.png");
+                enData.AvailabilityClassName = AlwaysAvailable.ClassName;
                 enData.LargeImage = LoadImage("flag_us_32.png");
                 enData.ToolTip = Loc.S("Ribbon.Settings.Lang.US.Tip");
                 RegisterButton("LangUS", LanguagePulldown.AddPushButton(enData));
 
                 var cnData = new PushButtonData("LangCN", "CN", assemblyPath, "Tools28.Commands.LanguageSwitch.SwitchToChineseCommand");
                 cnData.Image = LoadImage("flag_cn_16.png");
+                cnData.AvailabilityClassName = AlwaysAvailable.ClassName;
                 cnData.LargeImage = LoadImage("flag_cn_32.png");
                 cnData.ToolTip = Loc.S("Ribbon.Settings.Lang.CN.Tip");
                 RegisterButton("LangCN", LanguagePulldown.AddPushButton(cnData));
