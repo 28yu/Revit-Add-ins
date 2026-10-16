@@ -46,36 +46,28 @@ namespace Tools28.Commands.RealtimeRender
                 DiagLog.Cmd("RealtimeRender", $"開始 view={view.Name}");
                 var watch = Stopwatch.StartNew();
 
-                var context = new SceneExportContext(doc);
-                var exporter = new CustomExporter(doc, context) { IncludeGeometricObjects = false };
-                exporter.Export(view);
-
-                RenderScene scene = context.Scene;
-                DiagLog.Cmd("RealtimeRender",
-                    $"書き出し: 要素 {context.ElementCount} / 三角形 {scene.TriangleCount} / マテリアル {scene.Materials.Count} / テクスチャ {scene.Textures.Count} / {watch.ElapsedMilliseconds} ms");
-                foreach (string missing in context.MissingTextures)
-                    DiagLog.Cmd("RealtimeRender", $"テクスチャ画像が見つかりません: {missing}");
+                RenderScene scene = ExportScene(doc, view);
                 if (scene.TriangleCount == 0)
                 {
                     TaskDialog.Show(Loc.S("RtRender.Title"), Loc.S("RtRender.Err.NoGeometry"));
                     return Result.Cancelled;
                 }
 
-                scene.Camera = BuildCamera(view, scene);
-                ApplySun(doc, view, scene);
-
-                string scenePath = Path.Combine(Path.GetTempPath(), "Tools28", "Render", "scene.t28s");
+                // 描画ウィンドウごとに別のファイルにする（ライブ同期で、ウィンドウごとに書き直すため）
+                string scenePath = LiveSync.NewScenePath();
                 SceneWriter.Write(scenePath, scene);
 
                 var psi = new ProcessStartInfo
                 {
                     FileName = exePath,
-                    Arguments = $"--scene \"{scenePath}\" --lang {Loc.CurrentLang} --title \"{MakeTitle(doc, view)}\"",
+                    Arguments = $"--scene \"{scenePath}\" --lang {Loc.CurrentLang} --title \"{MakeTitle(doc, view)}\" --live",
                     UseShellExecute = false,
                     WorkingDirectory = Path.GetDirectoryName(exePath) ?? "",
                 };
-                Process.Start(psi);
+                Process process = Process.Start(psi);
                 DiagLog.Cmd("RealtimeRender", $"描画プログラム起動 ({watch.ElapsedMilliseconds} ms)");
+                if (process != null)
+                    LiveSync.Start(commandData.Application, doc, view, scenePath, process, scene);
                 return Result.Succeeded;
             }
             catch (Exception ex)
@@ -87,10 +79,33 @@ namespace Tools28.Commands.RealtimeRender
         }
 
         /// <summary>
+        /// 3D ビューに表示されている形状・マテリアルを集め、カメラと太陽の向きを決める（ライブ同期でも使う）。
+        /// </summary>
+        internal static RenderScene ExportScene(Document doc, View3D view)
+        {
+            var watch = Stopwatch.StartNew();
+            var context = new SceneExportContext(doc);
+            var exporter = new CustomExporter(doc, context) { IncludeGeometricObjects = false };
+            exporter.Export(view);
+
+            RenderScene scene = context.Scene;
+            DiagLog.Cmd("RealtimeRender",
+                $"書き出し: 要素 {context.ElementCount} / 三角形 {scene.TriangleCount} / マテリアル {scene.Materials.Count} / テクスチャ {scene.Textures.Count} / {watch.ElapsedMilliseconds} ms");
+            foreach (string missing in context.MissingTextures)
+                DiagLog.Cmd("RealtimeRender", $"テクスチャ画像が見つかりません: {missing}");
+            if (scene.TriangleCount > 0)
+            {
+                scene.Camera = BuildCamera(view, scene);
+                ApplySun(doc, view, scene);
+            }
+            return scene;
+        }
+
+        /// <summary>
         /// Revit のビューと同じ位置・向きのカメラを作る。
         /// アイソメ（平行投影）のビューは視点が遠く離れているので、モデル全体が見える位置に置き直す。
         /// </summary>
-        private static RenderCamera BuildCamera(View3D view, RenderScene scene)
+        internal static RenderCamera BuildCamera(View3D view, RenderScene scene, bool quiet = false)
         {
             ViewOrientation3D o = view.GetOrientation();
             var cam = new RenderCamera
@@ -122,7 +137,7 @@ namespace Tools28.Commands.RealtimeRender
                 }
                 cam.FovY = 50f;
             }
-            DiagLog.Cmd("RealtimeRender",
+            if (!quiet) DiagLog.Cmd("RealtimeRender",
                 $"カメラ: 透視={view.IsPerspective} 位置=({cam.Eye[0]:F2},{cam.Eye[1]:F2},{cam.Eye[2]:F2}) 画角={cam.FovY:F1}");
             return cam;
         }

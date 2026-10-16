@@ -11,6 +11,8 @@ Revit の「リアルタイムレンダリング」ボタン（`Commands/Realtim
 - **マテリアルの外観**（Revit の外観タブ）の色・イメージ（テクスチャ）・反射率・粗さ・透明度を使う。
   テクスチャは遠くほど縮小した段（ミップマップ）を使うので、遠くの模様がちらつかない
 - 速い GPU では 1 フレームで複数回（1〜4 回、約 30 fps を目安に自動調整）計算して、動いている間の画質を上げる
+- **ライブ同期**: Revit でモデルを変更したり、Revit のビューの視点を動かしたりすると、自動で描画ウィンドウに反映される
+  （右上の「同期中」ボタンで止める / 再開）
 - **書き出し**（ウィンドウ右上のボタン）: 画像（PNG）／360°画像（ブラウザで見回せる HTML ＋ JPEG）／
   ビューア（シーンを中に入れた exe。Revit の無い PC でもダブルクリックで歩き回れる）
 - 描画は Revit とは別のプログラムで行うので、ここで問題が起きても Revit は止まらない
@@ -77,6 +79,21 @@ Revit の 3D ビューと同じ操作を基本にし、Enscape のような歩�
 | P | 今の視点を画像で保存（右上の「画像」ボタンと同じ） |
 | Esc | 閉じる |
 
+## ライブ同期
+
+```
+Revit（LiveSync.cs）                                   Tools28Render.exe（window_app.cpp）
+  DocumentChanged → 0.8 秒待って Idling で書き出し直し      0.5 秒ごとに更新時刻を調べる
+    → scene_*.t28s.tmp を書いて scene_*.t28s と置き換え  →  読み直す（視点はそのまま）
+  ビューの視点が変わった → scene_*.t28s.cam を書く        →  視点を合わせる
+                          scene_*.t28s.pause があれば休む ←  「同期」ボタンで作る / 消す
+```
+
+- シーンファイルは描画ウィンドウごとに `%TEMP%\Tools28\Render\scene_<Revit の番号>_<連番>.t28s`（2 日たったものは次の起動時に消す）
+- `.cam` は 1 行の文字: 連番 位置xyz 前方向xyz 上方向xyz 縦の画角
+- 大きなモデルでは書き出しに時間がかかり、その間 Revit が止まる。気になるときは「同期」ボタンで止める
+- 描画ウィンドウを閉じると、Revit 側の見張りも終わる
+
 ## 書き出し
 
 | ボタン | 保存するもの | 大きさ・回数 |
@@ -123,7 +140,7 @@ Tools28Render --scene model.t28s [--lang JP|US|CN]     ウィンドウで表示
 Tools28Render --test-scene                              確認用の部屋
 Tools28Render --scene model.t28s --output out.png       画像を作って終わる
     [--width 1280 --height 720 --samples 256 --panorama]
-その他: --title 題名（ウィンドウと書き出すファイルの名前）/ --export-samples 回数（書き出しを短くする。動作確認用）
+その他: --live（シーンファイル・.cam の更新を見張る。Revit から起動したとき）/ --title 題名（ウィンドウと書き出すファイルの名前）/ --export-samples 回数（書き出しを短くする。動作確認用）
         --log ファイル / --gpu 番号 / --bounces 回数 / --exposure EV / --no-auto-exposure
         --render-scale 倍率（小さく描いて拡大＝速い。既定は RT コアあり 1.0・なし 0.5）
         --software（RT コアがあっても予備の方式で描く） / --exit-after フレーム数（動作確認用）

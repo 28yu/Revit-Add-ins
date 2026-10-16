@@ -50,6 +50,7 @@ static int run(int argc, char** argv) {
         else if (a == "--output") opt.outputPath = next();
         else if (a == "--log") opt.logPath = next();
         else if (a == "--title") opt.title = next();
+        else if (a == "--live") opt.liveSync = true;
         else if (a == "--lang") lang = next();
         else if (a == "--width") opt.width = std::atoi(next());
         else if (a == "--height") opt.height = std::atoi(next());

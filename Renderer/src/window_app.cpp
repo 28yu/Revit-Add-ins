@@ -3,6 +3,9 @@
 #include <chrono>
 #include <cmath>
 #include <cstdio>
+#include <filesystem>
+#include <fstream>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -384,9 +387,33 @@ int runWindow(const Options& opt, Scene& scene) {
     updateHelp();
 
     AutoExposure exposure;
+
+    // --- ライブ同期 -----------------------------------------------------------
+    // Revit 側（Tools28）は、モデルが変わるとシーンファイルを書き直し、Revit のビューの視点が変わると「.cam」を書く。
+    // ここでは 0.5 秒ごとにファイルの更新時刻を調べて読み直す。同期を止めると「.pause」を作り、Revit 側はそれを見て書き出しを休む
+    namespace fs = std::filesystem;
+    const bool liveSync = opt.liveSync && !opt.scenePath.empty();
+    const std::string camPath = opt.scenePath + ".cam", pausePath = opt.scenePath + ".pause";
+    // 更新時刻（ファイルが無ければ kNoFile。時刻の数値は負になることもあるので、負かどうかでは判断しない）
+    const long long kNoFile = std::numeric_limits<long long>::min();
+    auto stampOf = [&](const std::string& path) -> long long {
+        std::error_code ec;
+        auto t = fs::last_write_time(fs::u8path(path), ec);
+        return ec ? kNoFile : static_cast<long long>(t.time_since_epoch().count());
+    };
+    bool syncOn = true;
+    long long sceneStamp = kNoFile, camStamp = kNoFile;
+    if (liveSync) {
+        std::error_code ec;
+        fs::remove(fs::u8path(pausePath), ec);
+        sceneStamp = stampOf(opt.scenePath);
+        camStamp = stampOf(camPath);
+    }
+    double syncTimer = 0;
+
     ToolbarImage toolbar;
     auto updateToolbar = [&]() {
-        toolbar = buildToolbarImage(contentScale, nv.hoverButton);
+        toolbar = buildToolbarImage(contentScale, nv.hoverButton, liveSync ? (syncOn ? 1 : 0) : -1);
         renderer.setOverlay(kToolbarSlot, toolbar.image.rgba, toolbar.image.width, toolbar.image.height);
     };
     updateToolbar();
@@ -403,9 +430,9 @@ int runWindow(const Options& opt, Scene& scene) {
         status = lines.empty() ? HelpImage{} : buildStatusImage(lines, progress, contentScale);
         renderer.setOverlay(kStatusSlot, status.rgba, status.width, status.height);
     };
-    auto toast = [&](const std::vector<std::string>& lines) {
+    auto toast = [&](const std::vector<std::string>& lines, double seconds = 6.0) {
         setStatus(lines, -1);
-        toastUntil = glfwGetTime() + 6.0;
+        toastUntil = glfwGetTime() + seconds;
     };
 
     // --- 書き出し -------------------------------------------------------------
@@ -428,7 +455,7 @@ int runWindow(const Options& opt, Scene& scene) {
 #ifdef _WIN32
     nativeWindow = glfwGetWin32Window(window);
 #endif
-    const char* tipKeys[kButtonCount] = {"TipImage", "TipPanorama", "TipViewer"};
+    const char* tipKeys[kButtonCount] = {"TipImage", "TipPanorama", "TipViewer", "TipSync"};
 
     auto startExport = [&](int button) {
         ExportKind kind = button == kButtonImage ? ExportKind::Image
@@ -562,11 +589,57 @@ int runWindow(const Options& opt, Scene& scene) {
             updateHelp();
             nv.helpChanged = false;
         }
-        if (nv.clickedButton >= 0) {
+        if (nv.clickedButton == kButtonSync) {
+            nv.clickedButton = -1;
+            syncOn = !syncOn;
+            std::error_code ec;
+            if (syncOn) fs::remove(fs::u8path(pausePath), ec);
+            else std::ofstream(fs::u8path(pausePath)) << "paused\n";
+            logInfo("Live sync %s", syncOn ? "on" : "off");
+            toast({tr(syncOn ? "SyncResumed" : "SyncPaused")}, 3.0);
+            syncTimer = 1.0;  // すぐに調べ直す
+            updateToolbar();
+        } else if (nv.clickedButton >= 0) {
             int b = nv.clickedButton;
             nv.clickedButton = -1;
             startExport(b);
             last = std::chrono::steady_clock::now();  // 保存先を選ぶ画面で止まっていた時間は数えない
+        }
+
+        // Revit からの変更を受け取る（書き出し中・同期を止めている間は受け取らない）
+        syncTimer += dt;
+        if (liveSync && syncOn && !nv.exporting && syncTimer >= 0.5) {
+            syncTimer = 0;
+            long long st = stampOf(opt.scenePath);
+            if (st != sceneStamp && st != kNoFile) {
+                Scene next;
+                std::string error;
+                // Revit が書いている途中で読めなかったときは、次の機会にもう一度読む
+                if (loadScene(opt.scenePath, next, error)) {
+                    Bvh nextBvh;
+                    uint32_t nextGlass = prepareScene(next, nextBvh);
+                    renderer.reloadScene(next, nextGlass, nextBvh);
+                    scene = std::move(next);
+                    bvh = std::move(nextBvh);
+                    sceneStamp = st;
+                    logInfo("Live sync: scene reloaded (%zu triangles)", scene.triangleCount());
+                    toast({tr("SyncUpdated")}, 2.5);
+                } else {
+                    logInfo("Live sync: could not read the scene yet (%s)", error.c_str());
+                }
+            }
+            long long ct = stampOf(camPath);
+            if (ct != camStamp && ct != kNoFile) {
+                std::ifstream in(fs::u8path(camPath));
+                Camera c;
+                long long seq = 0;
+                if (in >> seq >> c.eye.x >> c.eye.y >> c.eye.z >> c.forward.x >> c.forward.y >> c.forward.z >> c.up.x >> c.up.y >>
+                    c.up.z >> c.fovY) {
+                    cam.setFrom(c);
+                    camStamp = ct;
+                    logInfo("Live sync: camera from Revit (%lld)", seq);
+                }
+            }
         }
         if (nv.toolbarChanged) {
             updateToolbar();

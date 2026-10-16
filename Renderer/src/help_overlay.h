@@ -21,15 +21,15 @@ struct HelpImage {
 // フォントが見つからなくても絵だけは作る（文字が欠けるだけ）
 HelpImage buildHelpImage(bool expanded, float scale);
 
-// 右上のツールバー（書き出しのボタン）。ボタンは左から「画像」「360°」「ビューア（exe）」
+// 右上のツールバー。ボタンは左から「画像」「360°」「ビューア（exe）」と、Revit から開いたときだけ「同期」
 struct ToolbarImage {
     HelpImage image;
     struct Rect { int x, y, w, h; };
     std::vector<Rect> buttons;  // 画像の左上からの画素
 };
-enum ToolbarButton { kButtonImage = 0, kButtonPanorama = 1, kButtonViewer = 2, kButtonCount = 3 };
-// hover: カーソルが乗っているボタン（-1 = 無し）
-ToolbarImage buildToolbarImage(float scale, int hover);
+enum ToolbarButton { kButtonImage = 0, kButtonPanorama = 1, kButtonViewer = 2, kButtonSync = 3, kButtonCount = 4 };
+// hover: カーソルが乗っているボタン（-1 = 無し）。sync: 同期のボタン（-1 = 出さない、0 = 止めている、1 = 同期中）
+ToolbarImage buildToolbarImage(float scale, int hover, int sync);
 
 // 画面の上の中央に出すお知らせ（ボタンの説明・書き出しの進み具合・保存しました 等）。
 // progress: 0〜1 なら進み具合の棒を出す（負なら出さない）。lines は 1〜2 行

@@ -273,6 +273,31 @@ bool sameView(const ViewParams& a, const ViewParams& b) {
 void Renderer::init(VkContext& ctx, const Scene& scene, uint32_t glassStart, const Bvh& bvh) {
     ctx_ = &ctx;
     hardwareRt_ = ctx.hardwareRt;
+    exposure_ = ctx.createBuffer(sizeof(ExposureData), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    memset(exposure_.mapped, 0, sizeof(ExposureData));
+    uploadScene(scene, glassStart, bvh);
+    createPasses();
+}
+
+void Renderer::reloadScene(const Scene& scene, uint32_t glassStart, const Bvh& bvh) {
+    vkDeviceWaitIdle(ctx_->device);
+    destroyScene();
+    uploadScene(scene, glassStart, bvh);
+    if (output_.view) writeDescriptors();
+    resetHistory_ = true;
+}
+
+void Renderer::destroyScene() {
+    destroyAccel(tlas_);
+    destroyAccel(blasOpaque_);
+    destroyAccel(blasGlass_);
+    for (Buffer* b : {&vertices_, &indices_, &triMaterials_, &materials_, &texInfos_, &texels_, &instances_, &bvhNodes_, &bvhTris_})
+        ctx_->destroyBuffer(*b);
+}
+
+void Renderer::uploadScene(const Scene& scene, uint32_t glassStart, const Bvh& bvh) {
+    VkContext& ctx = *ctx_;
     glassStart_ = glassStart;
     sunDir_ = scene.sunDir;
     sunIntensity_ = scene.sunIntensity;
@@ -302,10 +327,6 @@ void Renderer::init(VkContext& ctx, const Scene& scene, uint32_t glassStart, con
     texels_ = ctx.createDeviceBuffer(texels.data(), texels.size() * sizeof(uint32_t), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
     logInfo("Textures: %zu (%.1f MB)", scene.textures.size(), texels.size() * 4.0 / (1024.0 * 1024.0));
 
-    exposure_ = ctx.createBuffer(sizeof(ExposureData), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-                                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-    memset(exposure_.mapped, 0, sizeof(ExposureData));
-
     if (hardwareRt_) {
         buildAccelerationStructures(scene);
     } else {
@@ -313,7 +334,6 @@ void Renderer::init(VkContext& ctx, const Scene& scene, uint32_t glassStart, con
         bvhTris_ = ctx.createDeviceBuffer(bvh.triIndices().data(), bvh.triIndices().size() * sizeof(uint32_t), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
         logInfo("BVH uploaded: %zu nodes", bvh.nodes().size());
     }
-    createPasses();
 }
 
 // --- 加速構造（光線の当たり判定を速くするための索引） ----------------------------
@@ -693,11 +713,8 @@ void Renderer::destroy() {
     Image* all[] = {&noisy_, &gpos_[0], &gpos_[1], &gnormal_[0], &gnormal_[1], &galbedo_, &history_[0], &history_[1],
                     &moments_[0], &moments_[1], &filtered_[0], &filtered_[1], &albedoHist_[0], &albedoHist_[1], &output_, &overlay_[0], &overlay_[1], &overlay_[2]};
     for (Image* img : all) ctx_->destroyImage(*img);
-    destroyAccel(tlas_);
-    destroyAccel(blasOpaque_);
-    destroyAccel(blasGlass_);
-    for (Buffer* b : {&vertices_, &indices_, &triMaterials_, &materials_, &texInfos_, &texels_, &exposure_, &instances_, &bvhNodes_, &bvhTris_})
-        ctx_->destroyBuffer(*b);
+    destroyScene();
+    ctx_->destroyBuffer(exposure_);
     ctx_ = nullptr;
 }
 

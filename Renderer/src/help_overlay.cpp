@@ -474,10 +474,37 @@ void viewerIcon(Canvas& c, float cx, float cy, float s, const Color& col) {
     c.fill([&](float x, float y) { return sdTriangle(x, y, v); }, cx - 4 * s, cy - 6 * s, cx + 5 * s, cy + 3 * s, col);
 }
 
+// ボタンの絵: 2 本の回る矢印（同期）
+void syncIcon(Canvas& c, float cx, float cy, float s, const Color& col) {
+    float r = 7.5f * s;
+    for (int k = 0; k < 2; ++k) {
+        float a0 = k == 0 ? -2.8f : 0.34f, a1 = a0 + 2.3f;  // 上半分・下半分の円弧
+        auto arc = [&](float x, float y) {
+            float ang = std::atan2(y - cy, x - cx);
+            float d = ang - a0;
+            while (d < 0) d += 6.2831853f;
+            if (d <= a1 - a0) return std::fabs(std::hypot(x - cx, y - cy) - r);
+            float e0x = cx + std::cos(a0) * r, e0y = cy + std::sin(a0) * r;
+            float e1x = cx + std::cos(a1) * r, e1y = cy + std::sin(a1) * r;
+            return std::min(std::hypot(x - e0x, y - e0y), std::hypot(x - e1x, y - e1y));
+        };
+        c.fill([&](float x, float y) { return arc(x, y) - 0.75f * s; }, cx - r - 2 * s, cy - r - 2 * s, cx + r + 2 * s,
+               cy + r + 2 * s, col);
+        float ex = cx + std::cos(a1) * r, ey = cy + std::sin(a1) * r;
+        float tx = -std::sin(a1), ty = std::cos(a1), head = 3.4f * s;
+        float v[6] = {ex + tx * head, ey + ty * head, ex - ty * head * 0.8f, ey + tx * head * 0.8f,
+                      ex + ty * head * 0.8f, ey - tx * head * 0.8f};
+        c.fill([&](float x, float y) { return sdTriangle(x, y, v); }, ex - head * 2, ey - head * 2, ex + head * 2,
+               ey + head * 2, col);
+    }
+}
+
 }  // namespace
 
-ToolbarImage buildToolbarImage(float s, int hover) {
-    const char* labels[kButtonCount] = {"ExportImage", "ExportPanorama", "ExportViewer"};
+ToolbarImage buildToolbarImage(float s, int hover, int sync) {
+    std::vector<const char*> labels = {"ExportImage", "ExportPanorama", "ExportViewer"};
+    if (sync >= 0) labels.push_back(sync > 0 ? "SyncOn" : "SyncOff");
+    const int count = static_cast<int>(labels.size());
     const float pad = 6 * s, iconH = 24 * s, labelPx = 11 * s, labelH = 14 * s, gap = 2 * s;
     std::vector<float> widths;
     float total = pad;
@@ -495,8 +522,15 @@ ToolbarImage buildToolbarImage(float s, int hover) {
 
     ToolbarImage tb;
     float x = pad;
-    for (int i = 0; i < kButtonCount; ++i) {
+    for (int i = 0; i < count; ++i) {
         float w = widths[i];
+        if (i == kButtonSync) {
+            // 同期のボタンは、ほかのボタン（書き出し）と細い線で区切る
+            float sx = x - gap / 2 - 1 * s;
+            c.stroke([&](float px, float py) { return sdSegment(px, py, sx, pad + 4 * s, sx, height - pad - 4 * s); }, 1.0f * s,
+                     sx, pad, sx, height - pad, Color{1, 1, 1, 0.18f});
+            x += 3 * s;
+        }
         float bx0 = x, by0 = pad, bx1 = x + w, by1 = height - pad;
         if (i == hover) {
             auto hl = [&](float px, float py) {
@@ -504,12 +538,14 @@ ToolbarImage buildToolbarImage(float s, int hover) {
             };
             c.fill(hl, bx0, by0, bx1, by1, Color{1, 1, 1, 0.16f});
         }
-        const Color& col = i == hover ? kAccent : kWhite;
+        // 同期中は青、止めているときは薄い色
+        const Color& col = i == hover || (i == kButtonSync && sync > 0) ? kAccent : i == kButtonSync ? kDim : kWhite;
         float cx = x + w / 2, cy = pad + 2 * s + iconH / 2;
         if (i == kButtonImage) cameraIcon(c, cx, cy, s, col);
         else if (i == kButtonPanorama) globeIcon(c, cx, cy, s, col);
-        else viewerIcon(c, cx, cy, s, col);
-        c.textCentered(tr(labels[i]), cx, pad + 2 * s + iconH + labelH / 2 + 1 * s, labelPx, kWhite);
+        else if (i == kButtonViewer) viewerIcon(c, cx, cy, s, col);
+        else syncIcon(c, cx, cy, s, col);
+        c.textCentered(tr(labels[i]), cx, pad + 2 * s + iconH + labelH / 2 + 1 * s, labelPx, i == kButtonSync && sync <= 0 ? kDim : kWhite);
         tb.buttons.push_back({static_cast<int>(bx0), static_cast<int>(by0), static_cast<int>(w), static_cast<int>(by1 - by0)});
         x += w + gap;
     }

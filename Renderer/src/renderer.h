@@ -29,6 +29,8 @@ public:
     // RT コアが無い GPU では bvh を GPU に送って、予備の方式で描く
     void init(VkContext& ctx, const Scene& scene, uint32_t glassStart, const Bvh& bvh);
     void destroy();
+    // モデルを入れ替える（Revit で変更があったとき）。描画の大きさ・カメラはそのまま
+    void reloadScene(const Scene& scene, uint32_t glassStart, const Bvh& bvh);
 
     // 描画する大きさを変える（履歴も捨てる）
     void resize(uint32_t width, uint32_t height);
@@ -63,6 +65,8 @@ public:
     };
 
 private:
+    void uploadScene(const Scene& scene, uint32_t glassStart, const Bvh& bvh);
+    void destroyScene();
     void buildAccelerationStructures(const Scene& scene);
     void createPasses();
     void writeDescriptors();

@@ -24,6 +24,7 @@ struct Options {
     bool autoExposure = true;
     float renderScale = 0.0f;      // ウィンドウより小さく描いて拡大する（速さ優先）。0 = 自動
     bool forceSoftware = false;    // RT コアがあっても予備の方式で描く（動作確認用）
+    bool liveSync = false;         // Revit での変更を受け取る（シーンファイルの更新を見張る）。Revit から --live で指定
     int exportSamples = 0;         // 書き出しの足し合わせ回数（0 = 自動。動作確認で短くするとき用）
     int exitAfterFrames = 0;       // 動作確認用: このフレーム数を描いたら自動で閉じる（0 = 閉じない）
 };
