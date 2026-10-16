@@ -1,0 +1,100 @@
+// Tools28 リアルタイムレンダリング（描画プログラム本体）
+//
+// 使い方:
+//   Tools28Render --scene model.t28s [--lang JP]          ウィンドウで表示（Revit から起動される）
+//   Tools28Render --test-scene                             確認用の部屋をウィンドウで表示
+//   Tools28Render --scene model.t28s --output out.png      画像だけ作って終わる
+//       [--width 1280 --height 720 --samples 256 --panorama]
+// その他: --log ファイル / --gpu 番号 / --bounces 回数 / --exposure EV / --no-auto-exposure / --render-scale 倍率
+#include <cstdlib>
+#include <cstring>
+#include <string>
+#include <vector>
+
+#include "app.h"
+#include "log.h"
+#include "i18n.h"
+
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <shellapi.h>
+#endif
+
+using namespace t28;
+
+static std::string defaultLogPath() {
+#ifdef _WIN32
+    const char* base = std::getenv("LOCALAPPDATA");
+    if (base) {
+        std::string dir = std::string(base) + "\\Tools28\\Render";
+        CreateDirectoryA((std::string(base) + "\\Tools28").c_str(), nullptr);
+        CreateDirectoryA(dir.c_str(), nullptr);
+        return dir + "\\render.log";
+    }
+#endif
+    return "";
+}
+
+static int run(int argc, char** argv) {
+    Options opt;
+    bool testScene = false;
+    const char* lang = "JP";
+    for (int i = 1; i < argc; ++i) {
+        std::string a = argv[i];
+        auto next = [&]() -> const char* { return i + 1 < argc ? argv[++i] : ""; };
+        if (a == "--scene") opt.scenePath = next();
+        else if (a == "--test-scene") testScene = true;
+        else if (a == "--output") opt.outputPath = next();
+        else if (a == "--log") opt.logPath = next();
+        else if (a == "--lang") lang = next();
+        else if (a == "--width") opt.width = std::atoi(next());
+        else if (a == "--height") opt.height = std::atoi(next());
+        else if (a == "--samples") opt.samples = std::atoi(next());
+        else if (a == "--panorama") opt.panorama = true;
+        else if (a == "--gpu") opt.gpu = std::atoi(next());
+        else if (a == "--bounces") opt.bounces = static_cast<uint32_t>(std::atoi(next()));
+        else if (a == "--exposure") opt.exposureEv = static_cast<float>(std::atof(next()));
+        else if (a == "--no-auto-exposure") opt.autoExposure = false;
+        else if (a == "--render-scale") opt.renderScale = static_cast<float>(std::atof(next()));
+        else if (a == "--exit-after") opt.exitAfterFrames = std::atoi(next());
+    }
+    setLanguage(lang);
+    if (opt.logPath.empty() && opt.outputPath.empty()) opt.logPath = defaultLogPath();
+    if (!opt.logPath.empty()) logOpen(opt.logPath);
+    logInfo("Tools28Render start (scene=%s, output=%s)", opt.scenePath.c_str(), opt.outputPath.c_str());
+
+    Scene scene;
+    if (!opt.scenePath.empty() && !testScene) {
+        std::string error;
+        if (!loadScene(opt.scenePath, scene, error)) fatal("%s\n%s", tr("SceneLoadFailed"), error.c_str());
+    } else {
+        scene = makeTestScene();
+    }
+    if (opt.width < 16) opt.width = 16;
+    if (opt.height < 16) opt.height = 16;
+    if (opt.samples < 1) opt.samples = 1;
+    if (opt.renderScale < 0.25f || opt.renderScale > 2.0f) opt.renderScale = 1.0f;
+
+    return opt.outputPath.empty() ? runWindow(opt, scene) : runOffscreen(opt, scene);
+}
+
+#ifdef _WIN32
+// Windows では引数を UTF-16 で受け取り、日本語のファイル名も扱えるよう UTF-8 に変換する
+int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
+    int argc = 0;
+    wchar_t** wargv = CommandLineToArgvW(GetCommandLineW(), &argc);
+    std::vector<std::string> args(argc);
+    std::vector<char*> argv(argc);
+    for (int i = 0; i < argc; ++i) {
+        int len = WideCharToMultiByte(CP_UTF8, 0, wargv[i], -1, nullptr, 0, nullptr, nullptr);
+        args[i].resize(len > 0 ? len - 1 : 0);
+        WideCharToMultiByte(CP_UTF8, 0, wargv[i], -1, &args[i][0], len, nullptr, nullptr);
+        argv[i] = &args[i][0];
+    }
+    LocalFree(wargv);
+    return run(argc, argv.data());
+}
+#else
+int main(int argc, char** argv) { return run(argc, argv); }
+#endif

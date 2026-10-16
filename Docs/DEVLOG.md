@@ -5,6 +5,31 @@
 
 ---
 
+## RealtimeRender（リアルタイムレンダリング）開発知見（2026-10-16） {#RealtimeRender}
+
+Enscape 相当の「Revit だけで完結する」レンダリングを目指す試作。経緯と決定事項:
+
+- **方式の変遷**: Blender 版（RenderKit: FBX → Blender → HTML）を作ったが、「Blender のインストールが必要」で不採用・削除。
+  WebView2 + three.js 案は「ブラウザでは光の計算専用回路（RT コア）が使えず、動かしている間の画質が落ちる」ため不採用。
+  → **Vulkan のレイトレーシング（`VK_KHR_ray_query`）で描く C++ の別プログラム**（`Renderer/`）に決定
+- **別プログラムにした理由**: 描画側で落ちても Revit を巻き込まない（作業中のモデルを失わない）。Enscape も同様
+- **開発環境での確認方法**: Linux の Mesa **lavapipe**（CPU 実装の Vulkan）が `VK_KHR_acceleration_structure` /
+  `ray_query` / `ray_tracing_pipeline` に対応しているため、GPU の無いクラウド環境でも描画結果を画像で確認できる（遅い）。
+  Windows 版 exe は MinGW-w64 でクロスビルドし、**Wine + lavapipe で起動確認**できる（Wine は `DISPLAY` が無いと
+  `vkCreateInstance` が -3 で失敗するので Xvfb を立てる。日本語パスは `LANG=C.UTF-8` が必要）
+- **C# 側のコンパイル確認**: Ubuntu の dotnet には WindowsDesktop SDK が無く Tools28.csproj は丸ごとビルドできない。
+  追加した `Commands/RealtimeRender/*.cs` だけを Nice3point.Revit.Api（2021/2024/2026）と一緒にビルドする確認用プロジェクトで型を検査した
+  （`CustomExporter.ShadowsAndShading` は存在しない、など）
+- **exe の配り方**: `Renderer/prebuilt/win-x64/Tools28Render.exe` をリポジトリに入れ、csproj の `None`（`CopyToOutputDirectory`）で
+  Tools28.dll と同じフォルダに出し、`QuickBuild.ps1` が `*.exe` も配置する。ユーザーの PC に C++ 環境は不要
+  - ⚠ **インストーラ（`28Tools.iss`）は `*.dll` しか取り込まない**ので、リリース前に exe の取り込みを追加すること
+- **ノートPCの GPU 2枚問題**: Intel 内蔵 + NVIDIA の構成では、レイトレーシング対応かつ独立 GPU を優先して選ぶ（`vk_context.cpp`）
+- **ガラス**: 影の計算では「不透明マスク（0x01）」だけを見るので、ガラス（マスク 0x02）は光を通す＝窓から日が差し込む
+- **自動露出**: 4×4 画素に1つ、明るさの対数を整数で atomicAdd して CPU で平均 → 18% グレーに合わせる
+- **ファイル名の落とし穴**: `src/strings.h` は C 標準の `<strings.h>` とぶつかり、extern "C" の中に取り込まれてリンクエラーになった → `i18n.h` に改名
+- **未確認（実機待ち）**: RTX A3000 Laptop での速さ、太陽の方位（真北補正の符号）、透視ビューの画角の求め方、大きなモデルでの書き出し時間
+- **次の段階**: ノイズ除去（動いている間のざらつき）、Revit マテリアルの外観アセット（テクスチャ・反射）、照明器具、ライブ同期、パノラマ・exe の書き出し
+
 ## v2.6 リリースとインストーラ化（2026-10-14）
 
 ### 配布形式の変更

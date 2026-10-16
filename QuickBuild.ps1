@@ -151,9 +151,10 @@ if ($pendingResult.Applied -gt 0) {
 Write-Host "デプロイ中..." -ForegroundColor Yellow
 Write-Host ""
 
-# 配置対象: 全DLL（Tools28.dll + ClosedXML等の依存ライブラリ）＋ PDB
+# 配置対象: 全DLL（Tools28.dll + ClosedXML等の依存ライブラリ）＋ 描画プログラム（Tools28Render.exe）＋ PDB
 $buildOutputDir = ".\bin\Release\Revit$RevitVersion\"
 $deployFiles = @(Get-ChildItem -Path $buildOutputDir -Filter "*.dll" -File)
+$deployFiles += @(Get-ChildItem -Path $buildOutputDir -Filter "*.exe" -File)
 if (Test-Path $sourcePdb) { $deployFiles += Get-Item $sourcePdb }
 
 $copied   = @()  # そのまま反映された
