@@ -52,7 +52,9 @@ namespace Tools28.Commands.RealtimeRender
 
                 RenderScene scene = context.Scene;
                 DiagLog.Cmd("RealtimeRender",
-                    $"書き出し: 要素 {context.ElementCount} / 三角形 {scene.TriangleCount} / マテリアル {scene.Materials.Count} / {watch.ElapsedMilliseconds} ms");
+                    $"書き出し: 要素 {context.ElementCount} / 三角形 {scene.TriangleCount} / マテリアル {scene.Materials.Count} / テクスチャ {scene.Textures.Count} / {watch.ElapsedMilliseconds} ms");
+                foreach (string missing in context.MissingTextures)
+                    DiagLog.Cmd("RealtimeRender", $"テクスチャ画像が見つかりません: {missing}");
                 if (scene.TriangleCount == 0)
                 {
                     TaskDialog.Show(Loc.S("RtRender.Title"), Loc.S("RtRender.Err.NoGeometry"));

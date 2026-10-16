@@ -15,6 +15,11 @@ layout(set = 0, binding = 6, rgba32f) uniform readonly image2D uPrevMoments; // 
 layout(set = 0, binding = 7, rgba32f) uniform writeonly image2D uHistory;
 layout(set = 0, binding = 8, rgba32f) uniform writeonly image2D uMoments;
 layout(set = 0, binding = 9, rgba32f) uniform writeonly image2D uFiltered;   // rgb = 明るさ, a = ばらつき（分散）
+// 面の色も時間方向に平均する。輪郭の画素は、画素の中で狙う位置を毎回ずらすので「手前の物」「奥の物」の色が
+// 入れ替わる。その回の色で掛け戻すと輪郭が毎フレーム揺れて見えるため、平均した色で掛け戻す
+layout(set = 0, binding = 10, rgba8) uniform readonly image2D uGAlbedo;          // 今回の面の色
+layout(set = 0, binding = 11, rgba32f) uniform readonly image2D uPrevAlbedoHist; // 前回までの面の色の平均
+layout(set = 0, binding = 12, rgba32f) uniform writeonly image2D uAlbedoHist;
 
 layout(push_constant) uniform Params {
     vec4 prevEye;      // xyz = 前回のカメラ位置, w = 1 ならカメラが動いた
@@ -40,6 +45,7 @@ void main() {
 
     // --- 前回のどの画素に写っていたかを求め、使えるか確かめる ---------------------
     vec3 prevColor = vec3(0.0);
+    vec3 prevAlbedo = vec3(0.0);
     vec2 prevMoments = vec2(0.0);
     float prevLen = 0.0;
     float weightSum = 0.0;
@@ -67,16 +73,18 @@ void main() {
                 float w = ((k & 1) == 1 ? f.x : 1.0 - f.x) * ((k >> 1) == 1 ? f.y : 1.0 - f.y);
                 if (!moved) w = k == 0 ? 1.0 : 0.0;
                 if (w <= 0.0) continue;
+                // 止まっている間は同じ画素を必ず重ねる（輪郭では毎回手前・奥が入れ替わるが、それも平均してなめらかな線にする）
                 vec4 qgp = imageLoad(uPrevGPos, q);
                 bool qsky = qgp.w < 0.0;
-                if (qsky != sky) continue;
-                if (!sky) {
+                if (moved && qsky != sky) continue;
+                if (moved && !sky) {
                     vec3 qn = imageLoad(uPrevGNormal, q).xyz;
                     // 位置が近く（距離の 3% 程度まで）、向きがほぼ同じなら同じ面とみなす
                     if (length(qgp.xyz - gp.xyz) > 0.03 * gp.w + 0.01) continue;
                     if (dot(qn, n) < 0.9) continue;
                 }
                 vec4 h = imageLoad(uPrevHistory, q);
+                prevAlbedo += imageLoad(uPrevAlbedoHist, q).rgb * w;
                 prevColor += h.rgb * w;
                 prevLen += h.a * w;
                 prevMoments += imageLoad(uPrevMoments, q).xy * w;
@@ -89,8 +97,10 @@ void main() {
     float len = 1.0;
     vec3 history = color;
     vec2 moments = vec2(lum, lum * lum);
+    vec3 albedo = imageLoad(uGAlbedo, p).rgb;
     if (weightSum > 0.01) {
         prevColor /= weightSum;
+        prevAlbedo /= weightSum;
         prevLen /= weightSum;
         prevMoments /= weightSum;
         // 動いている間は重ねる回数を少なめにする（古い結果が残って残像になるのを防ぐ）
@@ -98,6 +108,7 @@ void main() {
         len = min(prevLen + 1.0, maxLen);
         float alpha = 1.0 / len;
         history = mix(prevColor, color, alpha);
+        albedo = mix(prevAlbedo, albedo, alpha);
         moments = mix(prevMoments, moments, alpha);
     }
 
@@ -123,6 +134,7 @@ void main() {
     float variance = sampleVariance / len * max(1.0, 16.0 / len);
 
     imageStore(uHistory, p, vec4(history, len));
+    imageStore(uAlbedoHist, p, vec4(albedo, 1.0));
     imageStore(uMoments, p, vec4(moments, 0.0, 0.0));
     imageStore(uFiltered, p, vec4(history, variance));
 }

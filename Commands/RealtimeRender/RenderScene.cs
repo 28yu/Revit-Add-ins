@@ -10,6 +10,8 @@ namespace Tools28.Commands.RealtimeRender
         /// <summary>三角形（頂点番号×3 とマテリアル番号）を並べたもの。</summary>
         public List<int> Triangles { get; } = new List<int>();
         public List<RenderMaterial> Materials { get; } = new List<RenderMaterial>();
+        /// <summary>テクスチャ画像（マテリアルの外観の「イメージ」）。</summary>
+        public List<RenderTexture> Textures { get; } = new List<RenderTexture>();
 
         public RenderCamera Camera { get; set; } = new RenderCamera();
         /// <summary>太陽のある方向（単位ベクトル）。</summary>
@@ -49,6 +51,8 @@ namespace Tools28.Commands.RealtimeRender
     {
         public float PX, PY, PZ;
         public float NX, NY, NZ;
+        /// <summary>テクスチャ画像上の位置（1 = 画像 1 枚分）。</summary>
+        public float U, V;
     }
 
     internal class RenderMaterial
@@ -59,6 +63,17 @@ namespace Tools28.Commands.RealtimeRender
         public float Roughness = 0.5f;
         public float Metallic;
         public float Emissive = 0f;  // 自己発光（照明器具の対応は今後）
+        public float F0 = 0.04f;     // 正面から見たときの反射率（外観の「反射率」）
+        public int TextureIndex = -1;  // 色のテクスチャ画像の番号（-1 = 無し）
+        /// <summary>テクスチャの貼り方（ファイルには書かない。頂点の U, V を求めるのに使う）。</summary>
+        public BitmapInfo Mapping;
+    }
+
+    /// <summary>テクスチャ画像。色は sRGB のまま、1 画素 4 バイト（R, G, B, A）。</summary>
+    internal class RenderTexture
+    {
+        public int Width, Height;
+        public byte[] Rgba;
     }
 
     internal class RenderCamera

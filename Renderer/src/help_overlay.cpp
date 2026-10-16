@@ -383,42 +383,43 @@ HelpImage buildHelpImage(bool expanded, float s) {
                           tr(keyLabels[i])});
     }
 
-    // 大きさを決める
-    const float pad = 10 * s, labelPx = 11.5f * s, iconH = 28 * s, labelH = 15 * s, rowGap = 6 * s, colGap = 12 * s;
-    const float closeSize = 18 * s;
+    // 大きさを決める（マウスの項目とキーの項目を 1 段に並べ、間を細い縦線で区切る）
+    const float pad = 10 * s, labelPx = 11.5f * s, iconH = 28 * s, labelH = 15 * s, colGap = 12 * s;
+    const float sepGap = 14 * s, closeSize = 18 * s;
     auto columnWidth = [&](const Item& it) { return std::max(it.iconW, textWidth(it.label, labelPx)); };
     auto rowWidth = [&](const std::vector<Item>& row) {
         float w = 0;
         for (const auto& it : row) w += columnWidth(it) + colGap;
         return w - colGap;
     };
-    float contentW = std::max(rowWidth(mouseRow), rowWidth(keyRow));
-    int width = static_cast<int>(std::ceil(pad * 2 + contentW + 6 * s + closeSize));
-    int height = static_cast<int>(std::ceil(pad * 2 + (iconH + labelH) * 2 + rowGap));
+    float mouseW2 = rowWidth(mouseRow), keyW = rowWidth(keyRow);
+    float contentW = mouseW2 + sepGap * 2 + keyW;
+    int width = static_cast<int>(std::ceil(pad * 2 + contentW + sepGap + closeSize));
+    int height = static_cast<int>(std::ceil(pad * 2 + iconH + labelH));
     Canvas c(width, height);
 
     // 背景（角の丸い半透明の黒）
     auto panel = [&](float x, float y) { return sdRoundBox(x, y, width / 2.0f, height / 2.0f, width / 2.0f, height / 2.0f, 8 * s); };
     c.fill(panel, 0, 0, static_cast<float>(width), static_cast<float>(height), kPanel);
 
-    auto drawRow = [&](const std::vector<Item>& row, float top) {
-        float x = pad;
+    auto drawRow = [&](const std::vector<Item>& row, float left) {
+        float x = left;
         for (const auto& it : row) {
             float cw = columnWidth(it);
             float cx = x + cw / 2;
-            it.draw(c, cx, top + iconH / 2);
-            c.textCentered(it.label, cx, top + iconH + labelH / 2, labelPx, kWhite);
+            it.draw(c, cx, pad + iconH / 2);
+            c.textCentered(it.label, cx, pad + iconH + labelH / 2, labelPx, kWhite);
             x += cw + colGap;
         }
     };
     drawRow(mouseRow, pad);
-    // 2 段目の前に細い区切り線
-    float lineY = pad + iconH + labelH + rowGap / 2;
-    c.stroke([&](float x, float y) { return sdSegment(x, y, pad, lineY, pad + contentW, lineY); }, 1.0f * s, pad, lineY,
-             pad + contentW, lineY, Color{1, 1, 1, 0.18f});
-    drawRow(keyRow, pad + iconH + labelH + rowGap);
+    // マウスの項目とキーの項目の間に細い縦線
+    float sepX = pad + mouseW2 + sepGap;
+    c.stroke([&](float x, float y) { return sdSegment(x, y, sepX, pad + 2 * s, sepX, height - pad - 2 * s); }, 1.0f * s,
+             sepX, pad, sepX, height - pad, Color{1, 1, 1, 0.18f});
+    drawRow(keyRow, sepX + sepGap);
 
-    // 閉じる記号「×」（右上）
+    // 閉じる記号「×」（右端の上）
     float bx = width - pad - closeSize / 2, by = pad + closeSize / 2;
     auto circle = [&](float x, float y) { return std::hypot(x - bx, y - by) - closeSize / 2; };
     c.stroke(circle, 1.2f * s, bx - closeSize, by - closeSize, bx + closeSize, by + closeSize, kDim);

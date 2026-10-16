@@ -4,7 +4,7 @@ layout(local_size_x = 8, local_size_y = 8) in;
 
 layout(set = 0, binding = 0, rgba32f) uniform readonly image2D uFiltered; // ならした明るさ
 layout(set = 0, binding = 1, rgba32f) uniform readonly image2D uHistory;  // （未使用。入出力の番号をそろえるため残す）
-layout(set = 0, binding = 2, rgba8) uniform readonly image2D uGAlbedo;    // 面の色
+layout(set = 0, binding = 2, rgba32f) uniform readonly image2D uAlbedo;  // 面の色（時間方向に平均したもの）
 layout(set = 0, binding = 3, rgba8) uniform writeonly image2D uOutput;    // 画面に出す色
 // 自動露出用: 画面の明るさの対数の合計
 layout(set = 0, binding = 4, std430) buffer Exposure { int logLumSum; int logLumCount; };
@@ -29,7 +29,7 @@ void main() {
     float lumForExposure = -1.0;
     if (inside) {
         // ならす強さは atrous の中で「残っているノイズの大きさ」に合わせて自動で弱まるので、ここではそのまま使う
-        vec3 color = imageLoad(uFiltered, p).rgb * imageLoad(uGAlbedo, p).rgb;
+        vec3 color = imageLoad(uFiltered, p).rgb * imageLoad(uAlbedo, p).rgb;
         vec3 mapped = tonemap(color * pc.exposure);
         imageStore(uOutput, p, vec4(pow(mapped, vec3(1.0 / 2.2)), 1.0));
         lumForExposure = dot(color, vec3(0.2126, 0.7152, 0.0722));

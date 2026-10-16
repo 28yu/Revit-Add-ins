@@ -323,6 +323,10 @@ int runWindow(const Options& opt, Scene& scene) {
     HelpImage help;
     auto updateHelp = [&]() {
         help = buildHelpImage(nv.showHelp, contentScale);
+        // ウィンドウが狭くて入りきらないときは、案内を小さくする
+        int available = static_cast<int>(sc.extent.width) - static_cast<int>(24 * contentScale);
+        if (static_cast<int>(help.width) > available && available > 100)
+            help = buildHelpImage(nv.showHelp, contentScale * available / static_cast<float>(help.width));
         renderer.setOverlay(help.rgba, help.width, help.height);
     };
     updateHelp();
@@ -389,6 +393,7 @@ int runWindow(const Options& opt, Scene& scene) {
         }
         if (needResize || static_cast<uint32_t>(fbw) != sc.extent.width || static_cast<uint32_t>(fbh) != sc.extent.height) {
             recreate();
+            updateHelp();
             needResize = false;
         }
 

@@ -1,5 +1,6 @@
 #include "renderer.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstring>
 
@@ -72,8 +73,69 @@ struct ExposureData {
 
 struct GpuMaterial {
     float color[4];
-    float params[4];
+    float params[4];  // 粗さ, 金属, 発光, 反射率
+    int32_t tex[4];   // x = テクスチャ番号（-1 = 無し）
 };
+
+// テクスチャ 1 枚分の置き場所（シェーダーの TexInfo と同じ並び）
+struct GpuTexInfo {
+    uint32_t offset;  // texels の何番目から始まるか（一番大きい段）
+    uint32_t width, height;
+    uint32_t levels;  // 縮小した段の数（ミップマップ。遠くの模様がちらつかないよう、離れたら小さい段を使う）
+};
+
+float srgbToLinear(uint8_t c) {
+    float s = c / 255.0f;
+    return s <= 0.04045f ? s / 12.92f : std::pow((s + 0.055f) / 1.055f, 2.4f);
+}
+
+uint8_t linearToSrgb(float l) {
+    l = std::min(std::max(l, 0.0f), 1.0f);
+    float s = l <= 0.0031308f ? l * 12.92f : 1.055f * std::pow(l, 1.0f / 2.4f) - 0.055f;
+    return static_cast<uint8_t>(s * 255.0f + 0.5f);
+}
+
+// 全テクスチャを 1 つの並びに詰める。段ごとに縦横半分にした画像も後ろに続けて入れる
+void packTextures(const std::vector<Texture>& textures, std::vector<GpuTexInfo>& infos, std::vector<uint32_t>& texels) {
+    for (const Texture& t : textures) {
+        GpuTexInfo info{static_cast<uint32_t>(texels.size()), t.width, t.height, 0};
+        uint32_t w = t.width, h = t.height;
+        std::vector<float> level(static_cast<size_t>(w) * h * 4);
+        for (size_t i = 0; i < level.size(); ++i)
+            level[i] = (i % 4 == 3) ? t.rgba[i] / 255.0f : srgbToLinear(t.rgba[i]);
+        while (true) {
+            for (size_t i = 0; i < static_cast<size_t>(w) * h; ++i) {
+                uint32_t r = linearToSrgb(level[i * 4]), g = linearToSrgb(level[i * 4 + 1]), b = linearToSrgb(level[i * 4 + 2]);
+                uint32_t a = static_cast<uint32_t>(std::min(std::max(level[i * 4 + 3], 0.0f), 1.0f) * 255.0f + 0.5f);
+                texels.push_back(r | (g << 8) | (b << 16) | (a << 24));
+            }
+            ++info.levels;
+            if (w == 1 && h == 1) break;
+            uint32_t nw = std::max(w / 2, 1u), nh = std::max(h / 2, 1u);
+            std::vector<float> next(static_cast<size_t>(nw) * nh * 4, 0.0f);
+            for (uint32_t y = 0; y < nh; ++y)
+                for (uint32_t x = 0; x < nw; ++x)
+                    for (int c = 0; c < 4; ++c) {
+                        float sum = 0.0f;
+                        int n = 0;
+                        for (uint32_t dy = 0; dy < 2; ++dy)
+                            for (uint32_t dx = 0; dx < 2; ++dx) {
+                                uint32_t sx = std::min(x * 2 + dx, w - 1), sy = std::min(y * 2 + dy, h - 1);
+                                sum += level[(static_cast<size_t>(sy) * w + sx) * 4 + c];
+                                ++n;
+                            }
+                        next[(static_cast<size_t>(y) * nw + x) * 4 + c] = sum / n;
+                    }
+            level.swap(next);
+            w = nw;
+            h = nh;
+        }
+        infos.push_back(info);
+    }
+    // 空のバッファは作れないので、テクスチャが無くても 1 つは入れておく
+    if (infos.empty()) infos.push_back({0, 1, 1, 1});
+    if (texels.empty()) texels.push_back(0xffffffffu);
+}
 
 VkDeviceSize alignUp(VkDeviceSize v, VkDeviceSize a) { return (v + a - 1) / a * a; }
 
@@ -230,8 +292,15 @@ void Renderer::init(VkContext& ctx, const Scene& scene, uint32_t glassStart, con
 
     std::vector<GpuMaterial> mats;
     for (const Material& m : scene.materials)
-        mats.push_back({{m.r, m.g, m.b, m.opacity}, {m.roughness, m.metallic, m.emissive, 0.0f}});
+        mats.push_back({{m.r, m.g, m.b, m.opacity}, {m.roughness, m.metallic, m.emissive, m.f0}, {m.texture, 0, 0, 0}});
     materials_ = ctx.createDeviceBuffer(mats.data(), mats.size() * sizeof(GpuMaterial), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+
+    std::vector<GpuTexInfo> texInfos;
+    std::vector<uint32_t> texels;
+    packTextures(scene.textures, texInfos, texels);
+    texInfos_ = ctx.createDeviceBuffer(texInfos.data(), texInfos.size() * sizeof(GpuTexInfo), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+    texels_ = ctx.createDeviceBuffer(texels.data(), texels.size() * sizeof(uint32_t), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+    logInfo("Textures: %zu (%.1f MB)", scene.textures.size(), texels.size() * 4.0 / (1024.0 * 1024.0));
 
     exposure_ = ctx.createBuffer(sizeof(ExposureData), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                                  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
@@ -398,10 +467,11 @@ void Renderer::createPasses() {
     VkDevice dev = ctx_->device;
     const VkDescriptorType IMG = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, BUF = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 
-    // パストレース: 0 = 形（加速構造 / BVH の箱）, 1 = 明るさ, 2 = 位置, 3〜6 = 形・材質, 7 = 面の向き, 8 = BVH の三角形, 9 = 面の色
+    // パストレース: 0 = 形（加速構造 / BVH の箱）, 1 = 明るさ, 2 = 位置, 3〜6 = 形・材質, 7 = 面の向き, 8 = BVH の三角形, 9 = 面の色,
+    //               10 = テクスチャの置き場所, 11 = テクスチャの画素
     std::vector<BindingSpec> pt = {
         {0, hardwareRt_ ? VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR : BUF},
-        {1, IMG}, {2, IMG}, {3, BUF}, {4, BUF}, {5, BUF}, {6, BUF}, {7, IMG}, {9, IMG},
+        {1, IMG}, {2, IMG}, {3, BUF}, {4, BUF}, {5, BUF}, {6, BUF}, {7, IMG}, {9, IMG}, {10, BUF}, {11, BUF},
     };
     if (!hardwareRt_) pt.push_back({8, BUF});
     pathTrace_ = hardwareRt_
@@ -409,7 +479,7 @@ void Renderer::createPasses() {
         : createPass(dev, pt, 2, sizeof(PathTracePush), kPathTraceSwSpv, sizeof(kPathTraceSwSpv), "path trace (sw)");
 
     std::vector<BindingSpec> temporal;
-    for (uint32_t i = 0; i < 10; ++i) temporal.push_back({i, IMG});
+    for (uint32_t i = 0; i < 13; ++i) temporal.push_back({i, IMG});
     temporal_ = createPass(dev, temporal, 2, sizeof(TemporalPush), kTemporalSpv, sizeof(kTemporalSpv), "temporal");
 
     std::vector<BindingSpec> atrous;
@@ -428,6 +498,7 @@ void Renderer::writeDescriptors() {
         std::vector<Bind> pt = {
             {1, noisy_.view}, {2, gpos_[cur].view}, {3, {}, vertices_.buffer}, {4, {}, indices_.buffer},
             {5, {}, triMaterials_.buffer}, {6, {}, materials_.buffer}, {7, gnormal_[cur].view}, {9, galbedo_.view},
+            {10, {}, texInfos_.buffer}, {11, {}, texels_.buffer},
         };
         if (hardwareRt_) {
             Bind b{0};
@@ -442,7 +513,8 @@ void Renderer::writeDescriptors() {
         writeSet(dev, temporal_.sets[cur], {
             {0, noisy_.view}, {1, gpos_[cur].view}, {2, gnormal_[cur].view}, {3, gpos_[prev].view},
             {4, gnormal_[prev].view}, {5, history_[prev].view}, {6, moments_[prev].view}, {7, history_[cur].view},
-            {8, moments_[cur].view}, {9, filtered_[0].view},
+            {8, moments_[cur].view}, {9, filtered_[0].view}, {10, galbedo_.view}, {11, albedoHist_[prev].view},
+            {12, albedoHist_[cur].view},
         });
         for (int dir = 0; dir < 2; ++dir) {
             writeSet(dev, atrous_.sets[cur * 2 + dir], {
@@ -452,7 +524,7 @@ void Renderer::writeDescriptors() {
         }
         // 平均を奇数回くり返すと、結果は filtered_[1] に入る
         writeSet(dev, composite_.sets[cur], {
-            {0, filtered_[kAtrousIterations % 2].view}, {1, history_[cur].view}, {2, galbedo_.view},
+            {0, filtered_[kAtrousIterations % 2].view}, {1, history_[cur].view}, {2, albedoHist_[cur].view},
             {3, output_.view}, {4, {}, exposure_.buffer},
         });
     }
@@ -502,11 +574,11 @@ void Renderer::recordOverlay(VkCommandBuffer cmd, int x, int y, float opacity) {
 void Renderer::resize(uint32_t width, uint32_t height) {
     vkDeviceWaitIdle(ctx_->device);
     Image* all[] = {&noisy_, &gpos_[0], &gpos_[1], &gnormal_[0], &gnormal_[1], &galbedo_, &history_[0], &history_[1],
-                    &moments_[0], &moments_[1], &filtered_[0], &filtered_[1], &output_};
+                    &moments_[0], &moments_[1], &filtered_[0], &filtered_[1], &albedoHist_[0], &albedoHist_[1], &output_};
     for (Image* img : all) ctx_->destroyImage(*img);
     const VkImageUsageFlags storage = VK_IMAGE_USAGE_STORAGE_BIT;
     for (Image* img : {&noisy_, &gpos_[0], &gpos_[1], &gnormal_[0], &gnormal_[1], &history_[0], &history_[1],
-                       &moments_[0], &moments_[1], &filtered_[0], &filtered_[1]})
+                       &moments_[0], &moments_[1], &filtered_[0], &filtered_[1], &albedoHist_[0], &albedoHist_[1]})
         *img = ctx_->createImage(width, height, VK_FORMAT_R32G32B32A32_SFLOAT, storage);
     galbedo_ = ctx_->createImage(width, height, VK_FORMAT_R8G8B8A8_UNORM, storage);
     output_ = ctx_->createImage(width, height, VK_FORMAT_R8G8B8A8_UNORM, storage | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
@@ -526,7 +598,7 @@ void Renderer::dispatch(VkCommandBuffer cmd, const ComputePass& pass, uint32_t s
 void Renderer::record(VkCommandBuffer cmd, const ViewParams& view) {
     if (imagesFresh_) {
         Image* all[] = {&noisy_, &gpos_[0], &gpos_[1], &gnormal_[0], &gnormal_[1], &galbedo_, &history_[0],
-                        &history_[1], &moments_[0], &moments_[1], &filtered_[0], &filtered_[1], &output_};
+                        &history_[1], &moments_[0], &moments_[1], &filtered_[0], &filtered_[1], &albedoHist_[0], &albedoHist_[1], &output_};
         for (Image* img : all)
             transitionImage(cmd, img->image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL,
                             VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
@@ -553,6 +625,8 @@ void Renderer::record(VkCommandBuffer cmd, const ViewParams& view) {
     pt.sunDir[0] = sunDir_.x; pt.sunDir[1] = sunDir_.y; pt.sunDir[2] = sunDir_.z; pt.sunDir[3] = sunIntensity_;
     pt.misc[1] = skyIntensity_;
     pt.misc[2] = static_cast<float>(glassStart_);
+    // 1 画素が 1 m 先で何 m の幅になるか（テクスチャの縮小した段を選ぶのに使う）
+    pt.misc[3] = view.panorama ? 2.0f * 3.14159265f / static_cast<float>(w) : 2.0f * tanHalf / static_cast<float>(h);
     pt.frame[0] = frameIndex_;
     pt.frame[1] = staticFrames_;
     pt.frame[2] = view.maxBounces;
@@ -612,12 +686,12 @@ void Renderer::destroy() {
     vkDeviceWaitIdle(dev);
     for (ComputePass* p : {&pathTrace_, &temporal_, &atrous_, &composite_, &overlayPass_}) destroyPass(dev, *p);
     Image* all[] = {&noisy_, &gpos_[0], &gpos_[1], &gnormal_[0], &gnormal_[1], &galbedo_, &history_[0], &history_[1],
-                    &moments_[0], &moments_[1], &filtered_[0], &filtered_[1], &output_, &overlay_};
+                    &moments_[0], &moments_[1], &filtered_[0], &filtered_[1], &albedoHist_[0], &albedoHist_[1], &output_, &overlay_};
     for (Image* img : all) ctx_->destroyImage(*img);
     destroyAccel(tlas_);
     destroyAccel(blasOpaque_);
     destroyAccel(blasGlass_);
-    for (Buffer* b : {&vertices_, &indices_, &triMaterials_, &materials_, &exposure_, &instances_, &bvhNodes_, &bvhTris_})
+    for (Buffer* b : {&vertices_, &indices_, &triMaterials_, &materials_, &texInfos_, &texels_, &exposure_, &instances_, &bvhNodes_, &bvhTris_})
         ctx_->destroyBuffer(*b);
     ctx_ = nullptr;
 }

@@ -9,7 +9,7 @@ namespace Tools28.Commands.RealtimeRender
     /// </summary>
     internal static class SceneWriter
     {
-        private const uint Version = 1;
+        private const uint Version = 2;
 
         public static void Write(string path, RenderScene scene)
         {
@@ -42,6 +42,8 @@ namespace Tools28.Commands.RealtimeRender
                     w.Write(m.Roughness);
                     w.Write(m.Metallic);
                     w.Write(m.Emissive);
+                    w.Write(m.F0);
+                    w.Write(m.TextureIndex);
                     byte[] name = Encoding.UTF8.GetBytes(m.Name ?? "");
                     w.Write((uint)name.Length);
                     w.Write(name);
@@ -52,10 +54,19 @@ namespace Tools28.Commands.RealtimeRender
                 {
                     w.Write(v.PX); w.Write(v.PY); w.Write(v.PZ);
                     w.Write(v.NX); w.Write(v.NY); w.Write(v.NZ);
+                    w.Write(v.U); w.Write(v.V);
                 }
 
                 w.Write((uint)scene.TriangleCount);
                 foreach (int i in scene.Triangles) w.Write((uint)i);
+
+                w.Write((uint)scene.Textures.Count);
+                foreach (RenderTexture t in scene.Textures)
+                {
+                    w.Write((uint)t.Width);
+                    w.Write((uint)t.Height);
+                    w.Write(t.Rgba);
+                }
             }
         }
     }

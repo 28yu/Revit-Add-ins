@@ -8,6 +8,8 @@ Revit の「リアルタイムレンダリング」ボタン（`Commands/Realtim
   自動で切り替える（同じ絵になるが遅いので、半分の大きさで描いて拡大する）
 - **ノイズ除去**: 前のフレームの結果を今のカメラ位置に合わせて重ね（再投影）、面の境目を守りながら周りの画素と平均する
   （SVGF 方式）。動いている間もざらつかず、止まると足し合わせが進んで正確な結果に近づく
+- **マテリアルの外観**（Revit の外観タブ）の色・イメージ（テクスチャ）・反射率・粗さ・透明度を使う。
+  テクスチャは遠くほど縮小した段（ミップマップ）を使うので、遠くの模様がちらつかない
 - 速い GPU では 1 フレームで複数回（1〜4 回、約 30 fps を目安に自動調整）計算して、動いている間の画質を上げる
 - 描画は Revit とは別のプログラムで行うので、ここで問題が起きても Revit は止まらない
 
@@ -17,6 +19,8 @@ Revit の「リアルタイムレンダリング」ボタン（`Commands/Realtim
 Revit（Tools28.dll）                       Tools28Render.exe
   RealtimeRenderCommand                      main.cpp        起動・設定
     SceneExportContext  … 3Dビューの形を集める   scene.cpp       シーンファイルの読み込み・確認用の部屋
+    AppearanceReader    … マテリアルの外観を読む
+    TextureLoader       … テクスチャ画像を探して読む
     SceneWriter         … %TEMP%\Tools28\Render\scene.t28s を書く
     → Tools28Render.exe --scene … --lang JP    vk_context.cpp  GPU の選択（NVIDIA などの独立 GPU を優先）
                                                bvh.cpp         BVH（予備の方式・マウス位置の物を調べる）
@@ -33,7 +37,7 @@ Revit（Tools28.dll）                       Tools28Render.exe
 
 | ファイル | 内容 |
 |--|--|
-| `common_head.glsl` / `common_body.glsl` | 共通部分（空・太陽・材質・光の通り道・自動露出） |
+| `common_head.glsl` / `common_body.glsl` | 共通部分（空・太陽・材質・テクスチャ・光の通り道） |
 | `pathtrace_hw.comp` | ハード版。当たり判定を RT コアで行う（Vulkan 1.2 + ray query） |
 | `pathtrace_sw.comp` | ソフト版（予備）。BVH を自分でたどる（Vulkan 1.0 で動く） |
 | `temporal.comp` | ノイズ除去 その1: 前のフレームを再投影して重ねる。ばらつき（分散）も求める |

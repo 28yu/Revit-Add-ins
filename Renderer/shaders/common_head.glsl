@@ -7,7 +7,7 @@ layout(set = 0, binding = 2, rgba32f) uniform writeonly image2D uGPos;    // xyz
 layout(set = 0, binding = 7, rgba32f) uniform writeonly image2D uGNormal; // xyz = 面の向き
 layout(set = 0, binding = 9, rgba8) uniform writeonly image2D uGAlbedo;   // rgb = 最初に当たった面の色
 
-struct Vertex { vec4 position; vec4 normal; };
+struct Vertex { vec4 position; vec4 normal; };  // position.w = テクスチャの u, normal.w = v
 layout(set = 0, binding = 3, std430) readonly buffer Vertices { Vertex vertices[]; };
 layout(set = 0, binding = 4, std430) readonly buffer Indices { uint indices[]; };
 // 三角形ごとのマテリアル番号。ガラスの三角形はガラス用の並びに入っている
@@ -15,9 +15,16 @@ layout(set = 0, binding = 5, std430) readonly buffer TriMaterials { uint triMate
 
 struct Material {
     vec4 color;   // rgb = 色（リニア）、a = 不透明度
-    vec4 params;  // x = 粗さ, y = 金属らしさ, z = 自己発光の強さ, w = 未使用
+    vec4 params;  // x = 粗さ, y = 金属らしさ, z = 自己発光の強さ, w = 正面から見たときの反射率
+    ivec4 tex;    // x = 色のテクスチャ番号（-1 = 無し）
 };
 layout(set = 0, binding = 6, std430) readonly buffer Materials { Material materials[]; };
+
+// テクスチャ（Revit の外観の「イメージ」）。画素は 1 つの uint に RGBA（sRGB）を詰めてある。
+// 段（ミップマップ）ごとに縦横半分にした画像が、一番大きい画像の後ろに続けて入っている
+struct TexInfo { uint offset; uint width; uint height; uint levels; };
+layout(set = 0, binding = 10, std430) readonly buffer TexInfos { TexInfo texInfos[]; };
+layout(set = 0, binding = 11, std430) readonly buffer Texels { uint texels[]; };
 
 layout(push_constant) uniform Params {
     vec4 camPos;      // xyz = 位置, w = 縦の画角の tan(半分)
@@ -25,7 +32,7 @@ layout(push_constant) uniform Params {
     vec4 camRight;    // xyz = 右, w = 横の倍率（縦横比）
     vec4 camUp;       // xyz = 上
     vec4 sunDir;      // xyz = 太陽のある方向, w = 太陽の明るさ
-    vec4 misc;        // x = 未使用, y = 空の明るさ, z = ガラス三角形の開始位置（三角形番号）, w = 未使用
+    vec4 misc;        // x = 未使用, y = 空の明るさ, z = ガラス三角形の開始位置（三角形番号）, w = 1 画素の幅（1 m 先で何 m か）
     uvec4 frame;      // x = フレーム番号, y = 止まってからのフレーム数, z = 最大反射回数, w = 1 フレームで計算する回数
 } pc;
 

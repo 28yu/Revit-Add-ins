@@ -83,6 +83,7 @@ private:
     VkContext* ctx_ = nullptr;
     bool hardwareRt_ = false;
     Buffer vertices_, indices_, triMaterials_, materials_, exposure_, instances_;
+    Buffer texInfos_, texels_;  // テクスチャ（Revit の外観の「イメージ」）
     Buffer bvhNodes_, bvhTris_;  // 予備の方式（RT コア無し）で使う
     AccelStruct blasOpaque_, blasGlass_, tlas_;
     uint32_t glassStart_ = 0;
@@ -91,7 +92,7 @@ private:
     float sunIntensity_ = 5.0f;
 
     // 描画とノイズ除去の画像。[2] は「今回」と「前回」を交互に使う
-    Image noisy_, gpos_[2], gnormal_[2], galbedo_, history_[2], moments_[2], filtered_[2], output_;
+    Image noisy_, gpos_[2], gnormal_[2], galbedo_, history_[2], moments_[2], filtered_[2], albedoHist_[2], output_;
     bool imagesFresh_ = false;  // 作り直した直後（レイアウトの切り替えが必要）
     bool resetHistory_ = true;
     bool hasLastView_ = false;

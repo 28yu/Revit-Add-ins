@@ -13,13 +13,15 @@ namespace t28 {
 // --- シーンファイル（.t28s）の形式 ------------------------------------------
 // すべてリトルエンディアン。Revit 側は Commands/RealtimeRender/SceneWriter.cs が書く。
 //   char[4]  "T28S"
-//   uint32   版（1）
+//   uint32   版（2）
 //   float[3] カメラ位置, float[3] 前方向, float[3] 上方向, float 縦の画角（度）
 //   float[3] 太陽のある方向, float 太陽の明るさ, float 空の明るさ
-//   uint32   マテリアル数 → 各: float r,g,b,不透明度,粗さ,金属,発光, uint32 名前のバイト数, 名前（UTF-8）
-//   uint32   頂点数       → 各: float 位置x,y,z, 法線x,y,z
+//   uint32   マテリアル数 → 各: float r,g,b,不透明度,粗さ,金属,発光,反射率, int32 テクスチャ番号（-1 = 無し）,
+//                               uint32 名前のバイト数, 名前（UTF-8）
+//   uint32   頂点数       → 各: float 位置x,y,z, 法線x,y,z, テクスチャ u,v
 //   uint32   三角形数     → 各: uint32 頂点番号×3, マテリアル番号
-static const uint32_t kVersion = 1;
+//   uint32   テクスチャ数 → 各: uint32 幅, 高さ, 画素（RGBA 各 1 バイト、sRGB）
+static const uint32_t kVersion = 2;
 
 namespace {
 class Reader {
@@ -51,7 +53,7 @@ bool loadScene(const std::string& path, Scene& scene, std::string& error) {
     char magic[4];
     uint32_t version = 0;
     if (!r.readBytes(magic, 4) || memcmp(magic, "T28S", 4) != 0) return fail("not a T28S file");
-    if (!r.read(version) || version != kVersion) return fail("unsupported version");
+    if (!r.read(version) || version != kVersion) return fail("unsupported version (please update Tools28)");
 
     float cam[10];
     if (!r.readFloats(cam, 10)) return fail("truncated camera");
@@ -70,11 +72,13 @@ bool loadScene(const std::string& path, Scene& scene, std::string& error) {
     if (!r.read(materialCount) || materialCount > 1000000) return fail("bad material count");
     scene.materials.resize(materialCount);
     for (Material& m : scene.materials) {
-        float v[7];
+        float v[8];
+        int32_t texture = -1;
         uint32_t nameLen = 0;
-        if (!r.readFloats(v, 7) || !r.read(nameLen) || nameLen > 4096) return fail("truncated material");
+        if (!r.readFloats(v, 8) || !r.read(texture) || !r.read(nameLen) || nameLen > 4096) return fail("truncated material");
         m.r = v[0]; m.g = v[1]; m.b = v[2];
-        m.opacity = v[3]; m.roughness = v[4]; m.metallic = v[5]; m.emissive = v[6];
+        m.opacity = v[3]; m.roughness = v[4]; m.metallic = v[5]; m.emissive = v[6]; m.f0 = v[7];
+        m.texture = texture;
         m.name.resize(nameLen);
         if (!r.readBytes(&m.name[0], nameLen)) return fail("truncated material name");
     }
@@ -84,9 +88,9 @@ bool loadScene(const std::string& path, Scene& scene, std::string& error) {
     if (!r.read(vertexCount)) return fail("truncated vertex count");
     scene.vertices.resize(vertexCount);
     for (Vertex& v : scene.vertices) {
-        float p[6];
-        if (!r.readFloats(p, 6)) return fail("truncated vertices");
-        v = {p[0], p[1], p[2], 1.0f, p[3], p[4], p[5], 0.0f};
+        float p[8];
+        if (!r.readFloats(p, 8)) return fail("truncated vertices");
+        v = {p[0], p[1], p[2], p[6], p[3], p[4], p[5], p[7]};
     }
 
     uint32_t triCount = 0;
@@ -102,6 +106,19 @@ bool loadScene(const std::string& path, Scene& scene, std::string& error) {
         }
         scene.triMaterials[t] = tri[3] < scene.materials.size() ? tri[3] : 0;
     }
+
+    uint32_t texCount = 0;
+    if (!r.read(texCount) || texCount > 4096) return fail("bad texture count");
+    scene.textures.resize(texCount);
+    for (Texture& tex : scene.textures) {
+        if (!r.read(tex.width) || !r.read(tex.height) || tex.width == 0 || tex.height == 0 || tex.width > 8192 ||
+            tex.height > 8192)
+            return fail("bad texture size");
+        tex.rgba.resize(static_cast<size_t>(tex.width) * tex.height * 4);
+        if (!r.readBytes(tex.rgba.data(), tex.rgba.size())) return fail("truncated texture");
+    }
+    for (Material& m : scene.materials)
+        if (m.texture >= static_cast<int32_t>(texCount)) m.texture = -1;
     fclose(f);
     if (triCount == 0) {
         error = "the model has no triangles";
@@ -145,9 +162,18 @@ struct Builder {
         s.materials.push_back(m);
         return static_cast<uint32_t>(s.materials.size() - 1);
     }
+    // 四角形。テクスチャは a→b を横、a→d を縦にして 1 m で画像 1 枚分を貼る
     void quad(Vec3 a, Vec3 b, Vec3 c, Vec3 d, Vec3 n, uint32_t mat) {
         uint32_t base = static_cast<uint32_t>(s.vertices.size());
-        for (const Vec3& p : {a, b, c, d}) s.vertices.push_back({p.x, p.y, p.z, 1, n.x, n.y, n.z, 0});
+        auto sub = [](Vec3 p, Vec3 q) { return Vec3{p.x - q.x, p.y - q.y, p.z - q.z}; };
+        auto len = [](Vec3 p) { return std::sqrt(p.x * p.x + p.y * p.y + p.z * p.z); };
+        Vec3 eu = sub(b, a), ev = sub(d, a);
+        float lu = std::max(len(eu), 1e-6f), lv = std::max(len(ev), 1e-6f);
+        for (const Vec3& p : {a, b, c, d}) {
+            Vec3 r = sub(p, a);
+            float u = (r.x * eu.x + r.y * eu.y + r.z * eu.z) / lu, v = (r.x * ev.x + r.y * ev.y + r.z * ev.z) / lv;
+            s.vertices.push_back({p.x, p.y, p.z, u, n.x, n.y, n.z, v});
+        }
         uint32_t idx[6] = {0, 1, 2, 0, 2, 3};
         for (uint32_t i : idx) s.indices.push_back(base + i);
         s.triMaterials.push_back(mat);
@@ -173,6 +199,28 @@ Scene makeTestScene() {
     Builder b{s};
     uint32_t wall = b.material("Wall", 0.8f, 0.8f, 0.78f, 0.8f);
     uint32_t floor = b.material("Floor", 0.42f, 0.27f, 0.15f, 0.35f);
+    // 床に木のフローリングの模様（テクスチャの確認用）: 幅 1/4 の板を 4 枚、板ごとに色を変えて木目の筋を入れる
+    {
+        Texture tex;
+        tex.width = tex.height = 256;
+        tex.rgba.resize(256 * 256 * 4);
+        for (uint32_t y = 0; y < 256; ++y) {
+            for (uint32_t x = 0; x < 256; ++x) {
+                uint32_t plank = y / 64;
+                float shade = 0.8f + 0.2f * std::sin(plank * 2.7f + 1.3f);
+                float grain = 0.9f + 0.1f * std::sin(x * 0.11f + plank * 5.0f + std::sin(x * 0.03f + y * 0.2f) * 2.0f);
+                float seam = (y % 64 < 2 || (x + plank * 97) % 256 < 2) ? 0.55f : 1.0f;
+                float k = shade * grain * seam;
+                uint8_t* p = &tex.rgba[(y * 256 + x) * 4];
+                p[0] = static_cast<uint8_t>(std::min(255.0f, 176 * k));
+                p[1] = static_cast<uint8_t>(std::min(255.0f, 124 * k));
+                p[2] = static_cast<uint8_t>(std::min(255.0f, 78 * k));
+                p[3] = 255;
+            }
+        }
+        s.textures.push_back(std::move(tex));
+        s.materials[floor].texture = 0;
+    }
     uint32_t ground = b.material("Ground", 0.25f, 0.33f, 0.15f, 0.9f);
     uint32_t steel = b.material("Steel", 0.75f, 0.75f, 0.77f, 0.3f, 1.0f);
     uint32_t glass = b.material("Glass", 0.85f, 0.95f, 0.95f, 0.02f, 0.0f, 0.2f);

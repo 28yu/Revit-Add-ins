@@ -1,16 +1,64 @@
 // 共通部分（後半）: 表面の情報・反射・光の通り道・トーンマッピング・main。
 // これより前に traceClosest(origin, dir) と occluded(origin, dir) が定義されている必要がある。
-void surfaceAt(Hit h, vec3 rayDir, out vec3 pos, out vec3 normal, out vec3 geomNormal) {
+// uv = テクスチャ上の位置（1 = 画像 1 枚分）, uvPerMeter = 1 m で何枚分進むか（遠くで縮小した段を選ぶのに使う）
+void surfaceAt(Hit h, vec3 rayDir, out vec3 pos, out vec3 normal, out vec3 geomNormal, out vec2 uv, out float uvPerMeter) {
     uint i0 = indices[h.tri * 3u], i1 = indices[h.tri * 3u + 1u], i2 = indices[h.tri * 3u + 2u];
-    vec3 p0 = vertices[i0].position.xyz, p1 = vertices[i1].position.xyz, p2 = vertices[i2].position.xyz;
+    vec4 v0 = vertices[i0].position, v1 = vertices[i1].position, v2 = vertices[i2].position;
+    vec3 p0 = v0.xyz, p1 = v1.xyz, p2 = v2.xyz;
+    vec2 t0 = vec2(v0.w, vertices[i0].normal.w), t1 = vec2(v1.w, vertices[i1].normal.w), t2 = vec2(v2.w, vertices[i2].normal.w);
     float b0 = 1.0 - h.bary.x - h.bary.y;
     pos = p0 * b0 + p1 * h.bary.x + p2 * h.bary.y;
-    geomNormal = normalize(cross(p1 - p0, p2 - p0));
+    uv = t0 * b0 + t1 * h.bary.x + t2 * h.bary.y;
+    vec3 cr = cross(p1 - p0, p2 - p0);
+    vec2 e1 = t1 - t0, e2 = t2 - t0;
+    float uvArea = abs(e1.x * e2.y - e1.y * e2.x);
+    uvPerMeter = sqrt(uvArea / max(length(cr), 1e-12));
+    geomNormal = normalize(cr);
     vec3 n = vertices[i0].normal.xyz * b0 + vertices[i1].normal.xyz * h.bary.x + vertices[i2].normal.xyz * h.bary.y;
     normal = dot(n, n) > 1e-8 ? normalize(n) : geomNormal;
     // 裏から当たったときは表向きにそろえる（Revit の形は裏表が混ざっていることがある）
     if (dot(geomNormal, rayDir) > 0.0) geomNormal = -geomNormal;
     if (dot(normal, geomNormal) < 0.0) normal = -normal;
+}
+
+// --- テクスチャ ---------------------------------------------------------
+vec4 texel(TexInfo ti, uint offset, uint w, uint h, ivec2 p) {
+    // 繰り返し貼る（画像の外は反対側から続ける）
+    uint x = uint(p.x - int(w) * int(floor(float(p.x) / float(w))));
+    uint y = uint(p.y - int(h) * int(floor(float(p.y) / float(h))));
+    uint c = texels[offset + min(y, h - 1u) * w + min(x, w - 1u)];
+    vec4 s = vec4(float(c & 255u), float((c >> 8) & 255u), float((c >> 16) & 255u), float(c >> 24)) / 255.0;
+    // sRGB → リニア
+    vec3 lin = mix(s.rgb / 12.92, pow((s.rgb + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), s.rgb));
+    return vec4(lin, s.a);
+}
+
+// 段 level の画像から、周りの 4 画素を距離に応じて混ぜて取り出す（バイリニア）
+vec4 sampleLevel(TexInfo ti, int level, vec2 uv) {
+    uint offset = ti.offset, w = ti.width, h = ti.height;
+    for (int i = 0; i < level; ++i) {
+        offset += w * h;
+        w = max(w / 2u, 1u);
+        h = max(h / 2u, 1u);
+    }
+    // 画像の上が v = 1（Revit と同じ向き）
+    vec2 p = vec2(uv.x, 1.0 - uv.y) * vec2(w, h) - 0.5;
+    vec2 base = floor(p);
+    vec2 f = p - base;
+    ivec2 b = ivec2(base);
+    vec4 a = mix(texel(ti, offset, w, h, b), texel(ti, offset, w, h, b + ivec2(1, 0)), f.x);
+    vec4 c = mix(texel(ti, offset, w, h, b + ivec2(0, 1)), texel(ti, offset, w, h, b + ivec2(1, 1)), f.x);
+    return mix(a, c, f.y);
+}
+
+// footprint = この点で 1 画素（または光の広がり）が覆うテクスチャの幅（画像 1 枚 = 1）
+vec4 sampleTexture(int index, vec2 uv, float footprint) {
+    TexInfo ti = texInfos[index];
+    float lod = log2(max(footprint * float(max(ti.width, ti.height)), 1e-8));
+    lod = clamp(lod, 0.0, float(ti.levels - 1u));
+    int l0 = int(floor(lod));
+    int l1 = min(l0 + 1, int(ti.levels) - 1);
+    return mix(sampleLevel(ti, l0, uv), sampleLevel(ti, l1, uv), lod - float(l0));
 }
 
 // --- 反射の向きを選ぶ ---------------------------------------------------
@@ -71,6 +119,9 @@ vec3 radiance(vec3 origin, vec3 dir, out Primary primary) {
     // ノイズ除去で使う「最初に見えている面」は、ガラスを素通りした先の物にする
     // （ガラスの面を使うと、動いたときに窓の外の景色がにじむため）
     float travelled = 0.0;
+    // 光の筋の太さ（m）と広がり方。遠く・ざらついた反射の先ほど太くなり、テクスチャの縮小した段を使う
+    float coneWidth = 0.0;
+    float coneSpread = pc.misc.w;
 
     for (uint bounce = 0u; bounce <= pc.frame.z; ++bounce) {
         Hit h = traceClosest(origin, dir);
@@ -79,17 +130,24 @@ vec3 radiance(vec3 origin, vec3 dir, out Primary primary) {
             break;
         }
         vec3 pos, n, gn;
-        surfaceAt(h, dir, pos, n, gn);
+        vec2 uv;
+        float uvPerMeter;
+        surfaceAt(h, dir, pos, n, gn, uv, uvPerMeter);
+        coneWidth += h.t * coneSpread;
         Material m = materials[triMaterials[h.tri]];
+        vec3 albedo = m.color.rgb;
+        if (m.tex.x >= 0) {
+            float slant = max(abs(dot(dir, gn)), 0.2);  // 斜めに見ると引き伸ばされる
+            albedo *= sampleTexture(m.tex.x, uv, coneWidth / slant * uvPerMeter).rgb;
+        }
         if (!primary.hit && !h.glass) {
             primary.hit = true;
             primary.pos = pos;
             primary.normal = n;
             primary.dist = travelled + h.t;
             // 鏡・金属は、映り込みそのものが見えているので色で割らない
-            primary.albedo = m.params.y > 0.5 ? vec3(1.0) : max(m.color.rgb, vec3(0.02));
+            primary.albedo = m.params.y > 0.5 ? vec3(1.0) : max(albedo, vec3(0.02));
         }
-        vec3 albedo = m.color.rgb;
         float roughness = clamp(m.params.x, 0.02, 1.0);
         float metallic = m.params.y;
         result += throughput * albedo * m.params.z;  // 自己発光（照明器具など）
@@ -109,7 +167,7 @@ vec3 radiance(vec3 origin, vec3 dir, out Primary primary) {
         vec3 v = dir;
         float cosV = max(dot(-v, n), 0.0);
         // 金属は色付きの反射だけ、金属でない物は「反射（白）」か「拡散（物の色）」を確率で選ぶ
-        float specProb = metallic > 0.5 ? 1.0 : fresnelSchlick(cosV, 0.04) * (1.0 - roughness * 0.7) + 0.04;
+        float specProb = metallic > 0.5 ? 1.0 : fresnelSchlick(cosV, clamp(m.params.w, 0.0, 1.0)) * (1.0 - roughness * 0.7) + 0.04;
         specProb = clamp(specProb, 0.0, 1.0);
 
         // 太陽の直接光（拡散面のみ。影の判定は専用回路で行う）
@@ -125,11 +183,13 @@ vec3 radiance(vec3 origin, vec3 dir, out Primary primary) {
             if (dot(newDir, gn) <= 0.0) break;
             throughput *= metallic > 0.5 ? albedo : vec3(1.0);
             dir = newDir;
+            coneSpread += roughness * roughness * 0.5;
             // ほぼ鏡のときだけ太陽の円盤を映す（ざらついた面では直接光として計算済み）
             specularPath = specularPath && roughness < 0.1;
         } else {
             dir = cosineHemisphere(n);
             throughput *= albedo;
+            coneSpread = max(coneSpread, 0.5);
             specularPath = false;
         }
         origin = pos + gn * 0.002;
@@ -144,6 +204,44 @@ vec3 radiance(vec3 origin, vec3 dir, out Primary primary) {
     return result;
 }
 
+// 画素の中心を通る光線で、最初に見えている面の位置・向きを求める（ガラスは素通りする）。
+// ノイズ除去で「同じ面か」を比べるのに使うので、毎フレーム同じ結果になるよう、狙う位置をずらさない
+void primaryGeometry(vec3 origin, vec3 dir, out vec3 pos, out vec3 normal, out float dist) {
+    pos = origin + dir * 1e5;
+    normal = -dir;
+    dist = -1.0;
+    float travelled = 0.0;
+    for (int i = 0; i < 8; ++i) {
+        Hit h = traceClosest(origin, dir);
+        if (!h.found) return;
+        vec3 p, n, gn;
+        vec2 uv;
+        float uvPerMeter;
+        surfaceAt(h, dir, p, n, gn, uv, uvPerMeter);
+        travelled += h.t;
+        if (!h.glass) {
+            pos = p;
+            normal = n;
+            dist = travelled;
+            return;
+        }
+        origin = p + dir * 0.001;
+    }
+}
+
+vec3 cameraRay(vec2 uv) {
+    if (pc.camForward.w > 0.5) {
+        // 360°パノラマ（正距円筒図法）: 横 = 方位 -180°〜180°、縦 = 上 90°〜下 -90°
+        float lon = (uv.x - 0.5) * 2.0 * PI;
+        float lat = (0.5 - uv.y) * PI;
+        vec3 f = pc.camForward.xyz, r = pc.camRight.xyz, u = pc.camUp.xyz;
+        return normalize(cos(lat) * (cos(lon) * f + sin(lon) * r) + sin(lat) * u);
+    }
+    vec2 ndc = vec2(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0);
+    float th = pc.camPos.w;
+    return normalize(pc.camForward.xyz + pc.camRight.xyz * ndc.x * th * pc.camRight.w + pc.camUp.xyz * ndc.y * th);
+}
+
 void main() {
     ivec2 size = imageSize(uNoisy);
     ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
@@ -152,37 +250,30 @@ void main() {
 
     // 1 フレームで何回か計算して平均する（速い GPU では回数を増やし、動いている間の画質を上げる）
     uint spp = max(pc.frame.w, 1u);
-    vec3 color = vec3(0.0);
-    Primary primary;
+    vec3 demod = vec3(0.0);   // 色で割った明るさ（1 回ずつ、その回の面の色で割ってから平均する）
+    vec3 albedo = vec3(0.0);  // 面の色の平均
     for (uint s = 0u; s < spp; ++s) {
         // ピクセル内の位置を毎回少しずらして、ぎざぎざを消す（止まって最初の 1 回だけは中心）
         vec2 jitter = (pc.frame.y == 0u && s == 0u) ? vec2(0.5) : vec2(rand(), rand());
-        vec2 uv = (vec2(pixel) + jitter) / vec2(size);
-        vec3 dir;
-        if (pc.camForward.w > 0.5) {
-            // 360°パノラマ（正距円筒図法）: 横 = 方位 -180°〜180°、縦 = 上 90°〜下 -90°
-            float lon = (uv.x - 0.5) * 2.0 * PI;
-            float lat = (0.5 - uv.y) * PI;
-            vec3 f = pc.camForward.xyz, r = pc.camRight.xyz, u = pc.camUp.xyz;
-            dir = normalize(cos(lat) * (cos(lon) * f + sin(lon) * r) + sin(lat) * u);
-        } else {
-            vec2 ndc = vec2(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0);
-            float th = pc.camPos.w;
-            dir = normalize(pc.camForward.xyz + pc.camRight.xyz * ndc.x * th * pc.camRight.w + pc.camUp.xyz * ndc.y * th);
-        }
+        vec3 dir = cameraRay((vec2(pixel) + jitter) / vec2(size));
 
         Primary pr;
         vec3 c = radiance(pc.camPos.xyz, dir, pr);
-        if (s == 0u) primary = pr;  // 面の情報は 1 回目のものを使う
         // 極端に明るい点（ホタル）を抑える
         float lum = dot(c, vec3(0.2126, 0.7152, 0.0722));
         if (lum > 50.0) c *= 50.0 / lum;
-        color += c;
+        demod += c / pr.albedo;
+        albedo += pr.albedo;
     }
-    color /= float(spp);
+    demod /= float(spp);
+    albedo /= float(spp);
 
-    imageStore(uNoisy, pixel, vec4(color / primary.albedo, 1.0));
-    imageStore(uGPos, pixel, vec4(primary.pos, primary.dist));
-    imageStore(uGNormal, pixel, vec4(primary.normal, 0.0));
-    imageStore(uGAlbedo, pixel, vec4(primary.albedo, 1.0));
+    imageStore(uNoisy, pixel, vec4(demod, 1.0));
+    // 位置・向きは画素の中心で求める（輪郭で毎フレーム手前・奥が入れ替わらないように）
+    vec3 gpos, gnormal;
+    float gdist;
+    primaryGeometry(pc.camPos.xyz, cameraRay((vec2(pixel) + 0.5) / vec2(size)), gpos, gnormal, gdist);
+    imageStore(uGPos, pixel, vec4(gpos, gdist));
+    imageStore(uGNormal, pixel, vec4(gnormal, 0.0));
+    imageStore(uGAlbedo, pixel, vec4(albedo, 1.0));
 }
