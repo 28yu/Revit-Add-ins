@@ -152,7 +152,7 @@ Tools28Render --scene model.t28s --output out.png       画像を作って終わ
 
 ## アイコン
 
-`res/Tools28Render.ico`（`res/draw_app_icon.py` で描く）を `res/app.rc` で exe に入れている。
+`res/Tools28Render.ico`（28 Tools のサイトのファビコン `res/favicon_28.png` から `res/make_app_icon.py` で作る）を `res/app.rc` で exe に入れている。
 エクスプローラー・ウィンドウ・タスクバーのアイコンになり、書き出したビューア exe も同じアイコンになる（28 Tools から書き出したと分かる）。
 
 ## 使っている外部の部品
