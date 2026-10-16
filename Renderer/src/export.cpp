@@ -230,9 +230,9 @@ std::string fileNameOf(const std::string& path) {
     return p == std::string::npos ? path : path.substr(p + 1);
 }
 
-std::string defaultExportName(const std::string& title, ExportKind kind) {
+std::string defaultExportName(const std::string& viewName, ExportKind kind) {
     std::string base;
-    for (unsigned char c : title) {
+    for (unsigned char c : viewName) {
         if (c < 0x20 || strchr("\\/:*?\"<>|", c)) base += '_';
         else base += static_cast<char>(c);
     }
@@ -243,11 +243,12 @@ std::string defaultExportName(const std::string& title, ExportKind kind) {
         base.resize(cut);
     }
     if (base.empty()) base = "Tools28";
-    char stamp[32];
+    // 日付（年の下 2 桁・月・日。例: 261016）_ビュー名.拡張子
+    char stamp[16];
     std::time_t now = std::time(nullptr);
-    std::strftime(stamp, sizeof(stamp), "_%Y%m%d_%H%M", std::localtime(&now));
+    std::strftime(stamp, sizeof(stamp), "%y%m%d_", std::localtime(&now));
     const char* ext = kind == ExportKind::Image ? ".png" : kind == ExportKind::Panorama ? ".html" : ".exe";
-    return base + stamp + (kind == ExportKind::Panorama ? "_360" : "") + ext;
+    return stamp + base + ext;
 }
 
 std::string chooseSavePath(void* ownerWindow, ExportKind kind, const std::string& defaultName) {

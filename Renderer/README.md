@@ -143,7 +143,7 @@ Tools28Render --scene model.t28s [--lang JP|US|CN]     ウィンドウで表示
 Tools28Render --test-scene                              確認用の部屋
 Tools28Render --scene model.t28s --output out.png       画像を作って終わる
     [--width 1280 --height 720 --samples 256 --panorama]
-その他: --sky-size 横の画素数（空の画像。既定 4096。動作確認で速くするときは 1024）/ --live（シーンファイル・.cam の更新を見張る。Revit から起動したとき）/ --title 題名（ウィンドウと書き出すファイルの名前）/ --export-samples 回数（書き出しを短くする。動作確認用）
+その他: --view ビュー名（書き出すファイルの名前「日付_ビュー名.拡張子」に使う。無ければ --title の「 - 」より後ろ）/ --sky-size 横の画素数（空の画像。既定 4096。動作確認で速くするときは 1024）/ --live（シーンファイル・.cam の更新を見張る。Revit から起動したとき）/ --title 題名（ウィンドウと書き出すファイルの名前）/ --export-samples 回数（書き出しを短くする。動作確認用）
         --log ファイル / --gpu 番号 / --bounces 回数 / --exposure EV / --no-auto-exposure
         --render-scale 倍率（小さく描いて拡大＝速い。既定は RT コアあり 1.0・なし 0.5）
         --software（RT コアがあっても予備の方式で描く） / --exit-after フレーム数（動作確認用）

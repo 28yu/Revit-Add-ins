@@ -62,7 +62,7 @@ namespace Tools28.Commands.RealtimeRender
                 var psi = new ProcessStartInfo
                 {
                     FileName = exePath,
-                    Arguments = $"--scene \"{scenePath}\" --lang {Loc.CurrentLang} --title \"{MakeTitle(doc, view)}\" --live",
+                    Arguments = $"--scene \"{scenePath}\" --lang {Loc.CurrentLang} --title \"{MakeTitle(doc, view)}\" --view \"{CleanArg(view.Name)}\" --live",
                     UseShellExecute = false,
                     WorkingDirectory = Path.GetDirectoryName(exePath) ?? "",
                 };
@@ -206,9 +206,11 @@ namespace Tools28.Commands.RealtimeRender
         /// </summary>
         private static string MakeTitle(Document doc, View view)
         {
-            string title = $"{doc.Title} - {view.Name}";
-            return title.Replace('"', '\'').Replace("\\", "_").Trim();
+            return CleanArg($"{doc.Title} - {view.Name}");
         }
+
+        /// <summary>コマンドラインの引数に入れる文字列（引用符・\ は使わない文字に置き換える）。</summary>
+        private static string CleanArg(string s) => (s ?? "").Replace('"', '\'').Replace("\\", "_").Trim();
 
                 private static float[] ToFloats(XYZ v, double scale = 1.0) =>
             new[] { (float)(v.X * scale), (float)(v.Y * scale), (float)(v.Z * scale) };

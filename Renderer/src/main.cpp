@@ -51,6 +51,7 @@ static int run(int argc, char** argv) {
         else if (a == "--output") opt.outputPath = next();
         else if (a == "--log") opt.logPath = next();
         else if (a == "--title") opt.title = next();
+        else if (a == "--view") opt.viewName = next();
         else if (a == "--live") opt.liveSync = true;
         else if (a == "--lang") lang = next();
         else if (a == "--width") opt.width = std::atoi(next());
@@ -74,6 +75,11 @@ static int run(int argc, char** argv) {
     long embeddedOffset = 0;
     bool embedded = opt.scenePath.empty() && !testScene &&
                     findEmbeddedScene(embeddedExe, embeddedOffset, opt.title);
+    // ビュー名: 指定が無ければ題名（モデル名 - ビュー名）の後ろの部分（書き出したビューアの exe でも使えるように）
+    if (opt.viewName.empty()) {
+        size_t sep = opt.title.rfind(" - ");
+        opt.viewName = sep == std::string::npos ? opt.title : opt.title.substr(sep + 3);
+    }
     // 言語: 指定が無ければ Windows の表示言語（ビューアを受け取った人の PC に合わせる）
     setLanguage(lang ? lang : systemLanguage());
     if (opt.logPath.empty() && opt.outputPath.empty()) opt.logPath = defaultLogPath();

@@ -14,7 +14,8 @@ struct Options {
     std::string scenePath;         // 空なら確認用の部屋
     std::string outputPath;        // 指定があれば画像だけ作って終わる
     std::string logPath;
-    std::string title;             // モデル名・ビュー名（ウィンドウの題名と、書き出すファイルの名前に使う）
+    std::string title;             // モデル名・ビュー名（ウィンドウの題名に使う）
+    std::string viewName;          // ビュー名（書き出すファイルの名前に使う）。無ければ題名の「 - 」より後ろ
     int width = 1280, height = 720;
     int samples = 256;             // 画像だけ作るときの足し合わせ回数
     bool panorama = false;

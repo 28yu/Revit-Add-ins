@@ -127,13 +127,39 @@ namespace Tools28.Commands.RealtimeRender
         /// この要素の変更が 3D ビューの見た目に関係するか。
         /// 関係する: モデルの要素（壁・床・ファミリなど）、そのタイプ、マテリアル・外観、3D ビュー自身、ビューに使っているテンプレート・フィルタ、
         ///           リンク、太陽の設定。
-        /// 関係しない: 特定のビューだけの要素（凡例・注記・寸法・文字・詳細線分など）、ほかのビュー・シート・集計表、その他の設定。
+        ///           平面・断面・立面・3D・集計表のビュー（そこでの編集で形状や値が変わることがあるため）。
+        /// 関係しない: 特定のビューだけの要素（凡例・注記・寸法・文字・詳細線分など）、凡例・シート・製図ビュー、その他の設定。
         /// </summary>
+        /// <summary>
+        /// ほかのビューの変更。平面・断面・立面・3D・集計表では、形状や値を変える操作があるので同期する。
+        /// 凡例・シート・製図ビューなど、モデルの形状に関係しないビューは同期しない。
+        /// （平面・断面・集計表で壁を動かしたり値を変えたりすると、その要素自体が変わるので、それはモデルの要素として同期される）
+        /// </summary>
+        private static bool IsRelevantView(View v, View3D view)
+        {
+            if (v.Id == view.ViewTemplateId) return true;
+            switch (v.ViewType)
+            {
+                case ViewType.FloorPlan:
+                case ViewType.CeilingPlan:
+                case ViewType.AreaPlan:
+                case ViewType.EngineeringPlan:
+                case ViewType.Section:
+                case ViewType.Elevation:
+                case ViewType.Detail:
+                case ViewType.ThreeD:
+                case ViewType.Schedule:
+                    return true;
+                default:
+                    return false;  // 凡例・シート・製図ビュー・レポートなど
+            }
+        }
+
         private static bool IsRelevant(Element e, View3D view)
         {
             if (e == null) return false;
             if (e.Id == view.Id) return true;  // 表示・非表示、切断ボックス、表示スタイルなど
-            if (e is View) return e.Id == view.ViewTemplateId;  // ほかのビュー（凡例・平面・シートなど）は関係ない
+            if (e is View v) return IsRelevantView(v, view);
             if (e.OwnerViewId != ElementId.InvalidElementId) return false;  // 特定のビューだけの要素（凡例・注記・詳細）
             if (e is Material || e is AppearanceAssetElement) return true;
             if (e is ParameterFilterElement) return view.GetFilters().Contains(e.Id);

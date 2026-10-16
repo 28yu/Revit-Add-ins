@@ -460,7 +460,7 @@ int runWindow(const Options& opt, Scene& scene) {
     auto startExport = [&](int button) {
         ExportKind kind = button == kButtonImage ? ExportKind::Image
                         : button == kButtonPanorama ? ExportKind::Panorama : ExportKind::Viewer;
-        std::string path = chooseSavePath(nativeWindow, kind, defaultExportName(opt.title, kind));
+        std::string path = chooseSavePath(nativeWindow, kind, defaultExportName(opt.viewName, kind));
         if (path.empty()) return;
         if (kind == ExportKind::Viewer) {
             // 今の視点を最初の視点にして、シーンを exe に付け足す
