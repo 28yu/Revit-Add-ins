@@ -67,7 +67,7 @@ namespace Tools28.Commands.RealtimeRender
                 Process process = Process.Start(psi);
                 DiagLog.Cmd("RealtimeRender", $"描画プログラム起動 ({watch.ElapsedMilliseconds} ms)");
                 if (process != null)
-                    LiveSync.Start(commandData.Application, doc, view, scenePath, process, scene);
+                    LiveSync.Start(commandData.Application, doc, view, scenePath, process);
                 return Result.Succeeded;
             }
             catch (Exception ex)
@@ -105,7 +105,7 @@ namespace Tools28.Commands.RealtimeRender
         /// Revit のビューと同じ位置・向きのカメラを作る。
         /// アイソメ（平行投影）のビューは視点が遠く離れているので、モデル全体が見える位置に置き直す。
         /// </summary>
-        internal static RenderCamera BuildCamera(View3D view, RenderScene scene, bool quiet = false)
+        internal static RenderCamera BuildCamera(View3D view, RenderScene scene)
         {
             ViewOrientation3D o = view.GetOrientation();
             var cam = new RenderCamera
@@ -137,7 +137,7 @@ namespace Tools28.Commands.RealtimeRender
                 }
                 cam.FovY = 50f;
             }
-            if (!quiet) DiagLog.Cmd("RealtimeRender",
+            DiagLog.Cmd("RealtimeRender",
                 $"カメラ: 透視={view.IsPerspective} 位置=({cam.Eye[0]:F2},{cam.Eye[1]:F2},{cam.Eye[2]:F2}) 画角={cam.FovY:F1}");
             return cam;
         }

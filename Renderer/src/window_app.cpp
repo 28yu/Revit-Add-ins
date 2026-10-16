@@ -389,11 +389,11 @@ int runWindow(const Options& opt, Scene& scene) {
     AutoExposure exposure;
 
     // --- ライブ同期 -----------------------------------------------------------
-    // Revit 側（Tools28）は、モデルが変わるとシーンファイルを書き直し、Revit のビューの視点が変わると「.cam」を書く。
+    // Revit 側（Tools28）は、モデルが変わるとシーンファイルを書き直す（視点は伝えない。描画ウィンドウと Revit は別々に動かす）。
     // ここでは 0.5 秒ごとにファイルの更新時刻を調べて読み直す。同期を止めると「.pause」を作り、Revit 側はそれを見て書き出しを休む
     namespace fs = std::filesystem;
     const bool liveSync = opt.liveSync && !opt.scenePath.empty();
-    const std::string camPath = opt.scenePath + ".cam", pausePath = opt.scenePath + ".pause";
+    const std::string pausePath = opt.scenePath + ".pause";
     // 更新時刻（ファイルが無ければ kNoFile。時刻の数値は負になることもあるので、負かどうかでは判断しない）
     const long long kNoFile = std::numeric_limits<long long>::min();
     auto stampOf = [&](const std::string& path) -> long long {
@@ -402,12 +402,11 @@ int runWindow(const Options& opt, Scene& scene) {
         return ec ? kNoFile : static_cast<long long>(t.time_since_epoch().count());
     };
     bool syncOn = true;
-    long long sceneStamp = kNoFile, camStamp = kNoFile;
+    long long sceneStamp = kNoFile;
     if (liveSync) {
         std::error_code ec;
         fs::remove(fs::u8path(pausePath), ec);
         sceneStamp = stampOf(opt.scenePath);
-        camStamp = stampOf(camPath);
     }
     double syncTimer = 0;
 
@@ -626,18 +625,6 @@ int runWindow(const Options& opt, Scene& scene) {
                     toast({tr("SyncUpdated")}, 2.5);
                 } else {
                     logInfo("Live sync: could not read the scene yet (%s)", error.c_str());
-                }
-            }
-            long long ct = stampOf(camPath);
-            if (ct != camStamp && ct != kNoFile) {
-                std::ifstream in(fs::u8path(camPath));
-                Camera c;
-                long long seq = 0;
-                if (in >> seq >> c.eye.x >> c.eye.y >> c.eye.z >> c.forward.x >> c.forward.y >> c.forward.z >> c.up.x >> c.up.y >>
-                    c.up.z >> c.fovY) {
-                    cam.setFrom(c);
-                    camStamp = ct;
-                    logInfo("Live sync: camera from Revit (%lld)", seq);
                 }
             }
         }

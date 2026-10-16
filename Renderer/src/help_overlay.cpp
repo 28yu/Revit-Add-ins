@@ -504,18 +504,22 @@ void syncIcon(Canvas& c, float cx, float cy, float s, const Color& col) {
 ToolbarImage buildToolbarImage(float s, int hover, int sync) {
     std::vector<const char*> labels = {"ExportImage", "ExportPanorama", "ExportViewer"};
     if (sync >= 0) labels.push_back(sync > 0 ? "SyncOn" : "SyncOff");
+    // 書き出しのボタンには、保存されるファイルの種類を小さな札で出す（どれが exe・html か分かるように）
+    const char* kinds[] = {"PNG", "HTML", "EXE", nullptr};
     const int count = static_cast<int>(labels.size());
     const float pad = 6 * s, iconH = 24 * s, labelPx = 11 * s, labelH = 14 * s, gap = 2 * s;
+    const float badgePx = 10 * s, badgeH = 15 * s;
     std::vector<float> widths;
     float total = pad;
-    for (const char* key : labels) {
-        float w = std::max(40 * s, textWidth(tr(key), labelPx) + 14 * s);
+    for (int i = 0; i < count; ++i) {
+        float w = std::max(40 * s, textWidth(tr(labels[i]), labelPx) + 14 * s);
+        if (kinds[i]) w = std::max(w, textWidth(kinds[i], badgePx) + 22 * s);
         widths.push_back(w);
         total += w + gap;
     }
     total += pad - gap;
     int width = static_cast<int>(std::ceil(total));
-    int height = static_cast<int>(std::ceil(pad * 2 + iconH + labelH + 4 * s));
+    int height = static_cast<int>(std::ceil(pad * 2 + iconH + labelH + badgeH + 6 * s));
     Canvas c(width, height);
     auto panel = [&](float x, float y) { return sdRoundBox(x, y, width / 2.0f, height / 2.0f, width / 2.0f, height / 2.0f, 8 * s); };
     c.fill(panel, 0, 0, static_cast<float>(width), static_cast<float>(height), kPanel);
@@ -546,6 +550,13 @@ ToolbarImage buildToolbarImage(float s, int hover, int sync) {
         else if (i == kButtonViewer) viewerIcon(c, cx, cy, s, col);
         else syncIcon(c, cx, cy, s, col);
         c.textCentered(tr(labels[i]), cx, pad + 2 * s + iconH + labelH / 2 + 1 * s, labelPx, i == kButtonSync && sync <= 0 ? kDim : kWhite);
+        if (kinds[i]) {
+            // ファイルの種類の札（角の丸い枠の中に PNG / HTML / EXE）
+            float bw = textWidth(kinds[i], badgePx) + 10 * s, by = pad + 2 * s + iconH + labelH + 2 * s + badgeH / 2;
+            auto badge = [&](float px, float py) { return sdRoundBox(px, py, cx, by, bw / 2, badgeH / 2 - 1 * s, 3 * s); };
+            c.fill(badge, cx - bw / 2, by - badgeH / 2, cx + bw / 2, by + badgeH / 2, i == hover ? kAccent : Color{1, 1, 1, 0.18f});
+            c.textCentered(kinds[i], cx, by, badgePx, kWhite);
+        }
         tb.buttons.push_back({static_cast<int>(bx0), static_cast<int>(by0), static_cast<int>(w), static_cast<int>(by1 - by0)});
         x += w + gap;
     }
