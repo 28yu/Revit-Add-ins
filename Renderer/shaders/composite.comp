@@ -1,0 +1,53 @@
+#version 450
+// ノイズ除去 その3: 仕上げ。ならした明るさに面の色を掛け戻し、画面に出す色にする。
+layout(local_size_x = 8, local_size_y = 8) in;
+
+layout(set = 0, binding = 0, rgba32f) uniform readonly image2D uFiltered; // ならした明るさ
+layout(set = 0, binding = 1, rgba32f) uniform readonly image2D uHistory;  // （未使用。入出力の番号をそろえるため残す）
+layout(set = 0, binding = 2, rgba8) uniform readonly image2D uGAlbedo;    // 面の色
+layout(set = 0, binding = 3, rgba8) uniform writeonly image2D uOutput;    // 画面に出す色
+// 自動露出用: 画面の明るさの対数の合計
+layout(set = 0, binding = 4, std430) buffer Exposure { int logLumSum; int logLumCount; };
+
+layout(push_constant) uniform Params {
+    float exposure;  // 明るさの倍率
+} pc;
+
+// ACES に近いトーンマッピング（明るい所を白飛びさせずに表示する）
+vec3 tonemap(vec3 x) {
+    const float a = 2.51, b = 0.03, c = 2.43, d = 0.59, e = 0.14;
+    return clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0, 1.0);
+}
+
+shared float sharedLum[64];
+
+void main() {
+    ivec2 size = imageSize(uFiltered);
+    ivec2 p = ivec2(gl_GlobalInvocationID.xy);
+    // 画面の外の画素も途中で終わらせない（下の barrier() に全員がたどり着く必要があるため）
+    bool inside = p.x < size.x && p.y < size.y;
+    float lumForExposure = -1.0;
+    if (inside) {
+        // ならす強さは atrous の中で「残っているノイズの大きさ」に合わせて自動で弱まるので、ここではそのまま使う
+        vec3 color = imageLoad(uFiltered, p).rgb * imageLoad(uGAlbedo, p).rgb;
+        vec3 mapped = tonemap(color * pc.exposure);
+        imageStore(uOutput, p, vec4(pow(mapped, vec3(1.0 / 2.2)), 1.0));
+        lumForExposure = dot(color, vec3(0.2126, 0.7152, 0.0722));
+    }
+
+    // 自動露出: 8×8 画素の平均をとってから対数にする（ざらつきの黒い点に引きずられないように）
+    sharedLum[gl_LocalInvocationIndex] = lumForExposure;
+    barrier();
+    if (gl_LocalInvocationIndex == 0u) {
+        float sum = 0.0;
+        int n = 0;
+        for (int i = 0; i < 64; ++i) {
+            if (sharedLum[i] >= 0.0) { sum += sharedLum[i]; n++; }
+        }
+        if (n > 0) {
+            int q = int(clamp(log2(max(sum / float(n), 1e-5)), -16.0, 16.0) * 64.0);  // 1/64 段刻み
+            atomicAdd(logLumSum, q);
+            atomicAdd(logLumCount, 1);
+        }
+    }
+}

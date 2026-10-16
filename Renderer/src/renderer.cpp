@@ -14,12 +14,26 @@ static const uint32_t kPathTraceHwSpv[] =  // RT コアで当たり判定
 static const uint32_t kPathTraceSwSpv[] =  // BVH を自分でたどる予備の方式
 #include "pathtrace_sw.spv.inc"
     ;
+static const uint32_t kTemporalSpv[] =     // ノイズ除去 その1（前のフレームを重ねる）
+#include "temporal.spv.inc"
+    ;
+static const uint32_t kAtrousSpv[] =       // ノイズ除去 その2（周りの画素と平均する）
+#include "atrous.spv.inc"
+    ;
+static const uint32_t kCompositeSpv[] =    // 仕上げ（色を掛け戻す・トーンマッピング）
+#include "composite.spv.inc"
+    ;
 static const uint32_t kOverlaySpv[] =      // 操作の案内を重ねる
 #include "overlay.spv.inc"
     ;
 
 namespace {
-struct PushConstants {
+
+const int kAtrousIterations = 5;           // 平均する回数（間隔 1, 2, 4, 8, 16 画素）
+const float kMovingHistoryAlpha = 0.125f;  // 動いている間、今回の結果を混ぜる最小の割合（= 最大 8 フレーム分を重ねる）
+const float kMaxHistory = 65536.0f;        // 止まっている間に重ねる回数の上限
+
+struct PathTracePush {
     float camPos[4];
     float camForward[4];
     float camRight[4];
@@ -28,16 +42,32 @@ struct PushConstants {
     float misc[4];
     uint32_t frame[4];
 };
-static_assert(sizeof(PushConstants) <= 128, "push constants must fit in 128 bytes");
+static_assert(sizeof(PathTracePush) <= 128, "push constants must fit in 128 bytes");
+
+struct TemporalPush {
+    float prevEye[4];
+    float prevForward[4];
+    float prevRight[4];
+    float prevUp[4];
+    float params[4];
+};
+
+struct AtrousPush {
+    int32_t stepSize;
+};
+
+struct CompositePush {
+    float exposure;
+};
+
+struct OverlayPush {
+    int32_t offset[2];
+    float opacity;
+};
 
 struct ExposureData {
     int32_t logLumSum;
     int32_t logLumCount;
-};
-
-struct OverlayPushConstants {
-    int32_t offset[2];
-    float opacity;
 };
 
 struct GpuMaterial {
@@ -47,47 +77,135 @@ struct GpuMaterial {
 
 VkDeviceSize alignUp(VkDeviceSize v, VkDeviceSize a) { return (v + a - 1) / a * a; }
 
-VkShaderModule makeShader(VkDevice device, const uint32_t* code, size_t size) {
-    VkShaderModuleCreateInfo smci{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
-    smci.codeSize = size;
-    smci.pCode = code;
-    VkShaderModule module;
-    vkCheck(vkCreateShaderModule(device, &smci, nullptr, &module), "vkCreateShaderModule");
-    return module;
-}
-
-VkPipeline makeComputePipeline(VkDevice device, VkShaderModule module, VkPipelineLayout layout) {
-    VkComputePipelineCreateInfo cpci{VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO};
-    cpci.stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    cpci.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-    cpci.stage.module = module;
-    cpci.stage.pName = "main";
-    cpci.layout = layout;
-    VkPipeline pipeline;
-    vkCheck(vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &cpci, nullptr, &pipeline), "vkCreateComputePipelines");
-    vkDestroyShaderModule(device, module, nullptr);
-    return pipeline;
-}
-}  // namespace
-
-namespace {
-// 予備の方式（BVH）で 0 番、ハード版で 0 番の種類が違うので、番号と種類の一覧を作って使う
 struct BindingSpec {
     uint32_t binding;
     VkDescriptorType type;
 };
 
-std::vector<BindingSpec> pathTraceBindings(bool hardwareRt) {
-    std::vector<BindingSpec> b = {
-        {0, hardwareRt ? VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR : VK_DESCRIPTOR_TYPE_STORAGE_BUFFER},
-        {1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE},  {2, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE},
-        {3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER}, {4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER},
-        {5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER}, {6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER},
-        {7, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER},
-    };
-    if (!hardwareRt) b.push_back({8, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER});
-    return b;
+// シェーダー1つ分の入出力の一覧・パイプラインを作る（setCount 個の入出力の組を用意する）
+Renderer::ComputePass createPass(VkDevice device, const std::vector<BindingSpec>& specs, uint32_t setCount,
+                                 uint32_t pushSize, const uint32_t* spv, size_t spvSize, const char* name) {
+    Renderer::ComputePass pass;
+    std::vector<VkDescriptorSetLayoutBinding> bindings(specs.size());
+    uint32_t images = 0, buffers = 0, accels = 0;
+    for (size_t i = 0; i < specs.size(); ++i) {
+        bindings[i].binding = specs[i].binding;
+        bindings[i].descriptorType = specs[i].type;
+        bindings[i].descriptorCount = 1;
+        bindings[i].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+        if (specs[i].type == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE) images++;
+        else if (specs[i].type == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER) buffers++;
+        else accels++;
+    }
+    VkDescriptorSetLayoutCreateInfo lci{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
+    lci.bindingCount = static_cast<uint32_t>(bindings.size());
+    lci.pBindings = bindings.data();
+    vkCheck(vkCreateDescriptorSetLayout(device, &lci, nullptr, &pass.layout), name);
+
+    std::vector<VkDescriptorPoolSize> sizes;
+    if (images) sizes.push_back({VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, images * setCount});
+    if (buffers) sizes.push_back({VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, buffers * setCount});
+    if (accels) sizes.push_back({VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, accels * setCount});
+    VkDescriptorPoolCreateInfo pci{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
+    pci.maxSets = setCount;
+    pci.poolSizeCount = static_cast<uint32_t>(sizes.size());
+    pci.pPoolSizes = sizes.data();
+    vkCheck(vkCreateDescriptorPool(device, &pci, nullptr, &pass.pool), name);
+    std::vector<VkDescriptorSetLayout> layouts(setCount, pass.layout);
+    pass.sets.resize(setCount);
+    VkDescriptorSetAllocateInfo ai{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
+    ai.descriptorPool = pass.pool;
+    ai.descriptorSetCount = setCount;
+    ai.pSetLayouts = layouts.data();
+    vkCheck(vkAllocateDescriptorSets(device, &ai, pass.sets.data()), name);
+
+    VkPushConstantRange pcr{VK_SHADER_STAGE_COMPUTE_BIT, 0, pushSize};
+    VkPipelineLayoutCreateInfo plci{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
+    plci.setLayoutCount = 1;
+    plci.pSetLayouts = &pass.layout;
+    plci.pushConstantRangeCount = 1;
+    plci.pPushConstantRanges = &pcr;
+    vkCheck(vkCreatePipelineLayout(device, &plci, nullptr, &pass.pipelineLayout), name);
+
+    VkShaderModuleCreateInfo smci{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
+    smci.codeSize = spvSize;
+    smci.pCode = spv;
+    VkShaderModule module;
+    vkCheck(vkCreateShaderModule(device, &smci, nullptr, &module), name);
+    VkComputePipelineCreateInfo cpci{VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO};
+    cpci.stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    cpci.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+    cpci.stage.module = module;
+    cpci.stage.pName = "main";
+    cpci.layout = pass.pipelineLayout;
+    vkCheck(vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &cpci, nullptr, &pass.pipeline), name);
+    vkDestroyShaderModule(device, module, nullptr);
+    return pass;
 }
+
+void destroyPass(VkDevice device, Renderer::ComputePass& pass) {
+    if (pass.pipeline) vkDestroyPipeline(device, pass.pipeline, nullptr);
+    if (pass.pipelineLayout) vkDestroyPipelineLayout(device, pass.pipelineLayout, nullptr);
+    if (pass.pool) vkDestroyDescriptorPool(device, pass.pool, nullptr);
+    if (pass.layout) vkDestroyDescriptorSetLayout(device, pass.layout, nullptr);
+    pass = Renderer::ComputePass{};
+}
+
+// 入出力の組に、画像・バッファ・加速構造を結び付ける
+struct Bind {
+    uint32_t binding;
+    VkImageView image = VK_NULL_HANDLE;
+    VkBuffer buffer = VK_NULL_HANDLE;
+    const VkAccelerationStructureKHR* accel = nullptr;
+};
+
+void writeSet(VkDevice device, VkDescriptorSet set, const std::vector<Bind>& binds) {
+    std::vector<VkWriteDescriptorSet> writes(binds.size());
+    std::vector<VkDescriptorImageInfo> images(binds.size());
+    std::vector<VkDescriptorBufferInfo> buffers(binds.size());
+    std::vector<VkWriteDescriptorSetAccelerationStructureKHR> accels(binds.size());
+    for (size_t i = 0; i < binds.size(); ++i) {
+        VkWriteDescriptorSet& w = writes[i];
+        w = VkWriteDescriptorSet{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+        w.dstSet = set;
+        w.dstBinding = binds[i].binding;
+        w.descriptorCount = 1;
+        if (binds[i].accel) {
+            accels[i] = VkWriteDescriptorSetAccelerationStructureKHR{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR};
+            accels[i].accelerationStructureCount = 1;
+            accels[i].pAccelerationStructures = binds[i].accel;
+            w.descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
+            w.pNext = &accels[i];
+        } else if (binds[i].image) {
+            images[i] = {VK_NULL_HANDLE, binds[i].image, VK_IMAGE_LAYOUT_GENERAL};
+            w.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+            w.pImageInfo = &images[i];
+        } else {
+            buffers[i] = {binds[i].buffer, 0, VK_WHOLE_SIZE};
+            w.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+            w.pBufferInfo = &buffers[i];
+        }
+    }
+    vkUpdateDescriptorSets(device, static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
+}
+
+// 前の計算の書き込みが終わってから次の計算が読むようにする
+void computeBarrier(VkCommandBuffer cmd) {
+    VkMemoryBarrier b{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
+    b.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    b.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+    vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 1, &b, 0,
+                         nullptr, 0, nullptr);
+}
+
+bool sameView(const ViewParams& a, const ViewParams& b) {
+    auto close = [](Vec3 p, Vec3 q) {
+        return std::fabs(p.x - q.x) < 1e-6f && std::fabs(p.y - q.y) < 1e-6f && std::fabs(p.z - q.z) < 1e-6f;
+    };
+    return close(a.eye, b.eye) && close(a.forward, b.forward) && close(a.up, b.up) && a.fovY == b.fovY &&
+           a.panorama == b.panorama && a.maxBounces == b.maxBounces;
+}
+
 }  // namespace
 
 void Renderer::init(VkContext& ctx, const Scene& scene, uint32_t glassStart, const Bvh& bvh) {
@@ -126,8 +244,7 @@ void Renderer::init(VkContext& ctx, const Scene& scene, uint32_t glassStart, con
         bvhTris_ = ctx.createDeviceBuffer(bvh.triIndices().data(), bvh.triIndices().size() * sizeof(uint32_t), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
         logInfo("BVH uploaded: %zu nodes", bvh.nodes().size());
     }
-    createPipeline();
-    createOverlayPipeline();
+    createPasses();
 }
 
 // --- 加速構造（光線の当たり判定を速くするための索引） ----------------------------
@@ -274,142 +391,81 @@ void Renderer::destroyAccel(AccelStruct& a) {
     a = AccelStruct{};
 }
 
-// --- パイプライン（シェーダーと入出力のつなぎ） --------------------------------
 
-void Renderer::createPipeline() {
-    std::vector<BindingSpec> specs = pathTraceBindings(hardwareRt_);
-    std::vector<VkDescriptorSetLayoutBinding> bindings(specs.size());
-    uint32_t imageCount = 0, bufferCount = 0, accelCount = 0;
-    for (size_t i = 0; i < specs.size(); ++i) {
-        bindings[i].binding = specs[i].binding;
-        bindings[i].descriptorType = specs[i].type;
-        bindings[i].descriptorCount = 1;
-        bindings[i].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-        if (specs[i].type == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE) imageCount++;
-        else if (specs[i].type == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER) bufferCount++;
-        else accelCount++;
-    }
-    VkDescriptorSetLayoutCreateInfo lci{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
-    lci.bindingCount = static_cast<uint32_t>(bindings.size());
-    lci.pBindings = bindings.data();
-    vkCheck(vkCreateDescriptorSetLayout(ctx_->device, &lci, nullptr, &setLayout_), "vkCreateDescriptorSetLayout");
+// --- シェーダーと入出力のつなぎ ---------------------------------------------------
 
-    std::vector<VkDescriptorPoolSize> poolSizes = {
-        {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, imageCount},
-        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, bufferCount},
+void Renderer::createPasses() {
+    VkDevice dev = ctx_->device;
+    const VkDescriptorType IMG = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, BUF = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+
+    // パストレース: 0 = 形（加速構造 / BVH の箱）, 1 = 明るさ, 2 = 位置, 3〜6 = 形・材質, 7 = 面の向き, 8 = BVH の三角形, 9 = 面の色
+    std::vector<BindingSpec> pt = {
+        {0, hardwareRt_ ? VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR : BUF},
+        {1, IMG}, {2, IMG}, {3, BUF}, {4, BUF}, {5, BUF}, {6, BUF}, {7, IMG}, {9, IMG},
     };
-    if (accelCount > 0) poolSizes.push_back({VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, accelCount});
-    VkDescriptorPoolCreateInfo pci{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
-    pci.maxSets = 1;
-    pci.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
-    pci.pPoolSizes = poolSizes.data();
-    vkCheck(vkCreateDescriptorPool(ctx_->device, &pci, nullptr, &pool_), "vkCreateDescriptorPool");
-    VkDescriptorSetAllocateInfo ai{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
-    ai.descriptorPool = pool_;
-    ai.descriptorSetCount = 1;
-    ai.pSetLayouts = &setLayout_;
-    vkCheck(vkAllocateDescriptorSets(ctx_->device, &ai, &set_), "vkAllocateDescriptorSets");
+    if (!hardwareRt_) pt.push_back({8, BUF});
+    pathTrace_ = hardwareRt_
+        ? createPass(dev, pt, 2, sizeof(PathTracePush), kPathTraceHwSpv, sizeof(kPathTraceHwSpv), "path trace (hw)")
+        : createPass(dev, pt, 2, sizeof(PathTracePush), kPathTraceSwSpv, sizeof(kPathTraceSwSpv), "path trace (sw)");
 
-    VkPushConstantRange pcr{VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(PushConstants)};
-    VkPipelineLayoutCreateInfo plci{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
-    plci.setLayoutCount = 1;
-    plci.pSetLayouts = &setLayout_;
-    plci.pushConstantRangeCount = 1;
-    plci.pPushConstantRanges = &pcr;
-    vkCheck(vkCreatePipelineLayout(ctx_->device, &plci, nullptr, &pipelineLayout_), "vkCreatePipelineLayout");
+    std::vector<BindingSpec> temporal;
+    for (uint32_t i = 0; i < 10; ++i) temporal.push_back({i, IMG});
+    temporal_ = createPass(dev, temporal, 2, sizeof(TemporalPush), kTemporalSpv, sizeof(kTemporalSpv), "temporal");
 
-    VkShaderModule module = hardwareRt_ ? makeShader(ctx_->device, kPathTraceHwSpv, sizeof(kPathTraceHwSpv))
-                                        : makeShader(ctx_->device, kPathTraceSwSpv, sizeof(kPathTraceSwSpv));
-    pipeline_ = makeComputePipeline(ctx_->device, module, pipelineLayout_);
-}
+    std::vector<BindingSpec> atrous;
+    for (uint32_t i = 0; i < 5; ++i) atrous.push_back({i, IMG});
+    atrous_ = createPass(dev, atrous, 4, sizeof(AtrousPush), kAtrousSpv, sizeof(kAtrousSpv), "atrous");
 
-void Renderer::createOverlayPipeline() {
-    VkDescriptorSetLayoutBinding bindings[2]{};
-    for (uint32_t i = 0; i < 2; ++i) {
-        bindings[i].binding = i;
-        bindings[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-        bindings[i].descriptorCount = 1;
-        bindings[i].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-    }
-    VkDescriptorSetLayoutCreateInfo lci{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
-    lci.bindingCount = 2;
-    lci.pBindings = bindings;
-    vkCheck(vkCreateDescriptorSetLayout(ctx_->device, &lci, nullptr, &overlayLayout_), "vkCreateDescriptorSetLayout (overlay)");
-
-    VkDescriptorPoolSize poolSize{VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 2};
-    VkDescriptorPoolCreateInfo pci{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
-    pci.maxSets = 1;
-    pci.poolSizeCount = 1;
-    pci.pPoolSizes = &poolSize;
-    vkCheck(vkCreateDescriptorPool(ctx_->device, &pci, nullptr, &overlayPool_), "vkCreateDescriptorPool (overlay)");
-    VkDescriptorSetAllocateInfo ai{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
-    ai.descriptorPool = overlayPool_;
-    ai.descriptorSetCount = 1;
-    ai.pSetLayouts = &overlayLayout_;
-    vkCheck(vkAllocateDescriptorSets(ctx_->device, &ai, &overlaySet_), "vkAllocateDescriptorSets (overlay)");
-
-    VkPushConstantRange pcr{VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(OverlayPushConstants)};
-    VkPipelineLayoutCreateInfo plci{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
-    plci.setLayoutCount = 1;
-    plci.pSetLayouts = &overlayLayout_;
-    plci.pushConstantRangeCount = 1;
-    plci.pPushConstantRanges = &pcr;
-    vkCheck(vkCreatePipelineLayout(ctx_->device, &plci, nullptr, &overlayPipelineLayout_), "vkCreatePipelineLayout (overlay)");
-    overlayPipeline_ = makeComputePipeline(ctx_->device, makeShader(ctx_->device, kOverlaySpv, sizeof(kOverlaySpv)),
-                                           overlayPipelineLayout_);
+    composite_ = createPass(dev, {{0, IMG}, {1, IMG}, {2, IMG}, {3, IMG}, {4, BUF}}, 2, sizeof(CompositePush),
+                            kCompositeSpv, sizeof(kCompositeSpv), "composite");
+    overlayPass_ = createPass(dev, {{0, IMG}, {1, IMG}}, 1, sizeof(OverlayPush), kOverlaySpv, sizeof(kOverlaySpv), "overlay");
 }
 
 void Renderer::writeDescriptors() {
-    VkWriteDescriptorSetAccelerationStructureKHR asInfo{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR};
-    asInfo.accelerationStructureCount = 1;
-    asInfo.pAccelerationStructures = &tlas_.handle;
-    VkDescriptorImageInfo accumInfo{VK_NULL_HANDLE, accum_.view, VK_IMAGE_LAYOUT_GENERAL};
-    VkDescriptorImageInfo outInfo{VK_NULL_HANDLE, output_.view, VK_IMAGE_LAYOUT_GENERAL};
-    // 番号 → 中身（予備の方式では 0 番が BVH の箱、8 番が BVH の三角形の並び）
-    VkDescriptorBufferInfo bufs[9] = {
-        {bvhNodes_.buffer, 0, VK_WHOLE_SIZE}, {}, {},
-        {vertices_.buffer, 0, VK_WHOLE_SIZE}, {indices_.buffer, 0, VK_WHOLE_SIZE},
-        {triMaterials_.buffer, 0, VK_WHOLE_SIZE}, {materials_.buffer, 0, VK_WHOLE_SIZE},
-        {exposure_.buffer, 0, VK_WHOLE_SIZE}, {bvhTris_.buffer, 0, VK_WHOLE_SIZE},
-    };
+    VkDevice dev = ctx_->device;
+    for (int cur = 0; cur < 2; ++cur) {
+        int prev = 1 - cur;
+        std::vector<Bind> pt = {
+            {1, noisy_.view}, {2, gpos_[cur].view}, {3, {}, vertices_.buffer}, {4, {}, indices_.buffer},
+            {5, {}, triMaterials_.buffer}, {6, {}, materials_.buffer}, {7, gnormal_[cur].view}, {9, galbedo_.view},
+        };
+        if (hardwareRt_) {
+            Bind b{0};
+            b.accel = &tlas_.handle;
+            pt.push_back(b);
+        } else {
+            pt.push_back({0, {}, bvhNodes_.buffer});
+            pt.push_back({8, {}, bvhTris_.buffer});
+        }
+        writeSet(dev, pathTrace_.sets[cur], pt);
 
-    std::vector<BindingSpec> specs = pathTraceBindings(hardwareRt_);
-    std::vector<VkWriteDescriptorSet> writes(specs.size());
-    for (size_t i = 0; i < specs.size(); ++i) {
-        VkWriteDescriptorSet& w = writes[i];
-        w = VkWriteDescriptorSet{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
-        w.dstSet = set_;
-        w.dstBinding = specs[i].binding;
-        w.descriptorCount = 1;
-        w.descriptorType = specs[i].type;
-        if (specs[i].type == VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR) w.pNext = &asInfo;
-        else if (specs[i].binding == 1) w.pImageInfo = &accumInfo;
-        else if (specs[i].binding == 2) w.pImageInfo = &outInfo;
-        else w.pBufferInfo = &bufs[specs[i].binding];
+        writeSet(dev, temporal_.sets[cur], {
+            {0, noisy_.view}, {1, gpos_[cur].view}, {2, gnormal_[cur].view}, {3, gpos_[prev].view},
+            {4, gnormal_[prev].view}, {5, history_[prev].view}, {6, moments_[prev].view}, {7, history_[cur].view},
+            {8, moments_[cur].view}, {9, filtered_[0].view},
+        });
+        for (int dir = 0; dir < 2; ++dir) {
+            writeSet(dev, atrous_.sets[cur * 2 + dir], {
+                {0, filtered_[dir].view}, {1, filtered_[1 - dir].view}, {2, gpos_[cur].view},
+                {3, gnormal_[cur].view}, {4, history_[cur].view},
+            });
+        }
+        // 平均を奇数回くり返すと、結果は filtered_[1] に入る
+        writeSet(dev, composite_.sets[cur], {
+            {0, filtered_[kAtrousIterations % 2].view}, {1, history_[cur].view}, {2, galbedo_.view},
+            {3, output_.view}, {4, {}, exposure_.buffer},
+        });
     }
-    vkUpdateDescriptorSets(ctx_->device, static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
+}
+
+void Renderer::writeOverlayDescriptors() {
+    if (!overlay_.view || !overlayTargetView_) return;
+    writeSet(ctx_->device, overlayPass_.sets[0], {{0, overlayTargetView_}, {1, overlay_.view}});
 }
 
 void Renderer::setOverlayTarget(const Image& target) {
     overlayTargetView_ = target.view;
     writeOverlayDescriptors();
-}
-
-void Renderer::writeOverlayDescriptors() {
-    if (!overlay_.view || !overlayTargetView_) return;
-    VkDescriptorImageInfo outInfo{VK_NULL_HANDLE, overlayTargetView_, VK_IMAGE_LAYOUT_GENERAL};
-    VkDescriptorImageInfo ovInfo{VK_NULL_HANDLE, overlay_.view, VK_IMAGE_LAYOUT_GENERAL};
-    VkWriteDescriptorSet writes[2]{};
-    for (uint32_t i = 0; i < 2; ++i) {
-        writes[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        writes[i].dstSet = overlaySet_;
-        writes[i].dstBinding = i;
-        writes[i].descriptorCount = 1;
-        writes[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-    }
-    writes[0].pImageInfo = &outInfo;
-    writes[1].pImageInfo = &ovInfo;
-    vkUpdateDescriptorSets(ctx_->device, 2, writes, 0, nullptr);
 }
 
 void Renderer::setOverlay(const std::vector<uint8_t>& rgba, uint32_t width, uint32_t height) {
@@ -439,56 +495,95 @@ void Renderer::setOverlay(const std::vector<uint8_t>& rgba, uint32_t width, uint
 void Renderer::recordOverlay(VkCommandBuffer cmd, int x, int y, float opacity) {
     if (!overlay_.view || !overlayTargetView_) return;
     // target は GENERAL レイアウトで、書き込みが終わっている前提（呼び出し側で切り替える）
-    OverlayPushConstants pc{{x, y}, opacity};
-    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, overlayPipeline_);
-    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, overlayPipelineLayout_, 0, 1, &overlaySet_, 0, nullptr);
-    vkCmdPushConstants(cmd, overlayPipelineLayout_, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(pc), &pc);
-    vkCmdDispatch(cmd, (overlay_.width + 7) / 8, (overlay_.height + 7) / 8, 1);
+    OverlayPush pc{{x, y}, opacity};
+    dispatch(cmd, overlayPass_, 0, &pc, sizeof(pc), overlay_.width, overlay_.height);
 }
 
 void Renderer::resize(uint32_t width, uint32_t height) {
     vkDeviceWaitIdle(ctx_->device);
-    ctx_->destroyImage(accum_);
-    ctx_->destroyImage(output_);
-    accum_ = ctx_->createImage(width, height, VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_USAGE_STORAGE_BIT);
-    output_ = ctx_->createImage(width, height, VK_FORMAT_R8G8B8A8_UNORM,
-                                VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
+    Image* all[] = {&noisy_, &gpos_[0], &gpos_[1], &gnormal_[0], &gnormal_[1], &galbedo_, &history_[0], &history_[1],
+                    &moments_[0], &moments_[1], &filtered_[0], &filtered_[1], &output_};
+    for (Image* img : all) ctx_->destroyImage(*img);
+    const VkImageUsageFlags storage = VK_IMAGE_USAGE_STORAGE_BIT;
+    for (Image* img : {&noisy_, &gpos_[0], &gpos_[1], &gnormal_[0], &gnormal_[1], &history_[0], &history_[1],
+                       &moments_[0], &moments_[1], &filtered_[0], &filtered_[1]})
+        *img = ctx_->createImage(width, height, VK_FORMAT_R32G32B32A32_SFLOAT, storage);
+    galbedo_ = ctx_->createImage(width, height, VK_FORMAT_R8G8B8A8_UNORM, storage);
+    output_ = ctx_->createImage(width, height, VK_FORMAT_R8G8B8A8_UNORM, storage | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
     imagesFresh_ = true;
-    accumulated_ = 0;
+    resetHistory_ = true;
     writeDescriptors();
+}
+
+void Renderer::dispatch(VkCommandBuffer cmd, const ComputePass& pass, uint32_t set, const void* push, uint32_t pushSize,
+                        uint32_t width, uint32_t height) {
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pass.pipeline);
+    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pass.pipelineLayout, 0, 1, &pass.sets[set], 0, nullptr);
+    vkCmdPushConstants(cmd, pass.pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, pushSize, push);
+    vkCmdDispatch(cmd, (width + 7) / 8, (height + 7) / 8, 1);
 }
 
 void Renderer::record(VkCommandBuffer cmd, const ViewParams& view) {
     if (imagesFresh_) {
-        for (VkImage img : {accum_.image, output_.image})
-            transitionImage(cmd, img, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL,
+        Image* all[] = {&noisy_, &gpos_[0], &gpos_[1], &gnormal_[0], &gnormal_[1], &galbedo_, &history_[0],
+                        &history_[1], &moments_[0], &moments_[1], &filtered_[0], &filtered_[1], &output_};
+        for (Image* img : all)
+            transitionImage(cmd, img->image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL,
                             VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
                             VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
         imagesFresh_ = false;
     }
     memset(exposure_.mapped, 0, sizeof(ExposureData));
 
-    PushConstants pc{};
-    float tanHalf = std::tan(view.fovY * 0.5f * 3.14159265f / 180.0f);
-    float aspect = static_cast<float>(output_.width) / static_cast<float>(output_.height);
-    pc.camPos[0] = view.eye.x; pc.camPos[1] = view.eye.y; pc.camPos[2] = view.eye.z; pc.camPos[3] = tanHalf;
-    pc.camForward[0] = view.forward.x; pc.camForward[1] = view.forward.y; pc.camForward[2] = view.forward.z;
-    pc.camForward[3] = view.panorama ? 1.0f : 0.0f;
-    pc.camRight[0] = view.right.x; pc.camRight[1] = view.right.y; pc.camRight[2] = view.right.z; pc.camRight[3] = aspect;
-    pc.camUp[0] = view.up.x; pc.camUp[1] = view.up.y; pc.camUp[2] = view.up.z;
-    pc.sunDir[0] = sunDir_.x; pc.sunDir[1] = sunDir_.y; pc.sunDir[2] = sunDir_.z; pc.sunDir[3] = sunIntensity_;
-    pc.misc[0] = view.exposure;
-    pc.misc[1] = skyIntensity_;
-    pc.misc[2] = static_cast<float>(glassStart_);
-    pc.frame[0] = frameIndex_++;
-    pc.frame[1] = accumulated_;
-    pc.frame[2] = view.maxBounces;
+    const bool reset = resetHistory_ || !hasLastView_;
+    const bool moved = !reset && !sameView(view, lastView_);
+    if (reset || moved) staticFrames_ = 0;
+    const uint32_t cur = frameIndex_ & 1u;
+    const uint32_t w = output_.width, h = output_.height;
+    const float tanHalf = std::tan(view.fovY * 0.5f * 3.14159265f / 180.0f);
+    const float aspect = static_cast<float>(w) / static_cast<float>(h);
 
-    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_);
-    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout_, 0, 1, &set_, 0, nullptr);
-    vkCmdPushConstants(cmd, pipelineLayout_, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(pc), &pc);
-    vkCmdDispatch(cmd, (output_.width + 7) / 8, (output_.height + 7) / 8, 1);
-    accumulated_++;
+    // 1. パストレース
+    PathTracePush pt{};
+    pt.camPos[0] = view.eye.x; pt.camPos[1] = view.eye.y; pt.camPos[2] = view.eye.z; pt.camPos[3] = tanHalf;
+    pt.camForward[0] = view.forward.x; pt.camForward[1] = view.forward.y; pt.camForward[2] = view.forward.z;
+    pt.camForward[3] = view.panorama ? 1.0f : 0.0f;
+    pt.camRight[0] = view.right.x; pt.camRight[1] = view.right.y; pt.camRight[2] = view.right.z; pt.camRight[3] = aspect;
+    pt.camUp[0] = view.up.x; pt.camUp[1] = view.up.y; pt.camUp[2] = view.up.z;
+    pt.sunDir[0] = sunDir_.x; pt.sunDir[1] = sunDir_.y; pt.sunDir[2] = sunDir_.z; pt.sunDir[3] = sunIntensity_;
+    pt.misc[1] = skyIntensity_;
+    pt.misc[2] = static_cast<float>(glassStart_);
+    pt.frame[0] = frameIndex_;
+    pt.frame[1] = staticFrames_;
+    pt.frame[2] = view.maxBounces;
+    pt.frame[3] = view.samplesPerFrame;
+    dispatch(cmd, pathTrace_, cur, &pt, sizeof(pt), w, h);
+    computeBarrier(cmd);
+
+    // 2. 前のフレームを重ねる（前のカメラの位置で、今の位置を写し直す）
+    const ViewParams& prev = hasLastView_ ? lastView_ : view;
+    TemporalPush tp{};
+    tp.prevEye[0] = prev.eye.x; tp.prevEye[1] = prev.eye.y; tp.prevEye[2] = prev.eye.z; tp.prevEye[3] = moved ? 1.0f : 0.0f;
+    tp.prevForward[0] = prev.forward.x; tp.prevForward[1] = prev.forward.y; tp.prevForward[2] = prev.forward.z;
+    tp.prevForward[3] = reset ? 1.0f : 0.0f;
+    tp.prevRight[0] = prev.right.x; tp.prevRight[1] = prev.right.y; tp.prevRight[2] = prev.right.z; tp.prevRight[3] = aspect;
+    tp.prevUp[0] = prev.up.x; tp.prevUp[1] = prev.up.y; tp.prevUp[2] = prev.up.z;
+    tp.prevUp[3] = std::tan(prev.fovY * 0.5f * 3.14159265f / 180.0f);
+    tp.params[0] = kMovingHistoryAlpha;
+    tp.params[1] = kMaxHistory;
+    dispatch(cmd, temporal_, cur, &tp, sizeof(tp), w, h);
+    computeBarrier(cmd);
+
+    // 3. 周りの画素と平均する（間隔を広げながらくり返す）
+    for (int i = 0; i < kAtrousIterations; ++i) {
+        AtrousPush ap{1 << i};
+        dispatch(cmd, atrous_, cur * 2 + (i % 2), &ap, sizeof(ap), w, h);
+        computeBarrier(cmd);
+    }
+
+    // 4. 仕上げ
+    CompositePush cp{view.exposure};
+    dispatch(cmd, composite_, cur, &cp, sizeof(cp), w, h);
 
     // 自動露出の集計を CPU から読めるようにする
     VkMemoryBarrier toHost{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
@@ -496,6 +591,12 @@ void Renderer::record(VkCommandBuffer cmd, const ViewParams& view) {
     toHost.dstAccessMask = VK_ACCESS_HOST_READ_BIT;
     vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_HOST_BIT, 0, 1, &toHost, 0,
                          nullptr, 0, nullptr);
+
+    lastView_ = view;
+    hasLastView_ = true;
+    resetHistory_ = false;
+    staticFrames_++;
+    frameIndex_++;
 }
 
 float Renderer::finishFrame() {
@@ -507,18 +608,12 @@ float Renderer::finishFrame() {
 
 void Renderer::destroy() {
     if (!ctx_) return;
-    vkDeviceWaitIdle(ctx_->device);
-    vkDestroyPipeline(ctx_->device, pipeline_, nullptr);
-    vkDestroyPipelineLayout(ctx_->device, pipelineLayout_, nullptr);
-    vkDestroyDescriptorPool(ctx_->device, pool_, nullptr);
-    vkDestroyDescriptorSetLayout(ctx_->device, setLayout_, nullptr);
-    ctx_->destroyImage(accum_);
-    ctx_->destroyImage(output_);
-    vkDestroyPipeline(ctx_->device, overlayPipeline_, nullptr);
-    vkDestroyPipelineLayout(ctx_->device, overlayPipelineLayout_, nullptr);
-    vkDestroyDescriptorPool(ctx_->device, overlayPool_, nullptr);
-    vkDestroyDescriptorSetLayout(ctx_->device, overlayLayout_, nullptr);
-    ctx_->destroyImage(overlay_);
+    VkDevice dev = ctx_->device;
+    vkDeviceWaitIdle(dev);
+    for (ComputePass* p : {&pathTrace_, &temporal_, &atrous_, &composite_, &overlayPass_}) destroyPass(dev, *p);
+    Image* all[] = {&noisy_, &gpos_[0], &gpos_[1], &gnormal_[0], &gnormal_[1], &galbedo_, &history_[0], &history_[1],
+                    &moments_[0], &moments_[1], &filtered_[0], &filtered_[1], &output_, &overlay_};
+    for (Image* img : all) ctx_->destroyImage(*img);
     destroyAccel(tlas_);
     destroyAccel(blasOpaque_);
     destroyAccel(blasGlass_);

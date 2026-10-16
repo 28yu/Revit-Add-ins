@@ -48,12 +48,29 @@ float fresnelSchlick(float cosTheta, float f0) {
 }
 
 // --- 1本の光の通り道を追う -----------------------------------------------
-vec3 radiance(vec3 origin, vec3 dir) {
+// 最初に当たった面の情報（ノイズ除去で使う）
+struct Primary {
+    bool hit;
+    vec3 pos;
+    vec3 normal;
+    vec3 albedo;
+    float dist;
+};
+
+vec3 radiance(vec3 origin, vec3 dir, out Primary primary) {
+    primary.hit = false;
+    primary.pos = origin + dir * 1e5;
+    primary.normal = -dir;
+    primary.albedo = vec3(1.0);
+    primary.dist = -1.0;
     vec3 result = vec3(0.0);
     vec3 throughput = vec3(1.0);
     vec3 sun = normalize(pc.sunDir.xyz);
     vec3 sunColor = vec3(1.0, 0.95, 0.88) * pc.sunDir.w;
     bool specularPath = true;  // カメラから鏡のような反射だけで来た（太陽の円盤を見せてよい）
+    // ノイズ除去で使う「最初に見えている面」は、ガラスを素通りした先の物にする
+    // （ガラスの面を使うと、動いたときに窓の外の景色がにじむため）
+    float travelled = 0.0;
 
     for (uint bounce = 0u; bounce <= pc.frame.z; ++bounce) {
         Hit h = traceClosest(origin, dir);
@@ -64,19 +81,27 @@ vec3 radiance(vec3 origin, vec3 dir) {
         vec3 pos, n, gn;
         surfaceAt(h, dir, pos, n, gn);
         Material m = materials[triMaterials[h.tri]];
+        if (!primary.hit && !h.glass) {
+            primary.hit = true;
+            primary.pos = pos;
+            primary.normal = n;
+            primary.dist = travelled + h.t;
+            // 鏡・金属は、映り込みそのものが見えているので色で割らない
+            primary.albedo = m.params.y > 0.5 ? vec3(1.0) : max(m.color.rgb, vec3(0.02));
+        }
         vec3 albedo = m.color.rgb;
         float roughness = clamp(m.params.x, 0.02, 1.0);
         float metallic = m.params.y;
         result += throughput * albedo * m.params.z;  // 自己発光（照明器具など）
 
         if (h.glass) {
-            // 薄いガラスとして扱う: 表面で反射するか、そのまま通り抜けるか
+            // 薄いガラスとして扱う。反射するか通り抜けるかを毎回ランダムに選ぶと、窓に点々のちらつきが出るので、
+            // 「必ず通り抜け、表面の映り込みは空の明るさ × 反射率で足す」決まった計算にする
+            // （室内側から見た窓への部屋の映り込みは省く）
             float f = fresnelSchlick(abs(dot(-dir, n)), 0.04);
-            if (rand() < f) {
-                dir = reflect(dir, gn);
-            } else {
-                throughput *= mix(vec3(1.0), albedo, 0.3);  // ガラスのわずかな色
-            }
+            travelled += h.t;
+            result += throughput * f * skyRadiance(reflect(dir, gn));
+            throughput *= (1.0 - f) * mix(vec3(1.0), albedo, 0.3);  // ガラスのわずかな色
             origin = pos + dir * 0.001;
             continue;
         }
@@ -119,27 +144,19 @@ vec3 radiance(vec3 origin, vec3 dir) {
     return result;
 }
 
-// ACES に近いトーンマッピング（明るい所を白飛びさせずに表示する）
-vec3 tonemap(vec3 x) {
-    const float a = 2.51, b = 0.03, c = 2.43, d = 0.59, e = 0.14;
-    return clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0, 1.0);
-}
-
-// 自動露出用: 8×8 画素（1 つのまとまり）の明るさの平均を共有メモリで求める
-shared float sharedLum[64];
-
 void main() {
-    ivec2 size = imageSize(uAccum);
+    ivec2 size = imageSize(uNoisy);
     ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
-    // 画面の外の画素も途中で終わらせない（下の barrier() に全員がたどり着く必要があるため）
-    bool inside = pixel.x < size.x && pixel.y < size.y;
-    float lumForExposure = -1.0;
+    if (pixel.x >= size.x || pixel.y >= size.y) return;
+    rngState = pcg(uint(pixel.x) + uint(pixel.y) * 9781u + pc.frame.x * 6271u * 26699u);
 
-    if (inside) {
-        rngState = pcg(uint(pixel.x) + uint(pixel.y) * 9781u + pc.frame.x * 6271u * 26699u);
-
-        // ピクセル内の位置を毎回少しずらして、ぎざぎざを消す
-        vec2 jitter = pc.frame.y == 0u ? vec2(0.5) : vec2(rand(), rand());
+    // 1 フレームで何回か計算して平均する（速い GPU では回数を増やし、動いている間の画質を上げる）
+    uint spp = max(pc.frame.w, 1u);
+    vec3 color = vec3(0.0);
+    Primary primary;
+    for (uint s = 0u; s < spp; ++s) {
+        // ピクセル内の位置を毎回少しずらして、ぎざぎざを消す（止まって最初の 1 回だけは中心）
+        vec2 jitter = (pc.frame.y == 0u && s == 0u) ? vec2(0.5) : vec2(rand(), rand());
         vec2 uv = (vec2(pixel) + jitter) / vec2(size);
         vec3 dir;
         if (pc.camForward.w > 0.5) {
@@ -154,36 +171,18 @@ void main() {
             dir = normalize(pc.camForward.xyz + pc.camRight.xyz * ndc.x * th * pc.camRight.w + pc.camUp.xyz * ndc.y * th);
         }
 
-        vec3 color = radiance(pc.camPos.xyz, dir);
+        Primary pr;
+        vec3 c = radiance(pc.camPos.xyz, dir, pr);
+        if (s == 0u) primary = pr;  // 面の情報は 1 回目のものを使う
         // 極端に明るい点（ホタル）を抑える
-        float lum = dot(color, vec3(0.2126, 0.7152, 0.0722));
-        if (lum > 50.0) color *= 50.0 / lum;
-
-        vec3 accum = color;
-        if (pc.frame.y > 0u) accum += imageLoad(uAccum, pixel).rgb;
-        imageStore(uAccum, pixel, vec4(accum, 1.0));
-
-        vec3 avg = accum / float(pc.frame.y + 1u);
-        vec3 mapped = tonemap(avg * pc.misc.x);
-        imageStore(uOutput, pixel, vec4(pow(mapped, vec3(1.0 / 2.2)), 1.0));
-        lumForExposure = dot(avg, vec3(0.2126, 0.7152, 0.0722));
+        float lum = dot(c, vec3(0.2126, 0.7152, 0.0722));
+        if (lum > 50.0) c *= 50.0 / lum;
+        color += c;
     }
+    color /= float(spp);
 
-    // 自動露出: 1 画素ずつだと、計算回数が少ない間のざらつき（真っ黒な点）で平均が大きく下がり、
-    // 明るくしすぎてしまう。8×8 画素の平均をとってから対数にする
-    sharedLum[gl_LocalInvocationIndex] = lumForExposure;
-    barrier();
-    if (gl_LocalInvocationIndex == 0u) {
-        float sum = 0.0;
-        int n = 0;
-        for (int i = 0; i < 64; ++i) {
-            if (sharedLum[i] >= 0.0) { sum += sharedLum[i]; n++; }
-        }
-        if (n > 0) {
-            float l = sum / float(n);
-            int q = int(clamp(log2(max(l, 1e-5)), -16.0, 16.0) * 64.0);  // 1/64 段刻み（8K でも整数が溢れない）
-            atomicAdd(logLumSum, q);
-            atomicAdd(logLumCount, 1);
-        }
-    }
+    imageStore(uNoisy, pixel, vec4(color / primary.albedo, 1.0));
+    imageStore(uGPos, pixel, vec4(primary.pos, primary.dist));
+    imageStore(uGNormal, pixel, vec4(primary.normal, 0.0));
+    imageStore(uGAlbedo, pixel, vec4(primary.albedo, 1.0));
 }

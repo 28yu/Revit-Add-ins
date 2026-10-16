@@ -1,7 +1,11 @@
 // 共通部分（前半）: 入出力・乱数・空・当たり判定の結果の形。
 // pathtrace_hw.comp / pathtrace_sw.comp から取り込まれる。
-layout(set = 0, binding = 1, rgba32f) uniform image2D uAccum;   // 足し合わせ中の明るさ（物理量のまま）
-layout(set = 0, binding = 2, rgba8) uniform writeonly image2D uOutput; // 画面に出す色
+// 出力（ノイズ除去 denoise の材料）。色は「最初に当たった面の色」で割った明るさにしておき、
+// ノイズ除去のあとで色を掛け戻す（模様や色の境目をぼかさないため）
+layout(set = 0, binding = 1, rgba32f) uniform writeonly image2D uNoisy;   // rgb = 今回の明るさ（色で割ったもの）
+layout(set = 0, binding = 2, rgba32f) uniform writeonly image2D uGPos;    // xyz = 最初に当たった位置, w = 距離（空なら -1）
+layout(set = 0, binding = 7, rgba32f) uniform writeonly image2D uGNormal; // xyz = 面の向き
+layout(set = 0, binding = 9, rgba8) uniform writeonly image2D uGAlbedo;   // rgb = 最初に当たった面の色
 
 struct Vertex { vec4 position; vec4 normal; };
 layout(set = 0, binding = 3, std430) readonly buffer Vertices { Vertex vertices[]; };
@@ -15,17 +19,14 @@ struct Material {
 };
 layout(set = 0, binding = 6, std430) readonly buffer Materials { Material materials[]; };
 
-// 自動露出用: 画面の明るさの対数の合計（間引いた画素だけ）
-layout(set = 0, binding = 7, std430) buffer Exposure { int logLumSum; int logLumCount; };
-
 layout(push_constant) uniform Params {
     vec4 camPos;      // xyz = 位置, w = 縦の画角の tan(半分)
     vec4 camForward;  // xyz = 前, w = パノラマなら 1
     vec4 camRight;    // xyz = 右, w = 横の倍率（縦横比）
     vec4 camUp;       // xyz = 上
     vec4 sunDir;      // xyz = 太陽のある方向, w = 太陽の明るさ
-    vec4 misc;        // x = 露出の倍率, y = 空の明るさ, z = ガラス三角形の開始位置（三角形番号）, w = 未使用
-    uvec4 frame;      // x = フレーム番号, y = 足し合わせ済みの回数, z = 最大反射回数
+    vec4 misc;        // x = 未使用, y = 空の明るさ, z = ガラス三角形の開始位置（三角形番号）, w = 未使用
+    uvec4 frame;      // x = フレーム番号, y = 止まってからのフレーム数, z = 最大反射回数, w = 1 フレームで計算する回数
 } pc;
 
 const float PI = 3.14159265359;

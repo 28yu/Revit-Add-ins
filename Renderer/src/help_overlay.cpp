@@ -1,0 +1,439 @@
+#include "help_overlay.h"
+
+#include <algorithm>
+#include <cmath>
+#include <cstdlib>
+#include <functional>
+#include <string>
+
+#include "i18n.h"
+#include "log.h"
+
+#define STB_TRUETYPE_IMPLEMENTATION
+#include <stb_truetype.h>
+
+namespace t28 {
+
+namespace {
+
+// --- フォント -----------------------------------------------------------------
+
+// 言語ごとのフォントの候補（上から順に探す）。見つからなければ他の言語の候補も試す
+std::vector<std::string> fontCandidates() {
+    std::vector<std::string> jp, cn, us, all;
+#ifdef _WIN32
+    const char* win = std::getenv("WINDIR");
+    std::string dir = std::string(win ? win : "C:\\Windows") + "\\Fonts\\";
+    jp = {dir + "YuGothM.ttc", dir + "YuGothR.ttc", dir + "meiryo.ttc", dir + "msgothic.ttc"};
+    cn = {dir + "msyh.ttc", dir + "msyh.ttf", dir + "simsun.ttc"};
+    us = {dir + "segoeui.ttf", dir + "arial.ttf"};
+#else
+    jp = cn = {"/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+               "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc"};
+    us = {"/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"};
+#endif
+    switch (currentLanguage()) {
+        case Lang::CN: all = cn; all.insert(all.end(), jp.begin(), jp.end()); break;
+        case Lang::US: all = us; all.insert(all.end(), jp.begin(), jp.end()); break;
+        default: all = jp; all.insert(all.end(), cn.begin(), cn.end()); break;
+    }
+    return all;
+}
+
+bool loadFile(const std::string& path, std::vector<unsigned char>& data) {
+    FILE* f = openFile(path, "rb");
+    if (!f) return false;
+    fseek(f, 0, SEEK_END);
+    long size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    data.resize(size > 0 ? static_cast<size_t>(size) : 0);
+    bool ok = size > 0 && fread(data.data(), 1, data.size(), f) == data.size();
+    fclose(f);
+    return ok;
+}
+
+// フォントは一度だけ読む。見つからなければ nullptr
+const stbtt_fontinfo* font() {
+    static std::vector<unsigned char> data;
+    static stbtt_fontinfo info;
+    static int state = 0;  // 0 = まだ, 1 = 読めた, -1 = 無い
+    if (state == 0) {
+        state = -1;
+        for (const std::string& path : fontCandidates()) {
+            if (!loadFile(path, data)) continue;
+            int offset = stbtt_GetFontOffsetForIndex(data.data(), 0);
+            if (offset >= 0 && stbtt_InitFont(&info, data.data(), offset)) {
+                logInfo("Help font: %s", path.c_str());
+                state = 1;
+                break;
+            }
+        }
+        if (state < 0) logError("No font found for the help text");
+    }
+    return state > 0 ? &info : nullptr;
+}
+
+// UTF-8 の文字列を文字（コードポイント）の並びにする
+std::vector<int> decodeUtf8(const std::string& s) {
+    std::vector<int> out;
+    for (size_t i = 0; i < s.size();) {
+        unsigned char c = static_cast<unsigned char>(s[i]);
+        int cp = c, extra = 0;
+        if (c >= 0xF0) { cp = c & 0x07; extra = 3; }
+        else if (c >= 0xE0) { cp = c & 0x0F; extra = 2; }
+        else if (c >= 0xC0) { cp = c & 0x1F; extra = 1; }
+        ++i;
+        for (int k = 0; k < extra && i < s.size(); ++k, ++i) cp = (cp << 6) | (static_cast<unsigned char>(s[i]) & 0x3F);
+        out.push_back(cp);
+    }
+    return out;
+}
+
+float textWidth(const std::string& text, float px) {
+    const stbtt_fontinfo* f = font();
+    if (!f) return 0;
+    float scale = stbtt_ScaleForPixelHeight(f, px);
+    std::vector<int> cps = decodeUtf8(text);
+    float w = 0;
+    for (size_t i = 0; i < cps.size(); ++i) {
+        int adv, lsb;
+        stbtt_GetCodepointHMetrics(f, cps[i], &adv, &lsb);
+        w += adv * scale;
+        if (i + 1 < cps.size()) w += stbtt_GetCodepointKernAdvance(f, cps[i], cps[i + 1]) * scale;
+    }
+    return w;
+}
+
+// --- 描画用のキャンバス（色は「不透明度を掛けた形」で持ち、上に重ねていく） -------------
+
+struct Color {
+    float r, g, b, a;
+};
+
+const Color kWhite{0.96f, 0.96f, 0.96f, 1.0f};
+const Color kDim{0.96f, 0.96f, 0.96f, 0.55f};
+const Color kAccent{0.30f, 0.64f, 1.0f, 1.0f};   // 使うボタンを示す青
+const Color kPanel{0.0f, 0.0f, 0.0f, 0.55f};
+
+struct Canvas {
+    int w, h;
+    std::vector<float> px;  // r, g, b, a（r, g, b には a を掛けておく）
+    Canvas(int width, int height) : w(width), h(height), px(static_cast<size_t>(width) * height * 4, 0.0f) {}
+
+    void blend(int x, int y, const Color& c, float coverage) {
+        if (x < 0 || y < 0 || x >= w || y >= h || coverage <= 0) return;
+        float a = c.a * std::min(coverage, 1.0f);
+        float* p = &px[(static_cast<size_t>(y) * w + x) * 4];
+        p[0] = c.r * a + p[0] * (1 - a);
+        p[1] = c.g * a + p[1] * (1 - a);
+        p[2] = c.b * a + p[2] * (1 - a);
+        p[3] = a + p[3] * (1 - a);
+    }
+
+    // sdf: 点 (x, y) から形の縁までの距離（内側が負）。範囲 [x0, x1) × [y0, y1) だけを調べる
+    void fill(const std::function<float(float, float)>& sdf, float x0, float y0, float x1, float y1, const Color& c) {
+        for (int y = std::max(0, static_cast<int>(y0) - 1); y < std::min(h, static_cast<int>(y1) + 2); ++y)
+            for (int x = std::max(0, static_cast<int>(x0) - 1); x < std::min(w, static_cast<int>(x1) + 2); ++x)
+                blend(x, y, c, 0.5f - sdf(x + 0.5f, y + 0.5f));
+    }
+    void stroke(const std::function<float(float, float)>& sdf, float width, float x0, float y0, float x1, float y1,
+                const Color& c) {
+        fill([&](float x, float y) { return std::fabs(sdf(x, y)) - width * 0.5f; }, x0 - width, y0 - width,
+             x1 + width, y1 + width, c);
+    }
+
+    void text(const std::string& s, float x, float baseline, float pxSize, const Color& c) {
+        const stbtt_fontinfo* f = font();
+        if (!f) return;
+        float scale = stbtt_ScaleForPixelHeight(f, pxSize);
+        std::vector<int> cps = decodeUtf8(s);
+        for (size_t i = 0; i < cps.size(); ++i) {
+            int adv, lsb;
+            stbtt_GetCodepointHMetrics(f, cps[i], &adv, &lsb);
+            float shift = x - std::floor(x);
+            int gx0, gy0, gx1, gy1;
+            stbtt_GetCodepointBitmapBoxSubpixel(f, cps[i], scale, scale, shift, 0, &gx0, &gy0, &gx1, &gy1);
+            int gw = gx1 - gx0, gh = gy1 - gy0;
+            if (gw > 0 && gh > 0) {
+                std::vector<unsigned char> glyph(static_cast<size_t>(gw) * gh);
+                stbtt_MakeCodepointBitmapSubpixel(f, glyph.data(), gw, gh, gw, scale, scale, shift, 0, cps[i]);
+                int ox = static_cast<int>(std::floor(x)) + gx0, oy = static_cast<int>(std::round(baseline)) + gy0;
+                for (int r = 0; r < gh; ++r)
+                    for (int col = 0; col < gw; ++col)
+                        blend(ox + col, oy + r, c, glyph[static_cast<size_t>(r) * gw + col] / 255.0f);
+            }
+            x += adv * scale;
+            if (i + 1 < cps.size()) x += stbtt_GetCodepointKernAdvance(f, cps[i], cps[i + 1]) * scale;
+        }
+    }
+    // 中央ぞろえの文字（cy は文字の縦の中心）
+    void textCentered(const std::string& s, float cx, float cy, float pxSize, const Color& c) {
+        text(s, cx - textWidth(s, pxSize) / 2, cy + pxSize * 0.36f, pxSize, c);
+    }
+};
+
+// --- 形の距離関数 ---------------------------------------------------------------
+
+float sdRoundBox(float x, float y, float cx, float cy, float hw, float hh, float r) {
+    float qx = std::fabs(x - cx) - (hw - r), qy = std::fabs(y - cy) - (hh - r);
+    float ox = std::max(qx, 0.0f), oy = std::max(qy, 0.0f);
+    return std::sqrt(ox * ox + oy * oy) + std::min(std::max(qx, qy), 0.0f) - r;
+}
+
+float sdSegment(float x, float y, float ax, float ay, float bx, float by) {
+    float px = x - ax, py = y - ay, dx = bx - ax, dy = by - ay;
+    float t = std::clamp((px * dx + py * dy) / (dx * dx + dy * dy), 0.0f, 1.0f);
+    float ex = px - dx * t, ey = py - dy * t;
+    return std::sqrt(ex * ex + ey * ey);
+}
+
+// 三角形（頂点は時計回り・反時計回りどちらでもよい）
+float sdTriangle(float x, float y, const float v[6]) {
+    float area = (v[2] - v[0]) * (v[5] - v[1]) - (v[3] - v[1]) * (v[4] - v[0]);
+    float s = area > 0 ? 1.0f : -1.0f;
+    float d = -1e9f;
+    for (int i = 0; i < 3; ++i) {
+        float ax = v[i * 2], ay = v[i * 2 + 1], bx = v[(i * 2 + 2) % 6], by = v[(i * 2 + 3) % 6];
+        float ex = bx - ax, ey = by - ay;
+        float len = std::sqrt(ex * ex + ey * ey);
+        // 辺の外向きの法線方向の距離
+        d = std::max(d, s * ((x - ax) * ey - (y - ay) * ex) / len);
+    }
+    return d;
+}
+
+// --- 絵の部品 ---------------------------------------------------------------------
+
+// 矢印（a → b、先に三角の頭）
+void arrow(Canvas& c, float ax, float ay, float bx, float by, float s, const Color& col) {
+    float dx = bx - ax, dy = by - ay, len = std::sqrt(dx * dx + dy * dy);
+    float ux = dx / len, uy = dy / len;
+    float head = 3.6f * s;
+    float lx = bx - ux * head, ly = by - uy * head;
+    c.stroke([&](float x, float y) { return sdSegment(x, y, ax, ay, lx, ly); }, 1.4f * s,
+             std::min(ax, lx), std::min(ay, ly), std::max(ax, lx), std::max(ay, ly), col);
+    float v[6] = {bx, by, lx - uy * head * 0.75f, ly + ux * head * 0.75f, lx + uy * head * 0.75f, ly - ux * head * 0.75f};
+    c.fill([&](float x, float y) { return sdTriangle(x, y, v); }, bx - head * 2, by - head * 2, bx + head * 2,
+           by + head * 2, col);
+}
+
+enum class MouseButton { Left, Wheel };
+
+// マウスの絵（cx, cy = 中心）。使うボタンを青く塗る
+void mouse(Canvas& c, float cx, float cy, float s, MouseButton active) {
+    const float hw = 9 * s, hh = 13 * s, r = 8.5f * s;
+    const float top = cy - hh, split = top + 10.5f * s;
+    auto body = [&](float x, float y) { return sdRoundBox(x, y, cx, cy, hw, hh, r); };
+    if (active == MouseButton::Left) {
+        // 左ボタン = 本体の左上の部分
+        c.fill([&](float x, float y) { return std::max({body(x, y), x - cx, y - split}); }, cx - hw, top, cx, split, kAccent);
+    }
+    c.stroke(body, 1.5f * s, cx - hw, cy - hh, cx + hw, cy + hh, kWhite);
+    c.stroke([&](float x, float y) { return sdSegment(x, y, cx - hw, split, cx + hw, split); }, 1.2f * s, cx - hw, split,
+             cx + hw, split, kWhite);
+    c.stroke([&](float x, float y) { return sdSegment(x, y, cx, top, cx, split); }, 1.2f * s, cx, top, cx, split, kWhite);
+    // ホイール
+    float wy = top + 5.6f * s;
+    auto wheel = [&](float x, float y) { return sdRoundBox(x, y, cx, wy, 2.2f * s, 3.6f * s, 2.2f * s); };
+    c.fill(wheel, cx - 3 * s, wy - 4 * s, cx + 3 * s, wy + 4 * s, active == MouseButton::Wheel ? kAccent : kPanel);
+    c.stroke(wheel, 1.1f * s, cx - 3 * s, wy - 4 * s, cx + 3 * s, wy + 4 * s, active == MouseButton::Wheel ? kAccent : kWhite);
+}
+
+// キーの絵。幅は文字に合わせる。戻り値 = 幅
+float keycapWidth(const std::string& label, float s) { return std::max(17.0f * s, textWidth(label, 10.5f * s) + 9 * s); }
+void keycap(Canvas& c, float x, float cy, const std::string& label, float s) {
+    float w = keycapWidth(label, s), h = 17 * s;
+    auto box = [&](float px, float py) { return sdRoundBox(px, py, x + w / 2, cy, w / 2, h / 2, 3.5f * s); };
+    c.fill(box, x, cy - h / 2, x + w, cy + h / 2, Color{1, 1, 1, 0.08f});
+    c.stroke(box, 1.2f * s, x, cy - h / 2, x + w, cy + h / 2, kWhite);
+    c.textCentered(label, x + w / 2, cy, 10.5f * s, kWhite);
+}
+float keysWidth(const std::vector<std::string>& keys, float s) {
+    float w = 0;
+    for (const auto& k : keys) w += keycapWidth(k, s) + 3 * s;
+    return w - 3 * s;
+}
+void keys(Canvas& c, float x, float cy, const std::vector<std::string>& labels, float s) {
+    for (const auto& k : labels) {
+        keycap(c, x, cy, k, s);
+        x += keycapWidth(k, s) + 3 * s;
+    }
+}
+
+// 回転の矢印（円弧＋矢じり）
+void orbitArrow(Canvas& c, float cx, float cy, float rad, float s) {
+    const float a0 = -2.6f, a1 = 1.4f;  // 円弧の範囲（ラジアン、画面の下向きが正）
+    auto arc = [&](float x, float y) {
+        float dx = x - cx, dy = y - cy;
+        float ang = std::atan2(dy, dx);
+        if (ang >= a0 && ang <= a1) return std::fabs(std::sqrt(dx * dx + dy * dy) - rad);
+        float e0x = cx + std::cos(a0) * rad, e0y = cy + std::sin(a0) * rad;
+        float e1x = cx + std::cos(a1) * rad, e1y = cy + std::sin(a1) * rad;
+        return std::min(std::hypot(x - e0x, y - e0y), std::hypot(x - e1x, y - e1y));
+    };
+    c.fill([&](float x, float y) { return arc(x, y) - 0.7f * s; }, cx - rad - 2 * s, cy - rad - 2 * s, cx + rad + 2 * s,
+           cy + rad + 2 * s, kWhite);
+    // 矢じり（円弧の終わりで接線の向き）
+    float ex = cx + std::cos(a1) * rad, ey = cy + std::sin(a1) * rad;
+    float tx = -std::sin(a1), ty = std::cos(a1);  // 角度が増える向きの接線
+    float head = 3.6f * s;
+    float v[6] = {ex + tx * head, ey + ty * head, ex - ty * head * 0.8f, ey + tx * head * 0.8f,
+                  ex + ty * head * 0.8f, ey - tx * head * 0.8f};
+    c.fill([&](float x, float y) { return sdTriangle(x, y, v); }, ex - head * 2, ey - head * 2, ex + head * 2,
+           ey + head * 2, kWhite);
+}
+
+// 上下左右の矢印（移動・見回す）
+void crossArrows(Canvas& c, float cx, float cy, float s) {
+    float r = 7 * s;
+    arrow(c, cx, cy, cx + r, cy, s, kWhite);
+    arrow(c, cx, cy, cx - r, cy, s, kWhite);
+    arrow(c, cx, cy, cx, cy + r, s, kWhite);
+    arrow(c, cx, cy, cx, cy - r, s, kWhite);
+}
+
+// 案内の項目: 絵（幅 iconW）と、その下の短い言葉
+struct Item {
+    float iconW;
+    std::function<void(Canvas&, float cx, float cy)> draw;
+    std::string label;
+};
+
+HelpImage finish(const Canvas& c) {
+    HelpImage img;
+    img.width = static_cast<uint32_t>(c.w);
+    img.height = static_cast<uint32_t>(c.h);
+    img.rgba.resize(static_cast<size_t>(c.w) * c.h * 4);
+    for (size_t i = 0; i < static_cast<size_t>(c.w) * c.h; ++i) {
+        float a = c.px[i * 4 + 3];
+        for (int k = 0; k < 3; ++k) {
+            float v = a > 1e-4f ? c.px[i * 4 + k] / a : 0.0f;  // 重ねる側は「不透明度を掛けていない色」を使う
+            img.rgba[i * 4 + k] = static_cast<uint8_t>(std::round(std::clamp(v, 0.0f, 1.0f) * 255));
+        }
+        img.rgba[i * 4 + 3] = static_cast<uint8_t>(std::round(std::clamp(a, 0.0f, 1.0f) * 255));
+    }
+    return img;
+}
+
+}  // namespace
+
+HelpImage buildHelpImage(bool expanded, float s) {
+    if (!expanded) {
+        // 閉じているとき: 「?」の丸い記号だけ
+        int d = static_cast<int>(std::ceil(28 * s));
+        Canvas c(d, d);
+        float r = d / 2.0f;
+        auto circle = [&](float x, float y) { return std::hypot(x - r, y - r) - (r - 1.5f * s); };
+        c.fill(circle, 0, 0, static_cast<float>(d), static_cast<float>(d), kPanel);
+        c.stroke(circle, 1.3f * s, 0, 0, static_cast<float>(d), static_cast<float>(d), kDim);
+        c.textCentered("?", r, r, 16 * s, kWhite);
+        HelpImage img = finish(c);
+        img.toggleX = 0;
+        img.toggleY = 0;
+        img.toggleW = d;
+        img.toggleH = d;
+        return img;
+    }
+
+    const float mouseW = 18 * s, glyphW = 18 * s, gap = 4 * s;
+    std::vector<Item> mouseRow = {
+        {mouseW + gap + glyphW,
+         [&](Canvas& c, float cx, float cy) {
+             float mx = cx - (gap + glyphW) / 2, gx = cx + (mouseW + gap) / 2;
+             mouse(c, mx, cy, s, MouseButton::Wheel);
+             arrow(c, gx, cy, gx, cy - 9 * s, s, kWhite);
+             arrow(c, gx, cy, gx, cy + 9 * s, s, kWhite);
+         },
+         tr("HelpZoom")},
+        {mouseW + gap + glyphW,
+         [&](Canvas& c, float cx, float cy) {
+             mouse(c, cx - (gap + glyphW) / 2, cy, s, MouseButton::Wheel);
+             crossArrows(c, cx + (mouseW + gap) / 2, cy, s);
+         },
+         tr("HelpPan")},
+        {keycapWidth("Shift", s) + gap + mouseW + gap + glyphW,
+         [&](Canvas& c, float cx, float cy) {
+             float total = keycapWidth("Shift", s) + gap + mouseW + gap + glyphW;
+             float x = cx - total / 2;
+             keycap(c, x, cy, "Shift", s);
+             x += keycapWidth("Shift", s) + gap;
+             mouse(c, x + mouseW / 2, cy, s, MouseButton::Wheel);
+             orbitArrow(c, x + mouseW + gap + glyphW / 2, cy, 6.5f * s, s);
+         },
+         tr("HelpOrbit")},
+        {mouseW + gap + glyphW,
+         [&](Canvas& c, float cx, float cy) {
+             mouse(c, cx - (gap + glyphW) / 2, cy, s, MouseButton::Wheel);
+             c.textCentered("×2", cx + (mouseW + gap) / 2, cy, 11.5f * s, kWhite);
+         },
+         tr("HelpFit")},
+        {mouseW + gap + glyphW,
+         [&](Canvas& c, float cx, float cy) {
+             mouse(c, cx - (gap + glyphW) / 2, cy, s, MouseButton::Left);
+             crossArrows(c, cx + (mouseW + gap) / 2, cy, s);
+         },
+         tr("HelpLook")},
+    };
+    std::vector<std::vector<std::string>> keyIcons = {{"W", "A", "S", "D"}, {"Q", "E"}, {"+", "−"}, {"R"}};
+    std::vector<Item> keyRow;
+    const char* keyLabels[] = {"HelpWalk", "HelpUpDown", "HelpBright", "HelpReset"};
+    for (size_t i = 0; i < keyIcons.size(); ++i) {
+        std::vector<std::string> k = keyIcons[i];
+        keyRow.push_back({keysWidth(k, s), [=](Canvas& c, float cx, float cy) { keys(c, cx - keysWidth(k, s) / 2, cy, k, s); },
+                          tr(keyLabels[i])});
+    }
+
+    // 大きさを決める
+    const float pad = 10 * s, labelPx = 11.5f * s, iconH = 28 * s, labelH = 15 * s, rowGap = 6 * s, colGap = 12 * s;
+    const float closeSize = 18 * s;
+    auto columnWidth = [&](const Item& it) { return std::max(it.iconW, textWidth(it.label, labelPx)); };
+    auto rowWidth = [&](const std::vector<Item>& row) {
+        float w = 0;
+        for (const auto& it : row) w += columnWidth(it) + colGap;
+        return w - colGap;
+    };
+    float contentW = std::max(rowWidth(mouseRow), rowWidth(keyRow));
+    int width = static_cast<int>(std::ceil(pad * 2 + contentW + 6 * s + closeSize));
+    int height = static_cast<int>(std::ceil(pad * 2 + (iconH + labelH) * 2 + rowGap));
+    Canvas c(width, height);
+
+    // 背景（角の丸い半透明の黒）
+    auto panel = [&](float x, float y) { return sdRoundBox(x, y, width / 2.0f, height / 2.0f, width / 2.0f, height / 2.0f, 8 * s); };
+    c.fill(panel, 0, 0, static_cast<float>(width), static_cast<float>(height), kPanel);
+
+    auto drawRow = [&](const std::vector<Item>& row, float top) {
+        float x = pad;
+        for (const auto& it : row) {
+            float cw = columnWidth(it);
+            float cx = x + cw / 2;
+            it.draw(c, cx, top + iconH / 2);
+            c.textCentered(it.label, cx, top + iconH + labelH / 2, labelPx, kWhite);
+            x += cw + colGap;
+        }
+    };
+    drawRow(mouseRow, pad);
+    // 2 段目の前に細い区切り線
+    float lineY = pad + iconH + labelH + rowGap / 2;
+    c.stroke([&](float x, float y) { return sdSegment(x, y, pad, lineY, pad + contentW, lineY); }, 1.0f * s, pad, lineY,
+             pad + contentW, lineY, Color{1, 1, 1, 0.18f});
+    drawRow(keyRow, pad + iconH + labelH + rowGap);
+
+    // 閉じる記号「×」（右上）
+    float bx = width - pad - closeSize / 2, by = pad + closeSize / 2;
+    auto circle = [&](float x, float y) { return std::hypot(x - bx, y - by) - closeSize / 2; };
+    c.stroke(circle, 1.2f * s, bx - closeSize, by - closeSize, bx + closeSize, by + closeSize, kDim);
+    float k = closeSize * 0.2f;
+    c.stroke([&](float x, float y) { return sdSegment(x, y, bx - k, by - k, bx + k, by + k); }, 1.4f * s, bx - k, by - k,
+             bx + k, by + k, kWhite);
+    c.stroke([&](float x, float y) { return sdSegment(x, y, bx - k, by + k, bx + k, by - k); }, 1.4f * s, bx - k, by - k,
+             bx + k, by + k, kWhite);
+
+    HelpImage img = finish(c);
+    img.toggleX = static_cast<int>(bx - closeSize / 2 - 4 * s);
+    img.toggleY = static_cast<int>(by - closeSize / 2 - 4 * s);
+    img.toggleW = static_cast<int>(closeSize + 8 * s);
+    img.toggleH = static_cast<int>(closeSize + 8 * s);
+    return img;
+}
+
+}  // namespace t28

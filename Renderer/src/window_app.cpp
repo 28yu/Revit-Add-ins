@@ -9,7 +9,7 @@
 #include "app.h"
 #include "i18n.h"
 #include "log.h"
-#include "text_overlay.h"
+#include "help_overlay.h"
 
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
@@ -114,8 +114,10 @@ struct Navigator {
     float evOffset = 0;
     bool autoExposure = true;
     bool showHelp = true;
-    bool changed = false;     // カメラや設定が変わった（画質の足し合わせをやり直す）
+    bool changed = false;     // カメラや設定が変わった
     bool helpChanged = false;
+    // 案内の切り替えの記号の位置（画面の画素）。クリックで開く / 閉じる
+    int toggleX = 0, toggleY = 0, toggleW = 0, toggleH = 0;
 
     Vec3 sceneCenter() const {
         Vec3 mn = bvh->boundsMin(), mx = bvh->boundsMax();
@@ -170,6 +172,17 @@ struct Navigator {
             return;
         }
         if (button == GLFW_MOUSE_BUTTON_LEFT) {
+            // 案内の記号（× / ?）の上なら、案内を開く / 閉じる（画面の画素とウィンドウの座標の比をそろえて比べる）
+            int ww = 1, wh = 1, fw = 1, fh = 1;
+            glfwGetWindowSize(window, &ww, &wh);
+            glfwGetFramebufferSize(window, &fw, &fh);
+            double fx = mx * fw / std::max(1, ww), fy = my * fh / std::max(1, wh);
+            if (fx >= toggleX && fx < toggleX + toggleW && fy >= toggleY && fy < toggleY + toggleH) {
+                showHelp = !showHelp;
+                helpChanged = true;
+                drag = Drag::None;
+                return;
+            }
             drag = Drag::Look;
         } else if (button == GLFW_MOUSE_BUTTON_MIDDLE) {
             double now = glfwGetTime();
@@ -239,16 +252,6 @@ struct Navigator {
 
 Navigator* nav(GLFWwindow* w) { return static_cast<Navigator*>(glfwGetWindowUserPointer(w)); }
 
-// 案内の画像を作る（表示中は3行、隠しているときは「H: 操作の案内」だけ）
-TextImage makeHelpImage(bool full, float contentScale) {
-    TextImage img;
-    std::vector<std::string> lines;
-    if (full) lines = {tr("Help1"), tr("Help2"), tr("Help3")};
-    else lines = {tr("HelpHidden")};
-    renderTextPanel(lines, 13.0f * contentScale, img);
-    return img;
-}
-
 }  // namespace
 
 int runWindow(const Options& opt, Scene& scene) {
@@ -317,8 +320,9 @@ int runWindow(const Options& opt, Scene& scene) {
     float contentScale = 1.0f;
     glfwGetWindowContentScale(window, &contentScale, nullptr);
     contentScale = std::clamp(contentScale, 1.0f, 3.0f);
+    HelpImage help;
     auto updateHelp = [&]() {
-        TextImage help = makeHelpImage(nv.showHelp, contentScale);
+        help = buildHelpImage(nv.showHelp, contentScale);
         renderer.setOverlay(help.rgba, help.width, help.height);
     };
     updateHelp();
@@ -338,6 +342,9 @@ int runWindow(const Options& opt, Scene& scene) {
 
     AutoExposure exposure;
     bool needResize = false;
+    // 1 フレームで計算する回数。GPU の速さに合わせて 1〜4 回の間で自動で調整する（目安 30 fps）
+    uint32_t samplesPerFrame = 1;
+    double frameTimeAvg = 0.0, sppTimer = 0.0;
     auto last = std::chrono::steady_clock::now();
     double statsTimer = 0;
     int statsFrames = 0;
@@ -366,10 +373,8 @@ int runWindow(const Options& opt, Scene& scene) {
             cam.eye = add(cam.eye, move, step);
             nv.changed = true;
         }
-        if (nv.changed) {
-            renderer.resetAccumulation();
-            nv.changed = false;
-        }
+        // カメラが動いたかどうかは Renderer が前のフレームと比べて判断する（動いても履歴は捨てずに重ね直す）
+        nv.changed = false;
         if (nv.helpChanged) {
             updateHelp();
             nv.helpChanged = false;
@@ -394,6 +399,7 @@ int runWindow(const Options& opt, Scene& scene) {
 
         ViewParams view = cam.view();
         view.maxBounces = opt.bounces;
+        view.samplesPerFrame = samplesPerFrame;
         view.exposure = nv.autoExposure ? exposure.current : std::exp2(nv.evOffset);
 
         VkCommandBufferBeginInfo bi{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
@@ -421,8 +427,12 @@ int runWindow(const Options& opt, Scene& scene) {
                         VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
                         VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
         int margin = static_cast<int>(12 * contentScale);
-        renderer.recordOverlay(cmd, margin, static_cast<int>(sc.extent.height) - static_cast<int>(renderer.overlayHeight()) - margin,
-                               nv.showHelp ? 0.9f : 0.6f);
+        int helpX = margin, helpY = static_cast<int>(sc.extent.height) - static_cast<int>(help.height) - margin;
+        renderer.recordOverlay(cmd, helpX, helpY, nv.showHelp ? 0.95f : 0.8f);
+        nv.toggleX = helpX + help.toggleX;
+        nv.toggleY = helpY + help.toggleY;
+        nv.toggleW = help.toggleW;
+        nv.toggleH = help.toggleH;
 
         // 3. 画面に写す（形式の違い BGRA / RGBA も blit が吸収する）
         VkImage swapImage = sc.images[imageIndex];
@@ -478,11 +488,20 @@ int runWindow(const Options& opt, Scene& scene) {
             glfwSetWindowShouldClose(window, GLFW_TRUE);
         }
 
+        frameTimeAvg = frameTimeAvg * 0.9 + dt * 0.1;
+        sppTimer += dt;
+        if (sppTimer >= 0.5) {
+            sppTimer = 0;
+            if (frameTimeAvg < 0.020 && samplesPerFrame < 4) samplesPerFrame++;
+            else if (frameTimeAvg > 0.040 && samplesPerFrame > 1) samplesPerFrame--;
+        }
+
         // 速さは画面には出さず、ログに残す（不具合の調査用）
         statsTimer += dt;
         statsFrames++;
         if (statsTimer >= 10.0) {
-            logInfo("%.1f fps, %u samples accumulated", statsFrames / statsTimer, renderer.accumulatedSamples());
+            logInfo("%.1f fps, %u samples/frame, %u frames since the camera stopped", statsFrames / statsTimer,
+                    samplesPerFrame, renderer.accumulatedSamples());
             statsTimer = 0;
             statsFrames = 0;
         }

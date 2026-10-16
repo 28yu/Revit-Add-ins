@@ -1,0 +1,128 @@
+#version 450
+// ノイズ除去 その1: 時間方向の再利用。
+// 前のフレームまでの結果（履歴）を、今のカメラの位置に合わせて重ね合わせる（再投影）。
+// 同じ物の同じ場所なら、前のフレームの計算結果をそのまま使えるので、実質的な計算回数が増える。
+// カメラが止まっている間は、全フレームを均等に足し合わせる（＝ノイズの無い正確な結果に近づいていく）。
+layout(local_size_x = 8, local_size_y = 8) in;
+
+layout(set = 0, binding = 0, rgba32f) uniform readonly image2D uNoisy;       // 今回の明るさ（色で割ったもの）
+layout(set = 0, binding = 1, rgba32f) uniform readonly image2D uGPos;        // 今回: 位置・距離
+layout(set = 0, binding = 2, rgba32f) uniform readonly image2D uGNormal;     // 今回: 面の向き
+layout(set = 0, binding = 3, rgba32f) uniform readonly image2D uPrevGPos;    // 前回: 位置・距離
+layout(set = 0, binding = 4, rgba32f) uniform readonly image2D uPrevGNormal; // 前回: 面の向き
+layout(set = 0, binding = 5, rgba32f) uniform readonly image2D uPrevHistory; // 前回の履歴: rgb = 平均, a = 重ねた回数
+layout(set = 0, binding = 6, rgba32f) uniform readonly image2D uPrevMoments; // 前回: x = 明るさの平均, y = 明るさの2乗の平均
+layout(set = 0, binding = 7, rgba32f) uniform writeonly image2D uHistory;
+layout(set = 0, binding = 8, rgba32f) uniform writeonly image2D uMoments;
+layout(set = 0, binding = 9, rgba32f) uniform writeonly image2D uFiltered;   // rgb = 明るさ, a = ばらつき（分散）
+
+layout(push_constant) uniform Params {
+    vec4 prevEye;      // xyz = 前回のカメラ位置, w = 1 ならカメラが動いた
+    vec4 prevForward;  // xyz = 前回の前方向, w = 1 なら履歴を捨ててやり直す
+    vec4 prevRight;    // xyz = 前回の右方向, w = 縦横比
+    vec4 prevUp;       // xyz = 前回の上方向, w = 縦の画角の tan(半分)
+    vec4 params;       // x = 動いている間の最小の混ぜ具合, y = 重ねる回数の上限
+} pc;
+
+float luminance(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
+
+void main() {
+    ivec2 size = imageSize(uNoisy);
+    ivec2 p = ivec2(gl_GlobalInvocationID.xy);
+    if (p.x >= size.x || p.y >= size.y) return;
+
+    vec3 color = imageLoad(uNoisy, p).rgb;
+    vec4 gp = imageLoad(uGPos, p);
+    vec3 n = imageLoad(uGNormal, p).xyz;
+    bool sky = gp.w < 0.0;
+    bool moved = pc.prevEye.w > 0.5;
+    bool reset = pc.prevForward.w > 0.5;
+
+    // --- 前回のどの画素に写っていたかを求め、使えるか確かめる ---------------------
+    vec3 prevColor = vec3(0.0);
+    vec2 prevMoments = vec2(0.0);
+    float prevLen = 0.0;
+    float weightSum = 0.0;
+    if (!reset) {
+        vec2 prevPixel = vec2(p);  // 止まっていれば同じ画素
+        bool onScreen = true;
+        if (moved) {
+            vec3 d = gp.xyz - pc.prevEye.xyz;
+            float z = dot(d, pc.prevForward.xyz);
+            if (z <= 1e-4) {
+                onScreen = false;
+            } else {
+                float x = dot(d, pc.prevRight.xyz) / (z * pc.prevUp.w * pc.prevRight.w);
+                float y = dot(d, pc.prevUp.xyz) / (z * pc.prevUp.w);
+                prevPixel = vec2((x + 1.0) * 0.5 * float(size.x) - 0.5, (1.0 - y) * 0.5 * float(size.y) - 0.5);
+            }
+        }
+        if (onScreen) {
+            // 周りの 4 画素から、同じ面だと確かめられたものだけを距離に応じて混ぜる
+            ivec2 base = ivec2(floor(prevPixel));
+            vec2 f = prevPixel - vec2(base);
+            for (int k = 0; k < 4; ++k) {
+                ivec2 q = base + ivec2(k & 1, k >> 1);
+                if (q.x < 0 || q.y < 0 || q.x >= size.x || q.y >= size.y) continue;
+                float w = ((k & 1) == 1 ? f.x : 1.0 - f.x) * ((k >> 1) == 1 ? f.y : 1.0 - f.y);
+                if (!moved) w = k == 0 ? 1.0 : 0.0;
+                if (w <= 0.0) continue;
+                vec4 qgp = imageLoad(uPrevGPos, q);
+                bool qsky = qgp.w < 0.0;
+                if (qsky != sky) continue;
+                if (!sky) {
+                    vec3 qn = imageLoad(uPrevGNormal, q).xyz;
+                    // 位置が近く（距離の 3% 程度まで）、向きがほぼ同じなら同じ面とみなす
+                    if (length(qgp.xyz - gp.xyz) > 0.03 * gp.w + 0.01) continue;
+                    if (dot(qn, n) < 0.9) continue;
+                }
+                vec4 h = imageLoad(uPrevHistory, q);
+                prevColor += h.rgb * w;
+                prevLen += h.a * w;
+                prevMoments += imageLoad(uPrevMoments, q).xy * w;
+                weightSum += w;
+            }
+        }
+    }
+
+    float lum = luminance(color);
+    float len = 1.0;
+    vec3 history = color;
+    vec2 moments = vec2(lum, lum * lum);
+    if (weightSum > 0.01) {
+        prevColor /= weightSum;
+        prevLen /= weightSum;
+        prevMoments /= weightSum;
+        // 動いている間は重ねる回数を少なめにする（古い結果が残って残像になるのを防ぐ）
+        float maxLen = moved ? 1.0 / pc.params.x : pc.params.y;
+        len = min(prevLen + 1.0, maxLen);
+        float alpha = 1.0 / len;
+        history = mix(prevColor, color, alpha);
+        moments = mix(prevMoments, moments, alpha);
+    }
+
+    // ばらつき: 1 フレーム分の明るさのばらつきを、重ねた回数で割ったもの（＝今の平均に残っているノイズの大きさ）。
+    // 重ねるほど小さくなるので、次の平均（atrous）は自然に弱まり、細部が残る
+    float sampleVariance = max(0.0, moments.y - moments.x * moments.x);
+    if (len < 16.0) {
+        // 履歴が短いうちは当てにならないので、周りの画素からも見積もる
+        float s = 0.0, s2 = 0.0, cnt = 0.0;
+        for (int dy = -2; dy <= 2; ++dy) {
+            for (int dx = -2; dx <= 2; ++dx) {
+                ivec2 q = clamp(p + ivec2(dx, dy), ivec2(0), size - 1);
+                float l = luminance(imageLoad(uNoisy, q).rgb);
+                s += l;
+                s2 += l * l;
+                cnt += 1.0;
+            }
+        }
+        float m = s / cnt;
+        sampleVariance = max(sampleVariance, max(0.0, s2 / cnt - m * m));
+    }
+    // 重ねた回数が少ないうちはノイズの見積もり自体が不確かなので、多めに見積もって強めにならす
+    float variance = sampleVariance / len * max(1.0, 16.0 / len);
+
+    imageStore(uHistory, p, vec4(history, len));
+    imageStore(uMoments, p, vec4(moments, 0.0, 0.0));
+    imageStore(uFiltered, p, vec4(history, variance));
+}

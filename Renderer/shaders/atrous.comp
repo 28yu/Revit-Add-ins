@@ -1,0 +1,72 @@
+#version 450
+// ノイズ除去 その2: 面の境目を守りながら、周りの画素と平均する（à-trous ウェーブレットフィルタ）。
+// 間隔を 1, 2, 4, 8, 16 画素と広げながら 5 回くり返し、少ない計算で広い範囲をならす。
+// 「同じ面」（位置・向きが近い）で「明るさが近い」画素だけを混ぜるので、物の輪郭や影の境目はぼかさない。
+layout(local_size_x = 8, local_size_y = 8) in;
+
+layout(set = 0, binding = 0, rgba32f) uniform readonly image2D uIn;       // rgb = 明るさ, a = ばらつき
+layout(set = 0, binding = 1, rgba32f) uniform writeonly image2D uOut;
+layout(set = 0, binding = 2, rgba32f) uniform readonly image2D uGPos;
+layout(set = 0, binding = 3, rgba32f) uniform readonly image2D uGNormal;
+layout(set = 0, binding = 4, rgba32f) uniform readonly image2D uHistory;  // a = 重ねた回数
+
+layout(push_constant) uniform Params {
+    int stepSize;  // 調べる画素の間隔
+} pc;
+
+float luminance(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
+
+void main() {
+    ivec2 size = imageSize(uIn);
+    ivec2 p = ivec2(gl_GlobalInvocationID.xy);
+    if (p.x >= size.x || p.y >= size.y) return;
+
+    vec4 c = imageLoad(uIn, p);
+    vec4 gp = imageLoad(uGPos, p);
+    float len = imageLoad(uHistory, p).a;
+    // 空はノイズが無い。十分に重ねた画素は、もう平均しなくてよい（ぼかさず細部を残す）
+    if (gp.w < 0.0 || len >= 4096.0) {
+        imageStore(uOut, p, c);
+        return;
+    }
+    vec3 n = imageLoad(uGNormal, p).xyz;
+
+    // ばらつきは周り 3×3 でならしてから使う（1 画素だけだと当てにならない）
+    float varBlur = 0.0;
+    for (int dy = -1; dy <= 1; ++dy) {
+        for (int dx = -1; dx <= 1; ++dx) {
+            ivec2 q = clamp(p + ivec2(dx, dy), ivec2(0), size - 1);
+            float k = (dx == 0 ? 0.5 : 0.25) * (dy == 0 ? 0.5 : 0.25);
+            varBlur += imageLoad(uIn, q).a * k;
+        }
+    }
+    float sigmaL = 4.0 * sqrt(max(varBlur, 0.0)) + 1e-4;
+    float lp = luminance(c.rgb);
+    float planeTol = 0.02 * gp.w + 0.005;
+
+    const float h[3] = float[](3.0 / 8.0, 1.0 / 4.0, 1.0 / 16.0);
+    vec3 sum = vec3(0.0);
+    float sumVar = 0.0, wSum = 0.0;
+    for (int dy = -2; dy <= 2; ++dy) {
+        for (int dx = -2; dx <= 2; ++dx) {
+            ivec2 q = p + ivec2(dx, dy) * pc.stepSize;
+            if (q.x < 0 || q.y < 0 || q.x >= size.x || q.y >= size.y) continue;
+            vec4 gq = imageLoad(uGPos, q);
+            if (gq.w < 0.0) continue;
+            vec4 cq = imageLoad(uIn, q);
+            vec3 nq = imageLoad(uGNormal, q).xyz;
+            float wPlane = exp(-abs(dot(n, gq.xyz - gp.xyz)) / planeTol);  // 同じ平面の上か
+            float wNormal = pow(max(dot(n, nq), 0.0), 64.0);                // 同じ向きか
+            float wLum = exp(-abs(lp - luminance(cq.rgb)) / sigmaL);        // 明るさが近いか
+            float w = h[abs(dx)] * h[abs(dy)] * wPlane * wNormal * wLum;
+            sum += cq.rgb * w;
+            sumVar += cq.a * w * w;
+            wSum += w;
+        }
+    }
+    if (wSum < 1e-6) {
+        imageStore(uOut, p, c);
+        return;
+    }
+    imageStore(uOut, p, vec4(sum / wSum, sumVar / (wSum * wSum)));
+}

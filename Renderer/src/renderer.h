@@ -1,5 +1,12 @@
 #pragma once
 // レイトレーシングで1フレームずつ描く本体。
+//
+// 1フレームの流れ:
+//   1. パストレース（pathtrace_hw / pathtrace_sw）: 1 画素 1 本の光の通り道を計算（ざらついた明るさ＋面の情報）
+//   2. ノイズ除去 その1（temporal）: 前のフレームまでの結果を今のカメラ位置に合わせて重ねる
+//   3. ノイズ除去 その2（atrous ×5）: 面の境目を守りながら周りの画素と平均する
+//   4. 仕上げ（composite）: 面の色を掛け戻し、トーンマッピングして画面に出す色にする（自動露出の集計も）
+// カメラが止まっている間は 2 で全フレームを均等に足し合わせるので、時間とともに正確な結果に近づく。
 #include "bvh.h"
 #include "scene.h"
 #include "vk_context.h"
@@ -13,6 +20,7 @@ struct ViewParams {
     bool panorama = false;    // 360°パノラマで描く
     float exposure = 1.0f;    // 明るさの倍率
     uint32_t maxBounces = 4;  // 光の反射を追う回数
+    uint32_t samplesPerFrame = 1;  // 1 フレームで計算する回数（速い GPU ほど多くして、動いている間の画質を上げる）
 };
 
 class Renderer {
@@ -22,13 +30,15 @@ public:
     void init(VkContext& ctx, const Scene& scene, uint32_t glassStart, const Bvh& bvh);
     void destroy();
 
-    // 描画する大きさを変える（足し合わせもやり直し）
+    // 描画する大きさを変える（履歴も捨てる）
     void resize(uint32_t width, uint32_t height);
-    // カメラが動いたときなどに、足し合わせをやり直す
-    void resetAccumulation() { accumulated_ = 0; }
-    uint32_t accumulatedSamples() const { return accumulated_; }
+    // 履歴を捨てて最初からやり直す
+    void resetAccumulation() { resetHistory_ = true; }
+    // カメラが止まってから描いたフレーム数
+    uint32_t accumulatedSamples() const { return staticFrames_; }
 
-    // 1フレーム分の命令を記録する。終わると出力画像は GENERAL レイアウトのまま
+    // 1フレーム分の命令を記録する（カメラが動いたかは前のフレームと比べて自動で判断する）。
+    // 終わると出力画像は GENERAL レイアウトのまま
     void record(VkCommandBuffer cmd, const ViewParams& view);
     // record した命令の実行が終わった後に呼ぶ（自動露出の集計を読む）
     // 戻り値: 画面全体の明るさ（対数平均）。集計がなければ負の値
@@ -44,12 +54,22 @@ public:
     uint32_t overlayWidth() const { return overlay_.width; }
     uint32_t overlayHeight() const { return overlay_.height; }
 
+    // シェーダー1つ分（入出力の一覧・パイプライン）
+    struct ComputePass {
+        VkDescriptorSetLayout layout = VK_NULL_HANDLE;
+        VkDescriptorPool pool = VK_NULL_HANDLE;
+        std::vector<VkDescriptorSet> sets;
+        VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
+        VkPipeline pipeline = VK_NULL_HANDLE;
+    };
+
 private:
     void buildAccelerationStructures(const Scene& scene);
-    void createPipeline();
-    void createOverlayPipeline();
+    void createPasses();
     void writeDescriptors();
     void writeOverlayDescriptors();
+    void dispatch(VkCommandBuffer cmd, const ComputePass& pass, uint32_t set, const void* push, uint32_t pushSize,
+                  uint32_t width, uint32_t height);
 
     struct AccelStruct {
         VkAccelerationStructureKHR handle = VK_NULL_HANDLE;
@@ -70,25 +90,20 @@ private:
     Vec3 sunDir_;
     float sunIntensity_ = 5.0f;
 
-    Image accum_, output_;
+    // 描画とノイズ除去の画像。[2] は「今回」と「前回」を交互に使う
+    Image noisy_, gpos_[2], gnormal_[2], galbedo_, history_[2], moments_[2], filtered_[2], output_;
     bool imagesFresh_ = false;  // 作り直した直後（レイアウトの切り替えが必要）
-    uint32_t accumulated_ = 0;
+    bool resetHistory_ = true;
+    bool hasLastView_ = false;
+    ViewParams lastView_;
+    uint32_t staticFrames_ = 0;
     uint32_t frameIndex_ = 0;
 
-    VkDescriptorSetLayout setLayout_ = VK_NULL_HANDLE;
-    VkDescriptorPool pool_ = VK_NULL_HANDLE;
-    VkDescriptorSet set_ = VK_NULL_HANDLE;
-    VkPipelineLayout pipelineLayout_ = VK_NULL_HANDLE;
-    VkPipeline pipeline_ = VK_NULL_HANDLE;
+    ComputePass pathTrace_, temporal_, atrous_, composite_, overlayPass_;
 
-    // 操作の案内を重ねる処理
+    // 操作の案内
     Image overlay_;
     VkImageView overlayTargetView_ = VK_NULL_HANDLE;
-    VkDescriptorSetLayout overlayLayout_ = VK_NULL_HANDLE;
-    VkDescriptorPool overlayPool_ = VK_NULL_HANDLE;
-    VkDescriptorSet overlaySet_ = VK_NULL_HANDLE;
-    VkPipelineLayout overlayPipelineLayout_ = VK_NULL_HANDLE;
-    VkPipeline overlayPipeline_ = VK_NULL_HANDLE;
 };
 
 }  // namespace t28

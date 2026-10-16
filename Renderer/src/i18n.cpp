@@ -33,23 +33,16 @@ static const Entry kStrings[] = {
      "Tools28 リアルタイムレンダリング",
      "Tools28 Real-time Rendering",
      "Tools28 实时渲染"},
-    // 操作の案内（ウィンドウの左下に小さく出す）。Revit の 3D ビューと同じ操作を先に書く
-    {"Help1",
-     "ホイール: ズーム　　ホイールドラッグ: 移動　　Shift＋ホイールドラッグ: 回転",
-     "Wheel: zoom    Wheel drag: pan    Shift + wheel drag: orbit",
-     "滚轮: 缩放　　按住滚轮拖动: 平移　　Shift＋按住滚轮拖动: 动态观察"},
-    {"Help2",
-     "ホイールをダブルクリック: 全体表示　　左ドラッグ: 見回す　　W A S D・Q E: 歩く・上下",
-     "Double-click wheel: zoom to fit    Left drag: look around    W A S D / Q E: walk / up, down",
-     "双击滚轮: 缩放匹配　　左键拖动: 环视　　W A S D・Q E: 行走・上下"},
-    {"Help3",
-     "＋ －: 明るさ　　R: 最初の視点　　H: この案内を隠す",
-     "+ / -: brightness    R: reset view    H: hide this help",
-     "＋ －: 亮度　　R: 初始视点　　H: 隐藏此提示"},
-    {"HelpHidden",
-     "H: 操作の案内",
-     "H: show controls",
-     "H: 操作提示"},
+    // 操作の案内（ウィンドウの左下に小さく出す）。絵の下に付ける短い言葉
+    {"HelpZoom", "ズーム", "Zoom", "缩放"},
+    {"HelpPan", "移動", "Pan", "平移"},
+    {"HelpOrbit", "回転", "Orbit", "动态观察"},
+    {"HelpFit", "全体表示", "Zoom to fit", "缩放匹配"},
+    {"HelpLook", "見回す", "Look around", "环视"},
+    {"HelpWalk", "歩く", "Walk", "行走"},
+    {"HelpUpDown", "下がる・上がる", "Down / up", "下降・上升"},
+    {"HelpBright", "明るさ", "Brightness", "亮度"},
+    {"HelpReset", "最初の視点", "Reset view", "初始视点"},
 };
 
 void setLanguage(const char* code) {
