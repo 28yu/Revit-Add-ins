@@ -289,6 +289,10 @@ namespace Tools28.Commands.ParameterValueReplace.Services
 
                 yield return end;
             }
+
+            // 最後のまとまりの処理中に中止が押された場合も中止として扱う（呼び出し側で元に戻す）
+            if (ct.IsCancellationRequested)
+                result.Cancelled = true;
         }
 
         // ===================== 共通 =====================

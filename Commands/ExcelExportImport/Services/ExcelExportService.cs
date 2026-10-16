@@ -110,6 +110,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
                 if (includeParamGroup)
                     WriteGroupRow(worksheet, categoryParams);
                 WriteHeaderRow(worksheet, categoryParams, headerRow);
+                SetTextColumnFormat(worksheet, categoryParams);
 
                 // データ行を作成
                 var catWatch = Stopwatch.StartNew();
@@ -144,7 +145,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
                         string value = ReadValueTimed(
                             elem, paramInfo, doc, typeElemCache, typeValueCache, progress, timings);
 
-                        if (double.TryParse(value, out double numValue))
+                        if (!paramInfo.IsText && double.TryParse(value, out double numValue))
                         {
                             worksheet.Cell(row, i + 3).Value = numValue;
                         }
@@ -212,6 +213,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
             if (includeParamGroup)
                 WriteGroupRow(worksheet, allParams);
             WriteHeaderRow(worksheet, allParams, headerRow);
+            SetTextColumnFormat(worksheet, allParams);
 
             // 列幅計算用（ヘッダー幅で初期化）
             int totalCols = allParams.Count + 2;
@@ -266,7 +268,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
                         string value = ReadValueTimed(
                             elem, matchParam, doc, typeElemCache, typeValueCache, progress, timings);
 
-                        if (double.TryParse(value, out double numValue))
+                        if (!matchParam.IsText && double.TryParse(value, out double numValue))
                         {
                             worksheet.Cell(row, i + 3).Value = numValue;
                         }
@@ -461,6 +463,19 @@ namespace Tools28.Commands.ExcelExportImport.Services
                     width += 1.0;
             }
             return width;
+        }
+
+        /// <summary>
+        /// 文字パラメータの列を「文字列」書式にする。値を文字として書き出すだけでは、
+        /// 利用者が Excel で「03」と入力し直したときに数値 3 に変換されてしまうため。
+        /// </summary>
+        private static void SetTextColumnFormat(IXLWorksheet worksheet, List<ParameterInfo> headerParams)
+        {
+            for (int i = 0; i < headerParams.Count; i++)
+            {
+                if (headerParams[i].IsText)
+                    worksheet.Column(i + 3).Style.NumberFormat.Format = "@";
+            }
         }
 
         /// <summary>

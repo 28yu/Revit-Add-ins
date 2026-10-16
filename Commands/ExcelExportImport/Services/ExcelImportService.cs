@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using Autodesk.Revit.DB;
@@ -994,7 +995,9 @@ namespace Tools28.Commands.ExcelExportImport.Services
                 // 整数なら小数点なしの文字列にする（Revit の AsValueString() と一致させる）
                 if (numVal == Math.Floor(numVal))
                     return ((long)numVal).ToString();
-                return numVal.ToString();
+                // 15桁に丸めて書式を固定する。.NET 8（Revit 2025/2026）の既定の ToString() は
+                // 「13.530000000000001」のような最短往復表記になり、.NET Framework と結果が変わるため
+                return numVal.ToString("G15", CultureInfo.InvariantCulture);
             }
             return cell.GetString();
         }

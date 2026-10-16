@@ -142,6 +142,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
                 {
                     // 要素参照型（レベル/材料/タイプ/画像等）＝文字値ではなく既存要素名が必要
                     IsElementReference = param.StorageType == StorageType.ElementId,
+                    IsText = param.StorageType == StorageType.String,
                     // 画像参照は文字値を一切設定できない（画像ピッカー専用）
                     IsImage = bip == BuiltInParameter.ALL_MODEL_IMAGE
                               || bip == BuiltInParameter.ALL_MODEL_TYPE_IMAGE,
@@ -253,21 +254,27 @@ namespace Tools28.Commands.ExcelExportImport.Services
         /// <summary>
         /// ElementId 型パラメータ（部屋の上部/下部レベル等）を設定する。
         /// エクスポートは要素名（例: レベル名 "1FL(2FL)"）で書き出すため、
-        /// 数値ID・名前検索・SetValueString の順に解決する。
+        /// 名前検索・数値ID・SetValueString の順に解決する。
+        /// （名前を先に調べる。レベル名が「3」のように数字だけの場合に、
+        ///   要素 ID 3 と取り違えて失敗しないようにするため）
         /// </summary>
         private static bool SetElementIdParameter(Parameter param, string value, Document doc)
         {
-            // 1) 数値ならそのまま ElementId として設定
-            if (int.TryParse(value, out int idVal))
-                return param.Set(new ElementId(idVal));
-
-            // 2) 名前から要素を検索して設定（レベル名など）
+            // 1) 名前から要素を検索して設定（レベル名など）
             var targetId = ResolveElementIdByName(param, value, doc);
             if (targetId != null && targetId != ElementId.InvalidElementId)
             {
                 bool ok = param.Set(targetId);
                 DiagLog.Write($"[SetParam] ElementId 名前解決 '{value}' -> {targetId} set={ok} ({param.Definition?.Name})");
                 return ok;
+            }
+
+            // 2) 数値で、その ID の要素が実在すれば ElementId として設定
+            if (int.TryParse(value, out int idVal))
+            {
+                var id = new ElementId(idVal);
+                if (doc.GetElement(id) != null)
+                    return param.Set(id);
             }
 
             // 3) 最後に SetValueString を試す

@@ -49,42 +49,41 @@ namespace Tools28.Commands.BeamTopLevel
 
                 try
                 {
-                    ParameterFilterElement existingFilter = FindFilterByName(doc, filterName);
-                    if (existingFilter != null)
+                    // 同名フィルタは同じレベルの別のビュー（意匠の平面図と構造伏図など）でも
+                    // 使われているため削除しない。既存があれば再利用してこのビューに適用する
+                    ParameterFilterElement filterElement = FindFilterByName(doc, filterName);
+                    if (filterElement == null)
                     {
-                        if (overwriteExisting)
-                        {
-                            if (activeView.GetFilters().Contains(existingFilter.Id))
-                                activeView.RemoveFilter(existingFilter.Id);
-                            doc.Delete(existingFilter.Id);
-                        }
-                        else
-                        {
-                            colorIndex++;
+                        ElementId paramId = GetSharedParameterIdByName(doc,
+                            ParameterManager.ParamDisplay);
+                        if (paramId == null)
                             continue;
-                        }
-                    }
-
-                    ElementId paramId = GetSharedParameterIdByName(doc,
-                        ParameterManager.ParamDisplay);
-                    if (paramId == null)
-                        continue;
 
 #if REVIT2026
-                    FilterRule rule = ParameterFilterRuleFactory.CreateEqualsRule(
-                        paramId, displayValue);
+                        FilterRule rule = ParameterFilterRuleFactory.CreateEqualsRule(
+                            paramId, displayValue);
 #else
-                    FilterRule rule = ParameterFilterRuleFactory.CreateEqualsRule(
-                        paramId, displayValue, false);
+                        FilterRule rule = ParameterFilterRuleFactory.CreateEqualsRule(
+                            paramId, displayValue, false);
 #endif
 
-                    ElementParameterFilter paramFilter =
-                        new ElementParameterFilter(rule);
+                        ElementParameterFilter paramFilter =
+                            new ElementParameterFilter(rule);
 
-                    ParameterFilterElement filterElement =
-                        ParameterFilterElement.Create(doc, filterName, categories, paramFilter);
+                        filterElement = ParameterFilterElement.Create(
+                            doc, filterName, categories, paramFilter);
+                    }
 
-                    activeView.AddFilter(filterElement.Id);
+                    if (!activeView.GetFilters().Contains(filterElement.Id))
+                    {
+                        activeView.AddFilter(filterElement.Id);
+                    }
+                    else if (!overwriteExisting)
+                    {
+                        // 上書きしない場合は、このビューの既存の色をそのまま残す
+                        colorIndex++;
+                        continue;
+                    }
 
                     Color color = colors[colorIndex];
                     OverrideGraphicSettings overrides = CreateColorOverrides(
@@ -112,41 +111,34 @@ namespace Tools28.Commands.BeamTopLevel
         {
             try
             {
-                ParameterFilterElement existingError = FindFilterByName(doc, ErrorFilterName);
-                if (existingError != null)
+                // 他のビューでも使われているため削除せず、既存があれば再利用する
+                ParameterFilterElement errorFilterElement = FindFilterByName(doc, ErrorFilterName);
+                if (errorFilterElement == null)
                 {
-                    if (overwriteExisting)
-                    {
-                        if (activeView.GetFilters().Contains(existingError.Id))
-                            activeView.RemoveFilter(existingError.Id);
-                        doc.Delete(existingError.Id);
-                    }
-                    else
-                    {
+                    ElementId errorParamId = GetSharedParameterIdByName(doc,
+                        ParameterManager.ParamError);
+                    if (errorParamId == null)
                         return;
-                    }
-                }
-
-                ElementId errorParamId = GetSharedParameterIdByName(doc,
-                    ParameterManager.ParamError);
-                if (errorParamId == null)
-                    return;
 
 #if REVIT2026
-                FilterRule errorRule = ParameterFilterRuleFactory.CreateNotEqualsRule(
-                    errorParamId, "");
+                    FilterRule errorRule = ParameterFilterRuleFactory.CreateNotEqualsRule(
+                        errorParamId, "");
 #else
-                FilterRule errorRule = ParameterFilterRuleFactory.CreateNotEqualsRule(
-                    errorParamId, "", false);
+                    FilterRule errorRule = ParameterFilterRuleFactory.CreateNotEqualsRule(
+                        errorParamId, "", false);
 #endif
 
-                ElementParameterFilter errorFilter =
-                    new ElementParameterFilter(errorRule);
+                    ElementParameterFilter errorFilter =
+                        new ElementParameterFilter(errorRule);
 
-                ParameterFilterElement errorFilterElement =
-                    ParameterFilterElement.Create(doc, ErrorFilterName, categories, errorFilter);
+                    errorFilterElement = ParameterFilterElement.Create(
+                        doc, ErrorFilterName, categories, errorFilter);
+                }
 
-                activeView.AddFilter(errorFilterElement.Id);
+                if (!activeView.GetFilters().Contains(errorFilterElement.Id))
+                    activeView.AddFilter(errorFilterElement.Id);
+                else if (!overwriteExisting)
+                    return;
 
                 Color errorColor = new Color(255, 100, 100);
                 ElementId solidFillId = GetSolidFillPatternId(doc);

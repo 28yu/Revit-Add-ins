@@ -205,6 +205,9 @@ namespace Tools28.Commands.BeamTopLevel
 
                 // mm単位に変換して表示形式を生成
                 double topLevelMm = Math.Round(FeetToMm(topLevel));
+                // -0.4mm 等は -0 に丸まる。.NET 8（Revit 2025/2026）では -0 が "-0" と表示され
+                // "+-0" という別の値（フィルタ名）になるため 0 に正規化する
+                if (topLevelMm == 0) topLevelMm = 0;
 
                 string sign = topLevelMm >= 0 ? "+" : "";
                 string displayValue = $"{refLevelName}{sign}{topLevelMm:0}";

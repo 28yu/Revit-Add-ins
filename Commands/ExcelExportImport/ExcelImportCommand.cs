@@ -111,10 +111,13 @@ namespace Tools28.Commands.ExcelExportImport
                             importResult.FailedCells.Add(pr.ElementId + "|" + pr.ParameterName);
                         }
                     }
-                    importResult.Errors.Add(
-                        $"{failingIds.Count}個の要素は Revit の制約により変更できずスキップしました" +
-                        "（例: 部屋の高さは0より大きい必要があります）。他の要素は反映しました。");
+                    importResult.Errors.Add(string.Format(
+                        Loc.S(committed ? "Import.ConstraintSkipped" : "Import.ConstraintSkippedNone"),
+                        failingIds.Count));
                 }
+
+                // 書き込む変更があったのに確定できなかった（モデルには何も反映されていない）
+                bool notApplied = !committed && importResult.SuccessCount > 0;
 
                 // コミットできていない場合、成功は0（モデルには反映されていない）
                 if (!committed)
@@ -123,9 +126,10 @@ namespace Tools28.Commands.ExcelExportImport
                 }
 
                 // インポート成功時、Excelの変更セルに色を付ける
+                // （確定できなかった場合は「取り込み済み」の色が誤解を招くため付けない）
                 string markedFilePath = null;
                 string colorMethod = null;
-                if ((importResult.SuccessCount > 0 || importResult.FailedCells.Count > 0) && previewRows != null)
+                if (committed && (importResult.SuccessCount > 0 || importResult.FailedCells.Count > 0) && previewRows != null)
                 {
                     try
                     {
@@ -146,10 +150,10 @@ namespace Tools28.Commands.ExcelExportImport
 
                 // 結果表示
                 var sb = new StringBuilder();
-                sb.AppendLine("インポートが完了しました。\n");
-                sb.AppendLine($"成功: {importResult.SuccessCount}件");
-                sb.AppendLine($"失敗: {importResult.FailCount}件");
-                sb.AppendLine($"スキップ: {importResult.SkipCount}件");
+                sb.AppendLine(Loc.S(notApplied ? "Import.Done.NotApplied" : "Import.Done.Header"));
+                sb.AppendLine();
+                sb.AppendLine(string.Format(Loc.S("Import.Done.Counts"),
+                    importResult.SuccessCount, importResult.FailCount, importResult.SkipCount));
                 if (importResult.SkipCount > 0)
                 {
                     // スキップの理由の内訳（大量スキップの原因がすぐ分かるように）
@@ -167,22 +171,26 @@ namespace Tools28.Commands.ExcelExportImport
                 {
                     if (markedFilePath != dialog.SelectedFilePath)
                     {
-                        sb.AppendLine($"\n※ 変更行に色を付けたファイルを別名で保存しました:");
+                        sb.AppendLine();
+                        sb.AppendLine(Loc.S("Import.Done.ColoredSavedAs"));
                         sb.AppendLine(markedFilePath);
                     }
                     else if (colorMethod == "COM")
                     {
-                        sb.AppendLine("\n※ 開いているExcelの変更行に色を付けました。");
+                        sb.AppendLine();
+                        sb.AppendLine(Loc.S("Import.Done.ColoredOpenBook"));
                     }
                     else
                     {
-                        sb.AppendLine("\n※ Excelファイルの変更行に色を付けました。");
+                        sb.AppendLine();
+                        sb.AppendLine(Loc.S("Import.Done.ColoredFile"));
                     }
                 }
 
                 if (importResult.Errors.Count > 0)
                 {
-                    sb.AppendLine("\n--- エラー詳細 ---");
+                    sb.AppendLine();
+                    sb.AppendLine(Loc.S("Import.Done.ErrorsHeader"));
                     int maxErrors = Math.Min(importResult.Errors.Count, 20);
                     for (int i = 0; i < maxErrors; i++)
                     {
@@ -190,13 +198,14 @@ namespace Tools28.Commands.ExcelExportImport
                     }
                     if (importResult.Errors.Count > 20)
                     {
-                        sb.AppendLine($"... 他 {importResult.Errors.Count - 20}件");
+                        sb.AppendLine(string.Format(Loc.S("Import.Done.More"), importResult.Errors.Count - 20));
                     }
                 }
 
                 if (importResult.Warnings.Count > 0)
                 {
-                    sb.AppendLine("\n--- 警告 ---");
+                    sb.AppendLine();
+                    sb.AppendLine(Loc.S("Import.Done.WarningsHeader"));
                     int maxWarnings = Math.Min(importResult.Warnings.Count, 10);
                     for (int i = 0; i < maxWarnings; i++)
                     {
@@ -204,7 +213,7 @@ namespace Tools28.Commands.ExcelExportImport
                     }
                     if (importResult.Warnings.Count > 10)
                     {
-                        sb.AppendLine($"... 他 {importResult.Warnings.Count - 10}件");
+                        sb.AppendLine(string.Format(Loc.S("Import.Done.More"), importResult.Warnings.Count - 10));
                     }
                 }
 

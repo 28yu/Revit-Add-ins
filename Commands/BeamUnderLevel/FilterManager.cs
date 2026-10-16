@@ -55,50 +55,42 @@ namespace Tools28.Commands.BeamUnderLevel
 
                 try
                 {
-                    // 同名フィルタが既に存在するか確認
-                    ParameterFilterElement existingFilter = FindFilterByName(doc, filterName);
-                    if (existingFilter != null)
+                    // 同名フィルタは同じレベルの別のビュー（意匠の平面図と構造伏図など）でも
+                    // 使われているため削除しない。既存があれば再利用してこのビューに適用する
+                    ParameterFilterElement filterElement = FindFilterByName(doc, filterName);
+                    if (filterElement == null)
                     {
-                        if (overwriteExisting)
-                        {
-                            // ビューから削除してからドキュメントから削除
-                            if (activeView.GetFilters().Contains(existingFilter.Id))
-                                activeView.RemoveFilter(existingFilter.Id);
-                            doc.Delete(existingFilter.Id);
-                        }
-                        else
-                        {
-                            colorIndex++;
+                        ElementId paramId = GetSharedParameterIdByName(doc,
+                            ParameterManager.ParamDisplay);
+                        if (paramId == null)
                             continue;
-                        }
-                    }
 
-                    // パラメータIDを取得
-                    ElementId paramId = GetSharedParameterIdByName(doc,
-                        ParameterManager.ParamDisplay);
-                    if (paramId == null)
-                        continue;
-
-                    // フィルタルール: 梁下_表示 == displayValue
 #if REVIT2026
-                    FilterRule rule = ParameterFilterRuleFactory.CreateEqualsRule(
-                        paramId, displayValue);
+                        FilterRule rule = ParameterFilterRuleFactory.CreateEqualsRule(
+                            paramId, displayValue);
 #else
-                    FilterRule rule = ParameterFilterRuleFactory.CreateEqualsRule(
-                        paramId, displayValue, false);
+                        FilterRule rule = ParameterFilterRuleFactory.CreateEqualsRule(
+                            paramId, displayValue, false);
 #endif
 
-                    ElementParameterFilter paramFilter =
-                        new ElementParameterFilter(rule);
+                        ElementParameterFilter paramFilter =
+                            new ElementParameterFilter(rule);
 
-                    // フィルタ要素を作成
-                    ParameterFilterElement filterElement =
-                        ParameterFilterElement.Create(doc, filterName, categories, paramFilter);
+                        filterElement = ParameterFilterElement.Create(
+                            doc, filterName, categories, paramFilter);
+                    }
 
-                    // ビューにフィルタを追加
-                    activeView.AddFilter(filterElement.Id);
+                    if (!activeView.GetFilters().Contains(filterElement.Id))
+                    {
+                        activeView.AddFilter(filterElement.Id);
+                    }
+                    else if (!overwriteExisting)
+                    {
+                        // 上書きしない場合は、このビューの既存の色をそのまま残す
+                        colorIndex++;
+                        continue;
+                    }
 
-                    // 色を設定（全グラフィック上書き）
                     Color color = colors[colorIndex];
                     OverrideGraphicSettings overrides = CreateColorOverrides(
                         color, solidFillPatternId);
@@ -129,45 +121,35 @@ namespace Tools28.Commands.BeamUnderLevel
         {
             try
             {
-                // 既存エラーフィルタの処理
-                ParameterFilterElement existingError = FindFilterByName(doc, ErrorFilterName);
-                if (existingError != null)
+                // 他のビューでも使われているため削除せず、既存があれば再利用する
+                ParameterFilterElement errorFilterElement = FindFilterByName(doc, ErrorFilterName);
+                if (errorFilterElement == null)
                 {
-                    if (overwriteExisting)
-                    {
-                        if (activeView.GetFilters().Contains(existingError.Id))
-                            activeView.RemoveFilter(existingError.Id);
-                        doc.Delete(existingError.Id);
-                    }
-                    else
-                    {
+                    ElementId errorParamId = GetSharedParameterIdByName(doc,
+                        ParameterManager.ParamError);
+                    if (errorParamId == null)
                         return;
-                    }
-                }
 
-                ElementId errorParamId = GetSharedParameterIdByName(doc,
-                    ParameterManager.ParamError);
-                if (errorParamId == null)
-                    return;
-
-                // ルール: 梁下_エラー != ""
 #if REVIT2026
-                FilterRule errorRule = ParameterFilterRuleFactory.CreateNotEqualsRule(
-                    errorParamId, "");
+                    FilterRule errorRule = ParameterFilterRuleFactory.CreateNotEqualsRule(
+                        errorParamId, "");
 #else
-                FilterRule errorRule = ParameterFilterRuleFactory.CreateNotEqualsRule(
-                    errorParamId, "", false);
+                    FilterRule errorRule = ParameterFilterRuleFactory.CreateNotEqualsRule(
+                        errorParamId, "", false);
 #endif
 
-                ElementParameterFilter errorFilter =
-                    new ElementParameterFilter(errorRule);
+                    ElementParameterFilter errorFilter =
+                        new ElementParameterFilter(errorRule);
 
-                ParameterFilterElement errorFilterElement =
-                    ParameterFilterElement.Create(doc, ErrorFilterName, categories, errorFilter);
+                    errorFilterElement = ParameterFilterElement.Create(
+                        doc, ErrorFilterName, categories, errorFilter);
+                }
 
-                activeView.AddFilter(errorFilterElement.Id);
+                if (!activeView.GetFilters().Contains(errorFilterElement.Id))
+                    activeView.AddFilter(errorFilterElement.Id);
+                else if (!overwriteExisting)
+                    return;
 
-                // エラー梁は赤で表示（全グラフィック上書き）
                 Color errorColor = new Color(255, 100, 100);
                 ElementId solidFillId = GetSolidFillPatternId(doc);
                 OverrideGraphicSettings errorOverrides = CreateColorOverrides(

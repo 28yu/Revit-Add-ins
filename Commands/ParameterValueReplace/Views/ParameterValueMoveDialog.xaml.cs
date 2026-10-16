@@ -261,19 +261,22 @@ namespace Tools28.Commands.ParameterValueReplace.Views
             using (var tg = new TransactionGroup(_doc, Loc.S("ValueMove.Txn")))
             {
                 tg.Start();
-                await RunBusyAsync(Loc.S("ValueMove.Status.Moving"), ct =>
+                bool completed = await RunBusyAsync(Loc.S("ValueMove.Status.Moving"), ct =>
                     ValueMoveService.Apply(_doc, ops, result, ct),
                     total: ops.Count, progressFormat: Loc.S("ValueMove.Status.MovingCount"));
 
-                if (result.Cancelled || _closed)
+                // 途中でエラーになった場合も、途中までの変更を残さず元に戻す
+                if (!completed || result.Cancelled || _closed)
                 {
                     tg.RollBack();
-                    DiagLog.Write($"[ValueMove] 中止して元に戻しました（{result.Success} 件処理済み）");
+                    DiagLog.Write($"[ValueMove] 中止/エラーのため元に戻しました（{result.Success} 件処理済み）");
                     if (!_closed)
                     {
-                        txtStatus.Text = Loc.S("ValueReplace.Status.Cancelled");
-                        MessageBox.Show(this, Loc.S("ValueReplace.CancelledMsg"), Loc.S("ValueMove.Title"),
-                            MessageBoxButton.OK, MessageBoxImage.Information);
+                        bool cancelled = result.Cancelled;
+                        txtStatus.Text = Loc.S(cancelled ? "ValueReplace.Status.Cancelled" : "ValueReplace.Status.ErrorRolledBack");
+                        MessageBox.Show(this, Loc.S(cancelled ? "ValueReplace.CancelledMsg" : "ValueReplace.ErrorRolledBackMsg"),
+                            Loc.S("ValueMove.Title"), MessageBoxButton.OK,
+                            cancelled ? MessageBoxImage.Information : MessageBoxImage.Warning);
                     }
                     return;
                 }

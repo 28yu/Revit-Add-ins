@@ -253,6 +253,7 @@ namespace Tools28.Commands.FormworkCalculator
                         }
                     }
 
+                    bool viewTxCommitted = false;
                     using (var t = new Transaction(doc, Loc.S("Formwork.Txn.View")))
                     {
                         t.Start();
@@ -317,14 +318,37 @@ namespace Tools28.Commands.FormworkCalculator
                                 summaryScheduleId = ScheduleCreator.CreateSummarySchedule(doc);
                             }
 
-                            t.Commit();
+                            // ワークシェアで他ユーザーが借用中の要素がある等で Revit が
+                            // 取り消した場合も失敗として扱う
+                            var status = t.Commit();
+                            viewTxCommitted = status == TransactionStatus.Committed;
+                            if (!viewTxCommitted)
+                            {
+                                TaskDialog.Show(Loc.S("Common.Error"),
+                                    string.Format(Loc.S("Formwork.ViewFailed"), status));
+                            }
                         }
                         catch (Exception ex)
                         {
-                            t.RollBack();
+                            if (t.GetStatus() == TransactionStatus.Started)
+                                t.RollBack();
                             TaskDialog.Show(Loc.S("Common.Error"),
                                 string.Format(Loc.S("Formwork.ViewFailed"), ex.Message));
                         }
+                    }
+
+                    // 取り消された場合、上で集めた ID はモデルに存在しない。
+                    // 残したままだと後段で「出力あり」と判定され、既存シートを削除して
+                    // 中身のないシートを作ってしまうため、すべて破棄する
+                    if (!viewTxCommitted)
+                    {
+                        perViewAnalysisViewIds.Clear();
+                        perViewScheduleIds.Clear();
+                        allMainScheduleIds.Clear();
+                        perAnalysisViewShapeIds.Clear();
+                        summaryScheduleId = null;
+                        totalShapesCreated = 0;
+                        FormworkDebugLog.Log("  [CMD] ビュー作成TXが確定しなかったため出力IDを破棄（シート処理はスキップ）");
                     }
 
                     // DirectShape 作成後にアクティブワークセットを復元する
@@ -398,9 +422,14 @@ namespace Tools28.Commands.FormworkCalculator
                         // 既存シートの削除は別トランザクションで先に行う。
                         // 同一トランザクション内でシート削除→Viewport.Create をすると
                         // Viewport.Create が null を返す既知の Revit API 問題を回避するため。
+                        // 削除と作成は TransactionGroup でまとめ、新しいシートを作れなかった場合は
+                        // 既存シートの削除ごと元に戻す（シートが消えたままにならないように）。
                         string savedSheetName = null, savedSheetNumber = null;
                         if (!skipSheet)
                         {
+                        using (var tgSheet = new TransactionGroup(doc, Loc.S("Formwork.Txn.Sheet")))
+                        {
+                        tgSheet.Start();
                         using (var tDeleteSheet = new Transaction(doc, Loc.S("Formwork.Txn.DeleteSheet")))
                         {
                             tDeleteSheet.Start();
@@ -428,14 +457,29 @@ namespace Tools28.Commands.FormworkCalculator
                                 sheetId = FormworkSheetCreator.CreateOrUpdateSheet(
                                     doc, perViewAnalysisViewIds, allMainScheduleIds, summaryScheduleId,
                                     preferredName: savedSheetName, preferredNumber: savedSheetNumber);
-                                tSheet.Commit();
+                                if (tSheet.Commit() != TransactionStatus.Committed)
+                                    sheetId = null;
                             }
                             catch (Exception ex)
                             {
-                                tSheet.RollBack();
+                                if (tSheet.GetStatus() == TransactionStatus.Started)
+                                    tSheet.RollBack();
+                                sheetId = null;
                                 FormworkDebugLog.Log($"  [Sheet] CreateSheet EX: {ex.Message}");
                             }
                         }
+
+                        if (sheetId != null && sheetId != ElementId.InvalidElementId)
+                        {
+                            tgSheet.Assimilate();
+                        }
+                        else
+                        {
+                            tgSheet.RollBack();
+                            sheetId = null;
+                            FormworkDebugLog.Log("  [Sheet] シート作成に失敗したため既存シートの削除も元に戻した");
+                        }
+                        }   // using tgSheet
                         }   // if (!skipSheet)
                     }
                 }
@@ -480,7 +524,8 @@ namespace Tools28.Commands.FormworkCalculator
                         totalInclinedArea);
 
                 if (sourceViews.Count > 1)
-                    summary = $"対象3Dビュー: {sourceViews.Count}件\n[{string.Join(", ", perViewSourceNames)}]\n\n" + summary;
+                    summary = string.Format(Loc.S("Formwork.TargetViews"), sourceViews.Count,
+                        string.Join(", ", perViewSourceNames)) + "\n\n" + summary;
 
                 if (settings.ExportToExcel && !string.IsNullOrEmpty(settings.ExcelOutputPath))
                     summary += "\n\n" + string.Format(Loc.S("Formwork.ExcelAt"), settings.ExcelOutputPath);

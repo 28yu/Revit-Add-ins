@@ -47,6 +47,12 @@ namespace Tools28.Commands.ExcelExportImport.Models
         /// <summary>要素参照型（StorageType.ElementId）＝文字値ではなく既存要素名が必要</summary>
         public bool IsElementReference { get; set; }
 
+        /// <summary>
+        /// 文字パラメータ（StorageType.String）。数字に見える値（記号 "01" 等）も
+        /// 数値ではなく文字として書き出し、先頭の 0 などが消えないようにする
+        /// </summary>
+        public bool IsText { get; set; }
+
         /// <summary>画像参照パラメータ（ALL_MODEL_IMAGE 等）＝文字値は設定不可</summary>
         public bool IsImage { get; set; }
 

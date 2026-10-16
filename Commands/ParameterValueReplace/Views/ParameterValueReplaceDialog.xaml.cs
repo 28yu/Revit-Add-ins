@@ -182,20 +182,23 @@ namespace Tools28.Commands.ParameterValueReplace.Views
             {
                 tg.Start();
 
-                await RunBusyAsync(Loc.S("ValueReplace.Status.Replacing"), ct =>
+                bool completed = await RunBusyAsync(Loc.S("ValueReplace.Status.Replacing"), ct =>
                     ValueReplaceService.Apply(_doc, selected, _searchedFind, _searchedReplace, _searchedMode, result, ct),
                     total: count,
                     progressFormat: Loc.S("ValueReplace.Status.ReplacingCount"));
 
-                if (result.Cancelled || _closed)
+                // 途中でエラーになった場合も、途中までの変更を残さず元に戻す
+                if (!completed || result.Cancelled || _closed)
                 {
                     tg.RollBack();
-                    DiagLog.Write($"[ValueReplace] 中止して元に戻しました（{result.Success} 件処理済み）");
+                    DiagLog.Write($"[ValueReplace] 中止/エラーのため元に戻しました（{result.Success} 件処理済み）");
                     if (!_closed)
                     {
-                        txtStatus.Text = Loc.S("ValueReplace.Status.Cancelled");
-                        MessageBox.Show(this, Loc.S("ValueReplace.CancelledMsg"), Loc.S("ValueReplace.Title"),
-                            MessageBoxButton.OK, MessageBoxImage.Information);
+                        bool cancelled = result.Cancelled;
+                        txtStatus.Text = Loc.S(cancelled ? "ValueReplace.Status.Cancelled" : "ValueReplace.Status.ErrorRolledBack");
+                        MessageBox.Show(this, Loc.S(cancelled ? "ValueReplace.CancelledMsg" : "ValueReplace.ErrorRolledBackMsg"),
+                            Loc.S("ValueReplace.Title"), MessageBoxButton.OK,
+                            cancelled ? MessageBoxImage.Information : MessageBoxImage.Warning);
                     }
                     return;
                 }
@@ -222,9 +225,11 @@ namespace Tools28.Commands.ParameterValueReplace.Views
         /// 反復子の処理を、約50ms ごとに画面へ制御を返しながら最後まで進める。
         /// 実行中は「検索」ボタンが「中止」に変わり、Revit 本体の操作は止める。
         /// </summary>
-        private async Task RunBusyAsync(string statusText, Func<CancellationToken, IEnumerable<int>> work,
+        /// <summary>最後まで終わったら true、中止・エラーなら false</summary>
+        private async Task<bool> RunBusyAsync(string statusText, Func<CancellationToken, IEnumerable<int>> work,
                                         int total, string progressFormat)
         {
+            bool ok = false;
             _busy = true;
             _cts = new CancellationTokenSource();
             var ct = _cts.Token;
@@ -247,6 +252,7 @@ namespace Tools28.Commands.ParameterValueReplace.Views
                     }
                     if (_closed) _cts.Cancel();
                 }
+                ok = !ct.IsCancellationRequested;
             }
             catch (Exception ex)
             {
@@ -263,6 +269,7 @@ namespace Tools28.Commands.ParameterValueReplace.Views
                 _busy = false;
                 if (!_closed) SetBusy(false, 0);
             }
+            return ok;
         }
 
         private void SetBusy(bool busy, int total)
