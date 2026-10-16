@@ -9,7 +9,7 @@ namespace Tools28.Commands.RealtimeRender
     /// </summary>
     internal static class SceneWriter
     {
-        private const uint Version = 2;
+        private const uint Version = 3;
 
         public static void Write(string path, RenderScene scene)
         {
@@ -43,7 +43,12 @@ namespace Tools28.Commands.RealtimeRender
                     w.Write(m.Metallic);
                     w.Write(m.Emissive);
                     w.Write(m.F0);
-                    w.Write(m.TextureIndex);
+                    w.Write(m.ColorTexture);
+                    foreach (float v in m.ColorXform) w.Write(v);
+                    w.Write(m.BumpTexture);
+                    foreach (float v in m.BumpXform) w.Write(v);
+                    w.Write(m.BumpType);
+                    w.Write(m.BumpDepth);
                     byte[] name = Encoding.UTF8.GetBytes(m.Name ?? "");
                     w.Write((uint)name.Length);
                     w.Write(name);
@@ -65,7 +70,20 @@ namespace Tools28.Commands.RealtimeRender
                 {
                     w.Write((uint)t.Width);
                     w.Write((uint)t.Height);
+                    w.Write(t.Linear ? 1u : 0u);
                     w.Write(t.Rgba);
+                }
+
+                w.Write((uint)scene.Lights.Count);
+                foreach (RenderLight l in scene.Lights)
+                {
+                    foreach (float v in l.Position) w.Write(v);
+                    w.Write(l.Radius);
+                    foreach (float v in l.Intensity) w.Write(v);
+                    w.Write((float)l.Type);
+                    foreach (float v in l.Direction) w.Write(v);
+                    w.Write(l.CosInner);
+                    w.Write(l.CosOuter);
                 }
             }
         }

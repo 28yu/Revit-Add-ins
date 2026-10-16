@@ -73,8 +73,18 @@ struct ExposureData {
 
 struct GpuMaterial {
     float color[4];
-    float params[4];  // 粗さ, 金属, 発光, 反射率
-    int32_t tex[4];   // x = テクスチャ番号（-1 = 無し）
+    float params[4];     // 粗さ, 金属, 発光, 反射率
+    int32_t tex[4];      // 色の画像の番号, 凹凸の画像の番号（-1 = 無し）, 凹凸の種類（0 = 高さ, 1 = 法線）, 未使用
+    float colorMap[2][4];  // 色の画像の貼り方（[0] = xform[0..2] と 凹凸の深さ, [1] = xform[3..5]）
+    float bumpMap[2][4];   // 凹凸の画像の貼り方
+};
+
+// 照明器具の光源（シェーダーの Light と同じ並び）
+struct GpuLight {
+    float positionRadius[4];
+    float intensityType[4];  // rgb = 明るさ, w = 種類（0 = 全方向, 1 = 半球, 2 = スポット）
+    float direction[4];      // xyz = 向き, w = cos（落ち始め）
+    float cone[4];           // x = cos（届く範囲）
 };
 
 // テクスチャ 1 枚分の置き場所（シェーダーの TexInfo と同じ並び）
@@ -100,12 +110,17 @@ void packTextures(const std::vector<Texture>& textures, std::vector<GpuTexInfo>&
     for (const Texture& t : textures) {
         GpuTexInfo info{static_cast<uint32_t>(texels.size()), t.width, t.height, 0};
         uint32_t w = t.width, h = t.height;
+        // 色の画像は明るさに直してから平均する（sRGB のまま平均すると縮小した段が暗くなる）。凹凸の画像はそのまま平均する
+        auto toLinear = [&](uint8_t c) { return t.linear ? c / 255.0f : srgbToLinear(c); };
+        auto toByte = [&](float v) {
+            return t.linear ? static_cast<uint8_t>(std::min(std::max(v, 0.0f), 1.0f) * 255.0f + 0.5f) : linearToSrgb(v);
+        };
         std::vector<float> level(static_cast<size_t>(w) * h * 4);
         for (size_t i = 0; i < level.size(); ++i)
-            level[i] = (i % 4 == 3) ? t.rgba[i] / 255.0f : srgbToLinear(t.rgba[i]);
+            level[i] = (i % 4 == 3) ? t.rgba[i] / 255.0f : toLinear(t.rgba[i]);
         while (true) {
             for (size_t i = 0; i < static_cast<size_t>(w) * h; ++i) {
-                uint32_t r = linearToSrgb(level[i * 4]), g = linearToSrgb(level[i * 4 + 1]), b = linearToSrgb(level[i * 4 + 2]);
+                uint32_t r = toByte(level[i * 4]), g = toByte(level[i * 4 + 1]), b = toByte(level[i * 4 + 2]);
                 uint32_t a = static_cast<uint32_t>(std::min(std::max(level[i * 4 + 3], 0.0f), 1.0f) * 255.0f + 0.5f);
                 texels.push_back(r | (g << 8) | (b << 16) | (a << 24));
             }
@@ -292,7 +307,7 @@ void Renderer::destroyScene() {
     destroyAccel(tlas_);
     destroyAccel(blasOpaque_);
     destroyAccel(blasGlass_);
-    for (Buffer* b : {&vertices_, &indices_, &triMaterials_, &materials_, &texInfos_, &texels_, &instances_, &bvhNodes_, &bvhTris_})
+    for (Buffer* b : {&vertices_, &indices_, &triMaterials_, &materials_, &texInfos_, &texels_, &lights_, &instances_, &bvhNodes_, &bvhTris_})
         ctx_->destroyBuffer(*b);
 }
 
@@ -317,8 +332,25 @@ void Renderer::uploadScene(const Scene& scene, uint32_t glassStart, const Bvh& b
 
     std::vector<GpuMaterial> mats;
     for (const Material& m : scene.materials)
-        mats.push_back({{m.r, m.g, m.b, m.opacity}, {m.roughness, m.metallic, m.emissive, m.f0}, {m.texture, 0, 0, 0}});
+        mats.push_back({{m.r, m.g, m.b, m.opacity},
+                        {m.roughness, m.metallic, m.emissive, m.f0},
+                        {m.color.texture, m.bump.texture, static_cast<int32_t>(m.bumpType), 0},
+                        {{m.color.xform[0], m.color.xform[1], m.color.xform[2], m.bumpDepth},
+                         {m.color.xform[3], m.color.xform[4], m.color.xform[5], 0}},
+                        {{m.bump.xform[0], m.bump.xform[1], m.bump.xform[2], 0},
+                         {m.bump.xform[3], m.bump.xform[4], m.bump.xform[5], 0}}});
     materials_ = ctx.createDeviceBuffer(mats.data(), mats.size() * sizeof(GpuMaterial), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+
+    std::vector<GpuLight> lights;
+    for (const Light& l : scene.lights)
+        lights.push_back({{l.position.x, l.position.y, l.position.z, l.radius},
+                          {l.intensity.x, l.intensity.y, l.intensity.z, static_cast<float>(l.type)},
+                          {l.direction.x, l.direction.y, l.direction.z, l.cosInner},
+                          {l.cosOuter, 0, 0, 0}});
+    lightCount_ = static_cast<uint32_t>(lights.size());
+    if (lights.empty()) lights.push_back({});  // 空のバッファは作れないので 1 つ入れておく（数は 0 のまま）
+    lights_ = ctx.createDeviceBuffer(lights.data(), lights.size() * sizeof(GpuLight), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+    logInfo("Lights: %u", lightCount_);
 
     std::vector<GpuTexInfo> texInfos;
     std::vector<uint32_t> texels;
@@ -488,10 +520,10 @@ void Renderer::createPasses() {
     const VkDescriptorType IMG = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, BUF = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 
     // パストレース: 0 = 形（加速構造 / BVH の箱）, 1 = 明るさ, 2 = 位置, 3〜6 = 形・材質, 7 = 面の向き, 8 = BVH の三角形, 9 = 面の色,
-    //               10 = テクスチャの置き場所, 11 = テクスチャの画素
+    //               10 = テクスチャの置き場所, 11 = テクスチャの画素, 12 = 照明器具の光源
     std::vector<BindingSpec> pt = {
         {0, hardwareRt_ ? VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR : BUF},
-        {1, IMG}, {2, IMG}, {3, BUF}, {4, BUF}, {5, BUF}, {6, BUF}, {7, IMG}, {9, IMG}, {10, BUF}, {11, BUF},
+        {1, IMG}, {2, IMG}, {3, BUF}, {4, BUF}, {5, BUF}, {6, BUF}, {7, IMG}, {9, IMG}, {10, BUF}, {11, BUF}, {12, BUF},
     };
     if (!hardwareRt_) pt.push_back({8, BUF});
     pathTrace_ = hardwareRt_
@@ -518,7 +550,7 @@ void Renderer::writeDescriptors() {
         std::vector<Bind> pt = {
             {1, noisy_.view}, {2, gpos_[cur].view}, {3, {}, vertices_.buffer}, {4, {}, indices_.buffer},
             {5, {}, triMaterials_.buffer}, {6, {}, materials_.buffer}, {7, gnormal_[cur].view}, {9, galbedo_.view},
-            {10, {}, texInfos_.buffer}, {11, {}, texels_.buffer},
+            {10, {}, texInfos_.buffer}, {11, {}, texels_.buffer}, {12, {}, lights_.buffer},
         };
         if (hardwareRt_) {
             Bind b{0};
@@ -648,6 +680,7 @@ void Renderer::record(VkCommandBuffer cmd, const ViewParams& view) {
     pt.camRight[0] = view.right.x; pt.camRight[1] = view.right.y; pt.camRight[2] = view.right.z; pt.camRight[3] = aspect;
     pt.camUp[0] = view.up.x; pt.camUp[1] = view.up.y; pt.camUp[2] = view.up.z;
     pt.sunDir[0] = sunDir_.x; pt.sunDir[1] = sunDir_.y; pt.sunDir[2] = sunDir_.z; pt.sunDir[3] = sunIntensity_;
+    pt.misc[0] = static_cast<float>(lightCount_);
     pt.misc[1] = skyIntensity_;
     pt.misc[2] = static_cast<float>(glassStart_);
     // 1 画素が 1 m 先で何 m の幅になるか（テクスチャの縮小した段を選ぶのに使う）

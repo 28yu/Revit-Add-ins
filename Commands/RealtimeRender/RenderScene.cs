@@ -12,6 +12,8 @@ namespace Tools28.Commands.RealtimeRender
         public List<RenderMaterial> Materials { get; } = new List<RenderMaterial>();
         /// <summary>テクスチャ画像（マテリアルの外観の「イメージ」）。</summary>
         public List<RenderTexture> Textures { get; } = new List<RenderTexture>();
+        /// <summary>照明器具の光源。</summary>
+        public List<RenderLight> Lights { get; } = new List<RenderLight>();
 
         public RenderCamera Camera { get; set; } = new RenderCamera();
         /// <summary>太陽のある方向（単位ベクトル）。</summary>
@@ -51,7 +53,7 @@ namespace Tools28.Commands.RealtimeRender
     {
         public float PX, PY, PZ;
         public float NX, NY, NZ;
-        /// <summary>テクスチャ画像上の位置（1 = 画像 1 枚分）。</summary>
+        /// <summary>面の上の位置（メートル）。画像上の位置へは、マテリアルの貼り方（Xform）で直す。</summary>
         public float U, V;
     }
 
@@ -64,16 +66,33 @@ namespace Tools28.Commands.RealtimeRender
         public float Metallic;
         public float Emissive = 0f;  // 自己発光（照明器具の対応は今後）
         public float F0 = 0.04f;     // 正面から見たときの反射率（外観の「反射率」）
-        public int TextureIndex = -1;  // 色のテクスチャ画像の番号（-1 = 無し）
-        /// <summary>テクスチャの貼り方（ファイルには書かない。頂点の U, V を求めるのに使う）。</summary>
-        public BitmapInfo Mapping;
+        public int ColorTexture = -1;  // 色の画像の番号（-1 = 無し）
+        public float[] ColorXform = BitmapInfo.Identity;
+        public int BumpTexture = -1;   // 凹凸の画像の番号（-1 = 無し）
+        public float[] BumpXform = BitmapInfo.Identity;
+        public int BumpType;           // 0 = 高さの画像, 1 = 法線の画像
+        public float BumpDepth;        // 高さの画像: 白と黒の差（メートル）、法線の画像: 強さ
+        /// <summary>画像を使うか（使うときだけ面の上の位置 U, V を求める）。</summary>
+        public bool UsesUv => ColorTexture >= 0 || BumpTexture >= 0;
     }
 
-    /// <summary>テクスチャ画像。色は sRGB のまま、1 画素 4 バイト（R, G, B, A）。</summary>
+    /// <summary>テクスチャ画像。1 画素 4 バイト（R, G, B, A）。色の画像は sRGB、凹凸の画像はそのままの値（Linear）。</summary>
     internal class RenderTexture
     {
         public int Width, Height;
+        public bool Linear;
         public byte[] Rgba;
+    }
+
+    /// <summary>照明器具の光源。明るさは「光度（カンデラ）÷ 20000」（描画プログラムの単位。太陽 5 = 10 万ルクス）。</summary>
+    internal class RenderLight
+    {
+        public float[] Position = new float[3];
+        public float Radius = 0.05f;
+        public float[] Intensity = new float[3];
+        public int Type;  // 0 = 全方向, 1 = 半球, 2 = スポット
+        public float[] Direction = { 0, 0, -1 };
+        public float CosInner = 1f, CosOuter;
     }
 
     internal class RenderCamera

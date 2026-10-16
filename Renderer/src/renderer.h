@@ -86,7 +86,9 @@ private:
     VkContext* ctx_ = nullptr;
     bool hardwareRt_ = false;
     Buffer vertices_, indices_, triMaterials_, materials_, exposure_, instances_;
-    Buffer texInfos_, texels_;  // テクスチャ（Revit の外観の「イメージ」）
+    Buffer texInfos_, texels_;  // テクスチャ（Revit の外観の「イメージ」「レリーフ パターン」）
+    Buffer lights_;             // 照明器具の光源
+    uint32_t lightCount_ = 0;
     Buffer bvhNodes_, bvhTris_;  // 予備の方式（RT コア無し）で使う
     AccelStruct blasOpaque_, blasGlass_, tlas_;
     uint32_t glassStart_ = 0;

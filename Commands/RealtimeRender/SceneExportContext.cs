@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Autodesk.Revit.DB;
+using Autodesk.Revit.DB.Lighting;
 using Autodesk.Revit.DB.Visual;
 
 namespace Tools28.Commands.RealtimeRender
@@ -20,6 +21,7 @@ namespace Tools28.Commands.RealtimeRender
         private readonly TextureLoader _textures;
 
         private int _currentMaterial;
+        private ElementId _currentElement = ElementId.InvalidElementId;
 
         public RenderScene Scene { get; } = new RenderScene();
         public int ElementCount { get; private set; }
@@ -55,6 +57,7 @@ namespace Tools28.Commands.RealtimeRender
 
         public RenderNodeAction OnElementBegin(ElementId elementId)
         {
+            _currentElement = elementId;
             ElementCount++;
             return RenderNodeAction.Proceed;
         }
@@ -88,7 +91,22 @@ namespace Tools28.Commands.RealtimeRender
 
         public void OnRPC(RPCNode node) { }
 
-        public void OnLight(LightNode node) { }
+        /// <summary>
+        /// 照明器具の光源。ファミリの「測光」の設定（明るさ・色温度・配光・光源の形）から、描画プログラムの光源を作る。
+        /// </summary>
+        public void OnLight(LightNode node)
+        {
+            try
+            {
+                Document doc = _documents.Peek();
+                RenderLight light = LightReader.Read(doc, _currentElement, _transforms.Peek().Multiply(node.GetTransform()));
+                if (light != null) Scene.Lights.Add(light);
+            }
+            catch (Exception ex)
+            {
+                DiagLog.Cmd("RealtimeRender", $"光源を読めませんでした: {_currentElement} ({ex.Message})");
+            }
+        }
 
         public void OnMaterial(MaterialNode node)
         {
@@ -140,14 +158,26 @@ namespace Tools28.Commands.RealtimeRender
             {
                 if (appearance.ColorImage != null)
                 {
-                    material.TextureIndex = GetTexture(appearance.ColorImage, srgb, appearance.ImageFade);
-                    if (material.TextureIndex >= 0)
+                    material.ColorTexture = GetTexture(appearance.ColorImage, srgb, appearance.ImageFade, false);
+                    if (material.ColorTexture >= 0)
                     {
                         // 色は画像に焼き込んだので、掛け合わせる色は白にする
                         material.R = material.G = material.B = 1f;
-                        material.Mapping = appearance.ColorImage;
+                        material.ColorXform = appearance.ColorImage.Xform();
                     }
                 }
+                if (appearance.BumpImage != null && Math.Abs(appearance.BumpDepth) > 1e-6)
+                {
+                    material.BumpTexture = GetTexture(appearance.BumpImage, null, 1.0, true);
+                    if (material.BumpTexture >= 0)
+                    {
+                        material.BumpXform = appearance.BumpImage.Xform();
+                        material.BumpType = appearance.BumpType;
+                        material.BumpDepth = (float)appearance.BumpDepth;
+                    }
+                }
+                // 自己発光（輝度 cd/m² → 描画プログラムの単位。太陽 5 = 10 万ルクス）
+                if (appearance.Luminance.HasValue) material.Emissive = (float)(appearance.Luminance.Value / 20000.0);
 
                 double? roughness = appearance.Roughness;
                 if (appearance.RoughnessImage != null)
@@ -176,7 +206,8 @@ namespace Tools28.Commands.RealtimeRender
             _materialIndex[key] = index;
             _currentMaterial = index;
             DiagLog.Cmd("RealtimeRender",
-                $"マテリアル: {name} 色={BitmapInfo.FormatColor(srgb)} 画像={(material.TextureIndex >= 0 ? appearance?.ColorImage?.Paths : "-")} " +
+                $"マテリアル: {name} 色={BitmapInfo.FormatColor(srgb)} 画像={(material.ColorTexture >= 0 ? appearance?.ColorImage?.Paths : "-")} " +
+                $"凹凸={(material.BumpTexture >= 0 ? $"{appearance?.BumpImage?.Paths} 種類={material.BumpType} 深さ={material.BumpDepth:G3}" : "-")} " +
                 $"粗さ={material.Roughness:F2} 反射率={material.F0:F2} 不透明度={material.Opacity:F2} 金属={material.Metallic}");
         }
 
@@ -184,9 +215,9 @@ namespace Tools28.Commands.RealtimeRender
         /// テクスチャ画像を読み込み、明るさ・色付け・「イメージ フェード」（色との混ぜ具合）を焼き込んで登録する。
         /// 戻り値はテクスチャ番号（読めなければ -1）。
         /// </summary>
-        private int GetTexture(BitmapInfo bitmap, double[] baseSrgb, double fade)
+        private int GetTexture(BitmapInfo bitmap, double[] baseSrgb, double fade, bool linear)
         {
-            string key = $"{bitmap.BakeKey}|{fade:F3}|{BitmapInfo.FormatColor(fade < 1 ? baseSrgb : null)}";
+            string key = $"{bitmap.BakeKey}|{fade:F3}|{BitmapInfo.FormatColor(fade < 1 ? baseSrgb : null)}|{linear}";
             if (_textureIndex.TryGetValue(key, out int index)) return index;
             index = -1;
             string path = _textures.Resolve(bitmap.Paths);
@@ -194,7 +225,18 @@ namespace Tools28.Commands.RealtimeRender
             RenderTexture texture = path != null ? TextureLoader.Decode(path, Scene.Textures.Count < 32 ? 1024 : 512) : null;
             if (texture != null)
             {
-                Bake(texture, bitmap, baseSrgb, fade);
+                texture.Linear = linear;
+                if (linear)
+                {
+                    // 凹凸の画像は色ではないので、反転だけ行う
+                    if (bitmap.Invert)
+                        for (int i = 0; i < texture.Rgba.Length; i++)
+                            if (i % 4 != 3) texture.Rgba[i] = (byte)(255 - texture.Rgba[i]);
+                }
+                else
+                {
+                    Bake(texture, bitmap, baseSrgb, fade);
+                }
                 index = Scene.Textures.Count;
                 Scene.Textures.Add(texture);
             }
@@ -230,10 +272,10 @@ namespace Tools28.Commands.RealtimeRender
             IList<PolymeshFacet> facets = mesh.GetFacets();
             if (points.Count == 0 || facets.Count == 0) return;
             // テクスチャのあるマテリアルだけ、面上の位置（UV）からテクスチャ画像上の位置を求める
-            BitmapInfo mapping = Scene.Materials[_currentMaterial].Mapping;
-            IList<UV> uvs = mapping != null ? mesh.GetUVs() : null;
+            // 画像を使うマテリアルだけ、面の上の位置（UV）を読む
+            IList<UV> uvs = Scene.Materials[_currentMaterial].UsesUv ? mesh.GetUVs() : null;
             RenderVertex Vertex(int i, XYZ n) =>
-                MakeVertex(t, points[i], n, mapping, uvs != null && i < uvs.Count ? uvs[i] : null);
+                MakeVertex(t, points[i], n, uvs != null && i < uvs.Count ? uvs[i] : null);
 
             switch (mesh.DistributionOfNormals)
             {
@@ -273,7 +315,7 @@ namespace Tools28.Commands.RealtimeRender
             }
         }
 
-        private static RenderVertex MakeVertex(Transform t, XYZ point, XYZ normal, BitmapInfo mapping, UV uv)
+        private static RenderVertex MakeVertex(Transform t, XYZ point, XYZ normal, UV uv)
         {
             XYZ p = t.OfPoint(point);
             var v = new RenderVertex
@@ -293,7 +335,12 @@ namespace Tools28.Commands.RealtimeRender
                     v.NZ = (float)(n.Z / len);
                 }
             }
-            if (mapping != null && uv != null) mapping.Map(uv.U, uv.V, out v.U, out v.V);
+            if (uv != null)
+            {
+                // Revit の UV はフィート（面の上の長さ）
+                v.U = (float)(uv.U * FeetToMeters);
+                v.V = (float)(uv.V * FeetToMeters);
+            }
             return v;
         }
 

@@ -16,12 +16,16 @@ namespace t28 {
 //   uint32   版（2）
 //   float[3] カメラ位置, float[3] 前方向, float[3] 上方向, float 縦の画角（度）
 //   float[3] 太陽のある方向, float 太陽の明るさ, float 空の明るさ
-//   uint32   マテリアル数 → 各: float r,g,b,不透明度,粗さ,金属,発光,反射率, int32 テクスチャ番号（-1 = 無し）,
+//   uint32   マテリアル数 → 各: float r,g,b,不透明度,粗さ,金属,発光,反射率,
+//                               色の画像: int32 テクスチャ番号（-1 = 無し）, float 貼り方×6,
+//                               凹凸の画像: int32 テクスチャ番号, float 貼り方×6, int32 種類（0 = 高さ, 1 = 法線）, float 深さ,
 //                               uint32 名前のバイト数, 名前（UTF-8）
-//   uint32   頂点数       → 各: float 位置x,y,z, 法線x,y,z, テクスチャ u,v
+//   uint32   頂点数       → 各: float 位置x,y,z, 法線x,y,z, 面の上の位置 u,v（メートル）
 //   uint32   三角形数     → 各: uint32 頂点番号×3, マテリアル番号
-//   uint32   テクスチャ数 → 各: uint32 幅, 高さ, 画素（RGBA 各 1 バイト、sRGB）
-static const uint32_t kVersion = 2;
+//   uint32   テクスチャ数 → 各: uint32 幅, 高さ, 種類（bit0: 1 = 色ではないデータ）, 画素（RGBA 各 1 バイト）
+//   uint32   光源数       → 各: float 位置x,y,z, 大きさ, 明るさr,g,b, 種類（0 = 全方向, 1 = 半球, 2 = スポット）,
+//                               向きx,y,z, cos（落ち始め）, cos（届く範囲）
+static const uint32_t kVersion = 3;
 
 namespace {
 class Reader {
@@ -78,12 +82,14 @@ bool loadScene(const std::string& path, Scene& scene, std::string& error, long o
     scene.materials.resize(materialCount);
     for (Material& m : scene.materials) {
         float v[8];
-        int32_t texture = -1;
+        int32_t bumpType = 0;
         uint32_t nameLen = 0;
-        if (!r.readFloats(v, 8) || !r.read(texture) || !r.read(nameLen) || nameLen > 4096) return fail("truncated material");
+        if (!r.readFloats(v, 8) || !r.read(m.color.texture) || !r.readFloats(m.color.xform, 6) || !r.read(m.bump.texture) ||
+            !r.readFloats(m.bump.xform, 6) || !r.read(bumpType) || !r.read(m.bumpDepth) || !r.read(nameLen) || nameLen > 4096)
+            return fail("truncated material");
         m.r = v[0]; m.g = v[1]; m.b = v[2];
         m.opacity = v[3]; m.roughness = v[4]; m.metallic = v[5]; m.emissive = v[6]; m.f0 = v[7];
-        m.texture = texture;
+        m.bumpType = bumpType == 1 ? BumpType::Normal : BumpType::Height;
         m.name.resize(nameLen);
         if (!r.readBytes(&m.name[0], nameLen)) return fail("truncated material name");
     }
@@ -116,14 +122,34 @@ bool loadScene(const std::string& path, Scene& scene, std::string& error, long o
     if (!r.read(texCount) || texCount > 4096) return fail("bad texture count");
     scene.textures.resize(texCount);
     for (Texture& tex : scene.textures) {
-        if (!r.read(tex.width) || !r.read(tex.height) || tex.width == 0 || tex.height == 0 || tex.width > 8192 ||
-            tex.height > 8192)
+        uint32_t flags = 0;
+        if (!r.read(tex.width) || !r.read(tex.height) || !r.read(flags) || tex.width == 0 || tex.height == 0 ||
+            tex.width > 8192 || tex.height > 8192)
             return fail("bad texture size");
+        tex.linear = (flags & 1u) != 0;
         tex.rgba.resize(static_cast<size_t>(tex.width) * tex.height * 4);
         if (!r.readBytes(tex.rgba.data(), tex.rgba.size())) return fail("truncated texture");
     }
-    for (Material& m : scene.materials)
-        if (m.texture >= static_cast<int32_t>(texCount)) m.texture = -1;
+    for (Material& m : scene.materials) {
+        if (m.color.texture >= static_cast<int32_t>(texCount)) m.color.texture = -1;
+        if (m.bump.texture >= static_cast<int32_t>(texCount)) m.bump.texture = -1;
+    }
+
+    uint32_t lightCount = 0;
+    if (!r.read(lightCount) || lightCount > 100000) return fail("bad light count");
+    scene.lights.resize(lightCount);
+    for (Light& l : scene.lights) {
+        float v[13];
+        if (!r.readFloats(v, 13)) return fail("truncated lights");
+        l.position = {v[0], v[1], v[2]};
+        l.radius = v[3];
+        l.intensity = {v[4], v[5], v[6]};
+        int type = static_cast<int>(v[7]);
+        l.type = type == 1 ? LightType::Hemisphere : type == 2 ? LightType::Spot : LightType::Omni;
+        l.direction = {v[8], v[9], v[10]};
+        l.cosInner = v[11];
+        l.cosOuter = v[12];
+    }
     fclose(f);
     if (triCount == 0) {
         error = "the model has no triangles";
@@ -149,7 +175,12 @@ void saveScene(const Scene& scene, std::vector<uint8_t>& out) {
     put(out, static_cast<uint32_t>(scene.materials.size()));
     for (const Material& m : scene.materials) {
         for (float v : {m.r, m.g, m.b, m.opacity, m.roughness, m.metallic, m.emissive, m.f0}) put(out, v);
-        put(out, m.texture);
+        put(out, m.color.texture);
+        for (float v : m.color.xform) put(out, v);
+        put(out, m.bump.texture);
+        for (float v : m.bump.xform) put(out, v);
+        put(out, static_cast<int32_t>(m.bumpType));
+        put(out, m.bumpDepth);
         put(out, static_cast<uint32_t>(m.name.size()));
         out.insert(out.end(), m.name.begin(), m.name.end());
     }
@@ -165,8 +196,14 @@ void saveScene(const Scene& scene, std::vector<uint8_t>& out) {
     for (const Texture& t : scene.textures) {
         put(out, t.width);
         put(out, t.height);
+        put(out, static_cast<uint32_t>(t.linear ? 1u : 0u));
         out.insert(out.end(), t.rgba.begin(), t.rgba.end());
     }
+    put(out, static_cast<uint32_t>(scene.lights.size()));
+    for (const Light& l : scene.lights)
+        for (float v : {l.position.x, l.position.y, l.position.z, l.radius, l.intensity.x, l.intensity.y, l.intensity.z,
+                        static_cast<float>(l.type), l.direction.x, l.direction.y, l.direction.z, l.cosInner, l.cosOuter})
+            put(out, v);
 }
 
 uint32_t Scene::sortGlassLast() {
@@ -261,7 +298,24 @@ Scene makeTestScene() {
             }
         }
         s.textures.push_back(std::move(tex));
-        s.materials[floor].texture = 0;
+        s.materials[floor].color.texture = 0;
+
+        // 板の継ぎ目を溝にする凹凸（高さの画像。白 = 高い）
+        Texture bump;
+        bump.width = bump.height = 256;
+        bump.linear = true;
+        bump.rgba.resize(256 * 256 * 4);
+        for (uint32_t y = 0; y < 256; ++y)
+            for (uint32_t x = 0; x < 256; ++x) {
+                uint32_t plank = y / 64;
+                bool seam = y % 64 < 3 || (x + plank * 97) % 256 < 3;
+                uint8_t* p = &bump.rgba[(y * 256 + x) * 4];
+                p[0] = p[1] = p[2] = seam ? 0 : 255;
+                p[3] = 255;
+            }
+        s.textures.push_back(std::move(bump));
+        s.materials[floor].bump.texture = 1;
+        s.materials[floor].bumpDepth = 0.003f;
     }
     uint32_t ground = b.material("Ground", 0.25f, 0.33f, 0.15f, 0.9f);
     uint32_t steel = b.material("Steel", 0.75f, 0.75f, 0.77f, 0.3f, 1.0f);

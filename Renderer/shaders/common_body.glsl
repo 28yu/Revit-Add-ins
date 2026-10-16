@@ -21,20 +21,43 @@ void surfaceAt(Hit h, vec3 rayDir, out vec3 pos, out vec3 normal, out vec3 geomN
     if (dot(normal, geomNormal) < 0.0) normal = -normal;
 }
 
+void basis(vec3 n, out vec3 t, out vec3 b);  // 下で定義
+
+// 三角形の上で、面の上の位置 u, v が増える向き（凹凸の計算に使う）。求められなければ面の向きから適当に決める
+void tangentFrame(Hit h, vec3 n, out vec3 tu, out vec3 tv) {
+    uint i0 = indices[h.tri * 3u], i1 = indices[h.tri * 3u + 1u], i2 = indices[h.tri * 3u + 2u];
+    vec4 v0 = vertices[i0].position, v1 = vertices[i1].position, v2 = vertices[i2].position;
+    vec3 dp1 = v1.xyz - v0.xyz, dp2 = v2.xyz - v0.xyz;
+    vec2 d1 = vec2(v1.w, vertices[i1].normal.w) - vec2(v0.w, vertices[i0].normal.w);
+    vec2 d2 = vec2(v2.w, vertices[i2].normal.w) - vec2(v0.w, vertices[i0].normal.w);
+    float det = d1.x * d2.y - d1.y * d2.x;
+    if (abs(det) < 1e-12) {
+        basis(n, tu, tv);
+        return;
+    }
+    tu = (dp1 * d2.y - dp2 * d1.y) / det;
+    tv = (dp2 * d1.x - dp1 * d2.x) / det;
+    // 面の向きに直角にそろえる
+    tu = normalize(tu - n * dot(n, tu));
+    tv = normalize(tv - n * dot(n, tv) - tu * dot(tu, tv));
+}
+
 // --- テクスチャ ---------------------------------------------------------
-vec4 texel(TexInfo ti, uint offset, uint w, uint h, ivec2 p) {
+// srgb: 色の画像なら true（sRGB → リニアに直す）、凹凸の画像なら false（そのままの値）
+vec4 texel(TexInfo ti, uint offset, uint w, uint h, ivec2 p, bool srgb) {
     // 繰り返し貼る（画像の外は反対側から続ける）
     uint x = uint(p.x - int(w) * int(floor(float(p.x) / float(w))));
     uint y = uint(p.y - int(h) * int(floor(float(p.y) / float(h))));
     uint c = texels[offset + min(y, h - 1u) * w + min(x, w - 1u)];
     vec4 s = vec4(float(c & 255u), float((c >> 8) & 255u), float((c >> 16) & 255u), float(c >> 24)) / 255.0;
+    if (!srgb) return s;
     // sRGB → リニア
     vec3 lin = mix(s.rgb / 12.92, pow((s.rgb + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), s.rgb));
     return vec4(lin, s.a);
 }
 
 // 段 level の画像から、周りの 4 画素を距離に応じて混ぜて取り出す（バイリニア）
-vec4 sampleLevel(TexInfo ti, int level, vec2 uv) {
+vec4 sampleLevel(TexInfo ti, int level, vec2 uv, bool srgb) {
     uint offset = ti.offset, w = ti.width, h = ti.height;
     for (int i = 0; i < level; ++i) {
         offset += w * h;
@@ -46,19 +69,55 @@ vec4 sampleLevel(TexInfo ti, int level, vec2 uv) {
     vec2 base = floor(p);
     vec2 f = p - base;
     ivec2 b = ivec2(base);
-    vec4 a = mix(texel(ti, offset, w, h, b), texel(ti, offset, w, h, b + ivec2(1, 0)), f.x);
-    vec4 c = mix(texel(ti, offset, w, h, b + ivec2(0, 1)), texel(ti, offset, w, h, b + ivec2(1, 1)), f.x);
+    vec4 a = mix(texel(ti, offset, w, h, b, srgb), texel(ti, offset, w, h, b + ivec2(1, 0), srgb), f.x);
+    vec4 c = mix(texel(ti, offset, w, h, b + ivec2(0, 1), srgb), texel(ti, offset, w, h, b + ivec2(1, 1), srgb), f.x);
     return mix(a, c, f.y);
 }
 
-// footprint = この点で 1 画素（または光の広がり）が覆うテクスチャの幅（画像 1 枚 = 1）
-vec4 sampleTexture(int index, vec2 uv, float footprint) {
+// 縮小した段のどれを使うか。footprint = この点で 1 画素（または光の広がり）が覆うテクスチャの幅（画像 1 枚 = 1）
+float textureLod(int index, float footprint) {
     TexInfo ti = texInfos[index];
     float lod = log2(max(footprint * float(max(ti.width, ti.height)), 1e-8));
-    lod = clamp(lod, 0.0, float(ti.levels - 1u));
+    return clamp(lod, 0.0, float(ti.levels - 1u));
+}
+
+vec4 sampleTextureLod(int index, vec2 uv, float lod, bool srgb) {
+    TexInfo ti = texInfos[index];
     int l0 = int(floor(lod));
     int l1 = min(l0 + 1, int(ti.levels) - 1);
-    return mix(sampleLevel(ti, l0, uv), sampleLevel(ti, l1, uv), lod - float(l0));
+    return mix(sampleLevel(ti, l0, uv, srgb), sampleLevel(ti, l1, uv, srgb), lod - float(l0));
+}
+
+// 貼り方（2 行 3 列）で、面の上の位置（メートル）→ 画像上の位置にする
+vec2 mapUv(vec4 row0, vec4 row1, vec2 uv) { return vec2(dot(row0.xyz, vec3(uv, 1.0)), dot(row1.xyz, vec3(uv, 1.0))); }
+// 貼り方の拡大率（1 m が画像の何枚分か）
+float mapScale(vec4 row0, vec4 row1) { return sqrt(abs(row0.x * row1.y - row0.y * row1.x)); }
+
+// 凹凸（レリーフ パターン）で面の向きを傾ける。footprint はメートル単位の光の筋の太さ
+vec3 bumpNormal(Material m, Hit h, vec3 n, vec2 uv, float footprintM) {
+    vec3 tu, tv;
+    tangentFrame(h, n, tu, tv);
+    vec2 uvB = mapUv(m.bumpMap0, m.bumpMap1, uv);
+    float lod = textureLod(m.tex.y, footprintM * mapScale(m.bumpMap0, m.bumpMap1));
+    float strength = m.colorMap0.w;
+    if (m.tex.z == 1) {
+        // 法線の画像: 色 (r, g, b) がそのまま向き（画像の横・縦・面の外向き）
+        vec3 t = sampleTextureLod(m.tex.y, uvB, lod, false).rgb * 2.0 - 1.0;
+        t.xy *= strength;
+        vec3 nb = normalize(tu * t.x * sign(m.bumpMap0.x) + tv * t.y * sign(m.bumpMap1.y) + n * max(t.z, 0.05));
+        return nb;
+    }
+    // 高さの画像: 隣の位置との高さの差から傾きを求める（差を取る間隔は使っている段の 1 画素）
+    TexInfo ti = texInfos[m.tex.y];
+    float du = exp2(floor(lod)) / float(ti.width), dv = exp2(floor(lod)) / float(ti.height);
+    float h0 = sampleTextureLod(m.tex.y, uvB, lod, false).r;
+    float hu = sampleTextureLod(m.tex.y, uvB + vec2(du, 0.0), lod, false).r;
+    float hv = sampleTextureLod(m.tex.y, uvB + vec2(0.0, dv), lod, false).r;
+    vec2 g = vec2((hu - h0) / du, (hv - h0) / dv) * strength;  // 画像 1 枚あたりの高さの変化（メートル）
+    // 画像上の向き → 面の上の向き（メートルあたり）に直す
+    float dhdu = g.x * m.bumpMap0.x + g.y * m.bumpMap1.x;
+    float dhdv = g.x * m.bumpMap0.y + g.y * m.bumpMap1.y;
+    return normalize(n - tu * dhdu - tv * dhdv);
 }
 
 // --- 反射の向きを選ぶ ---------------------------------------------------
@@ -136,9 +195,16 @@ vec3 radiance(vec3 origin, vec3 dir, out Primary primary) {
         coneWidth += h.t * coneSpread;
         Material m = materials[triMaterials[h.tri]];
         vec3 albedo = m.color.rgb;
+        float slant = max(abs(dot(dir, gn)), 0.2);  // 斜めに見ると引き伸ばされる
+        float footprintM = coneWidth / slant * uvPerMeter;  // 光の筋が面の上で覆う幅（面の上の位置の単位 = メートル）
         if (m.tex.x >= 0) {
-            float slant = max(abs(dot(dir, gn)), 0.2);  // 斜めに見ると引き伸ばされる
-            albedo *= sampleTexture(m.tex.x, uv, coneWidth / slant * uvPerMeter).rgb;
+            vec2 uvC = mapUv(m.colorMap0, m.colorMap1, uv);
+            float lod = textureLod(m.tex.x, footprintM * mapScale(m.colorMap0, m.colorMap1));
+            albedo *= sampleTextureLod(m.tex.x, uvC, lod, true).rgb;
+        }
+        if (m.tex.y >= 0 && !h.glass) {
+            vec3 nb = bumpNormal(m, h, n, uv, footprintM);
+            if (dot(nb, gn) > 0.05) n = nb;  // 裏を向くほど傾いたときは使わない
         }
         if (!primary.hit && !h.glass) {
             primary.hit = true;
@@ -175,6 +241,32 @@ vec3 radiance(vec3 origin, vec3 dir, out Primary primary) {
         if (nDotL > 0.0 && sun.z > -0.05 && metallic <= 0.5) {
             if (!occluded(pos + gn * 0.002, sun)) {
                 result += throughput * (1.0 - specProb) * albedo * sunColor * nDotL;  // 拡散面の明るさ = 色 × 光の強さ × 光の当たる角度
+            }
+        }
+
+        // 照明器具の光（拡散面のみ）。毎回 1 つの光源を選んで、その光が届くか影の判定をする
+        uint lightCount = uint(pc.misc.x);
+        if (lightCount > 0u && metallic <= 0.5) {
+            uint li = min(uint(rand() * float(lightCount)), lightCount - 1u);
+            Light L = lights[li];
+            float radius = L.positionRadius.w;
+            // 光る部分（球）の中の 1 点を狙う（影の縁がぼける）
+            vec3 jitter = (vec3(rand(), rand(), rand()) * 2.0 - 1.0) * radius;
+            vec3 toL = L.positionRadius.xyz + jitter - pos;
+            float d2 = max(dot(toL, toL), radius * radius + 1e-4);
+            float d = sqrt(d2);
+            vec3 l = toL / d;
+            float nDotLl = dot(n, l);
+            if (nDotLl > 0.0 && dot(gn, l) > 0.0) {
+                float k = 1.0;
+                float c = dot(-l, L.direction.xyz);
+                if (L.intensityType.w > 1.5) k = smoothstep(L.cone.x, L.direction.w, c);  // スポット
+                else if (L.intensityType.w > 0.5) k = c > 0.0 ? 1.0 : 0.0;           // 半球（下向きなど）
+                // 照明器具そのもの（光源のすぐ近くのかさ・電球の形）は影にしない
+                float reach = d - radius * 1.5 - 0.05;
+                if (k > 0.0 && (reach <= 0.0 || !occludedDist(pos + gn * 0.002, l, reach))) {
+                    result += throughput * (1.0 - specProb) * albedo * L.intensityType.rgb * (k * nDotLl / d2 * float(lightCount));
+                }
             }
         }
 

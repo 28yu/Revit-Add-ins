@@ -32,13 +32,14 @@ Hit traceClosest(vec3 origin, vec3 dir) {
     return h;
 }
 
-// 影の判定。ガラスは光を通すので不透明な物だけを見る
-bool occluded(vec3 origin, vec3 dir) {
+// 影の判定（距離 tmax まで）。ガラスは光を通すので不透明な物だけを見る
+bool occludedDist(vec3 origin, vec3 dir, float tmax) {
     rayQueryEXT rq;
     rayQueryInitializeEXT(rq, uScene, gl_RayFlagsOpaqueEXT | gl_RayFlagsTerminateOnFirstHitEXT,
-                          MASK_OPAQUE, origin, 0.0005, dir, 1e6);
+                          MASK_OPAQUE, origin, 0.0005, dir, tmax);
     while (rayQueryProceedEXT(rq)) {}
     return rayQueryGetIntersectionTypeEXT(rq, true) != gl_RayQueryCommittedIntersectionNoneEXT;
 }
+bool occluded(vec3 origin, vec3 dir) { return occludedDist(origin, dir, 1e6); }
 
 #include "common_body.glsl"

@@ -23,6 +23,14 @@ namespace Tools28.Commands.RealtimeRender
         public BitmapInfo RoughnessImage;
         /// <summary>正面から見たときの反射率（外観の「反射率」）。</summary>
         public double? F0;
+        /// <summary>凹凸の画像（外観の「レリーフ パターン」）。</summary>
+        public BitmapInfo BumpImage;
+        /// <summary>凹凸の画像の種類（0 = 高さ, 1 = 法線）。</summary>
+        public int BumpType;
+        /// <summary>高さの画像: 白と黒の差（メートル）。法線の画像: 強さ。</summary>
+        public double BumpDepth;
+        /// <summary>自己発光の輝度（cd/m²）。</summary>
+        public double? Luminance;
         /// <summary>透明度（0 = 不透明〜1 = 透明）。</summary>
         public double? Transparency;
         public bool Metal;
@@ -46,17 +54,22 @@ namespace Tools28.Commands.RealtimeRender
         /// <summary>同じ画像・同じ色付けなら同じテクスチャを使い回すための目印。</summary>
         public string BakeKey => $"{Paths}|{Brightness:F3}|{Invert}|{FormatColor(Tint)}";
 
+        /// <summary>そのまま（1 m = 画像 1 枚分）の貼り方。</summary>
+        public static readonly float[] Identity = { 1, 0, 0, 0, 1, 0 };
+
         /// <summary>
-        /// 形の面上の位置（Revit の UV。フィート）を、テクスチャ画像上の位置（1 = 画像 1 枚分）に直す。
+        /// 面の上の位置（メートル）→ 画像上の位置（1 = 画像 1 枚分）の貼り方（2 行 3 列）:
+        /// 画像の横 = [0]·u + [1]·v + [2]、画像の縦 = [3]·u + [4]·v + [5]。
+        /// オフセットをずらしてから回転し、実寸の大きさで割る。
         /// </summary>
-        public void Map(double uFeet, double vFeet, out float u, out float v)
+        public float[] Xform()
         {
-            double x = uFeet * 0.3048 - OffsetX, y = vFeet * 0.3048 - OffsetY;
-            double a = -AngleDegrees * Math.PI / 180.0;
-            double rx = x * Math.Cos(a) - y * Math.Sin(a);
-            double ry = x * Math.Sin(a) + y * Math.Cos(a);
-            u = (float)(rx / ScaleX);
-            v = (float)(ry / ScaleY);
+            double a = -AngleDegrees * Math.PI / 180.0, c = Math.Cos(a), s = Math.Sin(a);
+            return new[]
+            {
+                (float)(c / ScaleX), (float)(-s / ScaleX), (float)(-(OffsetX * c - OffsetY * s) / ScaleX),
+                (float)(s / ScaleY), (float)(c / ScaleY), (float)(-(OffsetX * s + OffsetY * c) / ScaleY),
+            };
         }
 
         internal static string FormatColor(double[] c) => c == null ? "-" : $"{c[0]:F3},{c[1]:F3},{c[2]:F3}";
@@ -124,6 +137,15 @@ namespace Tools28.Commands.RealtimeRender
             if (props.TryGetValue("generic_transparency", out AssetProperty transparency))
                 info.Transparency = ReadDouble(transparency);
 
+            ReadBump(props, info);
+
+            // 自己発光（照明器具のかさ・レンズなど）
+            if (props.TryGetValue("generic_self_illum_luminance", out AssetProperty lum))
+            {
+                double? l = ReadDouble(lum);
+                if (l.HasValue && l.Value > 0) info.Luminance = l;
+            }
+
             bool HasPrefix(string prefix)
             {
                 foreach (string key in props.Keys)
@@ -136,6 +158,55 @@ namespace Tools28.Commands.RealtimeRender
             info.Mirror = HasPrefix("mirror_");
             info.Glass = HasPrefix("glazing_") || HasPrefix("solidglass_") || HasPrefix("transparent_") || HasPrefix("water_");
             return info;
+        }
+
+        /// <summary>
+        /// 凹凸（レリーフ パターン）を読む。新しい外観は「surface_normal」に BumpMap（高さ／法線の画像と深さ）がつながっている。
+        /// 一般などは「…_bump_map」に画像、「…_bump_amount」に強さがある。
+        /// </summary>
+        private static void ReadBump(Dictionary<string, AssetProperty> props, AppearanceInfo info)
+        {
+            AssetProperty map = null;
+            string amountName = null;
+            if (props.TryGetValue("surface_normal", out AssetProperty normal) && normal.NumberOfConnectedProperties > 0)
+            {
+                map = normal;
+            }
+            else
+            {
+                foreach (var kv in props)
+                {
+                    if (!kv.Key.EndsWith("_bump_map", StringComparison.OrdinalIgnoreCase)) continue;
+                    if (kv.Value.NumberOfConnectedProperties == 0) continue;
+                    map = kv.Value;
+                    amountName = kv.Key.Substring(0, kv.Key.Length - "_map".Length) + "_amount";
+                    break;
+                }
+            }
+            if (map == null) return;
+            BitmapInfo bitmap = ReadBitmap(map);
+            if (bitmap == null) return;
+            info.BumpImage = bitmap;
+
+            Asset asset = map.GetSingleConnectedAsset();
+            if (asset.FindByName(BumpMap.BumpmapType) is AssetProperty type)
+                info.BumpType = (int)(ReadDouble(type) ?? 0) == 1 ? 1 : 0;
+            if (info.BumpType == 1)
+            {
+                info.BumpDepth = asset.FindByName(BumpMap.BumpmapNormalScale) is AssetProperty scale ? ReadDouble(scale) ?? 1.0 : 1.0;
+                return;
+            }
+            double? depth = Distance(asset, BumpMap.BumpmapDepth);
+            if (depth.HasValue)
+            {
+                info.BumpDepth = depth.Value;
+            }
+            else
+            {
+                // 一般の「量」は長さではないので、1 = 5 mm くらいの凹凸とみなす
+                double amount = amountName != null && props.TryGetValue(amountName, out AssetProperty a) ? ReadDouble(a) ?? 0.3 : 0.3;
+                info.BumpDepth = amount * 0.005;
+            }
         }
 
         /// <summary>色のプロパティを sRGB（0〜1）で読む。色の代わりに画像がつながっていることもある。</summary>
@@ -181,8 +252,11 @@ namespace Tools28.Commands.RealtimeRender
             if (bitmap == null) return null;
 
             var info = new BitmapInfo();
+            // 画像のファイル名は、普通の画像なら unifiedbitmap_Bitmap、凹凸の画像なら bumpmap_Bitmap にある
             if (bitmap.FindByName(UnifiedBitmap.UnifiedbitmapBitmap) is AssetPropertyString path)
                 info.Paths = path.Value ?? "";
+            else if (bitmap.FindByName("bumpmap_Bitmap") is AssetPropertyString bumpPath)
+                info.Paths = bumpPath.Value ?? "";
             if (string.IsNullOrWhiteSpace(info.Paths)) return null;
 
             info.ScaleX = Distance(bitmap, UnifiedBitmap.TextureRealWorldScaleX) ?? info.ScaleX;

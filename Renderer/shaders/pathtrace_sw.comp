@@ -54,10 +54,11 @@ bool rayTriangle(vec3 o, vec3 d, uint tri, float tmax, out float t, out vec2 bar
 }
 
 // anyHit: 何かに当たった時点で終わる（影の判定用） / skipGlass: ガラスを無視する（影の判定用）
-Hit traverse(vec3 o, vec3 d, bool anyHit, bool skipGlass) {
+// tmax: この距離より先は調べない
+Hit traverse(vec3 o, vec3 d, bool anyHit, bool skipGlass, float tmax) {
     Hit h;
     h.found = false;
-    h.t = 1e30;
+    h.t = tmax;
     h.tri = 0u;
     h.bary = vec2(0.0);
     h.glass = false;
@@ -104,9 +105,10 @@ Hit traverse(vec3 o, vec3 d, bool anyHit, bool skipGlass) {
     return h;
 }
 
-Hit traceClosest(vec3 origin, vec3 dir) { return traverse(origin, dir, false, false); }
+Hit traceClosest(vec3 origin, vec3 dir) { return traverse(origin, dir, false, false, 1e30); }
 
 // 影の判定。ガラスは光を通すので不透明な物だけを見る
-bool occluded(vec3 origin, vec3 dir) { return traverse(origin, dir, true, true).found; }
+bool occludedDist(vec3 origin, vec3 dir, float tmax) { return traverse(origin, dir, true, true, tmax).found; }
+bool occluded(vec3 origin, vec3 dir) { return occludedDist(origin, dir, 1e30); }
 
 #include "common_body.glsl"
