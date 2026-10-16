@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Reflection;
@@ -46,7 +47,8 @@ namespace Tools28.Commands.RealtimeRender
                 DiagLog.Cmd("RealtimeRender", $"開始 view={view.Name}");
                 var watch = Stopwatch.StartNew();
 
-                RenderScene scene = ExportScene(doc, view);
+                var exportedIds = new HashSet<ElementId>();
+                RenderScene scene = ExportScene(doc, view, exportedIds);
                 if (scene.TriangleCount == 0)
                 {
                     TaskDialog.Show(Loc.S("RtRender.Title"), Loc.S("RtRender.Err.NoGeometry"));
@@ -67,7 +69,7 @@ namespace Tools28.Commands.RealtimeRender
                 Process process = Process.Start(psi);
                 DiagLog.Cmd("RealtimeRender", $"描画プログラム起動 ({watch.ElapsedMilliseconds} ms)");
                 if (process != null)
-                    LiveSync.Start(commandData.Application, doc, view, scenePath, process);
+                    LiveSync.Start(commandData.Application, doc, view, scenePath, process, exportedIds);
                 return Result.Succeeded;
             }
             catch (Exception ex)
@@ -81,7 +83,8 @@ namespace Tools28.Commands.RealtimeRender
         /// <summary>
         /// 3D ビューに表示されている形状・マテリアルを集め、カメラと太陽の向きを決める（ライブ同期でも使う）。
         /// </summary>
-        internal static RenderScene ExportScene(Document doc, View3D view)
+        /// <param name="elementIds">指定すると、書き出した要素の ID を入れる（ライブ同期用）</param>
+        internal static RenderScene ExportScene(Document doc, View3D view, HashSet<ElementId> elementIds = null)
         {
             var watch = Stopwatch.StartNew();
             var context = new SceneExportContext(doc);
@@ -89,6 +92,11 @@ namespace Tools28.Commands.RealtimeRender
             exporter.Export(view);
 
             RenderScene scene = context.Scene;
+            if (elementIds != null)
+            {
+                elementIds.Clear();
+                elementIds.UnionWith(context.ElementIds);
+            }
             DiagLog.Cmd("RealtimeRender",
                 $"書き出し: 要素 {context.ElementCount} / 三角形 {scene.TriangleCount} / マテリアル {scene.Materials.Count} / テクスチャ {scene.Textures.Count} / {watch.ElapsedMilliseconds} ms");
             foreach (string missing in context.MissingTextures)

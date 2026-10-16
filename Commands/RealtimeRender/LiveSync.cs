@@ -31,6 +31,7 @@ namespace Tools28.Commands.RealtimeRender
             public string ScenePath;
             public bool Dirty;
             public DateTime LastChange;
+            public HashSet<ElementId> ExportedIds = new HashSet<ElementId>();  // 描いている要素（削除されたかを調べる）
         }
 
         private static readonly List<Session> Sessions = new List<Session>();
@@ -55,7 +56,8 @@ namespace Tools28.Commands.RealtimeRender
             return Path.Combine(dir, $"scene_{Process.GetCurrentProcess().Id}_{_counter}.t28s");
         }
 
-        public static void Start(UIApplication uiApp, Document doc, View3D view, string scenePath, Process process)
+        public static void Start(UIApplication uiApp, Document doc, View3D view, string scenePath, Process process,
+                                 HashSet<ElementId> exportedIds)
         {
             var session = new Session
             {
@@ -63,6 +65,7 @@ namespace Tools28.Commands.RealtimeRender
                 Doc = doc,
                 ViewId = view.Id,
                 ScenePath = scenePath,
+                ExportedIds = exportedIds ?? new HashSet<ElementId>(),
             };
             Sessions.Add(session);
             if (_uiApp == null)
@@ -88,10 +91,57 @@ namespace Tools28.Commands.RealtimeRender
             Document doc = e.GetDocument();
             foreach (Session s in Sessions)
             {
-                if (!s.Doc.Equals(doc)) continue;
+                if (!s.Doc.Equals(doc) || s.Dirty) continue;
+                try
+                {
+                    // 凡例・シート・注記など、描いている 3D ビューの見た目に関係ない変更では書き出さない（Revit が重くならないように）
+                    if (!AffectsView(doc, s, e)) continue;
+                }
+                catch (Exception ex)
+                {
+                    // 判断できないときは、念のため書き出す
+                    DiagLog.Cmd("RealtimeRender", $"ライブ同期: 変更の判定に失敗 {ex.Message}");
+                }
                 s.Dirty = true;
                 s.LastChange = DateTime.UtcNow;
             }
+        }
+
+        /// <summary>変更が、描いている 3D ビューの見た目に関係するか。</summary>
+        private static bool AffectsView(Document doc, Session s, DocumentChangedEventArgs e)
+        {
+            // 削除: 描いていた要素が消えたときだけ
+            foreach (ElementId id in e.GetDeletedElementIds())
+                if (id == s.ViewId || s.ExportedIds.Contains(id)) return true;
+
+            var view = doc.GetElement(s.ViewId) as View3D;
+            if (view == null) return false;
+            foreach (ElementId id in e.GetModifiedElementIds())
+                if (IsRelevant(doc.GetElement(id), view)) return true;
+            foreach (ElementId id in e.GetAddedElementIds())
+                if (IsRelevant(doc.GetElement(id), view)) return true;
+            return false;
+        }
+
+        /// <summary>
+        /// この要素の変更が 3D ビューの見た目に関係するか。
+        /// 関係する: モデルの要素（壁・床・ファミリなど）、そのタイプ、マテリアル・外観、3D ビュー自身、ビューに使っているテンプレート・フィルタ、
+        ///           リンク、太陽の設定。
+        /// 関係しない: 特定のビューだけの要素（凡例・注記・寸法・文字・詳細線分など）、ほかのビュー・シート・集計表、その他の設定。
+        /// </summary>
+        private static bool IsRelevant(Element e, View3D view)
+        {
+            if (e == null) return false;
+            if (e.Id == view.Id) return true;  // 表示・非表示、切断ボックス、表示スタイルなど
+            if (e is View) return e.Id == view.ViewTemplateId;  // ほかのビュー（凡例・平面・シートなど）は関係ない
+            if (e.OwnerViewId != ElementId.InvalidElementId) return false;  // 特定のビューだけの要素（凡例・注記・詳細）
+            if (e is Material || e is AppearanceAssetElement) return true;
+            if (e is ParameterFilterElement) return view.GetFilters().Contains(e.Id);
+            if (e is RevitLinkInstance || e is RevitLinkType || e is SunAndShadowSettings) return true;
+            if (e is SpatialElement) return false;  // 部屋・エリア・スペースは描かない
+            Category c = e.Category;
+            if (c == null) return false;  // フェーズ・プロジェクト情報など
+            return c.CategoryType == CategoryType.Model;  // 注釈（文字・寸法・タグなど）のタイプや要素は関係ない
         }
 
         private static void OnIdling(object sender, IdlingEventArgs e)
@@ -130,7 +180,8 @@ namespace Tools28.Commands.RealtimeRender
         {
             try
             {
-                RenderScene scene = RealtimeRenderCommand.ExportScene(s.Doc, view);
+                var exportedIds = new HashSet<ElementId>();
+                RenderScene scene = RealtimeRenderCommand.ExportScene(s.Doc, view, exportedIds);
                 if (scene.TriangleCount == 0) return;
                 // 書き終わってから置き換える（描画ウィンドウが書きかけのファイルを読まないように）
                 string temp = s.ScenePath + ".tmp";
@@ -148,6 +199,7 @@ namespace Tools28.Commands.RealtimeRender
                     s.LastChange = DateTime.UtcNow;
                     return;
                 }
+                s.ExportedIds = exportedIds;
                 DiagLog.Cmd("RealtimeRender", $"ライブ同期: モデルを更新 ({scene.TriangleCount} 三角形)");
             }
             catch (Exception ex)

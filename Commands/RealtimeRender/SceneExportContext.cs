@@ -25,6 +25,8 @@ namespace Tools28.Commands.RealtimeRender
 
         public RenderScene Scene { get; } = new RenderScene();
         public int ElementCount { get; private set; }
+        /// <summary>書き出した要素の ID（このモデルの物）。</summary>
+        public HashSet<ElementId> ElementIds { get; } = new HashSet<ElementId>();
         /// <summary>見つからなかったテクスチャ画像（ログ用）。</summary>
         public IReadOnlyList<string> MissingTextures => _textures.Missing;
 
@@ -58,6 +60,9 @@ namespace Tools28.Commands.RealtimeRender
         public RenderNodeAction OnElementBegin(ElementId elementId)
         {
             _currentElement = elementId;
+            // 書き出した要素（このモデルの物だけ。リンクの中の要素はリンク自体で見る）。ライブ同期で、削除された要素が
+            // 描いていた物かどうかを調べるのに使う
+            if (_documents.Count == 1) ElementIds.Add(elementId);
             ElementCount++;
             return RenderNodeAction.Proceed;
         }
