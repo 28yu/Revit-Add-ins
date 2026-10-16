@@ -31,6 +31,14 @@
     </PropertyGroup>
   </Target>
 
+  <!-- リアルタイムレンダリングの描画プログラム（Renderer/ の C++ を build-windows.sh でビルドしたもの）。
+       Tools28.dll と同じフォルダに置かれ、RealtimeRenderCommand から起動される -->
+  <ItemGroup>
+    <None Remove="Renderer\**" />
+    <Compile Remove="Renderer\**" />
+    <None Include="Renderer\prebuilt\win-x64\Tools28Render.exe" Link="Tools28Render.exe" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
   <!-- Revit API (NuGet パッケージ経由 - ローカル Revit 不要) -->
   <ItemGroup>
     <PackageReference Include="Nice3point.Revit.Api.RevitAPI" Version="$(RevitVersion).*">
@@ -102,6 +110,8 @@
     <Resource Include="Resources\Icons\dwg_layer_transfer_16.png" />
     <Resource Include="Resources\Icons\generic_model_merge.png" />
     <Resource Include="Resources\Icons\generic_model_merge_16.png" />
+    <Resource Include="Resources\Icons\realtime_render.png" />
+    <Resource Include="Resources\Icons\realtime_render_16.png" />
   </ItemGroup>
 
 

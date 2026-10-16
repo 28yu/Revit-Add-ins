@@ -102,7 +102,7 @@ Revit-Add-ins/
 ├── BuildAll.ps1                # 全バージョン一括ビルド（リリース用）
 ├── GenerateAddins.ps1          # .addinマニフェスト生成
 ├── CreatePackages.ps1          # インストーラ作成 (ローカル, ISCC 使用)
-├── RenderKit/                  # 個人用: Revit の FBX → Blender で 360°パノラマ → HTML1つ（アドインとは別。README.md 参照）
+├── Renderer/                   # リアルタイムレンダリングの描画プログラム（C++ / Vulkan レイトレーシング、別 exe。README.md 参照）
 ├── Docs/                       # GitHub Pages (ワークフロー図等)
 │   ├── workflow-diagram.html   #   開発ワークフロー図
 │   └── icons/workflow/         #   ワークフロー図用アイコン
@@ -456,6 +456,7 @@ _buttonTipKeys["FeatureName"] = "Ribbon.FeatureName.Button.Tip";
 | LanguageSwitch / Localization（多言語UI） | `Commands/LanguageSwitch/` + `Localization/` | `Docs/DEVLOG.md#LocSystem` |
 | AutoBackup（自動バックアップ/定期ローカル保存・クラウド同期） | `Commands/AutoBackup/` | `Docs/Features/AutoBackup.md` |
 | GenericModelMerge（一般モデル化/複数要素の形状を1つにまとめる） | `Commands/GenericModelMerge/` | `Docs/Features/GenericModelMerge.md` |
+| RealtimeRender（リアルタイムレンダリング/GPUレイトレーシング・試作） | `Commands/RealtimeRender/` + `Renderer/` | `Docs/DEVLOG.md#RealtimeRender`, `Renderer/README.md` |
 
 ### リボンパネル構成（左から順）
 1. **通り芯・レベル** — 符号表示切替（両方/左/右）
@@ -464,9 +465,10 @@ _buttonTipKeys["FeatureName"] = "Ribbon.FeatureName.Button.Tip";
 4. **注釈・詳細** — 部屋タグ自動配置、部屋3D色分け、塗潰し領域 分割・統合、塗潰しパターン入出力
 5. **構造** — 梁下端色分け、梁天端色分け、耐火被覆色分け、型枠数量算出
 6. **モデル** — 一般モデル化（3Dビュー内の複数カテゴリの形状を1つの一般モデル／.rfa にまとめる）
-7. **データ** — EXCELエクスポート、EXCELインポート
-8. **パラメータ** — パラメータ整理（同名特定・値の有無確認・未使用削除）、値の一括置換（文字パラメータの値をモデル全体で置換・削除）、値の移動（同名でグループ違いのパラメータ間で要素ごとに移動）
-9. **設定** — 自動バックアップ（定期ローカル保存・ワークシェア/クラウド中央同期）、言語切替（JP/US/CN）、バージョン情報、マニュアル
+7. **レンダリング** — リアルタイムレンダリング（3Dビューを別ウィンドウの Tools28Render.exe で GPU レイトレーシング描画・試作）
+8. **データ** — EXCELエクスポート、EXCELインポート
+9. **パラメータ** — パラメータ整理（同名特定・値の有無確認・未使用削除）、値の一括置換（文字パラメータの値をモデル全体で置換・削除）、値の移動（同名でグループ違いのパラメータ間で要素ごとに移動）
+10. **設定** — 自動バックアップ（定期ローカル保存・ワークシェア/クラウド中央同期）、言語切替（JP/US/CN）、バージョン情報、マニュアル
 
 実装: `Application.cs` の `CreateGridLevelPanel()` 等、パネル別メソッドで構築
 

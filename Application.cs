@@ -19,7 +19,7 @@ namespace Tools28
         private static readonly string[] _panelKeys = {
             "Ribbon.Panel.GridBubble", "Ribbon.Panel.SheetView", "Ribbon.Panel.3DView",
             "Ribbon.Panel.Annotation", "Ribbon.Panel.Structural", "Ribbon.Panel.Quantity",
-            "Ribbon.Panel.Model", "Ribbon.Panel.Excel", "Ribbon.Panel.Parameter",
+            "Ribbon.Panel.Model", "Ribbon.Panel.Render", "Ribbon.Panel.Excel", "Ribbon.Panel.Parameter",
             "Ribbon.Panel.Settings"
         };
 
@@ -46,6 +46,7 @@ namespace Tools28
             { "FireProtection", "Ribbon.FireProtection" },
             { "Formwork", "Ribbon.Formwork" },
             { "GenericModelMerge", "Ribbon.GmMerge" },
+            { "RealtimeRender", "Ribbon.RtRender" },
             { "ExcelExport", "Ribbon.Excel.Export" },
             { "ExcelImport", "Ribbon.Excel.Import" },
             { "ParameterCleanup", "Ribbon.ParamCleanup" },
@@ -82,6 +83,7 @@ namespace Tools28
             { "FireProtection", "Ribbon.FireProtection.Tip" },
             { "Formwork", "Ribbon.Formwork.Tip" },
             { "GenericModelMerge", "Ribbon.GmMerge.Tip" },
+            { "RealtimeRender", "Ribbon.RtRender.Tip" },
             { "ExcelExport", "Ribbon.Excel.Export.Tip" },
             { "ExcelImport", "Ribbon.Excel.Import.Tip" },
             { "ParameterCleanup", "Ribbon.ParamCleanup.Tip" },
@@ -148,6 +150,7 @@ namespace Tools28
                 CreateStructuralPanel(application, tabName, assemblyPath);
                 CreateQuantityPanel(application, tabName, assemblyPath);
                 CreateModelPanel(application, tabName, assemblyPath);
+                CreateRenderPanel(application, tabName, assemblyPath);
                 CreateExcelPanel(application, tabName, assemblyPath);
                 CreateParameterPanel(application, tabName, assemblyPath);
                 CreateSettingsPanel(application, tabName, assemblyPath);
@@ -482,6 +485,18 @@ namespace Tools28
             mergeData.Image = LoadImage("generic_model_merge_16.png");
             mergeData.LargeImage = LoadImage("generic_model_merge.png");
             AddButton(panel, mergeData);
+        }
+
+        private void CreateRenderPanel(UIControlledApplication application, string tabName, string assemblyPath)
+        {
+            RibbonPanel panel = application.CreateRibbonPanel(tabName, Loc.S("Ribbon.Panel.Render"));
+            _panels.Add(panel);
+
+            var renderData = new PushButtonData("RealtimeRender", Loc.S("Ribbon.RtRender"), assemblyPath, "Tools28.Commands.RealtimeRender.RealtimeRenderCommand");
+            renderData.ToolTip = Loc.S("Ribbon.RtRender.Tip");
+            renderData.Image = LoadImage("realtime_render_16.png");
+            renderData.LargeImage = LoadImage("realtime_render.png");
+            AddButton(panel, renderData);
         }
 
         private void CreateExcelPanel(UIControlledApplication application, string tabName, string assemblyPath)
