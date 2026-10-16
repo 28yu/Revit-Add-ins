@@ -150,6 +150,9 @@ vec3 ggxReflect(vec3 v, vec3 n, float roughness) {
     return reflect(v, h);
 }
 
+// つるつるの鏡（金属で粗さが小さい）
+bool isMirror(Material m) { return m.params.y > 0.5 && m.params.x < 0.1; }
+
 float fresnelSchlick(float cosTheta, float f0) {
     return f0 + (1.0 - f0) * pow(1.0 - clamp(cosTheta, 0.0, 1.0), 5.0);
 }
@@ -181,6 +184,11 @@ vec3 radiance(vec3 origin, vec3 dir, out Primary primary) {
     // 光の筋の太さ（m）と広がり方。遠く・ざらついた反射の先ほど太くなり、テクスチャの縮小した段を使う
     float coneWidth = 0.0;
     float coneSpread = pc.misc.w;
+    // 鏡: 映っている物を「鏡の向こうにある物（虚像）」として最初に見えている面にする。
+    // 動いたときに前のフレームと位置を合わせられるので、鏡の映り込みが残像にならない
+    vec3 camOrigin = origin, camDir = dir;
+    bool viaMirror = false;
+    vec3 mirrorN = vec3(0.0), mirrorTint = vec3(1.0);
 
     for (uint bounce = 0u; bounce <= pc.frame.z; ++bounce) {
         Hit h = traceClosest(origin, dir);
@@ -207,12 +215,28 @@ vec3 radiance(vec3 origin, vec3 dir, out Primary primary) {
             if (dot(nb, gn) > 0.05) n = nb;  // 裏を向くほど傾いたときは使わない
         }
         if (!primary.hit && !h.glass) {
-            primary.hit = true;
-            primary.pos = pos;
-            primary.normal = n;
-            primary.dist = travelled + h.t;
-            // 鏡・金属は、映り込みそのものが見えているので色で割らない
-            primary.albedo = m.params.y > 0.5 ? vec3(1.0) : max(albedo, vec3(0.02));
+            if (isMirror(m) && !viaMirror) {
+                // 鏡（1 枚目だけ）: この先に見える物を最初に見えている面にする
+                viaMirror = true;
+                mirrorN = n;
+                mirrorTint = albedo;
+                travelled += h.t;
+            } else {
+                primary.hit = true;
+                primary.dist = travelled + h.t;
+                // 鏡・金属は、映り込みそのものが見えているので色で割らない
+                vec3 a = m.params.y > 0.5 ? vec3(1.0) : max(albedo, vec3(0.02));
+                if (viaMirror) {
+                    // 虚像: カメラから見て、鏡までの距離＋鏡からの距離だけ奥にある。向きも鏡で折り返す
+                    primary.pos = camOrigin + camDir * primary.dist;
+                    primary.normal = reflect(n, mirrorN);
+                    primary.albedo = max(mirrorTint * a, vec3(0.02));
+                } else {
+                    primary.pos = pos;
+                    primary.normal = n;
+                    primary.albedo = a;
+                }
+            }
         }
         float roughness = clamp(m.params.x, 0.02, 1.0);
         float metallic = m.params.y;
@@ -298,10 +322,16 @@ vec3 radiance(vec3 origin, vec3 dir, out Primary primary) {
 
 // 画素の中心を通る光線で、最初に見えている面の位置・向きを求める（ガラスは素通りする）。
 // ノイズ除去で「同じ面か」を比べるのに使うので、毎フレーム同じ結果になるよう、狙う位置をずらさない
-void primaryGeometry(vec3 origin, vec3 dir, out vec3 pos, out vec3 normal, out float dist) {
+// mirror: ざらついた金属のように、見る位置で映り込みが変わる度合い（0〜1）。動いている間の残像を防ぐのに使う。
+// つるつるの鏡は、映っている物の虚像（鏡の向こうにあるとみなした位置・向き）を返すので 0
+void primaryGeometry(vec3 origin, vec3 dir, out vec3 pos, out vec3 normal, out float dist, out float mirror) {
     pos = origin + dir * 1e5;
     normal = -dir;
     dist = -1.0;
+    mirror = 0.0;
+    vec3 camOrigin = origin, camDir = dir;
+    bool viaMirror = false;
+    vec3 mirrorN = vec3(0.0);
     float travelled = 0.0;
     for (int i = 0; i < 8; ++i) {
         Hit h = traceClosest(origin, dir);
@@ -312,9 +342,18 @@ void primaryGeometry(vec3 origin, vec3 dir, out vec3 pos, out vec3 normal, out f
         surfaceAt(h, dir, p, n, gn, uv, uvPerMeter);
         travelled += h.t;
         if (!h.glass) {
-            pos = p;
-            normal = n;
+            Material m = materials[triMaterials[h.tri]];
+            if (isMirror(m) && !viaMirror) {
+                viaMirror = true;
+                mirrorN = n;
+                dir = reflect(dir, n);
+                origin = p + gn * 0.002;
+                continue;
+            }
+            pos = viaMirror ? camOrigin + camDir * travelled : p;
+            normal = viaMirror ? reflect(n, mirrorN) : n;
             dist = travelled;
+            if (m.params.y > 0.5) mirror = clamp(1.0 - m.params.x * 2.0, 0.0, 1.0);
             return;
         }
         origin = p + dir * 0.001;
@@ -363,9 +402,9 @@ void main() {
     imageStore(uNoisy, pixel, vec4(demod, 1.0));
     // 位置・向きは画素の中心で求める（輪郭で毎フレーム手前・奥が入れ替わらないように）
     vec3 gpos, gnormal;
-    float gdist;
-    primaryGeometry(pc.camPos.xyz, cameraRay((vec2(pixel) + 0.5) / vec2(size)), gpos, gnormal, gdist);
+    float gdist, gmirror;
+    primaryGeometry(pc.camPos.xyz, cameraRay((vec2(pixel) + 0.5) / vec2(size)), gpos, gnormal, gdist, gmirror);
     imageStore(uGPos, pixel, vec4(gpos, gdist));
-    imageStore(uGNormal, pixel, vec4(gnormal, 0.0));
+    imageStore(uGNormal, pixel, vec4(gnormal, gmirror));
     imageStore(uGAlbedo, pixel, vec4(albedo, 1.0));
 }

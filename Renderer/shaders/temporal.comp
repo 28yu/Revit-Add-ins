@@ -38,7 +38,9 @@ void main() {
 
     vec3 color = imageLoad(uNoisy, p).rgb;
     vec4 gp = imageLoad(uGPos, p);
-    vec3 n = imageLoad(uGNormal, p).xyz;
+    vec4 gn = imageLoad(uGNormal, p);
+    vec3 n = gn.xyz;
+    float mirror = gn.w;  // 鏡・金属らしさ（見る位置で映り込みが変わる）
     bool sky = gp.w < 0.0;
     bool moved = pc.prevEye.w > 0.5;
     bool reset = pc.prevForward.w > 0.5;
@@ -105,6 +107,22 @@ void main() {
         prevMoments /= weightSum;
         // 動いている間は重ねる回数を少なめにする（古い結果が残って残像になるのを防ぐ）
         float maxLen = moved ? 1.0 / pc.params.x : pc.params.y;
+        if (moved) {
+            // 鏡・金属の映り込みは、面の位置で前の結果を拾っても合わない（見る位置で変わる）ので、ほとんど重ねない
+            maxLen = mix(maxLen, 1.5, mirror);
+
+            // 面の色は、前の結果を今の周り 3×3 の最小〜最大に収める（模様や輪郭が遅れてついてくる残像を防ぐ。
+            // 面の色はノイズが無いので、収めても暗くならない）
+            vec3 aMin = vec3(1e9), aMax = vec3(-1e9);
+            for (int dy = -1; dy <= 1; ++dy)
+                for (int dx = -1; dx <= 1; ++dx) {
+                    vec3 a = imageLoad(uGAlbedo, clamp(p + ivec2(dx, dy), ivec2(0), size - 1)).rgb;
+                    aMin = min(aMin, a);
+                    aMax = max(aMax, a);
+                }
+            prevAlbedo = clamp(prevAlbedo, aMin, aMax);
+            // 明るさ（色で割ったもの）は収めない。ノイズが多いので、収めると暗く・まだらになる（試して悪化した）
+        }
         len = min(prevLen + 1.0, maxLen);
         float alpha = 1.0 / len;
         history = mix(prevColor, color, alpha);
@@ -132,6 +150,8 @@ void main() {
     }
     // 重ねた回数が少ないうちはノイズの見積もり自体が不確かなので、多めに見積もって強めにならす
     float variance = sampleVariance / len * max(1.0, 16.0 / len);
+    // 鏡・金属の映り込みはノイズが少ない（つるつるなほど）ので、平均しすぎて映り込みがぼけないようにする
+    variance *= 1.0 - 0.9 * mirror;
 
     imageStore(uHistory, p, vec4(history, len));
     imageStore(uAlbedoHist, p, vec4(albedo, 1.0));

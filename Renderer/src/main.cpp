@@ -63,6 +63,8 @@ static int run(int argc, char** argv) {
         else if (a == "--render-scale") opt.renderScale = static_cast<float>(std::atof(next()));
         else if (a == "--exit-after") opt.exitAfterFrames = std::atoi(next());
         else if (a == "--export-samples") opt.exportSamples = std::atoi(next());
+        else if (a == "--motion-test") opt.motionTest = std::atoi(next());
+        else if (a == "--motion-reference") opt.motionReference = std::atoi(next());
         else if (a == "--software") opt.forceSoftware = true;
     }
     // シーンの指定が無ければ、自分の exe に埋め込まれたシーンを探す（書き出したビューアとして開かれたとき）

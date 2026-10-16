@@ -72,8 +72,27 @@ int runOffscreen(const Options& opt, Scene& scene) {
     VkFence fence;
     vkCheck(vkCreateFence(ctx.device, &fci, nullptr, &fence), "vkCreateFence");
 
+    // 残像の確認: 横に歩きながら向きを変え続け、最後のフレームを保存する（--motion-test フレーム数）
+    auto step = [&]() {
+        Vec3 r = cam.right();
+        cam.eye = {cam.eye.x + r.x * 0.04f, cam.eye.y + r.y * 0.04f, cam.eye.z};
+        cam.yaw -= 0.006f;
+    };
+    if (opt.motionReference > 0) {
+        for (int i = 0; i < opt.motionReference; ++i) step();
+        ViewParams v = cam.view();
+        v.maxBounces = opt.bounces;
+        view = v;
+    }
+    const int frames = opt.motionTest > 0 ? opt.motionTest : opt.samples;
     auto start = std::chrono::steady_clock::now();
-    for (int s = 0; s < opt.samples; ++s) {
+    for (int s = 0; s < frames; ++s) {
+        if (opt.motionTest > 0) {
+            step();
+            ViewParams moving = cam.view();
+            moving.maxBounces = opt.bounces;
+            view = moving;
+        }
         view.exposure = exposure.current;
         VkCommandBufferBeginInfo bi{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
         bi.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
@@ -87,10 +106,12 @@ int runOffscreen(const Options& opt, Scene& scene) {
         vkWaitForFences(ctx.device, 1, &fence, VK_TRUE, UINT64_MAX);
         vkResetFences(ctx.device, 1, &fence);
         if (opt.autoExposure) exposure.update(renderer.finishFrame(), opt.exposureEv, 0.0f);
-        if ((s + 1) % 16 == 0 || s + 1 == opt.samples) logInfo("sample %d / %d", s + 1, opt.samples);
+        if ((s + 1) % 16 == 0 || s + 1 == frames) logInfo("sample %d / %d", s + 1, frames);
     }
     double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
-    logInfo("Rendered %d samples in %.1f s (exposure x%.2f)", opt.samples, seconds, exposure.current);
+    logInfo("Rendered %d samples in %.1f s (exposure x%.2f)", frames, seconds, exposure.current);
+    if (opt.motionTest > 0)
+        logInfo("Final camera: eye %.4f %.4f %.4f yaw %.5f pitch %.5f", cam.eye.x, cam.eye.y, cam.eye.z, cam.yaw, cam.pitch);
 
     // GPU の画像を CPU 側に写して PNG に保存する
     std::vector<uint8_t> rgba = readImageRgba(ctx, renderer.output());
