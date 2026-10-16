@@ -88,7 +88,7 @@ Revit の 3D ビューと同じ操作を基本にし、Enscape のような歩�
 
 ```
 Revit（LiveSync.cs）                                   Tools28Render.exe（window_app.cpp）
-  DocumentChanged → 0.8 秒待って Idling で書き出し直し      0.5 秒ごとに更新時刻を調べる
+  DocumentChanged → 0.3 秒待って Idling で書き出し直し      0.15 秒ごとに更新時刻を調べる
     → scene_*.t28s.tmp を書いて scene_*.t28s と置き換え  →  読み直す（視点はそのまま）
                           scene_*.t28s.pause があれば休む ←  「同期」ボタンで作る / 消す
 ```
@@ -149,6 +149,11 @@ Tools28Render --scene model.t28s --output out.png       画像を作って終わ
         --software（RT コアがあっても予備の方式で描く） / --exit-after フレーム数（動作確認用）
         --motion-test フレーム数 / --motion-reference フレーム数（動いている間の残像の確認。DEVLOG 参照）
 ```
+
+## アイコン
+
+`res/Tools28Render.ico`（`res/draw_app_icon.py` で描く）を `res/app.rc` で exe に入れている。
+エクスプローラー・ウィンドウ・タスクバーのアイコンになり、書き出したビューア exe も同じアイコンになる（28 Tools から書き出したと分かる）。
 
 ## 使っている外部の部品
 

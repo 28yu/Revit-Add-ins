@@ -21,7 +21,7 @@ namespace Tools28.Commands.RealtimeRender
     internal static class LiveSync
     {
         /// <summary>モデルが変わってから書き出すまで待つ時間（続けて変更されたときに何度も書き出さないため）。</summary>
-        private static readonly TimeSpan Debounce = TimeSpan.FromSeconds(0.8);
+        private static readonly TimeSpan Debounce = TimeSpan.FromSeconds(0.3);
 
         private class Session
         {

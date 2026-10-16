@@ -61,6 +61,13 @@ else()
   set(SHADER_INCLUDE_DIR ${SHADER_DIR}/generated)
 endif()
 
+# Windows ではアイコン（res/app.rc）を exe に入れる
+set(T28_RESOURCES "")
+if(WIN32)
+  enable_language(RC)
+  set(T28_RESOURCES res/app.rc)
+endif()
+
 add_executable(Tools28Render
   src/main.cpp
   src/bvh.cpp
@@ -74,6 +81,7 @@ add_executable(Tools28Render
   src/offscreen.cpp
   src/window_app.cpp
   third_party/volk/volk.c
+  ${T28_RESOURCES}
   ${SHADER_DEPS})
 
 target_include_directories(Tools28Render PRIVATE

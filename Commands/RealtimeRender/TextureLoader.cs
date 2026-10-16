@@ -15,7 +15,19 @@ namespace Tools28.Commands.RealtimeRender
     {
         private readonly List<string> _searchDirs = new List<string>();
         private Dictionary<string, string> _fileIndex;  // ファイル名 → 見つかった場所（ライブラリの中を一度だけ調べる）
-        private readonly Dictionary<string, string> _resolved = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        private Dictionary<string, string> _resolved;
+
+        // ライブ同期では書き出しを何度も繰り返すので、探した結果・読み込んだ画像は Revit を閉じるまで覚えておく
+        // （同じ画像を毎回読み直すと、反映が遅くなる）
+        private static readonly Dictionary<string, Dictionary<string, string>> FileIndexCache =
+            new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
+        private static readonly Dictionary<string, Dictionary<string, string>> ResolvedCache =
+            new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
+        private static readonly Dictionary<string, (DateTime time, RenderTexture texture)> DecodeCache =
+            new Dictionary<string, (DateTime, RenderTexture)>(StringComparer.OrdinalIgnoreCase);
+        private static long _decodeCacheBytes;
+        private const long DecodeCacheLimit = 256L * 1024 * 1024;  // 覚えておく画像は合計 256 MB まで
+        private string DirsKey => string.Join("|", _searchDirs);
 
         public List<string> Missing { get; } = new List<string>();
 
@@ -36,6 +48,12 @@ namespace Tools28.Commands.RealtimeRender
             {
                 // クラウドのモデルなど、パスとして扱えないときは使わない
             }
+            if (!ResolvedCache.TryGetValue(DirsKey, out _resolved))
+            {
+                _resolved = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                ResolvedCache[DirsKey] = _resolved;
+            }
+            if (FileIndexCache.TryGetValue(DirsKey, out Dictionary<string, string> index)) _fileIndex = index;
         }
 
         private void AddDir(string dir)
@@ -72,7 +90,11 @@ namespace Tools28.Commands.RealtimeRender
         public string Resolve(string paths)
         {
             if (string.IsNullOrWhiteSpace(paths)) return null;
-            if (_resolved.TryGetValue(paths, out string cached)) return cached;
+            if (_resolved.TryGetValue(paths, out string cached))
+            {
+                if (cached == null) Missing.Add(paths);
+                return cached;
+            }
             string found = null;
             foreach (string raw in paths.Split('|'))
             {
@@ -118,6 +140,7 @@ namespace Tools28.Commands.RealtimeRender
                     // 読めないフォルダは飛ばす
                 }
             }
+            FileIndexCache[DirsKey] = _fileIndex;
             return _fileIndex;
         }
 
@@ -126,6 +149,37 @@ namespace Tools28.Commands.RealtimeRender
         /// 読めない形式（WPF が対応していない .tga / .exr など）は null。
         /// </summary>
         public static RenderTexture Decode(string path, int maxSize)
+        {
+            string key = $"{path}|{maxSize}";
+            DateTime time;
+            try
+            {
+                time = File.GetLastWriteTimeUtc(path);
+            }
+            catch
+            {
+                time = DateTime.MinValue;
+            }
+            if (DecodeCache.TryGetValue(key, out var hit) && hit.time == time) return Copy(hit.texture);
+            RenderTexture texture = DecodeFile(path, maxSize);
+            if (texture != null)
+            {
+                if (_decodeCacheBytes + texture.Rgba.Length > DecodeCacheLimit)
+                {
+                    DecodeCache.Clear();
+                    _decodeCacheBytes = 0;
+                }
+                DecodeCache[key] = (time, Copy(texture));
+                _decodeCacheBytes += texture.Rgba.Length;
+            }
+            return texture;
+        }
+
+        // 色付けなどで中身を書き換えるので、覚えている画像そのものは渡さず写しを渡す
+        private static RenderTexture Copy(RenderTexture t) =>
+            new RenderTexture { Width = t.Width, Height = t.Height, Linear = t.Linear, Rgba = (byte[])t.Rgba.Clone() };
+
+        private static RenderTexture DecodeFile(string path, int maxSize)
         {
             try
             {

@@ -391,7 +391,7 @@ int runWindow(const Options& opt, Scene& scene) {
 
     // --- ライブ同期 -----------------------------------------------------------
     // Revit 側（Tools28）は、モデルが変わるとシーンファイルを書き直す（視点は伝えない。描画ウィンドウと Revit は別々に動かす）。
-    // ここでは 0.5 秒ごとにファイルの更新時刻を調べて読み直す。同期を止めると「.pause」を作り、Revit 側はそれを見て書き出しを休む
+    // ここでは 0.15 秒ごとにファイルの更新時刻を調べて読み直す。同期を止めると「.pause」を作り、Revit 側はそれを見て書き出しを休む
     namespace fs = std::filesystem;
     const bool liveSync = opt.liveSync && !opt.scenePath.empty();
     const std::string pausePath = opt.scenePath + ".pause";
@@ -608,7 +608,7 @@ int runWindow(const Options& opt, Scene& scene) {
 
         // Revit からの変更を受け取る（書き出し中・同期を止めている間は受け取らない）
         syncTimer += dt;
-        if (liveSync && syncOn && !nv.exporting && syncTimer >= 0.5) {
+        if (liveSync && syncOn && !nv.exporting && syncTimer >= 0.15) {
             syncTimer = 0;
             long long st = stampOf(opt.scenePath);
             if (st != sceneStamp && st != kNoFile) {

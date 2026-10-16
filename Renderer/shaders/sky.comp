@@ -211,7 +211,8 @@ vec3 skyColor(vec3 dir, vec2 pixel) {
         float powder = 1.0 - exp(-dens * 2.0);  // 雲の内側ほど明るく見える効果（縁が暗くならないように）
         float hFrac = clamp((height - CLOUD_BOTTOM) / (CLOUD_TOP - CLOUD_BOTTOM), 0.0, 1.0);
         vec3 ambient = mix(ambientBottom, ambientTop, hFrac) * 0.9;
-        vec3 light = sunCol * beer * (phase * 4.0 * PI) * mix(0.5, 1.0, powder) * 0.3 + ambient;
+        // 日の当たる所を明るく（影の側はそのまま）して、陰影をはっきりさせる
+        vec3 light = sunCol * beer * (phase * 4.0 * PI) * mix(0.5, 1.0, powder) * 0.5 + ambient;
         float stepT = exp(-dens * SIGMA * dt);
         // 光の足し方: その区間で散らされる量 ×（1 − 区間の透過）
         scattered += transmittance * light * (1.0 - stepT);
