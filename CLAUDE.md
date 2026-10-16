@@ -316,6 +316,10 @@ _buttonTipKeys["FeatureName"] = "Ribbon.FeatureName.Button.Tip";
 
 `Docs/Features/FeatureName.md` を作成する（日本語）。
 
+- 文章は最小限にし、「どこをクリックすると何ができるか」を**画面のスクショ**で見せる（サイトの方針。文字数は増やさない）
+- スクショは `Docs/Features/images/<FeatureName>/` に置き、`![説明](./images/<FeatureName>/01-xxx.png)` と書く。
+  撮り方・ファイル名の決まりは `Docs/Features/images/README.md`。画像がまだ無い枠はサイトでは自動で非表示になる
+
 ### 6. features.json に追加（必須）
 
 `Docs/features.json` の `features` 配列に1エントリ追加する。**これを忘れると配布サイトのカードが追加されない。**
