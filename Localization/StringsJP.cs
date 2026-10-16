@@ -1033,7 +1033,7 @@ namespace Tools28.Localization
             { "Ribbon.GmMerge.Tip", "3Dビューに表示されている複数カテゴリの要素から形状を読み取り、一つの一般モデルにまとめます。ダイレクトシェイプ／一般モデルファミリ(.rfa)のどちらでも作成できます。" },
             { "Ribbon.Panel.Render", "レンダリング" },
             { "Ribbon.RtRender", "リアルタイム\nレンダリング" },
-            { "Ribbon.RtRender.Tip", "表示中の3Dビューを、GPUのレイトレーシングで写真のように描画します。別ウィンドウで開き、Revitと同じマウス操作で見回せます。光の計算専用回路（RTコア）のあるGPU（NVIDIA RTX・AMD RX 6000以降・Intel Arc）では高速に、その他のGPUでも動作します。（試作版）" },
+            { "Ribbon.RtRender.Tip", "表示中の3Dビューを、GPUのレイトレーシングで写真のように描画します。別ウィンドウで開き、Revitと同じマウス操作で見回せます。光の計算専用回路（RTコア）のあるGPU（NVIDIA RTX・AMD RX 6000以降・Intel Arc）では高速に、その他のGPUでも動作します。Revitでの変更は自動で反映され、画像・360°画像・ビューア（exe）に書き出せます。" },
             { "RtRender.Title", "リアルタイムレンダリング" },
             { "RtRender.Err.Not3DView", "3Dビューを開いてから実行してください。" },
             { "RtRender.Err.NoGeometry", "このビューには描画できる形状がありません。" },

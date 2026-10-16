@@ -10,6 +10,7 @@
     "structure": { "ja": "構造", "en": "Structure", "zh": "结构" },
     "data": { "ja": "データ連携", "en": "Data", "zh": "数据" },
     "model": { "ja": "モデル", "en": "Model", "zh": "模型" },
+    "render": { "ja": "レンダリング", "en": "Rendering", "zh": "渲染" },
     "settings": { "ja": "設定", "en": "Settings", "zh": "设置" }
   },
   "features": [
@@ -264,6 +265,18 @@
         "ja": "一般モデル化（複数要素の形状を1つにまとめる）",
         "en": "Merge to Generic Model (Combine Shapes into One)",
         "zh": "合并为常规模型（将多个图元形状合为一体）"
+      }
+    },
+    {
+      "id": "RealtimeRender",
+      "category": "render",
+      "icon": "icons/features/realtime_render.png",
+      "manual": "Features/RealtimeRender.md",
+      "added_in": "2.7",
+      "names": {
+        "ja": "リアルタイムレンダリング",
+        "en": "Real-time Rendering",
+        "zh": "实时渲染"
       }
     },
     {

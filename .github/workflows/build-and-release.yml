@@ -125,6 +125,8 @@ jobs:
 
           # 全DLL（Tools28.dll + ClosedXML等の依存ライブラリ）
           Copy-Item "bin/Release/Revit$ver/*.dll" "$tools28Dir/"
+          # リアルタイムレンダリングの描画プログラム
+          Copy-Item "bin/Release/Revit$ver/Tools28Render.exe" "$tools28Dir/"
           Copy-Item "Packages/$ver/28Tools/Tools28.addin" "$tools28Dir/Tools28.addin"
 
       - name: Upload artifact
@@ -162,6 +164,7 @@ jobs:
             }
             New-Item -ItemType Directory -Path $dst -Force | Out-Null
             Copy-Item "$src/*.dll" "$dst/"
+            Copy-Item "$src/Tools28Render.exe" "$dst/"
           }
           Get-ChildItem stage -Recurse -Filter Tools28.dll | ForEach-Object { $_.FullName }
 

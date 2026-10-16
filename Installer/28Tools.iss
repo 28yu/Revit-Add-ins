@@ -143,6 +143,13 @@ Source: "{#BinRoot}\Revit2023\*.dll"; DestDir: "{#AddinsDir}\2023\28Tools"; Task
 Source: "{#BinRoot}\Revit2024\*.dll"; DestDir: "{#AddinsDir}\2024\28Tools"; Tasks: rvt2024; Flags: ignoreversion
 Source: "{#BinRoot}\Revit2025\*.dll"; DestDir: "{#AddinsDir}\2025\28Tools"; Tasks: rvt2025; Flags: ignoreversion
 Source: "{#BinRoot}\Revit2026\*.dll"; DestDir: "{#AddinsDir}\2026\28Tools"; Tasks: rvt2026; Flags: ignoreversion
+; リアルタイムレンダリングの描画プログラム（Renderer/ の C++。全バージョン共通の同じ exe）
+Source: "{#BinRoot}\Revit2021\Tools28Render.exe"; DestDir: "{#AddinsDir}\2021\28Tools"; Tasks: rvt2021; Flags: ignoreversion
+Source: "{#BinRoot}\Revit2022\Tools28Render.exe"; DestDir: "{#AddinsDir}\2022\28Tools"; Tasks: rvt2022; Flags: ignoreversion
+Source: "{#BinRoot}\Revit2023\Tools28Render.exe"; DestDir: "{#AddinsDir}\2023\28Tools"; Tasks: rvt2023; Flags: ignoreversion
+Source: "{#BinRoot}\Revit2024\Tools28Render.exe"; DestDir: "{#AddinsDir}\2024\28Tools"; Tasks: rvt2024; Flags: ignoreversion
+Source: "{#BinRoot}\Revit2025\Tools28Render.exe"; DestDir: "{#AddinsDir}\2025\28Tools"; Tasks: rvt2025; Flags: ignoreversion
+Source: "{#BinRoot}\Revit2026\Tools28Render.exe"; DestDir: "{#AddinsDir}\2026\28Tools"; Tasks: rvt2026; Flags: ignoreversion
 ; マニフェストは Addins 直下（<Assembly>28Tools\Tools28.dll</Assembly> で 28Tools フォルダを指す）
 Source: "{#AddinRoot}\2021\28Tools\Tools28.addin"; DestDir: "{#AddinsDir}\2021"; Tasks: rvt2021; Flags: ignoreversion
 Source: "{#AddinRoot}\2022\28Tools\Tools28.addin"; DestDir: "{#AddinsDir}\2022"; Tasks: rvt2022; Flags: ignoreversion
