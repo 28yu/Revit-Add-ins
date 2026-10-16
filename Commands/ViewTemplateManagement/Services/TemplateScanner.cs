@@ -15,6 +15,8 @@ namespace Tools28.Commands.ViewTemplateManagement.Services
     ///   - テンプレートは IsTemplate == true の View。
     ///   - 使用状況は非テンプレートの View を走査し View.ViewTemplateId を集計。
     ///     ビュー数は要素数より遥かに少ないため同期処理で十分軽量。
+    ///   - ビュータイプの「新しいビューに適用するテンプレート」（ViewFamilyType.DefaultTemplateId）も
+    ///     使用中とみなす。削除すると新規ビューに事務所標準のテンプレートが付かなくなるため。
     /// </summary>
     public class TemplateScanner
     {
@@ -62,6 +64,32 @@ namespace Tools28.Commands.ViewTemplateManagement.Services
                 }
                 list.Add(vname);
             }
+
+            // ビュータイプの既定テンプレート
+            try
+            {
+                var viewTypes = new FilteredElementCollector(doc)
+                    .OfClass(typeof(ViewFamilyType))
+                    .Cast<ViewFamilyType>();
+                foreach (var vft in viewTypes)
+                {
+                    ElementId tid;
+                    try { tid = vft.DefaultTemplateId; }
+                    catch { continue; }
+                    if (tid == null || tid == ElementId.InvalidElementId) continue;
+
+                    string typeName;
+                    try { typeName = vft.Name; } catch { typeName = "(?)"; }
+
+                    if (!usage.TryGetValue(tid, out var list))
+                    {
+                        list = new List<string>();
+                        usage[tid] = list;
+                    }
+                    list.Add(string.Format(Loc.S("TemplateMgmt.DefaultForType"), typeName));
+                }
+            }
+            catch { }
 
             var rows = new List<TemplateRow>();
             foreach (var t in templates)

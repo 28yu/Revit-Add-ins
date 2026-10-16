@@ -47,7 +47,8 @@ string sheetName = string.Format(Loc.S("Sheet.NewSheetName", modelLang), sheetNu
   `ScheduleCreator.ScheduleName`、`FormworkSheetCreator.SheetName`、`FormworkVisualizer.AnalysisViewName` 系、
   ワークセット名 `28Tools_型枠`
 - `Commands/FireProtection/` — `LegendManager.LegendViewName`、`FilledRegionCreator.TypePrefix`
-- `Commands/Room3DColor/` — `RoomColorLegendManager.TypePrefix`、DirectShape の識別マーカー
+- `Commands/Room3DColor/` — `RoomColorLegendManager.TypePrefix`、DirectShape の識別マーカー、
+  `RoomSolidGenerator.DefaultViewName` / `DefaultWorksetName` / `LegendViewName`（既定のビュー名・ワークセット名・凡例名）
 - `Commands/ExcelExportImport/` — `ExportSettingsExcelReader` の `"要素ID"` / `"カテゴリ"`、
   `ParameterHeaderMarker.*`（書き出した Excel を読み戻すときの目印）、
   `ParameterIdSheet.SheetName`（`Tools28_ParamIds`：列→パラメータ識別番号の隠しシート）とその見出し

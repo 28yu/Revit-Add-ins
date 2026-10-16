@@ -49,6 +49,7 @@ namespace Tools28.Commands.Room3DColor
                 bool workshared = doc.IsWorkshared;
                 ElementId legendViewId = null;
                 View3D colorView = null;
+                bool worksetNameInUse = false;
 
                 using (TransactionGroup tg = new TransactionGroup(doc, Loc.S("Room3D.Txn.Group")))
                 {
@@ -71,7 +72,7 @@ namespace Tools28.Commands.Room3DColor
 
                         // 専用ワークセット（ワークシェアモデルのみ）を取得・作成
                         WorksetId roomWorksetId = workshared
-                            ? RoomSolidGenerator.EnsureRoomWorkset(doc, result.WorksetName)
+                            ? RoomSolidGenerator.EnsureRoomWorkset(doc, result.WorksetName, out worksetNameInUse)
                             : null;
 
                         // 専用3Dビューを作成
@@ -116,9 +117,10 @@ namespace Tools28.Commands.Room3DColor
                             // 専用ビューのみワークセットを表示（既定は非表示に設定済み）
                             RoomSolidGenerator.ShowWorksetInView(colorView, roomWorksetId);
                         }
-                        else if (!workshared)
+                        else
                         {
-                            // ワークセット未使用モデルは要素単位で他ビューを非表示に
+                            // ワークセット未使用モデル（または同名ワークセットを使えない場合）は
+                            // 要素単位で他ビューを非表示に
                             RoomSolidGenerator.HideShapesInOtherViews(doc, colorView.Id, allShapeIds);
                         }
 
@@ -126,7 +128,7 @@ namespace Tools28.Commands.Room3DColor
                         if (result.CreateLegend)
                         {
                             legendViewId = RoomColorLegendManager.CreateLegendDraftingView(
-                                doc, Loc.S("Room3D.LegendViewName"), result.Groups);
+                                doc, RoomSolidGenerator.LegendViewName, result.Groups);
                         }
 
                         t2.Commit();
@@ -149,9 +151,11 @@ namespace Tools28.Commands.Room3DColor
                     ? "\n" + Loc.S("Room3D.VolumeEnabledNote")
                     : "";
 
-                string visibilityInfo = workshared
-                    ? "\n" + string.Format(Loc.S("Room3D.DoneWorkset"), result.WorksetName)
-                    : "\n" + Loc.S("Room3D.DoneHiddenOtherViews");
+                string visibilityInfo = worksetNameInUse
+                    ? "\n" + string.Format(Loc.S("Room3D.WorksetInUse"), result.WorksetName)
+                    : workshared
+                        ? "\n" + string.Format(Loc.S("Room3D.DoneWorkset"), result.WorksetName)
+                        : "\n" + Loc.S("Room3D.DoneHiddenOtherViews");
 
                 string doneMessage = string.Format(Loc.S("Room3D.DoneMessage"),
                     result.ViewName, shapeSuccess, result.Groups.Count) +
@@ -166,9 +170,8 @@ namespace Tools28.Commands.Room3DColor
             }
             catch (Exception ex)
             {
-                message = string.Format(Loc.S("Room3D.Error"), ex.Message) +
-                    "\n\nマニュアル: https://28tools.com/addins.html" +
-                    "\n配布サイト: https://28yu.github.io/28tools-download/";
+                message = string.Format(Loc.S("Common.ErrorWithManual"),
+                    string.Format(Loc.S("Room3D.Error"), ex.Message));
                 return Result.Failed;
             }
         }

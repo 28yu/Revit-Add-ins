@@ -49,8 +49,8 @@ namespace Tools28.Commands.Room3DColor
             txtWorksetNameLabel.Text = Loc.S("Room3D.WorksetNameLabel");
             DeleteExistingCheckBox.Content = Loc.S("Room3D.DeleteExisting");
             CreateLegendCheckBox.Content = Loc.S("Room3D.CreateLegend");
-            ViewNameTextBox.Text = Loc.S("Room3D.DefaultViewName");
-            WorksetNameTextBox.Text = Loc.S("Room3D.WorksetName");
+            ViewNameTextBox.Text = RoomSolidGenerator.DefaultViewName;
+            WorksetNameTextBox.Text = RoomSolidGenerator.DefaultWorksetName;
             OkButton.Content = Loc.S("Common.Execute");
             CancelButton.Content = Loc.S("Common.Cancel");
         }
@@ -178,11 +178,11 @@ namespace Tools28.Commands.Room3DColor
         {
             string viewName = ViewNameTextBox.Text?.Trim();
             if (string.IsNullOrEmpty(viewName))
-                viewName = Loc.S("Room3D.DefaultViewName");
+                viewName = RoomSolidGenerator.DefaultViewName;
 
             string worksetName = WorksetNameTextBox.Text?.Trim();
             if (string.IsNullOrEmpty(worksetName))
-                worksetName = Loc.S("Room3D.WorksetName");
+                worksetName = RoomSolidGenerator.DefaultWorksetName;
 
             return new RoomColorResult
             {

@@ -19,6 +19,10 @@ namespace Tools28.Commands.BeamTopLevel
             UIDocument uidoc = uiapp.ActiveUIDocument;
             Document doc = uidoc.Document;
 
+            // ビューテンプレートの解除から色分けの確定までを1つにまとめる。
+            // 設定ダイアログでキャンセルした・処理に失敗した場合は、解除も元に戻す
+            TransactionGroup templateGroup = null;
+
             try
             {
                 View activeView = doc.ActiveView;
@@ -41,6 +45,8 @@ namespace Tools28.Commands.BeamTopLevel
 
                     if (templateResult == TaskDialogResult.Yes)
                     {
+                        templateGroup = new TransactionGroup(doc, Loc.S("Common.Txn.ClearViewTemplate"));
+                        templateGroup.Start();
                         using (Transaction t = new Transaction(doc, Loc.S("Common.Txn.ClearViewTemplate")))
                         {
                             t.Start();
@@ -196,6 +202,8 @@ namespace Tools28.Commands.BeamTopLevel
                         selectedTextNoteTypeId);
 
                     trans.Commit();
+                    if (templateGroup != null && trans.GetStatus() == TransactionStatus.Committed)
+                        templateGroup.Assimilate();
                 }
 
                 // 完了ダイアログ
@@ -233,6 +241,15 @@ namespace Tools28.Commands.BeamTopLevel
                 message = string.Format(Loc.S("Common.ErrorWithManual"),
                     string.Format(Loc.S("BeamTop.ProcessError"), ex.Message));
                 return Result.Failed;
+            }
+            finally
+            {
+                if (templateGroup != null)
+                {
+                    if (templateGroup.GetStatus() == TransactionStatus.Started)
+                        templateGroup.RollBack();
+                    templateGroup.Dispose();
+                }
             }
         }
     }

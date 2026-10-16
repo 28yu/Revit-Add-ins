@@ -14,6 +14,12 @@ namespace Tools28.Commands.Room3DColor
         /// <summary>生成した DirectShape を識別するためのコメントマーカー</summary>
         public const string ShapeMarker = "Tools28_Room3DColor";
 
+        // 再実行時に既存の要素を名前で探すため多言語化しない（CLAUDE.md の分類C）。
+        // アドインの言語を切り替えても前回作ったビュー・ワークセット・凡例を見つけられるようにする
+        public const string DefaultViewName = "部屋3D色分け";
+        public const string DefaultWorksetName = "部屋3D色分け";
+        public const string LegendViewName = "部屋3D色分け 凡例";
+
         /// <summary>
         /// 配置済み（面積を持つ）部屋を収集
         /// </summary>
@@ -209,15 +215,24 @@ namespace Tools28.Commands.Room3DColor
         /// 部屋色分け専用ワークセットを取得または作成する。トランザクション内で呼ぶこと。
         /// ワークシェアされていないモデルでは null を返す。
         /// 作成したワークセットは既定で全ビュー非表示に設定する。
+        /// 同名のワークセットに部屋色分け以外の要素が入っている場合は、それを非表示にすると
+        /// モデル全体で要素が見えなくなるため使わずに null を返す（nameInUse = true）。
         /// </summary>
-        public static WorksetId EnsureRoomWorkset(Document doc, string worksetName)
+        public static WorksetId EnsureRoomWorkset(Document doc, string worksetName, out bool nameInUse)
         {
+            nameInUse = false;
             if (!doc.IsWorkshared)
                 return null;
 
             Workset existing = new FilteredWorksetCollector(doc)
                 .OfKind(WorksetKind.UserWorkset)
                 .FirstOrDefault(w => w.Name == worksetName);
+
+            if (existing != null && HasOtherElements(doc, existing.Id))
+            {
+                nameInUse = true;
+                return null;
+            }
 
             WorksetId id = existing != null ? existing.Id : Workset.Create(doc, worksetName).Id;
 
@@ -231,6 +246,15 @@ namespace Tools28.Commands.Room3DColor
             catch { }
 
             return id;
+        }
+
+        // ワークセットに部屋色分けの DirectShape 以外の要素があるか
+        private static bool HasOtherElements(Document doc, WorksetId worksetId)
+        {
+            return new FilteredElementCollector(doc)
+                .WherePasses(new ElementWorksetFilter(worksetId))
+                .WhereElementIsNotElementType()
+                .Any(e => !(e is DirectShape ds && GetComment(ds) == ShapeMarker));
         }
 
         /// <summary>
@@ -257,7 +281,10 @@ namespace Tools28.Commands.Room3DColor
             var views = new FilteredElementCollector(doc)
                 .OfClass(typeof(View))
                 .Cast<View>()
-                .Where(v => !v.IsTemplate && v.Id != colorViewId)
+                // シート・集計表・製図ビュー・凡例にはモデル要素が表示されないため対象外（処理時間の短縮）
+                .Where(v => !v.IsTemplate && v.Id != colorViewId
+                    && !(v is ViewSheet) && !(v is ViewSchedule) && !(v is ViewDrafting)
+                    && v.ViewType != ViewType.Legend)
                 .ToList();
 
             foreach (var v in views)
@@ -283,16 +310,16 @@ namespace Tools28.Commands.Room3DColor
 
         /// <summary>
         /// 専用の等角3Dビューを作成する。トランザクション内で呼ぶこと。
-        /// 同名ビューがあれば削除して作り直す。
+        /// このツールで作った同名ビューがあれば削除して作り直す。
+        /// 利用者が作った同名ビューは削除せず、新しいビューは別名（末尾に識別子）で作る。
         /// </summary>
         public static View3D CreateColorView(Document doc, string viewName)
         {
-            // 同名の既存ビューを削除
             var existing = new FilteredElementCollector(doc)
                 .OfClass(typeof(View3D))
                 .Cast<View3D>()
                 .FirstOrDefault(v => !v.IsTemplate && v.Name == viewName);
-            if (existing != null)
+            if (existing != null && IsColorView(doc, existing))
             {
                 try { doc.Delete(existing.Id); } catch { }
             }
@@ -318,6 +345,21 @@ namespace Tools28.Commands.Room3DColor
             try { view.DetailLevel = ViewDetailLevel.Fine; } catch { }
 
             return view;
+        }
+
+        // このツールが作った色分けビューか（IsolateRoomShapes で一般モデル以外を非表示にしている）
+        private static bool IsColorView(Document doc, View3D view)
+        {
+            try
+            {
+                return view.GetCategoryHidden(new ElementId(BuiltInCategory.OST_Walls))
+                    && view.GetCategoryHidden(new ElementId(BuiltInCategory.OST_Floors))
+                    && !view.GetCategoryHidden(new ElementId(BuiltInCategory.OST_GenericModel));
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         /// <summary>

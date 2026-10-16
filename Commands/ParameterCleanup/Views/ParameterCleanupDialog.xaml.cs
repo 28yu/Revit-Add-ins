@@ -578,6 +578,67 @@ namespace Tools28.Commands.ParameterCleanup.Views
         }
 
         // ===== 削除 =====
+
+        // フィルタ（ParameterFilterElement）の条件に使われているパラメータ ID → フィルタ名
+        private Dictionary<ElementId, List<string>> CollectFilterNamesByParameter()
+        {
+            var map = new Dictionary<ElementId, List<string>>();
+            try
+            {
+                var filters = new FilteredElementCollector(_doc)
+                    .OfClass(typeof(ParameterFilterElement))
+                    .Cast<ParameterFilterElement>();
+                foreach (var f in filters)
+                {
+                    ICollection<ElementId> paramIds;
+                    try { paramIds = f.GetElementFilterParameters(); }
+                    catch { continue; }
+                    foreach (var pid in paramIds)
+                    {
+                        if (!map.TryGetValue(pid, out var names))
+                        {
+                            names = new List<string>();
+                            map[pid] = names;
+                        }
+                        names.Add(f.Name);
+                    }
+                }
+            }
+            catch { }
+            return map;
+        }
+
+        // 削除すると影響が出る理由（無ければ空）
+        private List<string> GetDeleteRiskReasons(ParamRow r, Dictionary<ElementId, List<string>> filterNamesByParam)
+        {
+            var reasons = new List<string>();
+
+            if (r.Kind == ParamKind.Global)
+            {
+                try
+                {
+                    if (_doc.GetElement(r.Id) is GlobalParameter gp
+                        && (gp.GetAffectedElements().Count > 0 || gp.GetAffectedGlobalParameters().Count > 0))
+                        reasons.Add(Loc.S("ParamCleanup.Warn.GlobalInUse"));
+                }
+                catch { }
+                return reasons;
+            }
+
+            if (r.State == ValueState.HasValue)
+                reasons.Add(r.StateText + "  " + string.Format(Loc.S("ParamCleanup.Warn.Count"), r.UsageElementCount));
+            else if (r.State == ValueState.Unchecked || r.State == ValueState.Checking)
+                reasons.Add(r.StateText);
+
+            if (!string.IsNullOrEmpty(r.ScheduleRefText))
+                reasons.Add(string.Format(Loc.S("ParamCleanup.Warn.InSchedule"), r.ScheduleRefText));
+
+            if (r.Id != null && filterNamesByParam.TryGetValue(r.Id, out var filterNames))
+                reasons.Add(string.Format(Loc.S("ParamCleanup.Warn.InFilter"), string.Join(", ", filterNames)));
+
+            return reasons;
+        }
+
         private void Delete_Click(object sender, RoutedEventArgs e)
         {
             var selected = _rows.Where(r => r.IsSelected).ToList();
@@ -588,22 +649,23 @@ namespace Tools28.Commands.ParameterCleanup.Views
                 return;
             }
 
-            // 値が入っている／未確認のパラメータが混ざっていたら、削除前に必ず個別警告を出す。
+            // 値が入っている／未確認のパラメータ、集計表・フィルタで使っているパラメータ、
+            // 要素や他のグローバルパラメータが参照しているグローバルパラメータが混ざっていたら、
+            // 削除前に必ず個別警告を出す。値が空でも、削除すると集計表の列やフィルタの条件が消えるため。
             // （バインドなしでもファミリ内部定義のパラメータとして値を持つことがあるため）
-            var risky = selected
-                .Where(r => r.Kind != ParamKind.Global &&
-                            (r.State == ValueState.HasValue ||
-                             r.State == ValueState.Unchecked ||
-                             r.State == ValueState.Checking))
-                .ToList();
+            var filterNamesByParam = CollectFilterNamesByParameter();
+            var risky = new List<KeyValuePair<ParamRow, List<string>>>();
+            foreach (var r in selected)
+            {
+                var reasons = GetDeleteRiskReasons(r, filterNamesByParam);
+                if (reasons.Count > 0)
+                    risky.Add(new KeyValuePair<ParamRow, List<string>>(r, reasons));
+            }
 
             if (risky.Count > 0)
             {
-                var lines = risky.Take(15).Select(r =>
-                    "・" + r.Name + "  [" + r.StateText + "]" +
-                    (r.State == ValueState.HasValue
-                        ? "  " + string.Format(Loc.S("ParamCleanup.Warn.Count"), r.UsageElementCount)
-                        : "")).ToList();
+                var lines = risky.Take(15).Select(kv =>
+                    "・" + kv.Key.Name + "  [" + string.Join(" / ", kv.Value) + "]").ToList();
                 if (risky.Count > lines.Count) lines.Add("…");
 
                 var warn = new TaskDialog(Loc.S("ParamCleanup.Confirm.Title"))

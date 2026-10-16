@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using Autodesk.Revit.DB;
 
 namespace Tools28.Commands.BeamTopLevel
@@ -30,6 +31,11 @@ namespace Tools28.Commands.BeamTopLevel
             {
                 RemoveExistingBeamLabels(doc, activeView);
             }
+
+            // 上書きしない場合は、既に同じラベルが同じ位置にある梁には作らない（再実行で重ならないように）
+            var keptLabels = overwriteExisting
+                ? new List<TextNote>()
+                : FindExistingBeamLabels(doc, activeView);
 
             double textHeight = GetTextHeight(doc, textNoteTypeId);
             int viewScale = activeView.Scale;
@@ -67,6 +73,8 @@ namespace Tools28.Commands.BeamTopLevel
                 }
 
                 string labelText = result.DisplayValue + LabelSuffix;
+                if (HasSameLabelNearby(keptLabels, labelText, textPosition, modelTextHeight))
+                    continue;
 
                 try
                 {
@@ -191,16 +199,40 @@ namespace Tools28.Commands.BeamTopLevel
 
         private static void RemoveExistingBeamLabels(Document doc, View activeView)
         {
-            var existingNotes = new FilteredElementCollector(doc, activeView.Id)
-                .OfClass(typeof(TextNote))
-                .Cast<TextNote>()
-                .Where(tn => tn.Text.EndsWith(LabelSuffix))
-                .ToList();
-
-            foreach (var note in existingNotes)
+            foreach (var note in FindExistingBeamLabels(doc, activeView))
             {
                 try { doc.Delete(note.Id); } catch { }
             }
+        }
+
+        /// <summary>
+        /// このツールが作った梁ラベル（「レベル名+数値」＋接尾辞。例: 2FL+120天端）を探す。
+        /// TextNote.Text は末尾に改行が付くため取り除いてから判定する。
+        /// 「スラブ天端」のような利用者の文字は、符号付きの数値が無いため対象にしない。
+        /// </summary>
+        private static List<TextNote> FindExistingBeamLabels(Document doc, View activeView)
+        {
+            var pattern = new Regex(@"[+\-]-?\d+" + Regex.Escape(LabelSuffix) + "$");
+            return new FilteredElementCollector(doc, activeView.Id)
+                .OfClass(typeof(TextNote))
+                .Cast<TextNote>()
+                .Where(tn => pattern.IsMatch((tn.Text ?? "").TrimEnd('\r', '\n', ' ')))
+                .ToList();
+        }
+
+        private static bool HasSameLabelNearby(
+            List<TextNote> labels, string labelText, XYZ position, double tolerance)
+        {
+            foreach (var tn in labels)
+            {
+                if ((tn.Text ?? "").TrimEnd('\r', '\n', ' ') != labelText)
+                    continue;
+                XYZ c = tn.Coord;
+                double dx = c.X - position.X, dy = c.Y - position.Y;
+                if (Math.Sqrt(dx * dx + dy * dy) < tolerance)
+                    return true;
+            }
+            return false;
         }
     }
 }
