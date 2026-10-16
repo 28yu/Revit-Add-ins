@@ -363,6 +363,10 @@ _buttonTipKeys["FeatureName"] = "Ribbon.FeatureName.Button.Tip";
   誤検知なら Microsoft に報告（https://www.microsoft.com/wdsi/filesubmission）してから、
   **Revit-Add-ins と 28tools-download の両方**のリリース画面で「Publish release」を押して公開する。
   サイトのボタンは公開済みの最新リリースを読むため、公開するまでサイトには反映されない
+- **公開は Claude からもできる**（`publish-release.yml`）: ユーザーが実機確認を終えて「公開して」と言ったら、
+  `git push origin origin/main:refs/heads/publish/v<VERSION>` を実行する。ワークフローが両リポジトリの下書きと
+  exe の有無を確認してから両方を公開し、合図のブランチを削除する（Claude はリリース編集 API が 403 のため代行させる）。
+  手動なら Actions →「リリースの公開」→ Run workflow。公開後はサイト側の待機ブランチを `claude/*` へ push する
 - タグ push (`v*`) でも同様
 - GitHub → Actions → "Build and Release" → Run workflow で手動実行可能
 
