@@ -121,10 +121,8 @@ namespace Tools28.Commands.FireProtection
                     if (needTemplate)
                     {
                         TaskDialogResult templateResult = TaskDialog.Show(
-                            "ビューテンプレート確認",
-                            "ビューテンプレートが設定されているビューがあります。\n" +
-                            "塗潰領域を配置するにはテンプレートを解除する必要があります。\n\n" +
-                            "テンプレートを解除しますか？",
+                            Loc.S("Fire.ViewTemplate"),
+                            Loc.S("Fire.ViewTemplateMsg"),
                             TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No);
 
                         if (templateResult == TaskDialogResult.Yes)
@@ -169,15 +167,15 @@ namespace Tools28.Commands.FireProtection
 
                 string viewTypeName;
                 if (isSheet)
-                    viewTypeName = $"シート（{targetViews.Count}ビュー）";
+                    viewTypeName = string.Format(Loc.S("Fire.SheetViews"), targetViews.Count);
                 else
                 {
                     switch (activeView.ViewType)
                     {
-                        case ViewType.FloorPlan: viewTypeName = "平面ビュー"; break;
-                        case ViewType.CeilingPlan: viewTypeName = "天井伏図"; break;
-                        case ViewType.EngineeringPlan: viewTypeName = "構造伏図"; break;
-                        case ViewType.Section: viewTypeName = "断面図"; break;
+                        case ViewType.FloorPlan: viewTypeName = Loc.S("ViewType.FloorPlan"); break;
+                        case ViewType.CeilingPlan: viewTypeName = Loc.S("ViewType.CeilingPlan"); break;
+                        case ViewType.EngineeringPlan: viewTypeName = Loc.S("ViewType.EngineeringPlan"); break;
+                        case ViewType.Section: viewTypeName = Loc.S("ViewType.Section"); break;
                         default: viewTypeName = activeView.ViewType.ToString(); break;
                     }
                 }
@@ -416,7 +414,7 @@ namespace Tools28.Commands.FireProtection
                     {
                         trans.RollBack();
                         throw new Exception(
-                            "トランザクション内でエラー: " + ex.Message +
+                            string.Format(Loc.S("Fire.Err.InTransaction"), ex.Message) +
                             "\n" + ex.StackTrace, ex);
                     }
                 }
@@ -476,13 +474,13 @@ namespace Tools28.Commands.FireProtection
                 }
 
                 string legendInfo = legendViewId != null
-                    ? "凡例ビュー「耐火被覆色分け凡例」を作成しました"
-                    : "凡例ビュー作成をスキップしました";
+                    ? string.Format(Loc.S("Fire.LegendCreated"), LegendManager.LegendViewName)
+                    : Loc.S("Fire.LegendSkipped");
 
                 TaskDialog.Show(Loc.S("Fire.DoneTitle"),
                     string.Format(Loc.S("Fire.DoneMsg"), targetViews.Count, regionCount) +
-                    $"\n耐火被覆種類: {settings.Types.Count}\n" +
-                    $"{legendInfo}");
+                    "\n" + string.Format(Loc.S("Fire.DoneTypes"), settings.Types.Count) + "\n" +
+                    legendInfo);
 
                 return Result.Succeeded;
             }

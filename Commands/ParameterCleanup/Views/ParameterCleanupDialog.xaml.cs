@@ -66,6 +66,8 @@ namespace Tools28.Commands.ParameterCleanup.Views
             btnSelectNotBound.Content = Loc.S("ParamCleanup.SelectNotBound");
             btnSelectAllVisible.Content = Loc.S("ParamCleanup.SelectAll");
             btnDeselectAllVisible.Content = Loc.S("ParamCleanup.DeselectAll");
+            btnSelectAllVisible.ToolTip = Loc.S("Common.SelectAllVisible.Tip");
+            btnDeselectAllVisible.ToolTip = Loc.S("Common.DeselectAllVisible.Tip");
 
             lblKindFilter.Text = Loc.S("ParamCleanup.Filter.Kind");
             rbKindAll.Content = Loc.S("ParamCleanup.Filter.All");
@@ -733,7 +735,7 @@ namespace Tools28.Commands.ParameterCleanup.Views
                             catch { }
                         }
                     }
-                    t.Commit();
+                    t.CommitOrThrow();
 
                     var deletedSet = new HashSet<ElementId>(deleted ?? new List<ElementId>());
                     ok = ids.Count(id => deletedSet.Contains(id));

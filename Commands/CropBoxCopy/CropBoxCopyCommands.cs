@@ -102,12 +102,12 @@ namespace Tools28.Commands.CropBoxCopy
         {
             switch (viewType)
             {
-                case ViewType.FloorPlan: return "平面図";
-                case ViewType.CeilingPlan: return "天井伏図";
-                case ViewType.Section: return "断面図";
-                case ViewType.Elevation: return "立面図";
-                case ViewType.Detail: return "詳細図";
-                case ViewType.ThreeD: return "3Dビュー";
+                case ViewType.FloorPlan: return Loc.S("ViewType.FloorPlan");
+                case ViewType.CeilingPlan: return Loc.S("ViewType.CeilingPlan");
+                case ViewType.Section: return Loc.S("ViewType.Section");
+                case ViewType.Elevation: return Loc.S("ViewType.Elevation");
+                case ViewType.Detail: return Loc.S("ViewType.Detail");
+                case ViewType.ThreeD: return Loc.S("ViewType.ThreeD");
                 default: return viewType.ToString();
             }
         }
@@ -252,12 +252,12 @@ namespace Tools28.Commands.CropBoxCopy
         {
             switch (viewType)
             {
-                case ViewType.FloorPlan: return "平面図";
-                case ViewType.CeilingPlan: return "天井伏図";
-                case ViewType.Section: return "断面図";
-                case ViewType.Elevation: return "立面図";
-                case ViewType.Detail: return "詳細図";
-                case ViewType.ThreeD: return "3Dビュー";
+                case ViewType.FloorPlan: return Loc.S("ViewType.FloorPlan");
+                case ViewType.CeilingPlan: return Loc.S("ViewType.CeilingPlan");
+                case ViewType.Section: return Loc.S("ViewType.Section");
+                case ViewType.Elevation: return Loc.S("ViewType.Elevation");
+                case ViewType.Detail: return Loc.S("ViewType.Detail");
+                case ViewType.ThreeD: return Loc.S("ViewType.ThreeD");
                 default: return viewType.ToString();
             }
         }

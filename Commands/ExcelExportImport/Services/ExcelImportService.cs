@@ -205,7 +205,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
                                 ElementId = elementIdInt,
                                 CategoryName = categoryName,
                                 ParameterName = "",
-                                CurrentValue = "（要素が見つかりません）",
+                                CurrentValue = Loc.S("Import.Preview.ElementMissing"),
                                 NewValue = "",
                                 HasChange = false,
                                 IsReadOnly = true,
@@ -644,7 +644,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
                         if (!TryParseElementId(elementIdStr, out long elementIdInt))
                         {
                             result.FailCount++;
-                            result.Errors.Add($"シート '{worksheet.Name}' 行{row}: ElementIdの解析に失敗");
+                            result.Errors.Add(string.Format(Loc.S("Import.Err.ParseElementId"), worksheet.Name, row));
                             continue;
                         }
 
@@ -653,7 +653,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
                         if (elem == null)
                         {
                             result.FailCount++;
-                            result.Errors.Add($"シート '{worksheet.Name}' 行{row}: ElementId {elementIdInt} が見つかりません");
+                            result.Errors.Add(string.Format(Loc.S("Import.Err.RowElementNotFound"), worksheet.Name, row, elementIdInt));
                             continue;
                         }
 
@@ -677,7 +677,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
 
                             if (param == null)
                             {
-                                result.Warnings.Add($"シート '{worksheet.Name}' 行{row}: パラメータ '{headerName}' が見つかりません");
+                                result.Warnings.Add(string.Format(Loc.S("Import.Warn.RowParamNotFound"), worksheet.Name, row, headerName));
                                 result.SkipCount++;
                                 continue;
                             }
@@ -716,8 +716,8 @@ namespace Tools28.Commands.ExcelExportImport.Services
                                 result.FailCount++;
                                 result.FailedCells.Add(elementIdInt.ToString() + "|" + headerName);
                                 string errorDetail = ParameterService.IsTypeChangeParameter(param)
-                                    ? $"シート '{worksheet.Name}' 行{row}: タイプ変更に失敗（値: '{newValue}'）— 一致するタイプが見つかりません"
-                                    : $"シート '{worksheet.Name}' 行{row}: パラメータ '{headerName}' の値設定に失敗（値: '{newValue}'）";
+                                    ? string.Format(Loc.S("Import.Err.RowTypeChangeFailed"), worksheet.Name, row, newValue)
+                                    : string.Format(Loc.S("Import.Err.RowSetFailed"), worksheet.Name, row, headerName, newValue);
                                 result.Errors.Add(errorDetail);
                             }
                         }
@@ -763,7 +763,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
                 if (elem == null)
                 {
                     result.FailCount++;
-                    result.Errors.Add($"要素 {pr.ElementId} が見つかりません（パラメータ '{pr.ParameterName}'）");
+                    result.Errors.Add(string.Format(Loc.S("Import.Err.ElementNotFound"), pr.ElementId, pr.ParameterName));
                     continue;
                 }
 
@@ -776,7 +776,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
                 var param = ParameterService.FindParameter(elem, rawName, isTypeParam, parsed.Kind, parsed.Index, pr.ParamId, doc);
                 if (param == null)
                 {
-                    result.Warnings.Add($"パラメータ '{headerName}' が見つかりません（要素 {pr.ElementId}）");
+                    result.Warnings.Add(string.Format(Loc.S("Import.Warn.ParamNotFound"), headerName, pr.ElementId));
                     result.SkipNotFound++;
                     continue;
                 }
@@ -943,7 +943,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
         private static string BuildSetFailureMessage(Parameter param, string headerName, long elementId, string value, Document doc)
         {
             if (ParameterService.IsTypeChangeParameter(param))
-                return $"タイプ変更に失敗（要素 {elementId}, 値: '{value}'）— 一致するタイプが見つかりません";
+                return string.Format(Loc.S("Import.Err.TypeChangeFailed"), elementId, value);
 
             if (param.StorageType == StorageType.ElementId)
             {
@@ -957,11 +957,9 @@ namespace Tools28.Commands.ExcelExportImport.Services
                 catch { }
 
                 if (isImage)
-                    return $"パラメータ '{headerName}' は画像参照（イメージ）型のため文字値 '{value}' は設定できません" +
-                           $"（要素 {elementId}）。設定するにはその名前の画像がプロジェクトに存在する必要があります。";
+                    return string.Format(Loc.S("Import.Err.ImageRefText"), headerName, value, elementId);
 
-                string msg = $"パラメータ '{headerName}' は要素参照型のため文字値 '{value}' は設定できません" +
-                             $"（要素 {elementId}）。'{value}' という名前の要素が見つかりません。";
+                string msg = string.Format(Loc.S("Import.Err.ElementRefText"), headerName, value, elementId);
 
                 // 似た名前の候補（例: 「7FL」→「6階(7FL)」）を添える。自動では置き換えない
                 var candidates = ParameterService.SuggestReferenceNames(param, value, doc);
@@ -973,7 +971,7 @@ namespace Tools28.Commands.ExcelExportImport.Services
                 return msg;
             }
 
-            return $"パラメータ '{headerName}' の値設定に失敗（要素 {elementId}, 値: '{value}'）";
+            return string.Format(Loc.S("Import.Err.SetFailed"), headerName, elementId, value);
         }
 
         /// <summary>

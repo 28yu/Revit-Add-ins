@@ -790,7 +790,7 @@ namespace Tools28.Commands.ExcelExportImport.Views
         {
             var dialog = new SaveFileDialog
             {
-                Filter = "JSON設定ファイル (*.json)|*.json",
+                Filter = Loc.S("Common.JsonSettingsFilter"),
                 DefaultExt = ".json",
                 FileName = "ExcelExportSettings"
             };
@@ -815,7 +815,7 @@ namespace Tools28.Commands.ExcelExportImport.Views
         {
             var dialog = new OpenFileDialog
             {
-                Filter = "JSON設定ファイル (*.json)|*.json",
+                Filter = Loc.S("Common.JsonSettingsFilter"),
                 DefaultExt = ".json"
             };
 
@@ -842,7 +842,7 @@ namespace Tools28.Commands.ExcelExportImport.Views
         {
             var dialog = new OpenFileDialog
             {
-                Filter = "Excelファイル (*.xlsx)|*.xlsx",
+                Filter = Loc.S("Common.ExcelFileFilter"),
                 DefaultExt = ".xlsx"
             };
 
@@ -965,9 +965,9 @@ namespace Tools28.Commands.ExcelExportImport.Views
             // キャンセルした場合はダイアログに戻る（選択内容は残る）。
             var saveDialog = new SaveFileDialog
             {
-                Filter = "Excelファイル (*.xlsx)|*.xlsx",
+                Filter = Loc.S("Common.ExcelFileFilter"),
                 DefaultExt = ".xlsx",
-                FileName = $"{_doc.Title}_パラメータ"
+                FileName = string.Format(Loc.S("Export.DefaultFileName"), _doc.Title)
             };
             if (saveDialog.ShowDialog(this) != true)
                 return;

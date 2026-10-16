@@ -144,7 +144,7 @@ namespace Tools28.Commands.BeamTopLevel
                             Error = "パラメータが未選択"
                         };
                         failureCount++;
-                        failedBeams.Add($"ID:{beam.Id} ({familyName}) - パラメータ未選択");
+                        failedBeams.Add($"ID:{beam.Id} ({familyName}) - {Loc.S("Beam.ParamNotSelected")}");
                         continue;
                     }
 
@@ -208,28 +208,24 @@ namespace Tools28.Commands.BeamTopLevel
 
                 // 完了ダイアログ
                 string legendInfo = legendViewId != null
-                    ? "凡例ビュー: 「梁天端色分け凡例」を作成しました"
-                    : "凡例ビュー: 作成をスキップしました（既存あり）";
+                    ? string.Format(Loc.S("Beam.LegendCreated"), LegendManager.LegendViewName)
+                    : Loc.S("Beam.LegendSkipped");
 
-                string resultMessage = $"処理が完了しました。\n\n" +
-                    $"対象梁数: {beams.Count}\n" +
-                    $"成功: {successCount}\n" +
-                    $"失敗: {failureCount}\n" +
-                    $"作成フィルタ数: {levelGroups.Count}\n" +
-                    $"{legendInfo}";
+                string resultMessage = string.Format(Loc.S("Beam.Result"),
+                    beams.Count, successCount, failureCount, levelGroups.Count, legendInfo);
 
                 if (failureCount > 0)
                 {
-                    resultMessage += "\n\n--- 失敗した梁 ---\n";
+                    resultMessage += Loc.S("Beam.FailedHeader");
                     foreach (var info in failedBeams.Take(20))
                     {
                         resultMessage += $"\n{info}";
                     }
                     if (failedBeams.Count > 20)
                     {
-                        resultMessage += $"\n...他 {failedBeams.Count - 20} 件";
+                        resultMessage += "\n" + string.Format(Loc.S("Import.Done.More"), failedBeams.Count - 20);
                     }
-                    resultMessage += "\n\n※ 失敗した梁は赤色フィルタで表示されています。";
+                    resultMessage += Loc.S("Beam.FailedNote");
                 }
 
                 TaskDialog.Show(Loc.S("BeamTop.DoneTitle"), resultMessage);

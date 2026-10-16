@@ -211,7 +211,7 @@ namespace Tools28.Commands.FillPatternIO
                         skipped += s;
                         invalid += inv;
                     }
-                    trans.Commit();
+                    trans.CommitOrThrow();
                 }
             }
             catch (Exception ex)

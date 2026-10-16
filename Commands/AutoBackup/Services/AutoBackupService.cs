@@ -268,7 +268,7 @@ namespace Tools28.Commands.AutoBackup.Services
                 string backupFolder = ResolveBackupFolder(sourcePath);
                 Directory.CreateDirectory(backupFolder);
 
-                string baseName = Path.GetFileNameWithoutExtension(sourcePath);
+                string baseName = GetBackupBaseName(sourcePath);
                 string ext = Path.GetExtension(sourcePath);
                 string stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
                 string destName = $"{baseName}{BackupMarker}{stamp}{ext}";
@@ -349,6 +349,28 @@ namespace Tools28.Commands.AutoBackup.Services
         private sealed class SkipIfLockedCallback : ICentralLockedCallback
         {
             public bool ShouldWaitForLockAvailability() => false;
+        }
+
+        /// <summary>
+        /// バックアップファイル名の先頭部分。指定フォルダにまとめて保存する場合は、
+        /// 別フォルダにある同名モデル（A案件\構造.rvt と B案件\構造.rvt 等）が
+        /// 世代を奪い合わないよう、モデルの場所から作った短い識別子を付ける。
+        /// （モデルと同じフォルダに保存する場合は、場所ごとにフォルダが分かれるため付けない）
+        /// </summary>
+        private string GetBackupBaseName(string sourcePath)
+        {
+            string name = Path.GetFileNameWithoutExtension(sourcePath);
+            if (_settings.UseModelFolder || string.IsNullOrWhiteSpace(_settings.BackupFolder))
+                return name;
+
+            // string.GetHashCode は .NET 8 では起動ごとに値が変わるため SHA1 を使う
+            using (var sha = System.Security.Cryptography.SHA1.Create())
+            {
+                byte[] hash = sha.ComputeHash(
+                    System.Text.Encoding.UTF8.GetBytes(Path.GetFullPath(sourcePath).ToLowerInvariant()));
+                string id = BitConverter.ToString(hash, 0, 3).Replace("-", "").ToLowerInvariant();
+                return $"{name}_{id}";
+            }
         }
 
         private string ResolveBackupFolder(string sourcePath)

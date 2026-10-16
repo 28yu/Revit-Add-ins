@@ -60,7 +60,7 @@ namespace Tools28.Commands.Room3DColor
                     {
                         t1.Start();
                         volumeEnabled = RoomSolidGenerator.EnsureVolumeComputation(doc);
-                        t1.Commit();
+                        t1.CommitOrThrow();
                     }
 
                     using (Transaction t2 = new Transaction(doc, Loc.S("Room3D.Txn.Generate")))
@@ -131,7 +131,7 @@ namespace Tools28.Commands.Room3DColor
                                 doc, RoomSolidGenerator.LegendViewName, result.Groups);
                         }
 
-                        t2.Commit();
+                        t2.CommitOrThrow();
                     }
 
                     tg.Assimilate();

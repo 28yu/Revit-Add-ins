@@ -10,7 +10,7 @@ namespace Tools28.Commands.BeamUnderLevel
     /// </summary>
     public static class LegendManager
     {
-        private const string LegendViewName = "梁下端色分け凡例";
+        internal const string LegendViewName = "梁下端色分け凡例";
         // フィルタ名と同じプレフィックス
         private const string FilterPrefix = "梁下_";
         private const string ErrorFilterName = "梁下_エラー";
@@ -33,7 +33,7 @@ namespace Tools28.Commands.BeamUnderLevel
                 {
                     if (overwriteExisting)
                     {
-                        doc.Delete(existingView.Id);
+                        ClearViewContents(doc, existingView);
                     }
                     else
                     {
@@ -53,15 +53,19 @@ namespace Tools28.Commands.BeamUnderLevel
                     return null;
 
                 // 製図ビューを作成
-                ViewDrafting draftingView = ViewDrafting.Create(doc, viewFamilyTypeId);
-                try
+                // 既存の凡例ビューは中身を消して再利用する（シート上の配置を残すため）
+                ViewDrafting draftingView = existingView ?? ViewDrafting.Create(doc, viewFamilyTypeId);
+                if (existingView == null)
                 {
-                    draftingView.Name = LegendViewName;
-                }
-                catch
-                {
-                    draftingView.Name = LegendViewName + "_" +
-                        DateTime.Now.ToString("yyyyMMdd_HHmmss");
+                    try
+                    {
+                        draftingView.Name = LegendViewName;
+                    }
+                    catch
+                    {
+                        draftingView.Name = LegendViewName + "_" +
+                            DateTime.Now.ToString("yyyyMMdd_HHmmss");
+                    }
                 }
 
                 // 尺度を1:1に設定
@@ -254,6 +258,23 @@ namespace Tools28.Commands.BeamUnderLevel
                 .Cast<ViewDrafting>()
                 .FirstOrDefault(v => v.Name == LegendViewName ||
                     v.Name.StartsWith(LegendViewName + "_"));
+        }
+
+        /// <summary>
+        /// 凡例ビューの中身（文字・塗潰し領域など）だけを削除する。
+        /// ビュー自体を削除して作り直すと、シートに配置した凡例が消えてしまうため
+        /// </summary>
+        private static void ClearViewContents(Document doc, View view)
+        {
+            var ids = new FilteredElementCollector(doc, view.Id)
+                .WhereElementIsNotElementType()
+                .Where(e => e.Id != view.Id && e.OwnerViewId == view.Id)
+                .Select(e => e.Id)
+                .ToList();
+            foreach (var id in ids)
+            {
+                try { doc.Delete(id); } catch { }
+            }
         }
 
         /// <summary>

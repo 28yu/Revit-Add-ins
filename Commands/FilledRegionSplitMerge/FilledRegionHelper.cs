@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Autodesk.Revit.DB;
+using Tools28.Localization;
 
 namespace Tools28.Commands.FilledRegionSplitMerge
 {
@@ -116,7 +117,7 @@ namespace Tools28.Commands.FilledRegionSplitMerge
 
             if (view == null)
             {
-                throw new InvalidOperationException("ビューが見つかりません");
+                throw new InvalidOperationException(Loc.S("Common.ViewNotFound"));
             }
 
             // 外形ループとその穴をまとめて1エリアとする（穴を別の領域にしない）
@@ -167,7 +168,7 @@ namespace Tools28.Commands.FilledRegionSplitMerge
 
             if (view == null)
             {
-                throw new InvalidOperationException("ビューが見つかりません");
+                throw new InvalidOperationException(Loc.S("Common.ViewNotFound"));
             }
 
             if (regionLoops.Count == 0)

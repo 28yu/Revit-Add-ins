@@ -38,7 +38,7 @@ namespace Tools28.Commands.RoomTagCreator
                     pickedRef = uidoc.Selection.PickObject(
                         ObjectType.Element,
                         new ViewportSelectionFilter(),
-                        "シート上のビューポートを選択してください");
+                        Loc.S("RoomTag.PickViewport"));
                 }
                 catch (Autodesk.Revit.Exceptions.OperationCanceledException)
                 {
@@ -123,7 +123,7 @@ namespace Tools28.Commands.RoomTagCreator
                             TaskDialog.Show(Loc.S("Common.Error"), ex.Message);
                             return Result.Failed;
                         }
-                        t1.Commit();
+                        t1.CommitOrThrow();
                     }
 
                     // 2. 部屋タグ生成
@@ -152,7 +152,7 @@ namespace Tools28.Commands.RoomTagCreator
                                 string.Format(Loc.S("RoomTag.GenError"), ex.Message));
                             return Result.Failed;
                         }
-                        t2.Commit();
+                        t2.CommitOrThrow();
                     }
 
                     tg.Assimilate();

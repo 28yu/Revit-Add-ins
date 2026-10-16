@@ -336,7 +336,7 @@ namespace Tools28.Commands.SheetCreation
         /// </summary>
         private string GetErrorMessageWithManualUrl(string errorMessage)
         {
-            return $"{errorMessage}\n\nマニュアル: https://28tools.com/addins.html\n配布サイト: https://28yu.github.io/28tools-download/\nFor English: Click 🌐 button on the manual page";
+            return string.Format(Loc.S("Common.ErrorWithManual"), errorMessage);
         }
     }
 }

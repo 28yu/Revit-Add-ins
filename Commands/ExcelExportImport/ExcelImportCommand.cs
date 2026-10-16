@@ -223,7 +223,7 @@ namespace Tools28.Commands.ExcelExportImport
             }
             catch (Exception ex)
             {
-                message = ex.Message + "\n\nマニュアル: https://28tools.com/addins.html";
+                message = string.Format(Loc.S("Common.ErrorWithManual"), ex.Message);
                 return Result.Failed;
             }
         }

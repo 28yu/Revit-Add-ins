@@ -64,7 +64,7 @@ namespace Tools28.Commands.FormworkCalculator
                 if (sourceViews.Count == 0)
                 {
                     TaskDialog.Show(Loc.S("Common.Warning"),
-                        "型枠数量算出は 3D ビューで実行してください。\nプロジェクトブラウザで複数の 3D ビューを選択すると、それらをまとめて 1 シートに集約できます。");
+                        Loc.S("Formwork.Need3DView"));
                     return Result.Cancelled;
                 }
 

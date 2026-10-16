@@ -45,7 +45,7 @@ string sheetName = string.Format(Loc.S("Sheet.NewSheetName", modelLang), sheetNu
   `FilterManager.FilterPrefix` / `ErrorFilterName`、`LegendManager.LegendViewName`
 - `Commands/FormworkCalculator/` — `FormworkParameterManager.Param*` / `*Label`、
   `ScheduleCreator.ScheduleName`、`FormworkSheetCreator.SheetName`、`FormworkVisualizer.AnalysisViewName` 系、
-  ワークセット名 `28Tools_型枠`
+  ワークセット名 `28Tools_型枠`、非表示フィルタ `FormworkVisualizer.HideAllFilterName`（`28T_型枠_全非表示`）
 - `Commands/FireProtection/` — `LegendManager.LegendViewName`、`FilledRegionCreator.TypePrefix`
 - `Commands/Room3DColor/` — `RoomColorLegendManager.TypePrefix`、DirectShape の識別マーカー、
   `RoomSolidGenerator.DefaultViewName` / `DefaultWorksetName` / `LegendViewName`（既定のビュー名・ワークセット名・凡例名）

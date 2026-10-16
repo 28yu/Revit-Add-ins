@@ -53,6 +53,10 @@ namespace Tools28.Commands.FilterManagement.Views
             btnSelectAllVisible.Content = Loc.S("FilterMgmt.SelectAll");
             btnDeselectAllVisible.Content = Loc.S("FilterMgmt.DeselectAll");
             btnReload.Content = Loc.S("FilterMgmt.Btn.Reload");
+            btnSelectUnused.ToolTip = Loc.S("FilterMgmt.SelectUnused.Tip");
+            btnSelectAllVisible.ToolTip = Loc.S("Common.SelectAllVisible.Tip");
+            btnDeselectAllVisible.ToolTip = Loc.S("Common.DeselectAllVisible.Tip");
+            btnReload.ToolTip = Loc.S("Common.Reload.Tip");
             btnDelete.Content = Loc.S("FilterMgmt.Btn.Delete");
             btnClose.Content = Loc.S("FilterMgmt.Btn.Close");
         }
@@ -156,7 +160,7 @@ namespace Tools28.Commands.FilterManagement.Views
                 {
                     t.Start();
                     fe.Name = newName;
-                    t.Commit();
+                    t.CommitOrThrow();
                 }
                 row.Name = newName;   // 念のため確定
                 UpdateCount();
@@ -257,7 +261,7 @@ namespace Tools28.Commands.FilterManagement.Views
                             catch { }
                         }
                     }
-                    t.Commit();
+                    t.CommitOrThrow();
 
                     var deletedSet = new HashSet<ElementId>(deleted ?? new List<ElementId>());
                     ok = ids.Count(id => deletedSet.Contains(id));

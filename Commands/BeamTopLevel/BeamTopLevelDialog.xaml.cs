@@ -68,7 +68,7 @@ namespace Tools28.Commands.BeamTopLevel
         private void InitializeStep1()
         {
             ViewNameText.Text = _data.ViewName;
-            BeamCountText.Text = $"{_data.BeamCount} 本";
+            BeamCountText.Text = string.Format(Loc.S("Beam.CountFmt"), _data.BeamCount);
 
             double refElevMm = BeamCalculator.FeetToMm(_data.RefLevel.Elevation);
             RefLevelText.Text = $"{_data.RefLevel.Name} ({refElevMm:+0;-0}mm)";
@@ -121,7 +121,7 @@ namespace Tools28.Commands.BeamTopLevel
 
                 var header = new TextBlock
                 {
-                    Text = $"{familyName} ({beamCount}梁)",
+                    Text = string.Format(Loc.S("Beam.FamilyHeader"), familyName, beamCount),
                     FontSize = 13,
                     FontWeight = FontWeights.Bold,
                     Foreground = new System.Windows.Media.SolidColorBrush(
@@ -138,7 +138,7 @@ namespace Tools28.Commands.BeamTopLevel
                 {
                     var radio = new RadioButton
                     {
-                        Content = $"{candidate.ParamName}  ({candidate.DetectedCount}梁で検出)",
+                        Content = string.Format(Loc.S("Beam.DetectedIn"), candidate.ParamName, candidate.DetectedCount),
                         GroupName = groupName,
                         Tag = candidate.ParamName,
                         FontSize = 11,
@@ -208,7 +208,7 @@ namespace Tools28.Commands.BeamTopLevel
                 {
                     var noParamText = new TextBlock
                     {
-                        Text = "天端レベル関連のパラメータが見つかりませんでした。",
+                        Text = Loc.S("Beam.NoTopParam"),
                         FontSize = 11,
                         Foreground = new System.Windows.Media.SolidColorBrush(
                             System.Windows.Media.Color.FromRgb(0xCC, 0x00, 0x00)),
@@ -282,19 +282,18 @@ namespace Tools28.Commands.BeamTopLevel
         {
             FamilyTopLevelParamSelection = CollectTopLevelParamSelections();
 
-            string summary = $"ビュー: {_data.ViewName}\n" +
-                $"対象梁数: {_data.BeamCount} 本\n" +
-                $"ファミリ数: {_data.BeamsByFamily.Count}\n\n";
+            string summary = string.Format(Loc.S("Beam.Summary.Header"),
+                _data.ViewName, _data.BeamCount, _data.BeamsByFamily.Count);
 
-            summary += $"参照レベル: {_data.RefLevel.Name}\n\n";
+            summary += string.Format(Loc.S("Beam.Summary.RefLevel"), _data.RefLevel.Name) + "\n";
 
-            summary += "ファミリ別パラメータ:\n";
+            summary += Loc.S("Beam.Summary.FamilyParams");
             foreach (var entry in FamilyTopLevelParamSelection)
             {
                 int count = _data.BeamsByFamily.ContainsKey(entry.Key)
                     ? _data.BeamsByFamily[entry.Key].Count : 0;
-                summary += $"  {entry.Key} ({count}梁)\n";
-                summary += $"    天端レベル: {entry.Value}\n";
+                summary += string.Format(Loc.S("Beam.Summary.FamilyLine"), entry.Key, count);
+                summary += string.Format(Loc.S("Beam.Summary.TopLevel"), entry.Value);
             }
 
             // パラメータ未選択のファミリ
@@ -303,11 +302,11 @@ namespace Tools28.Commands.BeamTopLevel
                 .ToList();
             if (unselected.Count > 0)
             {
-                summary += "\n未選択のファミリ (処理スキップ):\n";
+                summary += Loc.S("Beam.Summary.Unselected");
                 foreach (var f in unselected)
                 {
                     int count = _data.BeamsByFamily[f].Count;
-                    summary += $"  {f} ({count}梁)\n";
+                    summary += string.Format(Loc.S("Beam.Summary.FamilyLine"), f, count);
                 }
             }
 
@@ -347,8 +346,8 @@ namespace Tools28.Commands.BeamTopLevel
                 if (selections.Count == 0)
                 {
                     MessageBox.Show(
-                        "少なくとも1つのファミリで天端レベルパラメータを選択してください。",
-                        "入力エラー", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        Loc.S("Beam.SelectTopParam"),
+                        Loc.S("Common.InputError"), MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }
 

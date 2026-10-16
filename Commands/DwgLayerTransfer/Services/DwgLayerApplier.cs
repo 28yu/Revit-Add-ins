@@ -188,7 +188,7 @@ namespace Tools28.Commands.DwgLayerTransfer.Services
                                      missingLayers, missingPatterns, writtenTargets, w, result);
                 }
 
-                t.Commit();
+                t.CommitOrThrow();
             }
 
             result.MissingLayers.AddRange(missingLayers.OrderBy(s => s, StringComparer.CurrentCultureIgnoreCase));

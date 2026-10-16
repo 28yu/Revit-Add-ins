@@ -3,6 +3,7 @@ using System.IO;
 using System.Text;
 using Autodesk.Revit.DB;
 using RevitApp = Autodesk.Revit.ApplicationServices.Application;
+using Tools28.Localization;
 
 namespace Tools28.Commands.FormworkCalculator.Engine
 {
@@ -75,7 +76,7 @@ namespace Tools28.Commands.FormworkCalculator.Engine
 
                 DefinitionFile defFile = app.OpenSharedParameterFile();
                 if (defFile == null)
-                    throw new Exception("共有パラメータファイルを開けませんでした。");
+                    throw new Exception(Loc.S("Common.SharedParamFileOpenFailed"));
 
                 DefinitionGroup defGroup = defFile.Groups.get_Item(SharedParamGroupName)
                     ?? defFile.Groups.Create(SharedParamGroupName);

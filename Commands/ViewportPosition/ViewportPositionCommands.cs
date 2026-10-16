@@ -474,7 +474,7 @@ namespace Tools28.Commands.ViewportPosition
 
                 // 関連するビュー情報を取得
                 View relatedView = doc.GetElement(selectedViewport.ViewId) as View;
-                string viewInfo = relatedView != null ? relatedView.Name : "不明なビュー";
+                string viewInfo = relatedView != null ? relatedView.Name : Loc.S("ViewportPos.UnknownView");
 
                 // クリップボードに保存
                 ViewportPositionClipboard.CopiedPosition = position;
@@ -538,7 +538,7 @@ namespace Tools28.Commands.ViewportPosition
                         // 複数シート選択の場合は自動マッチング機能を使用
                         if (selectedSheets.Count > 1)
                         {
-                            return ExecuteAutoMatchingImpl(doc, selectedSheets, ViewMatcher.MatchingMode.ExactMatch, "完全一致");
+                            return ExecuteAutoMatchingImpl(doc, selectedSheets, ViewMatcher.MatchingMode.ExactMatch, Loc.S("ViewportPos.Mode.ExactMatch"));
                         }
                         else
                         {
@@ -631,7 +631,7 @@ namespace Tools28.Commands.ViewportPosition
             List<(ViewSheet sheet, List<(Viewport source, Viewport target, string reason)> matches)> allMatches,
             string modeDescription)
         {
-            using (Transaction trans = new Transaction(doc, $"自動マッチング位置変更 ({modeDescription})"))
+            using (Transaction trans = new Transaction(doc, string.Format(Loc.S("ViewportPos.Txn.AutoMatch"), modeDescription)))
             {
                 trans.Start();
 
@@ -664,7 +664,7 @@ namespace Tools28.Commands.ViewportPosition
 
         private Result ExecuteDirectViewportPasteImpl(Document doc, ViewSheet activeSheet, List<Viewport> viewports)
         {
-            return ApplyPositionToViewportsImpl(doc, viewports, "直接選択ビューポート", null);
+            return ApplyPositionToViewportsImpl(doc, viewports, Loc.S("ViewportPos.Op.DirectViewport"), null);
         }
 
         private Result ExecuteMultiSheetPasteImpl(Document doc, List<ViewSheet> sheets)
@@ -746,14 +746,14 @@ namespace Tools28.Commands.ViewportPosition
 
             // ビューポートのリストを抽出して処理
             var viewports = viewportInfo.Select(vi => vi.viewport).ToList();
-            return ApplyPositionToViewportsImpl(doc, viewports, "選択ビュー", viewportInfo);
+            return ApplyPositionToViewportsImpl(doc, viewports, Loc.S("ViewportPos.Op.SelectedView"), viewportInfo);
         }
 
         private Result ApplyPositionToViewportsImpl(Document doc, List<Viewport> viewports, string operationType,
             List<(View view, Viewport viewport, ViewSheet sheet)> detailInfo = null)
         {
             // ビューポートに位置を適用する共通処理
-            using (Transaction trans = new Transaction(doc, $"{operationType} ビューポート位置変更"))
+            using (Transaction trans = new Transaction(doc, string.Format(Loc.S("ViewportPos.Txn.ApplyOp"), operationType)))
             {
                 trans.Start();
 

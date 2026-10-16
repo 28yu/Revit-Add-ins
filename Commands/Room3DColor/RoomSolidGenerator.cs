@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.DB.Architecture;
+using Tools28.Localization;
 
 namespace Tools28.Commands.Room3DColor
 {
@@ -330,7 +331,7 @@ namespace Tools28.Commands.Room3DColor
                 .FirstOrDefault(v => v.ViewFamily == ViewFamily.ThreeDimensional)?.Id;
 
             if (vftId == null)
-                throw new InvalidOperationException("3Dビューファミリタイプが見つかりません。");
+                throw new InvalidOperationException(Loc.S("Room3D.Err.No3DViewFamilyType"));
 
             View3D view = View3D.CreateIsometric(doc, vftId);
 

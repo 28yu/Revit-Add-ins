@@ -98,7 +98,7 @@ namespace Tools28.Commands.FilledRegionSplitMerge
                             resultMessage = string.Format(Loc.S("FilledRegion.MergeResult"), processedCount);
                         }
 
-                        trans.Commit();
+                        trans.CommitOrThrow();
 
                         // ステップ10: 完了メッセージ表示
                         TaskDialog.Show(Loc.S("Common.ProcessComplete"), resultMessage);
@@ -110,7 +110,7 @@ namespace Tools28.Commands.FilledRegionSplitMerge
                     }
                     catch (Exception ex)
                     {
-                        trans.RollBack();
+                        trans.RollBackIfStarted();
                         throw;
                     }
                 }

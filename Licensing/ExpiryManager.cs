@@ -21,11 +21,14 @@ namespace Tools28.Licensing
         /// <summary>期限切れ前に警告を表示し始める日数。</summary>
         private const int WarningDays = 30;
 
-        /// <summary>有効期限を過ぎているか。</summary>
-        public static bool IsExpired => DateTime.Now > ExpiryDate;
+        /// <summary>
+        /// 有効期限を過ぎているか。表示している期限日の当日いっぱいまでは使えるよう日付で比較する
+        /// （DateTime.Now と比べると、期限日の 0:00 を過ぎた時点で期限切れになっていた）。
+        /// </summary>
+        public static bool IsExpired => DateTime.Today > ExpiryDate.Date;
 
         /// <summary>有効期限まで残り何日か（過ぎていれば負値）。</summary>
-        public static int DaysRemaining => (int)Math.Ceiling((ExpiryDate - DateTime.Now).TotalDays);
+        public static int DaysRemaining => (ExpiryDate.Date - DateTime.Today).Days;
 
         /// <summary>期限切れ警告を表示するべきか。</summary>
         public static bool ShouldShowWarning => !IsExpired && DaysRemaining <= WarningDays;

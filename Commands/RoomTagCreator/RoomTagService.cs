@@ -5,6 +5,7 @@ using Autodesk.Revit.DB;
 using Autodesk.Revit.DB.Architecture;
 using Autodesk.Revit.UI;
 using Tools28.Commands.RoomTagCreator.Model;
+using Tools28.Localization;
 
 namespace Tools28.Commands.RoomTagCreator
 {
@@ -72,7 +73,7 @@ namespace Tools28.Commands.RoomTagCreator
 
             // なければ最初のタイプを複製
             if (allTypes.Count == 0)
-                throw new InvalidOperationException($"{targetFamily} のビューファミリタイプが見つかりません。");
+                throw new InvalidOperationException(string.Format(Loc.S("RoomTag.Err.ViewFamilyTypeNotFound"), targetFamily));
 
             var duplicated = allTypes.First().Duplicate(typeName);
             return duplicated.Id;
@@ -93,7 +94,7 @@ namespace Tools28.Commands.RoomTagCreator
 
             if (level == null)
             {
-                throw new InvalidOperationException("ソースビューのレベルが取得できません。");
+                throw new InvalidOperationException(Loc.S("RoomTag.Err.NoSourceLevel"));
             }
 
             // ビュー名の重複チェック
@@ -106,7 +107,7 @@ namespace Tools28.Commands.RoomTagCreator
 
             if (existingViews.Contains(viewName))
             {
-                throw new InvalidOperationException($"ビュー名「{viewName}」は既に存在します。別の名前を指定してください。");
+                throw new InvalidOperationException(string.Format(Loc.S("RoomTag.Err.ViewNameExists"), viewName));
             }
 
             // ビューファミリタイプを取得または作成

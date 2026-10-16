@@ -3,6 +3,7 @@ using System.IO;
 using System.Text;
 using Autodesk.Revit.DB;
 using RevitApp = Autodesk.Revit.ApplicationServices.Application;
+using Tools28.Localization;
 
 namespace Tools28.Commands.BeamUnderLevel
 {
@@ -41,7 +42,7 @@ namespace Tools28.Commands.BeamUnderLevel
 
                 DefinitionFile defFile = app.OpenSharedParameterFile();
                 if (defFile == null)
-                    throw new Exception("共有パラメータファイルを開けませんでした。");
+                    throw new Exception(Loc.S("Common.SharedParamFileOpenFailed"));
 
                 // グループを取得または作成
                 DefinitionGroup defGroup = defFile.Groups.get_Item(SharedParamGroupName);

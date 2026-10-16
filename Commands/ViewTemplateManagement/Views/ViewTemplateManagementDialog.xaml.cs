@@ -48,6 +48,10 @@ namespace Tools28.Commands.ViewTemplateManagement.Views
             btnSelectAllVisible.Content = Loc.S("TemplateMgmt.SelectAll");
             btnDeselectAllVisible.Content = Loc.S("TemplateMgmt.DeselectAll");
             btnReload.Content = Loc.S("TemplateMgmt.Btn.Reload");
+            btnSelectUnused.ToolTip = Loc.S("TemplateMgmt.SelectUnused.Tip");
+            btnSelectAllVisible.ToolTip = Loc.S("Common.SelectAllVisible.Tip");
+            btnDeselectAllVisible.ToolTip = Loc.S("Common.DeselectAllVisible.Tip");
+            btnReload.ToolTip = Loc.S("Common.Reload.Tip");
             btnDelete.Content = Loc.S("TemplateMgmt.Btn.Delete");
             btnClose.Content = Loc.S("TemplateMgmt.Btn.Close");
         }
@@ -146,7 +150,7 @@ namespace Tools28.Commands.ViewTemplateManagement.Views
                 {
                     t.Start();
                     el.Name = newName;
-                    t.Commit();
+                    t.CommitOrThrow();
                 }
                 row.Name = newName;   // 念のため確定
                 UpdateCount();
@@ -247,7 +251,7 @@ namespace Tools28.Commands.ViewTemplateManagement.Views
                             catch { }
                         }
                     }
-                    t.Commit();
+                    t.CommitOrThrow();
 
                     var deletedSet = new HashSet<ElementId>(deleted ?? new List<ElementId>());
                     ok = ids.Count(id => deletedSet.Contains(id));

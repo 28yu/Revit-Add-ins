@@ -19,6 +19,8 @@ namespace Tools28.Commands.FormworkCalculator.Output
     {
         internal const string AnalysisViewName = "3D_型枠数量";
         internal const string AnalysisViewPrefix = "3D_型枠数量 - ";
+        // 型枠 DirectShape を全ビューで隠すフィルタ（名前で再利用するため多言語化しない＝分類C）
+        internal const string HideAllFilterName = "28T_型枠_全非表示";
         // 旧名 (以前のバージョンで作成されたビューを検出するためのフォールバック)
         internal const string LegacyAnalysisViewName = "型枠分析";
         internal const string LegacyAnalysisViewPrefix = "型枠分析 - ";
@@ -254,6 +256,11 @@ namespace Tools28.Commands.FormworkCalculator.Output
             // フィルタは型枠フィルタ適用後に追加して優先度を低くする（型枠フィルタが上位）。
             bool shouldCopySourceFilters = false;
 
+            // ソースに切断ボックスが無い場合は、型枠 DirectShape を作成した後に
+            // その形状だけを囲む切断ボックスを設定する（作成前に集計対象要素全体から
+            // 算出するとリンクモデル全体を囲むほど大きくなり、型枠が小さすぎて空白に見えるため）
+            bool fitSectionBoxToShapes = false;
+
             FormworkDebugLog.Log(
                 $"  [Visual] CreateVisualization: sourceView='{sourceView?.Name}' " +
                 $"type={sourceView?.GetType().Name} reusedView={reusedView} " +
@@ -290,8 +297,8 @@ namespace Tools28.Commands.FormworkCalculator.Output
                         // これにより解析ビューがモデル全体表示にならず、型枠エリアにフォーカスされる。
                         // EnableSectionBox は要素BBoxが取得できない場合は切断ボックスを有効化しないため安全。
                         FormworkDebugLog.Log(
-                            "  [Visual] source IsSectionBoxActive=False → compute section box from element BBoxes");
-                        EnableSectionBox(doc, view, result);
+                            "  [Visual] source IsSectionBoxActive=False → fit section box to created shapes (after creation)");
+                        fitSectionBoxToShapes = true;
                     }
                 }
                 else
@@ -687,6 +694,16 @@ namespace Tools28.Commands.FormworkCalculator.Output
             FormworkDebugLog.Log(
                 $"  [Visual] total DirectShapes: {vr.CreatedShapeIds.Count} " +
                 $"(formwork={formworkShapesCount} excluded={excludedShapesCount})");
+
+            if (fitSectionBoxToShapes)
+            {
+                try { doc.Regenerate(); } catch { }
+                if (!EnableSectionBoxFromShapes(doc, view, vr.CreatedShapeIds))
+                {
+                    FormworkDebugLog.Log("  [Visual] fit to shapes failed → fallback to element BBoxes");
+                    EnableSectionBox(doc, view, result);
+                }
+            }
 
             // ワークセット可視性コピー後に型枠 DirectShape のワークセットを強制表示する。
             // ソースビューがホストのワークセットを非表示にしている場合、CopyWorksetVisibility で
@@ -1294,6 +1311,8 @@ namespace Tools28.Commands.FormworkCalculator.Output
             //                            (個別ビューには適用しない → V/G ダイアログが汚れない)
             //   テンプレートなしビュー → HideElements（フィルタ不使用 → V/G に影響なし）
             //   分析ビュー           → 他ソースのシェイプのみ HideElements
+            // モデル要素（型枠 DirectShape）が表示されないビューは対象外にする。
+            // シート・製図ビュー等まで処理すると、大きなモデルでは非表示処理だけで長時間止まるため
             var excludedViewTypes = new HashSet<ViewType>
             {
                 ViewType.Legend,
@@ -1301,6 +1320,13 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 ViewType.Internal,
                 ViewType.ProjectBrowser,
                 ViewType.SystemBrowser,
+                ViewType.DrawingSheet,
+                ViewType.DraftingView,
+                ViewType.Report,
+                ViewType.Rendering,
+                ViewType.ColumnSchedule,
+                ViewType.PanelSchedule,
+                ViewType.Undefined,
             };
             var allViews = new FilteredElementCollector(doc)
                 .OfClass(typeof(View))
@@ -1406,11 +1432,15 @@ namespace Tools28.Commands.FormworkCalculator.Output
             // 他フィルタの設定を保存
             var savedOverrides = new Dictionary<ElementId, OverrideGraphicSettings>();
             var savedVisibility = new Dictionary<ElementId, bool>();
+            // 「有効」チェック（利用者が一時的に無効にしたフィルタ）も保存する。
+            // 保存しないと再追加で有効に戻り、テンプレートの見た目が変わってしまう
+            var savedEnabled = new Dictionary<ElementId, bool>();
             foreach (var f in others)
             {
                 try { savedOverrides[f] = v.GetFilterOverrides(f); } catch { }
                 try { savedVisibility[f] = v.GetFilterVisibility(f); }
                 catch { savedVisibility[f] = true; }
+                try { savedEnabled[f] = v.GetIsFilterEnabled(f); } catch { }
             }
 
             // 他フィルタを一旦すべて削除（filterId だけが残る → 先頭）
@@ -1433,6 +1463,10 @@ namespace Tools28.Commands.FormworkCalculator.Output
                     {
                         try { v.SetFilterVisibility(f, vis); } catch { }
                     }
+                    if (savedEnabled.TryGetValue(f, out var enabled) && !enabled)
+                    {
+                        try { v.SetIsFilterEnabled(f, false); } catch { }
+                    }
                 }
                 catch { }
             }
@@ -1446,7 +1480,7 @@ namespace Tools28.Commands.FormworkCalculator.Output
         private static ElementId GetOrCreateHideAllFormworkFilter(
             Document doc, ElementId markerParamId)
         {
-            const string filterName = "28T_型枠_全非表示";
+            const string filterName = HideAllFilterName;
 
             var existing = new FilteredElementCollector(doc)
                 .OfClass(typeof(ParameterFilterElement))
@@ -1629,20 +1663,32 @@ namespace Tools28.Commands.FormworkCalculator.Output
             }
             catch (Exception ex)
             {
+                // 1件ずつ HideElements を呼ぶと、失敗のたびに例外が出て非常に遅い
+                // （シェイプ数×ビュー数）。非表示にできる要素だけに絞ってもう一度まとめて呼ぶ
                 int ok = 0;
-                foreach (var id in toHide)
+                try
                 {
-                    try
+                    var doc = v.Document;
+                    var hideable = toHide.Where(id =>
                     {
-                        v.HideElements(new List<ElementId> { id });
-                        ok++;
+                        try
+                        {
+                            var e = doc.GetElement(id);
+                            return e != null && e.CanBeHidden(v) && !e.IsHidden(v);
+                        }
+                        catch { return false; }
+                    }).ToList();
+                    if (hideable.Count > 0)
+                    {
+                        v.HideElements(hideable);
+                        ok = hideable.Count;
                     }
-                    catch { }
                 }
+                catch { }
                 counter += ok;
                 FormworkDebugLog.Log(
                     $"  [Hide] view='{v.Name}'({v.ViewType}) " +
-                    $"batchEX='{ex.Message}' perItem={ok}/{toHide.Count}");
+                    $"batchEX='{ex.Message}' retry={ok}/{toHide.Count}");
             }
         }
 
@@ -2082,6 +2128,13 @@ namespace Tools28.Commands.FormworkCalculator.Output
                 foreach (var fid in srcFilterIds)
                 {
                     if (fid == null || fid == ElementId.InvalidElementId) continue;
+
+                    // このアドイン自身が他ビュー用に付けた非表示フィルタはコピーしない。
+                    // コピーすると分析ビューでも型枠が隠れ、何も表示されなくなる
+                    string fname = (doc.GetElement(fid) as ParameterFilterElement)?.Name ?? "";
+                    if (fname == HideAllFilterName || fname.StartsWith("28T_FW_"))
+                        continue;
+
                     try
                     {
                         bool srcVis = source.GetFilterVisibility(fid);
@@ -2250,6 +2303,53 @@ namespace Tools28.Commands.FormworkCalculator.Output
         /// <summary>
         /// 解析対象要素の BoundingBox を全て囲む形でセクションボックスを設定し有効化。
         /// </summary>
+        /// <summary>
+        /// 作成した型枠 DirectShape だけを囲む切断ボックスを設定する。成功したら true。
+        /// 視点ロック済みのビューは一時的にロックを外して設定し、元に戻す。
+        /// </summary>
+        private static bool EnableSectionBoxFromShapes(Document doc, View3D view, List<ElementId> shapeIds)
+        {
+            if (shapeIds == null || shapeIds.Count == 0) return false;
+            try
+            {
+                XYZ minP = null, maxP = null;
+                foreach (var id in shapeIds)
+                {
+                    BoundingBoxXYZ bb = null;
+                    try { bb = doc.GetElement(id)?.get_BoundingBox(null); } catch { }
+                    if (bb == null) continue;
+                    minP = minP == null ? bb.Min : new XYZ(
+                        System.Math.Min(minP.X, bb.Min.X), System.Math.Min(minP.Y, bb.Min.Y), System.Math.Min(minP.Z, bb.Min.Z));
+                    maxP = maxP == null ? bb.Max : new XYZ(
+                        System.Math.Max(maxP.X, bb.Max.X), System.Math.Max(maxP.Y, bb.Max.Y), System.Math.Max(maxP.Z, bb.Max.Z));
+                }
+                if (minP == null) return false;
+
+                double margin = 1.0; // 1ft 余裕
+                var sb = new BoundingBoxXYZ
+                {
+                    Min = new XYZ(minP.X - margin, minP.Y - margin, minP.Z - margin),
+                    Max = new XYZ(maxP.X + margin, maxP.Y + margin, maxP.Z + margin),
+                };
+
+                bool wasLocked = view.IsLocked;
+                if (wasLocked) view.Unlock();
+                view.SetSectionBox(sb);
+                view.IsSectionBoxActive = true;
+                if (wasLocked) view.SaveOrientationAndLock();
+
+                FormworkDebugLog.Log(
+                    $"  [Visual] EnableSectionBoxFromShapes: set BB shapes={shapeIds.Count} locked={wasLocked} " +
+                    $"min=({minP.X:F2},{minP.Y:F2},{minP.Z:F2}) max=({maxP.X:F2},{maxP.Y:F2},{maxP.Z:F2})");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                FormworkDebugLog.Log($"  [Visual] EnableSectionBoxFromShapes EX: {ex.Message}");
+                return false;
+            }
+        }
+
         private static void EnableSectionBox(Document doc, View3D view, FormworkResult result)
         {
             try

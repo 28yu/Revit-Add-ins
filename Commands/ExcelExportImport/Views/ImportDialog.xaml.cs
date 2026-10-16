@@ -151,7 +151,7 @@ namespace Tools28.Commands.ExcelExportImport.Views
 
             var label = new TextBlock
             {
-                Text = "インポートするExcelファイルを選択してください:",
+                Text = Loc.S("Import.SelectFilePrompt"),
                 FontSize = 12,
                 Margin = new Thickness(0, 0, 0, 8)
             };
@@ -279,7 +279,7 @@ namespace Tools28.Commands.ExcelExportImport.Views
         {
             var dialog = new OpenFileDialog
             {
-                Filter = "Excelファイル (*.xlsx)|*.xlsx",
+                Filter = Loc.S("Common.ExcelFileFilter"),
                 DefaultExt = ".xlsx"
             };
 
