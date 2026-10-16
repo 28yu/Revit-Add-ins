@@ -1,0 +1,107 @@
+name: リリースの公開
+run-name: "リリースの公開 ${{ github.ref_name }}"
+
+# 下書き（Draft）のリリースを、Revit-Add-ins と 28tools-download の両方で公開する。
+# GitHub の画面で「Publish release」を押すのと同じ操作。
+#
+# 起動方法（どちらでも可）:
+#   - publish/v<バージョン> ブランチを push（例: publish/v2.7）。Claude のセッションからはこちら
+#     （Claude はリリースの編集が 403 で不可のため、ブランチ push を合図にこのワークフローが代行する。
+#       運営者の指示で 2026-10 に導入）
+#   - Actions → 「リリースの公開」→ Run workflow（version に 2.7 などを入力）
+#
+# 安全装置:
+#   - 両リポジトリに v<バージョン> の下書きがあり、インストーラ 28Tools_Setup_v<バージョン>.exe が
+#     添付されていることを先に両方確認してから公開する（片方だけ公開される事態を避ける）
+#   - すでに公開済みなら何もしない（再実行しても安全）
+
+on:
+  push:
+    branches:
+      - 'publish/v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '公開するバージョン（例: 2.7）'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: バージョンを決める
+        id: v
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="$INPUT_VERSION"
+          else
+            VERSION="${REF_NAME#publish/v}"
+          fi
+          VERSION="${VERSION#v}"
+          if ! [[ "$VERSION" =~ ^[0-9]+(\.[0-9]+)*$ ]]; then
+            echo "::error::バージョンの形式が不正です: '$VERSION'"; exit 1
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "対象: v$VERSION"
+
+      - name: 下書きを確認して公開する
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+          ADDIN_REPO: ${{ github.repository }}
+          ADDIN_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SITE_REPO: 28yu/28tools-download
+          SITE_TOKEN: ${{ secrets.DOWNLOAD_SITE_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="v$VERSION"
+          ASSET="28Tools_Setup_v$VERSION.exe"
+
+          find_release() {  # $1=repo  → 該当タグのリリース JSON（下書きを優先）
+            gh api "repos/$1/releases?per_page=30" \
+              --jq "[.[] | select(.tag_name == \"$TAG\")] | sort_by(.draft) | reverse | .[0] // empty"
+          }
+
+          # 1) 両リポジトリの状態を先に調べる（ここでは何も変更しない）
+          declare -A IDS
+          for REPO in "$ADDIN_REPO" "$SITE_REPO"; do
+            if [ "$REPO" = "$SITE_REPO" ]; then export GH_TOKEN="$SITE_TOKEN"; else export GH_TOKEN="$ADDIN_TOKEN"; fi
+            if [ -z "$GH_TOKEN" ]; then echo "::error::$REPO 用のトークンがありません"; exit 1; fi
+            REL=$(find_release "$REPO")
+            if [ -z "$REL" ]; then echo "::error::$REPO に $TAG のリリースがありません"; exit 1; fi
+            ID=$(jq -r .id <<<"$REL"); DRAFT=$(jq -r .draft <<<"$REL")
+            if [ "$(jq --arg a "$ASSET" '[.assets[].name] | index($a) != null' <<<"$REL")" != "true" ]; then
+              echo "::error::$REPO の $TAG に $ASSET が添付されていません"; exit 1
+            fi
+            if [ "$DRAFT" = "true" ]; then
+              IDS[$REPO]="$ID"; echo "$REPO: 下書き（id=$ID）→ 公開します"
+            else
+              echo "$REPO: すでに公開済み → スキップ"
+            fi
+          done
+
+          # 2) 公開する（下書きを draft=false にし、最新リリースとして扱う）
+          for REPO in "$ADDIN_REPO" "$SITE_REPO"; do
+            ID="${IDS[$REPO]:-}"
+            [ -z "$ID" ] && continue
+            if [ "$REPO" = "$SITE_REPO" ]; then export GH_TOKEN="$SITE_TOKEN"; else export GH_TOKEN="$ADDIN_TOKEN"; fi
+            gh api -X PATCH "repos/$REPO/releases/$ID" -F draft=false -f make_latest=true \
+              --jq '"公開しました: \(.html_url)"'
+          done
+
+          # 3) サイトのボタンが読む releases/latest が新バージョンを指しているか確認
+          export GH_TOKEN="$SITE_TOKEN"
+          LATEST=$(gh api "repos/$SITE_REPO/releases/latest" --jq .tag_name)
+          echo "$SITE_REPO の releases/latest: $LATEST"
+          [ "$LATEST" = "$TAG" ] || { echo "::error::releases/latest が $TAG ではありません（$LATEST）"; exit 1; }
+
+      - name: 合図のブランチを削除
+        if: always() && startsWith(github.ref, 'refs/heads/publish/v')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh api -X DELETE "repos/${{ github.repository }}/git/refs/heads/${{ github.ref_name }}" || true
