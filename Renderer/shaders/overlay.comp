@@ -1,0 +1,25 @@
+#version 450
+// 操作の案内（CPU で文字を描いた半透明の画像）を、描画結果の上に重ねる。
+layout(local_size_x = 8, local_size_y = 8) in;
+
+layout(set = 0, binding = 0, rgba8) uniform image2D uOutput;            // 描画結果（画面に出す色）
+layout(set = 0, binding = 1, rgba8) uniform readonly image2D uOverlay;  // 案内の画像（a = 不透明度）
+
+layout(push_constant) uniform Params {
+    ivec2 offset;  // 案内を置く位置（描画結果の左上からの画素数）
+    float opacity; // 全体の濃さ
+} pc;
+
+void main() {
+    ivec2 p = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 size = imageSize(uOverlay);
+    if (p.x >= size.x || p.y >= size.y) return;
+    ivec2 dst = p + pc.offset;
+    ivec2 outSize = imageSize(uOutput);
+    if (dst.x < 0 || dst.y < 0 || dst.x >= outSize.x || dst.y >= outSize.y) return;
+    vec4 o = imageLoad(uOverlay, p);
+    float a = o.a * pc.opacity;
+    if (a <= 0.0) return;
+    vec4 base = imageLoad(uOutput, dst);
+    imageStore(uOutput, dst, vec4(mix(base.rgb, o.rgb, a), 1.0));
+}

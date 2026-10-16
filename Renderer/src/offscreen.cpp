@@ -13,9 +13,11 @@ namespace t28 {
 
 int runOffscreen(const Options& opt, Scene& scene) {
     VkContext ctx;
-    ctx.init({}, nullptr, opt.gpu);
+    ctx.init({}, nullptr, opt.gpu, !opt.forceSoftware);
+    Bvh bvh;
+    uint32_t glassStart = prepareScene(scene, bvh);
     Renderer renderer;
-    renderer.init(ctx, scene);
+    renderer.init(ctx, scene, glassStart, bvh);
     uint32_t w = static_cast<uint32_t>(opt.width), h = static_cast<uint32_t>(opt.height);
     renderer.resize(w, h);
 

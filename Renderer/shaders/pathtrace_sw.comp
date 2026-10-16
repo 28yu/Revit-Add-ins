@@ -1,0 +1,112 @@
+#version 450
+// 1ピクセルずつ「光の通り道」を追いかけて色を決める（パストレーシング）。
+// ソフト版: 光の計算専用回路（RT コア）の無い GPU 用。CPU で作った BVH（三角形を箱で入れ子に分けた索引）を
+// シェーダーで自分でたどって当たり判定をする。ハード版より遅いが、どの GPU でも動く。
+#extension GL_GOOGLE_include_directive : require
+
+layout(local_size_x = 8, local_size_y = 8) in;
+
+// src/bvh.h の BvhNode と同じ並び（32 バイト）
+struct BvhNode {
+    vec3 bmin;
+    uint leftOrFirst;  // 中間の箱: 左の子の番号（右の子は +1）/ 末端: bvhTris の開始位置
+    vec3 bmax;
+    uint count;        // 0 = 中間の箱、1 以上 = 末端の三角形の数
+};
+layout(set = 0, binding = 0, std430) readonly buffer BvhNodes { BvhNode nodes[]; };
+layout(set = 0, binding = 8, std430) readonly buffer BvhTris { uint bvhTris[]; };
+
+#include "common_head.glsl"
+
+const int STACK_SIZE = 48;
+const float T_MIN = 0.0005;
+
+// 光線が箱に入る距離（入らなければ大きな値）
+float boxEntry(vec3 o, vec3 invD, vec3 bmin, vec3 bmax, float tmax) {
+    vec3 t0 = (bmin - o) * invD, t1 = (bmax - o) * invD;
+    vec3 lo = min(t0, t1), hi = max(t0, t1);
+    float tn = max(max(lo.x, lo.y), max(lo.z, 0.0));
+    float tf = min(min(hi.x, hi.y), min(hi.z, tmax));
+    return tn <= tf ? tn : 1e30;
+}
+
+// 光線と三角形の交差（Möller–Trumbore）。bary はハード版と同じく (頂点1の重み, 頂点2の重み)
+bool rayTriangle(vec3 o, vec3 d, uint tri, float tmax, out float t, out vec2 bary) {
+    vec3 a = vertices[indices[tri * 3u]].position.xyz;
+    vec3 b = vertices[indices[tri * 3u + 1u]].position.xyz;
+    vec3 c = vertices[indices[tri * 3u + 2u]].position.xyz;
+    vec3 e1 = b - a, e2 = c - a;
+    vec3 p = cross(d, e2);
+    float det = dot(e1, p);
+    t = 0.0;
+    bary = vec2(0.0);
+    if (abs(det) < 1e-12) return false;
+    float invDet = 1.0 / det;
+    vec3 s = o - a;
+    float u = dot(s, p) * invDet;
+    if (u < 0.0 || u > 1.0) return false;
+    vec3 q = cross(s, e1);
+    float v = dot(d, q) * invDet;
+    if (v < 0.0 || u + v > 1.0) return false;
+    t = dot(e2, q) * invDet;
+    bary = vec2(u, v);
+    return t > T_MIN && t < tmax;
+}
+
+// anyHit: 何かに当たった時点で終わる（影の判定用） / skipGlass: ガラスを無視する（影の判定用）
+Hit traverse(vec3 o, vec3 d, bool anyHit, bool skipGlass) {
+    Hit h;
+    h.found = false;
+    h.t = 1e30;
+    h.tri = 0u;
+    h.bary = vec2(0.0);
+    h.glass = false;
+    vec3 safeD = mix(d, sign(d) * 1e-8 + vec3(1e-12), lessThan(abs(d), vec3(1e-8)));
+    vec3 invD = 1.0 / safeD;
+    uint glassStart = uint(pc.misc.z);
+
+    uint stack[STACK_SIZE];
+    int sp = 0;
+    stack[sp++] = 0u;
+    while (sp > 0) {
+        BvhNode n = nodes[stack[--sp]];
+        if (boxEntry(o, invD, n.bmin, n.bmax, h.t) >= 1e29) continue;
+        if (n.count > 0u) {
+            for (uint i = n.leftOrFirst; i < n.leftOrFirst + n.count; ++i) {
+                uint tri = bvhTris[i];
+                bool glass = tri >= glassStart;
+                if (skipGlass && glass) continue;
+                float t;
+                vec2 bary;
+                if (rayTriangle(o, d, tri, h.t, t, bary)) {
+                    h.found = true;
+                    h.t = t;
+                    h.tri = tri;
+                    h.bary = bary;
+                    h.glass = glass;
+                    if (anyHit) return h;
+                }
+            }
+        } else if (sp + 2 <= STACK_SIZE) {
+            // 近い方の箱を先に調べる（後に積んだ方が先に取り出される）
+            uint l = n.leftOrFirst, r = n.leftOrFirst + 1u;
+            float dl = boxEntry(o, invD, nodes[l].bmin, nodes[l].bmax, h.t);
+            float dr = boxEntry(o, invD, nodes[r].bmin, nodes[r].bmax, h.t);
+            if (dl < dr) {
+                if (dr < 1e29) stack[sp++] = r;
+                if (dl < 1e29) stack[sp++] = l;
+            } else {
+                if (dl < 1e29) stack[sp++] = l;
+                if (dr < 1e29) stack[sp++] = r;
+            }
+        }
+    }
+    return h;
+}
+
+Hit traceClosest(vec3 origin, vec3 dir) { return traverse(origin, dir, false, false); }
+
+// 影の判定。ガラスは光を通すので不透明な物だけを見る
+bool occluded(vec3 origin, vec3 dir) { return traverse(origin, dir, true, true).found; }
+
+#include "common_body.glsl"

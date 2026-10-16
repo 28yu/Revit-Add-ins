@@ -6,6 +6,7 @@ namespace t28 {
 enum class Lang { JP, US, CN };
 
 void setLanguage(const char* code);  // "JP" / "US" / "CN"
+Lang currentLanguage();
 const char* tr(const char* key);
 
 }  // namespace t28

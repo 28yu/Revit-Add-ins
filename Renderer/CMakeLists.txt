@@ -33,26 +33,37 @@ else()
 endif()
 
 # シェーダー: glslc があればビルド時に変換し、無ければ変換済みのもの（shaders/generated）を使う
+#   pathtrace_hw: RT コアで当たり判定（Vulkan 1.2 + ray query）
+#   pathtrace_sw: BVH を自分でたどる予備の方式（Vulkan 1.0 で動く）
+#   overlay:      操作の案内を重ねる
 find_program(GLSLC glslc)
-set(SHADER_SRC ${CMAKE_CURRENT_SOURCE_DIR}/shaders/pathtrace.comp)
+set(SHADER_DIR ${CMAKE_CURRENT_SOURCE_DIR}/shaders)
+set(SHADER_COMMON ${SHADER_DIR}/common_head.glsl ${SHADER_DIR}/common_body.glsl)
+set(SHADER_DEPS "")
 if(GLSLC)
   set(SHADER_OUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/shaders)
   file(MAKE_DIRECTORY ${SHADER_OUT_DIR})
-  add_custom_command(
-    OUTPUT ${SHADER_OUT_DIR}/pathtrace.spv.inc
-    COMMAND ${GLSLC} --target-env=vulkan1.2 -O -mfmt=c ${SHADER_SRC} -o ${SHADER_OUT_DIR}/pathtrace.spv.inc
-    COMMAND ${CMAKE_COMMAND} -E copy ${SHADER_OUT_DIR}/pathtrace.spv.inc ${CMAKE_CURRENT_SOURCE_DIR}/shaders/generated/pathtrace.spv.inc
-    DEPENDS ${SHADER_SRC}
-    COMMENT "Compiling pathtrace.comp")
+  foreach(spec pathtrace_hw:vulkan1.2 pathtrace_sw:vulkan1.0 overlay:vulkan1.0)
+    string(REPLACE ":" ";" pair ${spec})
+    list(GET pair 0 name)
+    list(GET pair 1 env)
+    add_custom_command(
+      OUTPUT ${SHADER_OUT_DIR}/${name}.spv.inc
+      COMMAND ${GLSLC} --target-env=${env} -O -mfmt=c -I ${SHADER_DIR} ${SHADER_DIR}/${name}.comp -o ${SHADER_OUT_DIR}/${name}.spv.inc
+      COMMAND ${CMAKE_COMMAND} -E copy ${SHADER_OUT_DIR}/${name}.spv.inc ${SHADER_DIR}/generated/${name}.spv.inc
+      DEPENDS ${SHADER_DIR}/${name}.comp ${SHADER_COMMON}
+      COMMENT "Compiling ${name}.comp")
+    list(APPEND SHADER_DEPS ${SHADER_OUT_DIR}/${name}.spv.inc)
+  endforeach()
   set(SHADER_INCLUDE_DIR ${SHADER_OUT_DIR})
-  set(SHADER_DEPS ${SHADER_OUT_DIR}/pathtrace.spv.inc)
 else()
-  set(SHADER_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/shaders/generated)
-  set(SHADER_DEPS "")
+  set(SHADER_INCLUDE_DIR ${SHADER_DIR}/generated)
 endif()
 
 add_executable(Tools28Render
   src/main.cpp
+  src/bvh.cpp
+  src/text_overlay.cpp
   src/log.cpp
   src/i18n.cpp
   src/scene.cpp

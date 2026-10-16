@@ -1034,7 +1034,7 @@ namespace Tools28.Localization
             { "Ribbon.GmMerge.Tip", "Reads the shapes of elements visible in the current 3D view, across any categories, and builds them into a single generic model. Can be created either as a DirectShape or as a generic model family (.rfa)." },
             { "Ribbon.Panel.Render", "Rendering" },
             { "Ribbon.RtRender", "Real-time\nRendering" },
-            { "Ribbon.RtRender.Tip", "Renders the current 3D view photorealistically using GPU ray tracing hardware. Opens in a separate window where you can walk around with the mouse and keyboard. Requires an NVIDIA RTX 20 series or later, AMD RX 6000 series or later, or Intel Arc GPU. (Preview)" },
+            { "Ribbon.RtRender.Tip", "Renders the current 3D view photorealistically using GPU ray tracing. Opens in a separate window that you navigate with the same mouse controls as Revit. Fast on GPUs with ray tracing hardware (NVIDIA RTX, AMD RX 6000 or later, Intel Arc), and also works on other GPUs. (Preview)" },
             { "RtRender.Title", "Real-time Rendering" },
             { "RtRender.Err.Not3DView", "Please open a 3D view first." },
             { "RtRender.Err.NoGeometry", "There is no geometry to render in this view." },

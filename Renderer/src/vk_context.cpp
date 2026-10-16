@@ -34,7 +34,8 @@ static const char* deviceTypeName(VkPhysicalDeviceType t) {
 }
 
 void VkContext::init(const std::vector<const char*>& instanceExtensions,
-                     const std::function<VkSurfaceKHR(VkInstance)>& makeSurface, int preferredGpu) {
+                     const std::function<VkSurfaceKHR(VkInstance)>& makeSurface, int preferredGpu,
+                     bool allowHardwareRt) {
     if (volkInitialize() != VK_SUCCESS) fatal("%s", tr("NoVulkan"));
 
     VkApplicationInfo app{VK_STRUCTURE_TYPE_APPLICATION_INFO};
@@ -51,12 +52,13 @@ void VkContext::init(const std::vector<const char*>& instanceExtensions,
 
     // --- GPU を選ぶ -------------------------------------------------------
     // ノートPCでは「CPU 内蔵の GPU」と「NVIDIA などの GPU」の2つがあることが多い。
-    // レイトレーシングに対応した GPU のうち、性能の高い独立 GPU を優先する。
+    // RT コア（光の計算専用回路）がある GPU を最優先し、無ければ RT コアの無い GPU でも予備の方式で描く。
+    // 同じ条件なら、性能の高い独立 GPU を内蔵 GPU より優先する。
     uint32_t count = 0;
     vkEnumeratePhysicalDevices(instance, &count, nullptr);
     std::vector<VkPhysicalDevice> devices(count);
     vkEnumeratePhysicalDevices(instance, &count, devices.data());
-    if (count == 0) fatal("%s", tr("NoVulkan"));
+    if (count == 0) fatal("%s", tr("NoGpu"));
 
     int bestScore = -1;
     for (uint32_t i = 0; i < count; ++i) {
@@ -67,7 +69,7 @@ void VkContext::init(const std::vector<const char*>& instanceExtensions,
         std::vector<VkExtensionProperties> exts(extCount);
         vkEnumerateDeviceExtensionProperties(devices[i], nullptr, &extCount, exts.data());
 
-        bool rt = props.apiVersion >= VK_API_VERSION_1_2;
+        bool rt = allowHardwareRt && props.apiVersion >= VK_API_VERSION_1_2;
         for (const char* name : kRayTracingExtensions) rt = rt && hasExtension(exts, name);
         bool swap = !surface || hasExtension(exts, VK_KHR_SWAPCHAIN_EXTENSION_NAME);
 
@@ -89,24 +91,27 @@ void VkContext::init(const std::vector<const char*>& instanceExtensions,
 
         logInfo("GPU %u: %s (%s) raytracing=%s swapchain=%s queue=%d", i, props.deviceName,
                 deviceTypeName(props.deviceType), rt ? "yes" : "no", swap ? "yes" : "no", family);
-        if (!rt || !swap || family < 0) continue;
+        if (!swap || family < 0) continue;
 
-        int score = props.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU ? 1000
+        int score = props.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU ? 200
                   : props.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU ? 100 : 1;
+        if (rt) score += 1000;
         if (static_cast<int>(i) == preferredGpu) score = 100000;
         if (score > bestScore) {
             bestScore = score;
             physical = devices[i];
             queueFamily = static_cast<uint32_t>(family);
             properties = props;
+            hardwareRt = rt;
         }
     }
-    if (!physical) fatal("%s", tr("NoRayTracingGpu"));
+    if (!physical) fatal("%s", tr("NoGpu"));
     gpuName = properties.deviceName;
-    logInfo("Using GPU: %s", gpuName.c_str());
+    logInfo("Using GPU: %s (%s)", gpuName.c_str(), hardwareRt ? "hardware ray tracing" : "software BVH");
 
     // --- 論理デバイスを作る -----------------------------------------------
-    std::vector<const char*> deviceExts(std::begin(kRayTracingExtensions), std::end(kRayTracingExtensions));
+    std::vector<const char*> deviceExts;
+    if (hardwareRt) deviceExts.assign(std::begin(kRayTracingExtensions), std::end(kRayTracingExtensions));
     if (surface) deviceExts.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
 
     VkPhysicalDeviceRayQueryFeaturesKHR rayQuery{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR};
@@ -124,7 +129,7 @@ void VkContext::init(const std::vector<const char*>& instanceExtensions,
     qci.queueCount = 1;
     qci.pQueuePriorities = &priority;
     VkDeviceCreateInfo dci{VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO};
-    dci.pNext = &v12;
+    dci.pNext = hardwareRt ? &v12 : nullptr;  // 予備の方式では追加の機能は要らない
     dci.queueCreateInfoCount = 1;
     dci.pQueueCreateInfos = &qci;
     dci.enabledExtensionCount = static_cast<uint32_t>(deviceExts.size());

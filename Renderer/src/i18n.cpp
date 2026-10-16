@@ -18,16 +18,13 @@ static const Entry kStrings[] = {
      "Vulkan（GPU を動かす仕組み）を使えません。GPU のドライバーを最新にしてください。",
      "Vulkan is not available. Please update your GPU driver.",
      "无法使用 Vulkan。请将显卡驱动更新到最新版本。"},
-    {"NoRayTracingGpu",
-     "レイトレーシングに対応した GPU が見つかりません。\n"
-     "NVIDIA RTX 20 シリーズ以降・AMD RX 6000 シリーズ以降・Intel Arc が必要です。\n"
-     "対応 GPU がある場合は、GPU のドライバーを最新にしてください。",
-     "No GPU with ray tracing support was found.\n"
-     "An NVIDIA RTX 20 series or later, AMD RX 6000 series or later, or Intel Arc GPU is required.\n"
-     "If you have one, please update its driver.",
-     "未找到支持光线追踪的 GPU。\n"
-     "需要 NVIDIA RTX 20 系列及以上、AMD RX 6000 系列及以上或 Intel Arc。\n"
-     "如已安装此类 GPU，请将驱动更新到最新版本。"},
+    {"NoGpu",
+     "使える GPU が見つかりません。GPU のドライバーを最新にしてください。\n"
+     "（リモートデスクトップや仮想マシンでは GPU を使えないことがあります）",
+     "No usable GPU was found. Please update your GPU driver.\n"
+     "(The GPU may not be available over Remote Desktop or in a virtual machine.)",
+     "未找到可用的 GPU。请将显卡驱动更新到最新版本。\n"
+     "（通过远程桌面或在虚拟机中可能无法使用 GPU）"},
     {"SceneLoadFailed",
      "モデルのデータを読み込めませんでした。",
      "Could not load the model data.",
@@ -36,10 +33,23 @@ static const Entry kStrings[] = {
      "Tools28 リアルタイムレンダリング",
      "Tools28 Real-time Rendering",
      "Tools28 实时渲染"},
-    {"Controls",
-     "左ドラッグ: 見回す / W A S D: 移動 / Q E: 上下 / ホイール: 移動の速さ / + -: 明るさ / F: 自動露出",
-     "Left drag: look / W A S D: move / Q E: down, up / Wheel: speed / + -: brightness / F: auto exposure",
-     "左键拖动: 环视 / W A S D: 移动 / Q E: 下、上 / 滚轮: 移动速度 / + -: 亮度 / F: 自动曝光"},
+    // 操作の案内（ウィンドウの左下に小さく出す）。Revit の 3D ビューと同じ操作を先に書く
+    {"Help1",
+     "ホイール: ズーム　　ホイールドラッグ: 移動　　Shift＋ホイールドラッグ: 回転",
+     "Wheel: zoom    Wheel drag: pan    Shift + wheel drag: orbit",
+     "滚轮: 缩放　　按住滚轮拖动: 平移　　Shift＋按住滚轮拖动: 动态观察"},
+    {"Help2",
+     "ホイールをダブルクリック: 全体表示　　左ドラッグ: 見回す　　W A S D・Q E: 歩く・上下",
+     "Double-click wheel: zoom to fit    Left drag: look around    W A S D / Q E: walk / up, down",
+     "双击滚轮: 缩放匹配　　左键拖动: 环视　　W A S D・Q E: 行走・上下"},
+    {"Help3",
+     "＋ －: 明るさ　　R: 最初の視点　　H: この案内を隠す",
+     "+ / -: brightness    R: reset view    H: hide this help",
+     "＋ －: 亮度　　R: 初始视点　　H: 隐藏此提示"},
+    {"HelpHidden",
+     "H: 操作の案内",
+     "H: show controls",
+     "H: 操作提示"},
 };
 
 void setLanguage(const char* code) {
@@ -48,6 +58,8 @@ void setLanguage(const char* code) {
     else if (strcmp(code, "CN") == 0) g_lang = Lang::CN;
     else g_lang = Lang::JP;
 }
+
+Lang currentLanguage() { return g_lang; }
 
 const char* tr(const char* key) {
     for (const Entry& e : kStrings) {

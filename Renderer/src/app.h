@@ -3,6 +3,7 @@
 #include <cmath>
 #include <string>
 
+#include "bvh.h"
 #include "renderer.h"
 #include "scene.h"
 
@@ -19,7 +20,8 @@ struct Options {
     uint32_t bounces = 4;
     float exposureEv = 0.0f;       // 自動露出への上乗せ（+1 で2倍明るい）
     bool autoExposure = true;
-    float renderScale = 1.0f;      // ウィンドウより小さく描いて拡大する（速さ優先）
+    float renderScale = 0.0f;      // ウィンドウより小さく描いて拡大する（速さ優先）。0 = 自動
+    bool forceSoftware = false;    // RT コアがあっても予備の方式で描く（動作確認用）
     int exitAfterFrames = 0;       // 動作確認用: このフレーム数を描いたら自動で閉じる（0 = 閉じない）
 };
 
@@ -45,6 +47,22 @@ struct CameraController {
     Vec3 up() const {
         Vec3 f = forward(), r = right();
         return {r.y * f.z - r.z * f.y, r.z * f.x - r.x * f.z, r.x * f.y - r.y * f.x};
+    }
+    // 前方向から向きを決め直す（回転の操作の後に使う）
+    void setForward(Vec3 f) {
+        float len = std::sqrt(f.x * f.x + f.y * f.y + f.z * f.z);
+        if (len < 1e-6f) return;
+        yaw = std::atan2(f.x / len, f.y / len);
+        pitch = std::asin(std::fmax(-1.0f, std::fmin(1.0f, f.z / len)));
+    }
+    // 画面上の位置（-1〜1、上が +1）を通る光線の向き
+    Vec3 rayThrough(float ndcX, float ndcY, float aspect) const {
+        float t = std::tan(fovY * 0.5f * 3.14159265f / 180.0f);
+        Vec3 f = forward(), r = right(), u = up();
+        Vec3 d{f.x + (r.x * ndcX * aspect + u.x * ndcY) * t, f.y + (r.y * ndcX * aspect + u.y * ndcY) * t,
+               f.z + (r.z * ndcX * aspect + u.z * ndcY) * t};
+        float len = std::sqrt(d.x * d.x + d.y * d.y + d.z * d.z);
+        return {d.x / len, d.y / len, d.z / len};
     }
     ViewParams view() const {
         ViewParams v;
@@ -76,6 +94,13 @@ struct AutoExposure {
         }
     }
 };
+
+// 描画の準備: ガラスの三角形を後ろに並べ替え、BVH を作る。戻り値はガラスの最初の三角形番号
+inline uint32_t prepareScene(Scene& scene, Bvh& bvh) {
+    uint32_t glassStart = scene.sortGlassLast();
+    bvh.build(scene);
+    return glassStart;
+}
 
 int runOffscreen(const Options& opt, Scene& scene);
 int runWindow(const Options& opt, Scene& scene);

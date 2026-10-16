@@ -1,0 +1,44 @@
+#version 460
+// 1ピクセルずつ「光の通り道」を追いかけて色を決める（パストレーシング）。
+// ハード版: 光線と形の当たり判定を GPU の光の計算専用回路（RT コア）が行う（GL_EXT_ray_query）。
+// 毎フレーム 1 回ずつ計算し、カメラが止まっている間は結果を足し合わせて画質を上げていく。
+#extension GL_EXT_ray_query : require
+#extension GL_GOOGLE_include_directive : require
+
+layout(local_size_x = 8, local_size_y = 8) in;
+
+// 形の当たり判定用データ。インスタンス 0 = 不透明な物（マスク 0x01）、1 = ガラス（マスク 0x02）
+layout(set = 0, binding = 0) uniform accelerationStructureEXT uScene;
+
+#include "common_head.glsl"
+
+const uint MASK_OPAQUE = 0x01u;
+const uint MASK_GLASS = 0x02u;
+
+Hit traceClosest(vec3 origin, vec3 dir) {
+    rayQueryEXT rq;
+    rayQueryInitializeEXT(rq, uScene, gl_RayFlagsOpaqueEXT, MASK_OPAQUE | MASK_GLASS, origin, 0.0005, dir, 1e6);
+    while (rayQueryProceedEXT(rq)) {}
+    Hit h;
+    h.found = rayQueryGetIntersectionTypeEXT(rq, true) == gl_RayQueryCommittedIntersectionTriangleEXT;
+    if (h.found) {
+        h.t = rayQueryGetIntersectionTEXT(rq, true);
+        uint instance = rayQueryGetIntersectionInstanceCustomIndexEXT(rq, true);
+        uint prim = uint(rayQueryGetIntersectionPrimitiveIndexEXT(rq, true));
+        h.glass = instance == 1u;
+        h.tri = h.glass ? prim + uint(pc.misc.z) : prim;
+        h.bary = rayQueryGetIntersectionBarycentricsEXT(rq, true);
+    }
+    return h;
+}
+
+// 影の判定。ガラスは光を通すので不透明な物だけを見る
+bool occluded(vec3 origin, vec3 dir) {
+    rayQueryEXT rq;
+    rayQueryInitializeEXT(rq, uScene, gl_RayFlagsOpaqueEXT | gl_RayFlagsTerminateOnFirstHitEXT,
+                          MASK_OPAQUE, origin, 0.0005, dir, 1e6);
+    while (rayQueryProceedEXT(rq)) {}
+    return rayQueryGetIntersectionTypeEXT(rq, true) != gl_RayQueryCommittedIntersectionNoneEXT;
+}
+
+#include "common_body.glsl"

@@ -31,8 +31,10 @@ public:
     // instanceExtensions: 画面に出すときに必要な拡張機能（画像だけ作るなら空）
     // makeSurface: 画面表示用の面を作る関数（画像だけ作るなら空）。GPU 選びの前に呼ぶ
     // preferredGpu: 使う GPU の番号（-1 なら自動で選ぶ）
+    // allowHardwareRt: false なら RT コアがあっても使わない（予備の方式の動作確認用）
     void init(const std::vector<const char*>& instanceExtensions,
-              const std::function<VkSurfaceKHR(VkInstance)>& makeSurface, int preferredGpu);
+              const std::function<VkSurfaceKHR(VkInstance)>& makeSurface, int preferredGpu,
+              bool allowHardwareRt = true);
     void destroy();
 
     Buffer createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags props);
@@ -55,6 +57,8 @@ public:
     VkPhysicalDeviceProperties properties{};
     std::string gpuName;
     VkSurfaceKHR surface = VK_NULL_HANDLE;
+    // RT コア（光の計算専用回路）を使えるか。false なら BVH を自分でたどる予備の方式で描く
+    bool hardwareRt = false;
 
 private:
     uint32_t findMemoryType(uint32_t typeBits, VkMemoryPropertyFlags props) const;

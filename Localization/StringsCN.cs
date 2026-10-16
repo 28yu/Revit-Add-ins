@@ -1033,7 +1033,7 @@ namespace Tools28.Localization
             { "Ribbon.GmMerge.Tip", "读取当前三维视图中显示的多个类别图元的形状，合并为一个常规模型。可选择创建为直接形状或常规模型族 (.rfa)。" },
             { "Ribbon.Panel.Render", "渲染" },
             { "Ribbon.RtRender", "实时\n渲染" },
-            { "Ribbon.RtRender.Tip", "使用 GPU 光线追踪硬件，将当前三维视图渲染为照片级效果。在单独的窗口中打开，可用鼠标和键盘自由漫游。需要 NVIDIA RTX 20 系列及以上、AMD RX 6000 系列及以上或 Intel Arc。（试用版）" },
+            { "Ribbon.RtRender.Tip", "使用 GPU 光线追踪将当前三维视图渲染为照片级效果。在单独的窗口中打开，可使用与 Revit 相同的鼠标操作浏览。在具有光线追踪硬件的 GPU（NVIDIA RTX、AMD RX 6000 及以上、Intel Arc）上速度更快，其他 GPU 也可运行。（试用版）" },
             { "RtRender.Title", "实时渲染" },
             { "RtRender.Err.Not3DView", "请先打开三维视图。" },
             { "RtRender.Err.NoGeometry", "此视图中没有可渲染的几何图形。" },

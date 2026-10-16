@@ -1,13 +1,15 @@
 // ウィンドウで表示して、マウスとキーボードで歩き回るモード。
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <cstdio>
 #include <string>
 #include <vector>
 
 #include "app.h"
-#include "log.h"
 #include "i18n.h"
+#include "log.h"
+#include "text_overlay.h"
 
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
@@ -77,33 +79,174 @@ void createSwapchain(VkContext& ctx, GLFWwindow* window, Swapchain& sc) {
     logInfo("Swapchain %ux%u, %u images, format %d", extent.width, extent.height, count, static_cast<int>(chosen.format));
 }
 
-struct InputState {
-    bool dragging = false;
-    double lastX = 0, lastY = 0;
-    float speed = 3.0f;  // 歩く速さ（m/秒）
-    float evOffset = 0;
-    bool autoExposure = true;
-    bool changed = false;  // カメラや設定が変わった（画質の足し合わせをやり直す）
-    CameraController* cam = nullptr;
-    CameraController initial;
-};
-
-void onScroll(GLFWwindow* w, double, double dy) {
-    auto* in = static_cast<InputState*>(glfwGetWindowUserPointer(w));
-    in->speed = std::clamp(in->speed * (dy > 0 ? 1.25f : 0.8f), 0.2f, 100.0f);
+// 点 p を、点 center を通る軸 axis（単位ベクトル）のまわりに angle（ラジアン）回す
+Vec3 rotateAround(Vec3 p, Vec3 center, Vec3 axis, float angle) {
+    Vec3 v{p.x - center.x, p.y - center.y, p.z - center.z};
+    float c = std::cos(angle), s = std::sin(angle);
+    float d = axis.x * v.x + axis.y * v.y + axis.z * v.z;
+    Vec3 cr{axis.y * v.z - axis.z * v.y, axis.z * v.x - axis.x * v.z, axis.x * v.y - axis.y * v.x};
+    Vec3 r{v.x * c + cr.x * s + axis.x * d * (1 - c), v.y * c + cr.y * s + axis.y * d * (1 - c),
+           v.z * c + cr.z * s + axis.z * d * (1 - c)};
+    return {center.x + r.x, center.y + r.y, center.z + r.z};
 }
 
-void onKey(GLFWwindow* w, int key, int, int action, int) {
-    if (action != GLFW_PRESS) return;
-    auto* in = static_cast<InputState*>(glfwGetWindowUserPointer(w));
-    switch (key) {
-        case GLFW_KEY_ESCAPE: glfwSetWindowShouldClose(w, GLFW_TRUE); break;
-        case GLFW_KEY_EQUAL: case GLFW_KEY_KP_ADD: in->evOffset += 0.5f; in->changed = true; break;
-        case GLFW_KEY_MINUS: case GLFW_KEY_KP_SUBTRACT: in->evOffset -= 0.5f; in->changed = true; break;
-        case GLFW_KEY_F: in->autoExposure = !in->autoExposure; in->changed = true; break;
-        case GLFW_KEY_R: *in->cam = in->initial; in->changed = true; break;
-        default: break;
+Vec3 add(Vec3 a, Vec3 b, float k = 1.0f) { return {a.x + b.x * k, a.y + b.y * k, a.z + b.z * k}; }
+float length(Vec3 a) { return std::sqrt(a.x * a.x + a.y * a.y + a.z * a.z); }
+
+// マウスの操作。Revit の 3D ビューと同じ割り当てにしている
+//   ホイール: ズーム / ホイールドラッグ: パン / Shift + ホイールドラッグ: オービット / ホイールのダブルクリック: 全体表示
+//   左ドラッグ: 見回す（その場で向きを変える）
+enum class Drag { None, Look, Pan, Orbit };
+
+struct Navigator {
+    GLFWwindow* window = nullptr;
+    CameraController* cam = nullptr;
+    CameraController initial;
+    const Scene* scene = nullptr;
+    const Bvh* bvh = nullptr;
+
+    Drag drag = Drag::None;
+    double lastX = 0, lastY = 0;
+    Vec3 pivot;           // オービットの中心（ドラッグを始めた位置にある物の表面）
+    float panDepth = 1;   // パンの基準の奥行き（ドラッグを始めた位置にある物までの距離）
+    double lastMiddleClick = -1;
+
+    float evOffset = 0;
+    bool autoExposure = true;
+    bool showHelp = true;
+    bool changed = false;     // カメラや設定が変わった（画質の足し合わせをやり直す）
+    bool helpChanged = false;
+
+    Vec3 sceneCenter() const {
+        Vec3 mn = bvh->boundsMin(), mx = bvh->boundsMax();
+        return {(mn.x + mx.x) / 2, (mn.y + mx.y) / 2, (mn.z + mx.z) / 2};
     }
+    float sceneRadius() const { return std::max(1.0f, length(add(bvh->boundsMax(), bvh->boundsMin(), -1.0f)) / 2); }
+
+    // カーソルの位置を通る光線と、その先にある物までの距離（何も無ければモデルの中心までの距離）
+    Vec3 cursorRay(double mx, double my, float* distance) const {
+        int ww = 1, wh = 1;
+        glfwGetWindowSize(window, &ww, &wh);
+        float ndcX = static_cast<float>(mx / std::max(1, ww) * 2 - 1);
+        float ndcY = static_cast<float>(1 - my / std::max(1, wh) * 2);
+        Vec3 dir = cam->rayThrough(ndcX, ndcY, static_cast<float>(ww) / std::max(1, wh));
+        float d = bvh->intersect(*scene, cam->eye, dir);
+        if (d <= 0) d = std::max(0.5f, length(add(sceneCenter(), cam->eye, -1.0f)));
+        *distance = d;
+        return dir;
+    }
+
+    void zoomToFit() {
+        // 今の向きのまま、モデル全体が画面に入る位置まで下がる
+        float r = sceneRadius();
+        int ww = 1, wh = 1;
+        glfwGetWindowSize(window, &ww, &wh);
+        float halfFov = cam->fovY * 0.5f * 3.14159265f / 180.0f;
+        float halfFovX = std::atan(std::tan(halfFov) * ww / std::max(1, wh));
+        float dist = r / std::sin(std::min(halfFov, halfFovX));
+        Vec3 f = cam->forward();
+        cam->eye = add(sceneCenter(), f, -dist);
+        changed = true;
+    }
+
+    void onScroll(double dy) {
+        double mx, my;
+        glfwGetCursorPos(window, &mx, &my);
+        float d;
+        Vec3 dir = cursorRay(mx, my, &d);
+        // 1 目盛りで、カーソルの先の物まで 2 割近づく（離れるときは同じ割合で戻る）
+        float step = static_cast<float>(dy) > 0 ? d * 0.2f : -d * 0.25f;
+        cam->eye = add(cam->eye, dir, step * static_cast<float>(std::fabs(dy)));
+        changed = true;
+    }
+
+    void onMouseButton(int button, int action, int mods) {
+        double mx, my;
+        glfwGetCursorPos(window, &mx, &my);
+        lastX = mx;
+        lastY = my;
+        if (action == GLFW_RELEASE) {
+            drag = Drag::None;
+            return;
+        }
+        if (button == GLFW_MOUSE_BUTTON_LEFT) {
+            drag = Drag::Look;
+        } else if (button == GLFW_MOUSE_BUTTON_MIDDLE) {
+            double now = glfwGetTime();
+            if (lastMiddleClick >= 0 && now - lastMiddleClick < 0.35) {
+                zoomToFit();
+                lastMiddleClick = -1;
+                drag = Drag::None;
+                return;
+            }
+            lastMiddleClick = now;
+            float d;
+            Vec3 dir = cursorRay(mx, my, &d);
+            pivot = add(cam->eye, dir, d);
+            Vec3 f = cam->forward();
+            panDepth = std::max(0.1f, d * (dir.x * f.x + dir.y * f.y + dir.z * f.z));
+            drag = (mods & GLFW_MOD_SHIFT) ? Drag::Orbit : Drag::Pan;
+        }
+    }
+
+    void onCursor(double mx, double my) {
+        float dx = static_cast<float>(mx - lastX), dy = static_cast<float>(my - lastY);
+        lastX = mx;
+        lastY = my;
+        if (drag == Drag::None || (dx == 0 && dy == 0)) return;
+        int ww = 1, wh = 1;
+        glfwGetWindowSize(window, &ww, &wh);
+
+        if (drag == Drag::Look) {
+            float sens = 0.0035f * cam->fovY / 60.0f;
+            cam->yaw += dx * sens;
+            cam->pitch = std::clamp(cam->pitch - dy * sens, -1.55f, 1.55f);
+        } else if (drag == Drag::Pan) {
+            // カーソルの下の物が、カーソルに付いて動くように平行移動する
+            float k = panDepth * 2.0f * std::tan(cam->fovY * 0.5f * 3.14159265f / 180.0f) / std::max(1, wh);
+            cam->eye = add(add(cam->eye, cam->right(), -dx * k), cam->up(), dy * k);
+        } else if (drag == Drag::Orbit) {
+            // 中心のまわりにカメラを回す（左右: 上下の軸まわり、上下: カメラの横の軸まわり）
+            const float sens = 0.005f;
+            float yawAngle = -dx * sens;
+            Vec3 zAxis{0, 0, 1};
+            cam->eye = rotateAround(cam->eye, pivot, zAxis, yawAngle);
+            cam->yaw -= yawAngle;
+
+            float pitchAngle = -dy * sens;
+            Vec3 right = cam->right();
+            Vec3 f = rotateAround(cam->forward(), {0, 0, 0}, right, pitchAngle);
+            if (std::fabs(f.z) < 0.995f) {  // 真上・真下を越えて裏返らないようにする
+                cam->eye = rotateAround(cam->eye, pivot, right, pitchAngle);
+                cam->setForward(f);
+            }
+        }
+        changed = true;
+    }
+
+    void onKey(int key) {
+        switch (key) {
+            case GLFW_KEY_ESCAPE: glfwSetWindowShouldClose(window, GLFW_TRUE); break;
+            case GLFW_KEY_EQUAL: case GLFW_KEY_KP_ADD: evOffset += 0.5f; changed = true; break;
+            case GLFW_KEY_MINUS: case GLFW_KEY_KP_SUBTRACT: evOffset -= 0.5f; changed = true; break;
+            case GLFW_KEY_F: autoExposure = !autoExposure; changed = true; break;
+            case GLFW_KEY_R: *cam = initial; changed = true; break;
+            case GLFW_KEY_H: showHelp = !showHelp; helpChanged = true; break;
+            default: break;
+        }
+    }
+};
+
+Navigator* nav(GLFWwindow* w) { return static_cast<Navigator*>(glfwGetWindowUserPointer(w)); }
+
+// 案内の画像を作る（表示中は3行、隠しているときは「H: 操作の案内」だけ）
+TextImage makeHelpImage(bool full, float contentScale) {
+    TextImage img;
+    std::vector<std::string> lines;
+    if (full) lines = {tr("Help1"), tr("Help2"), tr("Help3")};
+    else lines = {tr("HelpHidden")};
+    renderTextPanel(lines, 13.0f * contentScale, img);
+    return img;
 }
 
 }  // namespace
@@ -124,31 +267,61 @@ int runWindow(const Options& opt, Scene& scene) {
         VkSurfaceKHR surface;
         vkCheck(glfwCreateWindowSurface(inst, window, nullptr, &surface), "glfwCreateWindowSurface");
         return surface;
-    }, opt.gpu);
+    }, opt.gpu, !opt.forceSoftware);
 
+    Bvh bvh;
+    uint32_t glassStart = prepareScene(scene, bvh);
     Renderer renderer;
-    renderer.init(ctx, scene);
+    renderer.init(ctx, scene, glassStart, bvh);
+
+    // RT コアの無い GPU では、半分の大きさで描いて拡大する（速さを保つため）
+    float renderScale = opt.renderScale > 0 ? opt.renderScale : (ctx.hardwareRt ? 1.0f : 0.5f);
+    logInfo("Render scale %.2f", renderScale);
 
     Swapchain sc;
-    createSwapchain(ctx, window, sc);
-    auto renderSize = [&](VkExtent2D e) {
-        return VkExtent2D{std::max(16u, static_cast<uint32_t>(e.width * opt.renderScale)),
-                          std::max(16u, static_cast<uint32_t>(e.height * opt.renderScale))};
+    Image display;  // 画面と同じ大きさの画像（描画結果を拡大して写し、案内を重ねてから画面に出す）
+    VkImageLayout displayLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    VkExtent2D rs{};
+    auto recreate = [&]() {
+        vkDeviceWaitIdle(ctx.device);
+        createSwapchain(ctx, window, sc);
+        rs = {std::max(16u, static_cast<uint32_t>(sc.extent.width * renderScale)),
+              std::max(16u, static_cast<uint32_t>(sc.extent.height * renderScale))};
+        renderer.resize(rs.width, rs.height);
+        ctx.destroyImage(display);
+        display = ctx.createImage(sc.extent.width, sc.extent.height, VK_FORMAT_R8G8B8A8_UNORM,
+                                  VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+        displayLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        renderer.setOverlayTarget(display);
     };
-    VkExtent2D rs = renderSize(sc.extent);
-    renderer.resize(rs.width, rs.height);
+    recreate();
 
     CameraController cam;
     cam.setFrom(scene.camera);
-    InputState input;
-    input.cam = &cam;
-    input.initial = cam;
-    input.evOffset = opt.exposureEv;
-    input.autoExposure = opt.autoExposure;
-    glfwSetWindowUserPointer(window, &input);
-    glfwSetScrollCallback(window, onScroll);
-    glfwSetKeyCallback(window, onKey);
-    logInfo("%s", tr("Controls"));
+    Navigator nv;
+    nv.window = window;
+    nv.cam = &cam;
+    nv.initial = cam;
+    nv.scene = &scene;
+    nv.bvh = &bvh;
+    nv.evOffset = opt.exposureEv;
+    nv.autoExposure = opt.autoExposure;
+    glfwSetWindowUserPointer(window, &nv);
+    glfwSetScrollCallback(window, [](GLFWwindow* w, double, double dy) { nav(w)->onScroll(dy); });
+    glfwSetMouseButtonCallback(window, [](GLFWwindow* w, int b, int a, int m) { nav(w)->onMouseButton(b, a, m); });
+    glfwSetCursorPosCallback(window, [](GLFWwindow* w, double x, double y) { nav(w)->onCursor(x, y); });
+    glfwSetKeyCallback(window, [](GLFWwindow* w, int key, int, int action, int) {
+        if (action == GLFW_PRESS) nav(w)->onKey(key);
+    });
+
+    float contentScale = 1.0f;
+    glfwGetWindowContentScale(window, &contentScale, nullptr);
+    contentScale = std::clamp(contentScale, 1.0f, 3.0f);
+    auto updateHelp = [&]() {
+        TextImage help = makeHelpImage(nv.showHelp, contentScale);
+        renderer.setOverlay(help.rgba, help.width, help.height);
+    };
+    updateHelp();
 
     VkCommandBufferAllocateInfo ai{VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
     ai.commandPool = ctx.commandPool;
@@ -166,8 +339,8 @@ int runWindow(const Options& opt, Scene& scene) {
     AutoExposure exposure;
     bool needResize = false;
     auto last = std::chrono::steady_clock::now();
-    double titleTimer = 0;
-    int framesSinceTitle = 0;
+    double statsTimer = 0;
+    int statsFrames = 0;
 
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
@@ -175,43 +348,31 @@ int runWindow(const Options& opt, Scene& scene) {
         float dt = std::min(0.1f, std::chrono::duration<float>(now - last).count());
         last = now;
 
-        // --- 操作 ---------------------------------------------------------
-        double mx, my;
-        glfwGetCursorPos(window, &mx, &my);
-        bool leftDown = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS;
-        if (leftDown && input.dragging) {
-            float sens = 0.0035f * cam.fovY / 60.0f;
-            cam.yaw += static_cast<float>(mx - input.lastX) * sens;
-            cam.pitch -= static_cast<float>(my - input.lastY) * sens;
-            cam.pitch = std::clamp(cam.pitch, -1.55f, 1.55f);
-            if (mx != input.lastX || my != input.lastY) input.changed = true;
-        }
-        input.dragging = leftDown;
-        input.lastX = mx;
-        input.lastY = my;
-
+        // --- キーボードで歩く（W A S D / 矢印: 水平に移動、Q E: 上下、Shift: 速く） ----------
         Vec3 f = cam.forward(), r = cam.right();
         Vec3 flat{f.x, f.y, 0};
         float flatLen = std::sqrt(flat.x * flat.x + flat.y * flat.y);
         if (flatLen > 1e-4f) { flat.x /= flatLen; flat.y /= flatLen; }
-        float step = input.speed * dt * (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS ? 3.0f : 1.0f);
+        float step = 3.0f * dt * (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS ? 3.0f : 1.0f);
         auto key = [&](int k) { return glfwGetKey(window, k) == GLFW_PRESS; };
         Vec3 move{0, 0, 0};
-        if (key(GLFW_KEY_W) || key(GLFW_KEY_UP)) { move.x += flat.x; move.y += flat.y; }
-        if (key(GLFW_KEY_S) || key(GLFW_KEY_DOWN)) { move.x -= flat.x; move.y -= flat.y; }
-        if (key(GLFW_KEY_D) || key(GLFW_KEY_RIGHT)) { move.x += r.x; move.y += r.y; }
-        if (key(GLFW_KEY_A) || key(GLFW_KEY_LEFT)) { move.x -= r.x; move.y -= r.y; }
+        if (key(GLFW_KEY_W) || key(GLFW_KEY_UP)) move = add(move, flat);
+        if (key(GLFW_KEY_S) || key(GLFW_KEY_DOWN)) move = add(move, flat, -1);
+        if (key(GLFW_KEY_D) || key(GLFW_KEY_RIGHT)) move = add(move, r);
+        if (key(GLFW_KEY_A) || key(GLFW_KEY_LEFT)) move = add(move, r, -1);
         if (key(GLFW_KEY_E)) move.z += 1;
         if (key(GLFW_KEY_Q)) move.z -= 1;
         if (move.x != 0 || move.y != 0 || move.z != 0) {
-            cam.eye.x += move.x * step;
-            cam.eye.y += move.y * step;
-            cam.eye.z += move.z * step;
-            input.changed = true;
+            cam.eye = add(cam.eye, move, step);
+            nv.changed = true;
         }
-        if (input.changed) {
+        if (nv.changed) {
             renderer.resetAccumulation();
-            input.changed = false;
+            nv.changed = false;
+        }
+        if (nv.helpChanged) {
+            updateHelp();
+            nv.helpChanged = false;
         }
 
         // --- 描画 ---------------------------------------------------------
@@ -222,10 +383,7 @@ int runWindow(const Options& opt, Scene& scene) {
             continue;
         }
         if (needResize || static_cast<uint32_t>(fbw) != sc.extent.width || static_cast<uint32_t>(fbh) != sc.extent.height) {
-            vkDeviceWaitIdle(ctx.device);
-            createSwapchain(ctx, window, sc);
-            rs = renderSize(sc.extent);
-            renderer.resize(rs.width, rs.height);
+            recreate();
             needResize = false;
         }
 
@@ -236,27 +394,51 @@ int runWindow(const Options& opt, Scene& scene) {
 
         ViewParams view = cam.view();
         view.maxBounces = opt.bounces;
-        view.exposure = input.autoExposure ? exposure.current : std::exp2(input.evOffset);
+        view.exposure = nv.autoExposure ? exposure.current : std::exp2(nv.evOffset);
 
         VkCommandBufferBeginInfo bi{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
         bi.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
         vkBeginCommandBuffer(cmd, &bi);
         renderer.record(cmd, view);
 
-        // 描いた画像を画面の大きさに拡大・縮小して写す
-        VkImage swapImage = sc.images[imageIndex];
+        // 1. 描いた画像を、画面の大きさの画像に拡大して写す
         transitionImage(cmd, renderer.output().image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_WRITE_BIT,
                         VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT);
-        transitionImage(cmd, swapImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                        VK_PIPELINE_STAGE_TRANSFER_BIT, 0, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT);
+        transitionImage(cmd, display.image, displayLayout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                        VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT,
+                        VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT);
         VkImageBlit blit{};
         blit.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
         blit.srcOffsets[1] = {static_cast<int32_t>(rs.width), static_cast<int32_t>(rs.height), 1};
         blit.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
         blit.dstOffsets[1] = {static_cast<int32_t>(sc.extent.width), static_cast<int32_t>(sc.extent.height), 1};
-        vkCmdBlitImage(cmd, renderer.output().image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, swapImage,
+        vkCmdBlitImage(cmd, renderer.output().image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, display.image,
                        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR);
+
+        // 2. 操作の案内を左下に重ねる
+        transitionImage(cmd, display.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL,
+                        VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                        VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+        int margin = static_cast<int>(12 * contentScale);
+        renderer.recordOverlay(cmd, margin, static_cast<int>(sc.extent.height) - static_cast<int>(renderer.overlayHeight()) - margin,
+                               nv.showHelp ? 0.9f : 0.6f);
+
+        // 3. 画面に写す（形式の違い BGRA / RGBA も blit が吸収する）
+        VkImage swapImage = sc.images[imageIndex];
+        transitionImage(cmd, display.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_WRITE_BIT,
+                        VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT);
+        displayLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+        transitionImage(cmd, swapImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                        VK_PIPELINE_STAGE_TRANSFER_BIT, 0, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT);
+        VkImageBlit present{};
+        present.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+        present.srcOffsets[1] = {static_cast<int32_t>(sc.extent.width), static_cast<int32_t>(sc.extent.height), 1};
+        present.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+        present.dstOffsets[1] = present.srcOffsets[1];
+        vkCmdBlitImage(cmd, display.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, swapImage,
+                       VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &present, VK_FILTER_NEAREST);
         transitionImage(cmd, swapImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
                         VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
                         VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0);
@@ -289,24 +471,20 @@ int runWindow(const Options& opt, Scene& scene) {
         vkWaitForFences(ctx.device, 1, &fence, VK_TRUE, UINT64_MAX);
         vkResetFences(ctx.device, 1, &fence);
         // 動いている間はゆっくり、止まった直後に素早く合わせると目が疲れにくい
-        exposure.update(renderer.finishFrame(), input.evOffset, 0.9f);
+        exposure.update(renderer.finishFrame(), nv.evOffset, 0.9f);
 
         if (opt.exitAfterFrames > 0 && static_cast<int>(renderer.accumulatedSamples()) >= opt.exitAfterFrames) {
             logInfo("Exit after %d frames (exposure x%.2f)", opt.exitAfterFrames, exposure.current);
             glfwSetWindowShouldClose(window, GLFW_TRUE);
         }
 
-        // --- タイトルに状態を出す（1 秒ごと） -------------------------------
-        titleTimer += dt;
-        framesSinceTitle++;
-        if (titleTimer >= 1.0) {
-            char title[512];
-            snprintf(title, sizeof(title), "%s  |  %s  |  %.0f fps  |  %u samples  |  %s%+.1f EV",
-                     tr("WindowTitle"), ctx.gpuName.c_str(), framesSinceTitle / titleTimer,
-                     renderer.accumulatedSamples(), input.autoExposure ? "Auto " : "", input.evOffset);
-            glfwSetWindowTitle(window, title);
-            titleTimer = 0;
-            framesSinceTitle = 0;
+        // 速さは画面には出さず、ログに残す（不具合の調査用）
+        statsTimer += dt;
+        statsFrames++;
+        if (statsTimer >= 10.0) {
+            logInfo("%.1f fps, %u samples accumulated", statsFrames / statsTimer, renderer.accumulatedSamples());
+            statsTimer = 0;
+            statsFrames = 0;
         }
     }
 
@@ -315,6 +493,7 @@ int runWindow(const Options& opt, Scene& scene) {
     vkDestroySemaphore(ctx.device, imageReady, nullptr);
     for (VkSemaphore s : sc.renderDone) vkDestroySemaphore(ctx.device, s, nullptr);
     vkDestroySwapchainKHR(ctx.device, sc.handle, nullptr);
+    ctx.destroyImage(display);
     renderer.destroy();
     ctx.destroy();
     glfwDestroyWindow(window);

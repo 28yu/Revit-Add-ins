@@ -3,7 +3,9 @@
 Revit の「リアルタイムレンダリング」ボタン（`Commands/RealtimeRender/`）から起動される、
 別プログラム（exe）の描画エンジンです。C++ と Vulkan で書かれています。
 
-- GPU の**光の計算専用回路**（レイトレーシング、`VK_KHR_ray_query`）で、影・反射・間接光を計算する
+- GPU の**光の計算専用回路**（RT コア、`VK_KHR_ray_query`）で、影・反射・間接光を計算する
+- RT コアの無い GPU（Intel の内蔵 GPU、古い GTX など）では、**CPU で作った BVH をシェーダーで自分でたどる予備の方式**に
+  自動で切り替える（同じ絵になるが遅いので、半分の大きさで描いて拡大する）
 - 動いている間は1回分の計算、止まると計算結果を足し合わせて画質が上がっていく
 - 描画は Revit とは別のプログラムで行うので、ここで問題が起きても Revit は止まらない
 
@@ -15,28 +17,49 @@ Revit（Tools28.dll）                       Tools28Render.exe
     SceneExportContext  … 3Dビューの形を集める   scene.cpp       シーンファイルの読み込み・確認用の部屋
     SceneWriter         … %TEMP%\Tools28\Render\scene.t28s を書く
     → Tools28Render.exe --scene … --lang JP    vk_context.cpp  GPU の選択（NVIDIA などの独立 GPU を優先）
-                                               renderer.cpp    加速構造の作成・1フレームの描画
-                                               shaders/pathtrace.comp  光の計算（GPU 上で動く）
+                                               bvh.cpp         BVH（予備の方式・マウス位置の物を調べる）
+                                               renderer.cpp    加速構造の作成・1フレームの描画・案内の重ね合わせ
+                                               shaders/        光の計算（GPU 上で動く）※下の表
                                                window_app.cpp  ウィンドウ・操作 / offscreen.cpp 画像の書き出し
+                                               text_overlay.cpp 操作の案内（Windows のフォントで文字を描く）
 ```
 
 シーンファイル（`.t28s`）の形式は `src/scene.cpp` の先頭に書いてあります。
 **形式を変えるときは `Commands/RealtimeRender/SceneWriter.cs` も同時に直すこと。**
 
+## シェーダー
+
+| ファイル | 内容 |
+|--|--|
+| `common_head.glsl` / `common_body.glsl` | 共通部分（空・太陽・材質・光の通り道・自動露出） |
+| `pathtrace_hw.comp` | ハード版。当たり判定を RT コアで行う（Vulkan 1.2 + ray query） |
+| `pathtrace_sw.comp` | ソフト版（予備）。BVH を自分でたどる（Vulkan 1.0 で動く） |
+| `overlay.comp` | 操作の案内を画面に重ねる |
+
+GPU の選び方（`vk_context.cpp`）: RT コアのある独立 GPU → RT コアのある内蔵 GPU → RT コアの無い独立 GPU → RT コアの無い内蔵 GPU。
+ノートPCの「内蔵 GPU ＋ NVIDIA」の構成でも NVIDIA が選ばれる。どれを選んだかはログに出る（画面には出さない）。
+
 ## 操作（ウィンドウ）
+
+Revit の 3D ビューと同じ操作を基本にし、Enscape のような歩き回る操作も使える。
+ウィンドウの左下に小さく案内を出す（H で隠す／出す）。
 
 | 操作 | 内容 |
 |--|--|
-| 左ドラッグ | 見回す |
-| W A S D / 矢印キー | 前後左右に移動（Shift で速く） |
+| ホイール | ズーム（カーソルの先の物に近づく） |
+| ホイールを押してドラッグ | 移動（パン） |
+| Shift ＋ ホイールを押してドラッグ | 回転（オービット。ドラッグを始めた位置の物が中心） |
+| ホイールをダブルクリック | 全体表示 |
+| 左ドラッグ | その場で見回す |
+| W A S D / 矢印キー | 前後左右に歩く（Shift で速く） |
 | Q / E | 下がる / 上がる |
-| ホイール | 移動の速さ |
 | + / - | 明るさ（0.5 EV ずつ） |
 | F | 自動露出の切り替え |
-| R | 最初の位置に戻る |
+| R | 最初の視点に戻る |
+| H | 操作の案内を隠す / 出す |
 | Esc | 閉じる |
 
-ログ: `%LOCALAPPDATA%\Tools28\Render\render.log`（どの GPU を使ったか、エラーの内容が残る）
+ログ: `%LOCALAPPDATA%\Tools28\Render\render.log`（どの GPU・方式を使ったか、速さ（10 秒ごとの fps）、エラーの内容が残る）
 
 ## ビルド
 
@@ -55,7 +78,10 @@ cmake -S . -B build-linux -DT28_SYSTEM_GLFW=ON && cmake --build build-linux -j
 
 - GPU の無い Linux でも、Mesa の **lavapipe**（CPU で Vulkan を再現する）がレイトレーシングに対応しているので、
   画像書き出しモード（`--output`）で描画結果を確かめられる（遅い）
-- シェーダーは glslc があればビルド時に変換され、`shaders/generated/pathtrace.spv.inc` も更新される（これもリポジトリに入れる）
+- シェーダーは glslc があればビルド時に変換され、`shaders/generated/*.spv.inc` も更新される（これもリポジトリに入れる）
+- 予備の方式は `--software` で強制できるので、RT コアのある環境でも動作確認できる
+- ウィンドウ表示の確認: Xvfb ＋ xdotool でマウス操作を再現して画面を撮れる。Windows 版は Wine で動く
+  （Wine には日本語フォントが無いので、`drive_c/windows/Fonts/YuGothM.ttc` に Noto CJK を置くと案内の確認ができる）
 - ダウンロードは git で行う（この開発環境では GitHub の圧縮ファイルのダウンロードが通らないため）
 
 ## コマンドライン
@@ -66,7 +92,8 @@ Tools28Render --test-scene                              確認用の部屋
 Tools28Render --scene model.t28s --output out.png       画像を作って終わる
     [--width 1280 --height 720 --samples 256 --panorama]
 その他: --log ファイル / --gpu 番号 / --bounces 回数 / --exposure EV / --no-auto-exposure
-        --render-scale 倍率（小さく描いて拡大＝速い） / --exit-after フレーム数（動作確認用）
+        --render-scale 倍率（小さく描いて拡大＝速い。既定は RT コアあり 1.0・なし 0.5）
+        --software（RT コアがあっても予備の方式で描く） / --exit-after フレーム数（動作確認用）
 ```
 
 ## 使っている外部の部品
@@ -77,3 +104,4 @@ Tools28Render --scene model.t28s --output out.png       画像を作って終わ
 | volk | Vulkan の読み込み | MIT | `third_party/volk` |
 | GLFW | ウィンドウ | zlib | ビルド時に git で取得（Linux はシステムのもの） |
 | stb_image_write | PNG 保存 | Public Domain / MIT | `third_party/stb` |
+| stb_truetype | 案内の文字を描く（フォントは Windows のものを使う） | Public Domain / MIT | `third_party/stb` |

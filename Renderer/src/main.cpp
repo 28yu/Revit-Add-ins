@@ -6,6 +6,7 @@
 //   Tools28Render --scene model.t28s --output out.png      画像だけ作って終わる
 //       [--width 1280 --height 720 --samples 256 --panorama]
 // その他: --log ファイル / --gpu 番号 / --bounces 回数 / --exposure EV / --no-auto-exposure / --render-scale 倍率
+//         --software（RT コアを使わない予備の方式で描く。動作確認用）
 #include <cstdlib>
 #include <cstring>
 #include <string>
@@ -58,6 +59,7 @@ static int run(int argc, char** argv) {
         else if (a == "--no-auto-exposure") opt.autoExposure = false;
         else if (a == "--render-scale") opt.renderScale = static_cast<float>(std::atof(next()));
         else if (a == "--exit-after") opt.exitAfterFrames = std::atoi(next());
+        else if (a == "--software") opt.forceSoftware = true;
     }
     setLanguage(lang);
     if (opt.logPath.empty() && opt.outputPath.empty()) opt.logPath = defaultLogPath();
@@ -74,7 +76,7 @@ static int run(int argc, char** argv) {
     if (opt.width < 16) opt.width = 16;
     if (opt.height < 16) opt.height = 16;
     if (opt.samples < 1) opt.samples = 1;
-    if (opt.renderScale < 0.25f || opt.renderScale > 2.0f) opt.renderScale = 1.0f;
+    if (opt.renderScale != 0.0f && (opt.renderScale < 0.25f || opt.renderScale > 2.0f)) opt.renderScale = 0.0f;
 
     return opt.outputPath.empty() ? runWindow(opt, scene) : runOffscreen(opt, scene);
 }
