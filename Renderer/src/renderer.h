@@ -89,6 +89,7 @@ private:
     Buffer texInfos_, texels_;  // テクスチャ（Revit の外観の「イメージ」「レリーフ パターン」）
     Buffer lights_;             // 照明器具の光源
     uint32_t lightCount_ = 0;
+    float groundZ_ = 0.0f;      // 地面の高さ（モデルの一番下）
     Buffer bvhNodes_, bvhTris_;  // 予備の方式（RT コア無し）で使う
     AccelStruct blasOpaque_, blasGlass_, tlas_;
     uint32_t glassStart_ = 0;

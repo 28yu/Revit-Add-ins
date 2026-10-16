@@ -30,7 +30,11 @@ void main() {
     if (inside) {
         // ならす強さは atrous の中で「残っているノイズの大きさ」に合わせて自動で弱まるので、ここではそのまま使う
         vec3 color = imageLoad(uFiltered, p).rgb * imageLoad(uAlbedo, p).rgb;
-        vec3 mapped = tonemap(color * pc.exposure);
+        // 仕上げの色味: 少し暖かく（日なたの白が青白くならないように）、彩度をわずかに抑える（Enscape に近い落ち着いた色）
+        vec3 graded = color * vec3(1.06, 1.0, 0.92);
+        float gl = dot(graded, vec3(0.2126, 0.7152, 0.0722));
+        graded = mix(vec3(gl), graded, 0.9);
+        vec3 mapped = tonemap(graded * pc.exposure);
         imageStore(uOutput, p, vec4(pow(mapped, vec3(1.0 / 2.2)), 1.0));
         lumForExposure = dot(color, vec3(0.2126, 0.7152, 0.0722));
     }

@@ -127,7 +127,8 @@ namespace Tools28.Commands.RealtimeRender
                     float[] min = bounds.Value.min, max = bounds.Value.max;
                     float cx = (min[0] + max[0]) / 2, cy = (min[1] + max[1]) / 2, cz = (min[2] + max[2]) / 2;
                     float dx = max[0] - min[0], dy = max[1] - min[1], dz = max[2] - min[2];
-                    float distance = (float)Math.Sqrt(dx * dx + dy * dy + dz * dz) * 0.9f;
+                    // Enscape と同じく広い画角（横 約 90°）で、モデルが画面いっぱいに入る距離に置く
+                    float distance = (float)Math.Sqrt(dx * dx + dy * dy + dz * dz) * 0.55f;
                     cam.Eye = new[]
                     {
                         cx - cam.Forward[0] * distance,
@@ -135,7 +136,7 @@ namespace Tools28.Commands.RealtimeRender
                         cz - cam.Forward[2] * distance,
                     };
                 }
-                cam.FovY = 50f;
+                cam.FovY = 65f;
             }
             DiagLog.Cmd("RealtimeRender",
                 $"カメラ: 透視={view.IsPerspective} 位置=({cam.Eye[0]:F2},{cam.Eye[1]:F2},{cam.Eye[2]:F2}) 画角={cam.FovY:F1}");

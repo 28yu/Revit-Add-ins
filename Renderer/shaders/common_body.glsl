@@ -157,6 +157,29 @@ float fresnelSchlick(float cosTheta, float f0) {
     return f0 + (1.0 - f0) * pow(1.0 - clamp(cosTheta, 0.0, 1.0), 5.0);
 }
 
+// --- 地面 -----------------------------------------------------------------
+// モデルの一番下の高さに、どこまでも続く地面がある（Enscape と同じく、ベージュの地面が地平線の霞に溶け込む）
+const vec3 GROUND_ALBEDO = vec3(0.44, 0.40, 0.37);
+
+// 光線が地面に当たる距離（当たらなければ負）
+float groundHit(vec3 origin, vec3 dir) {
+    float gz = pc.camUp.w;
+    if (dir.z > -1e-5 || origin.z <= gz) return -1.0;
+    return (gz - origin.z) / dir.z;
+}
+
+// 地面の明るさ（太陽の光は影の判定をする。空の光は平均で足す）。distance = カメラからの距離（遠いほど霞む）
+vec3 groundRadiance(vec3 p, float distance) {
+    vec3 sun = normalize(pc.sunDir.xyz);
+    // 空の光（真上と横の平均）と、周りの日なたの地面からの照り返し（影の中が青黒くならないように）
+    vec3 light = skyBase(vec3(0.0, 0.0, 1.0)) * 0.35 + skyBase(normalize(vec3(sun.xy, 0.3))) * 0.35 +
+                 GROUND_ALBEDO * sunColor() * max(sun.z, 0.0) * 0.25;
+    if (sun.z > 0.0 && !occluded(p + vec3(0.0, 0.0, 0.002), sun)) light += sunColor() * sun.z;
+    vec3 c = GROUND_ALBEDO * light;
+    float haze = 1.0 - exp(-distance / 1500.0);
+    return mix(c, hazeColor(), haze);
+}
+
 // --- 1本の光の通り道を追う -----------------------------------------------
 // 最初に当たった面の情報（ノイズ除去で使う）
 struct Primary {
@@ -176,7 +199,7 @@ vec3 radiance(vec3 origin, vec3 dir, out Primary primary) {
     vec3 result = vec3(0.0);
     vec3 throughput = vec3(1.0);
     vec3 sun = normalize(pc.sunDir.xyz);
-    vec3 sunColor = vec3(1.0, 0.95, 0.88) * pc.sunDir.w;
+    vec3 sunCol = sunColor();
     bool specularPath = true;  // カメラから鏡のような反射だけで来た（太陽の円盤を見せてよい）
     // ノイズ除去で使う「最初に見えている面」は、ガラスを素通りした先の物にする
     // （ガラスの面を使うと、動いたときに窓の外の景色がにじむため）
@@ -193,6 +216,20 @@ vec3 radiance(vec3 origin, vec3 dir, out Primary primary) {
     for (uint bounce = 0u; bounce <= pc.frame.z; ++bounce) {
         Hit h = traceClosest(origin, dir);
         if (!h.found) {
+            float tg = groundHit(origin, dir);
+            if (tg > 0.0) {
+                // 地面に当たった（地面は光を跳ね返さない簡単な扱い。明るさは groundRadiance で決まる）
+                vec3 gp = origin + dir * tg;
+                if (!primary.hit) {
+                    primary.hit = true;
+                    primary.dist = travelled + tg;
+                    primary.pos = viaMirror ? camOrigin + camDir * primary.dist : gp;
+                    primary.normal = viaMirror ? reflect(vec3(0.0, 0.0, 1.0), mirrorN) : vec3(0.0, 0.0, 1.0);
+                    primary.albedo = viaMirror ? max(mirrorTint * GROUND_ALBEDO, vec3(0.02)) : GROUND_ALBEDO;
+                }
+                result += throughput * groundRadiance(gp, travelled + tg);
+                break;
+            }
             result += throughput * (skyRadiance(dir) + (specularPath ? sunDisc(dir) : vec3(0.0)));
             break;
         }
@@ -264,7 +301,7 @@ vec3 radiance(vec3 origin, vec3 dir, out Primary primary) {
         float nDotL = dot(n, sun);
         if (nDotL > 0.0 && sun.z > -0.05 && metallic <= 0.5) {
             if (!occluded(pos + gn * 0.002, sun)) {
-                result += throughput * (1.0 - specProb) * albedo * sunColor * nDotL;  // 拡散面の明るさ = 色 × 光の強さ × 光の当たる角度
+                result += throughput * (1.0 - specProb) * albedo * sunCol * nDotL;  // 拡散面の明るさ = 色 × 光の強さ × 光の当たる角度
             }
         }
 
@@ -335,7 +372,15 @@ void primaryGeometry(vec3 origin, vec3 dir, out vec3 pos, out vec3 normal, out f
     float travelled = 0.0;
     for (int i = 0; i < 8; ++i) {
         Hit h = traceClosest(origin, dir);
-        if (!h.found) return;
+        if (!h.found) {
+            float tg = groundHit(origin, dir);
+            if (tg > 0.0) {
+                dist = travelled + tg;
+                pos = viaMirror ? camOrigin + camDir * dist : origin + dir * tg;
+                normal = viaMirror ? reflect(vec3(0.0, 0.0, 1.0), mirrorN) : vec3(0.0, 0.0, 1.0);
+            }
+            return;
+        }
         vec3 p, n, gn;
         vec2 uv;
         float uvPerMeter;

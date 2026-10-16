@@ -81,7 +81,8 @@ struct CameraController {
     }
 };
 
-// 自動露出: 画面の明るさの平均（対数平均）が写真の標準の明るさ（18% グレー）になるように合わせる
+// 自動露出: 画面の明るさの平均（対数平均）が kExposureKey になるように合わせる
+const float kExposureKey = 0.32f;
 struct AutoExposure {
     float current = 1.0f;
     bool initialized = false;
@@ -89,7 +90,8 @@ struct AutoExposure {
     // key: 画面の明るさ（対数平均）。smooth: 0 = 即座に合わせる、1 に近いほどゆっくり
     void update(float key, float evOffset, float smooth) {
         if (key <= 0) return;
-        float target = 0.18f / key * std::exp2(evOffset);
+        // 写真の標準（18% グレー）より明るめに合わせる（Enscape のような明るく軽い仕上がりにするため）
+        float target = kExposureKey / key * std::exp2(evOffset);
         target = std::fmax(1.0f / 64.0f, std::fmin(1024.0f, target));
         if (!initialized) {
             current = target;

@@ -31,7 +31,7 @@ static const uint32_t kOverlaySpv[] =      // 操作の案内を重ねる
 namespace {
 
 const int kAtrousIterations = 5;           // 平均する回数（間隔 1, 2, 4, 8, 16 画素）
-const float kMovingHistoryAlpha = 0.125f;  // 動いている間、今回の結果を混ぜる最小の割合（= 最大 8 フレーム分を重ねる）
+const float kMovingHistoryAlpha = 0.2f;    // 動いている間、今回の結果を混ぜる最小の割合（= 最大 5 フレーム分を重ねる。多いと残像になる）
 const float kMaxHistory = 65536.0f;        // 止まっている間に重ねる回数の上限
 
 struct PathTracePush {
@@ -348,6 +348,12 @@ void Renderer::uploadScene(const Scene& scene, uint32_t glassStart, const Bvh& b
                           {l.direction.x, l.direction.y, l.direction.z, l.cosInner},
                           {l.cosOuter, 0, 0, 0}});
     lightCount_ = static_cast<uint32_t>(lights.size());
+    // 地面の高さ = モデルの一番下
+    groundZ_ = 0.0f;
+    if (!scene.vertices.empty()) {
+        groundZ_ = scene.vertices[0].pz;
+        for (const Vertex& v : scene.vertices) groundZ_ = std::min(groundZ_, v.pz);
+    }
     if (lights.empty()) lights.push_back({});  // 空のバッファは作れないので 1 つ入れておく（数は 0 のまま）
     lights_ = ctx.createDeviceBuffer(lights.data(), lights.size() * sizeof(GpuLight), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
     logInfo("Lights: %u", lightCount_);
@@ -678,7 +684,7 @@ void Renderer::record(VkCommandBuffer cmd, const ViewParams& view) {
     pt.camForward[0] = view.forward.x; pt.camForward[1] = view.forward.y; pt.camForward[2] = view.forward.z;
     pt.camForward[3] = view.panorama ? 1.0f : 0.0f;
     pt.camRight[0] = view.right.x; pt.camRight[1] = view.right.y; pt.camRight[2] = view.right.z; pt.camRight[3] = aspect;
-    pt.camUp[0] = view.up.x; pt.camUp[1] = view.up.y; pt.camUp[2] = view.up.z;
+    pt.camUp[0] = view.up.x; pt.camUp[1] = view.up.y; pt.camUp[2] = view.up.z; pt.camUp[3] = groundZ_;
     pt.sunDir[0] = sunDir_.x; pt.sunDir[1] = sunDir_.y; pt.sunDir[2] = sunDir_.z; pt.sunDir[3] = sunIntensity_;
     pt.misc[0] = static_cast<float>(lightCount_);
     pt.misc[1] = skyIntensity_;
