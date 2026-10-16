@@ -456,7 +456,7 @@ _buttonTipKeys["FeatureName"] = "Ribbon.FeatureName.Button.Tip";
 | LanguageSwitch / Localization（多言語UI） | `Commands/LanguageSwitch/` + `Localization/` | `Docs/DEVLOG.md#LocSystem` |
 | AutoBackup（自動バックアップ/定期ローカル保存・クラウド同期） | `Commands/AutoBackup/` | `Docs/Features/AutoBackup.md` |
 | GenericModelMerge（一般モデル化/複数要素の形状を1つにまとめる） | `Commands/GenericModelMerge/` | `Docs/Features/GenericModelMerge.md` |
-| RealtimeRender（リアルタイムレンダリング/GPUレイトレーシング・試作） | `Commands/RealtimeRender/` + `Renderer/` | `Docs/DEVLOG.md#RealtimeRender`, `Renderer/README.md` |
+| RealtimeRender（リアルタイムレンダリング/GPUレイトレーシング・ライブ同期・画像/360°/ビューア書き出し） | `Commands/RealtimeRender/` + `Renderer/` | `Docs/DEVLOG.md#RealtimeRender`, `Renderer/README.md` |
 
 ### リボンパネル構成（左から順）
 1. **通り芯・レベル** — 符号表示切替（両方/左/右）
@@ -465,7 +465,7 @@ _buttonTipKeys["FeatureName"] = "Ribbon.FeatureName.Button.Tip";
 4. **注釈・詳細** — 部屋タグ自動配置、部屋3D色分け、塗潰し領域 分割・統合、塗潰しパターン入出力
 5. **構造** — 梁下端色分け、梁天端色分け、耐火被覆色分け、型枠数量算出
 6. **モデル** — 一般モデル化（3Dビュー内の複数カテゴリの形状を1つの一般モデル／.rfa にまとめる）
-7. **レンダリング** — リアルタイムレンダリング（3Dビューを別ウィンドウの Tools28Render.exe で GPU レイトレーシング描画・試作）
+7. **レンダリング** — リアルタイムレンダリング（3Dビューを別ウィンドウの Tools28Render.exe で GPU レイトレーシング描画。ライブ同期・画像/360°/ビューア exe の書き出し）
 8. **データ** — EXCELエクスポート、EXCELインポート
 9. **パラメータ** — パラメータ整理（同名特定・値の有無確認・未使用削除）、値の一括置換（文字パラメータの値をモデル全体で置換・削除）、値の移動（同名でグループ違いのパラメータ間で要素ごとに移動）
 10. **設定** — 自動バックアップ（定期ローカル保存・ワークシェア/クラウド中央同期）、言語切替（JP/US/CN）、バージョン情報、マニュアル
