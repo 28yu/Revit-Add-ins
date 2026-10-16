@@ -176,8 +176,10 @@ vec3 groundRadiance(vec3 p, float distance) {
                  GROUND_ALBEDO * sunColor() * max(sun.z, 0.0) * 0.25;
     if (sun.z > 0.0 && !occluded(p + vec3(0.0, 0.0, 0.002), sun)) light += sunColor() * sun.z;
     vec3 c = GROUND_ALBEDO * light;
-    float haze = 1.0 - exp(-distance / 1500.0);
-    return mix(c, hazeColor(), haze);
+    // 遠くの地面は少し暗く・灰色になる（地平線の明るい空との差で、遠さが分かる）
+    float haze = 1.0 - exp(-distance / 900.0);
+    vec3 far = vec3(dot(c, vec3(0.2126, 0.7152, 0.0722))) * vec3(0.55, 0.56, 0.59);
+    return mix(c, far, haze);
 }
 
 // --- 1本の光の通り道を追う -----------------------------------------------

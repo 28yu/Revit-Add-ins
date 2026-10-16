@@ -7,6 +7,7 @@
 //       [--width 1280 --height 720 --samples 256 --panorama]
 // その他: --log ファイル / --gpu 番号 / --bounces 回数 / --exposure EV / --no-auto-exposure / --render-scale 倍率
 //         --software（RT コアを使わない予備の方式で描く。動作確認用）
+#include <algorithm>
 #include <cstdlib>
 #include <cstring>
 #include <string>
@@ -63,6 +64,7 @@ static int run(int argc, char** argv) {
         else if (a == "--render-scale") opt.renderScale = static_cast<float>(std::atof(next()));
         else if (a == "--exit-after") opt.exitAfterFrames = std::atoi(next());
         else if (a == "--export-samples") opt.exportSamples = std::atoi(next());
+        else if (a == "--sky-size") opt.skySize = std::max(256, std::min(8192, std::atoi(next())));
         else if (a == "--motion-test") opt.motionTest = std::atoi(next());
         else if (a == "--motion-reference") opt.motionReference = std::atoi(next());
         else if (a == "--software") opt.forceSoftware = true;

@@ -330,6 +330,7 @@ int runWindow(const Options& opt, Scene& scene) {
     Bvh bvh;
     uint32_t glassStart = prepareScene(scene, bvh);
     Renderer renderer;
+    renderer.skyWidth_ = static_cast<uint32_t>(opt.skySize);
     renderer.init(ctx, scene, glassStart, bvh);
 
     // RT コアの無い GPU では、半分の大きさで描いて拡大する（速さを保つため）

@@ -26,6 +26,7 @@ struct Options {
     bool forceSoftware = false;    // RT コアがあっても予備の方式で描く（動作確認用）
     bool liveSync = false;         // Revit での変更を受け取る（シーンファイルの更新を見張る）。Revit から --live で指定
     int exportSamples = 0;
+    int skySize = 4096;            // 空と雲の画像の横の画素数（動作確認で短くするときは小さくする）
     int motionReference = 0;       // 動作確認用: カメラを --motion-test と同じだけ動かした位置で、止めたまま描く（比べる正解）
     int motionTest = 0;            // 動作確認用: 画像だけ作るとき、カメラをこのフレーム数だけ動かし続けて最後の絵を保存する（残像の確認）         // 書き出しの足し合わせ回数（0 = 自動。動作確認で短くするとき用）
     int exitAfterFrames = 0;       // 動作確認用: このフレーム数を描いたら自動で閉じる（0 = 閉じない）

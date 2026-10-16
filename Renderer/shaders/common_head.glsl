@@ -61,31 +61,9 @@ uint pcg(uint v) {
 float rand() { rngState = pcg(rngState); return float(rngState) / 4294967296.0; }
 
 // --- 空 -----------------------------------------------------------------
-// 青い空（天頂は濃く、地平線に向かって白っぽく霞む）＋太陽の周りの明るさ＋雲。
-// 雲は向きだけで決まる模様なので、毎フレーム同じ絵になる（動いてもちらつかない）
-
-float hash12(vec2 p) {
-    vec3 p3 = fract(vec3(p.xyx) * 0.1031);
-    p3 += dot(p3, p3.yzx + 33.33);
-    return fract((p3.x + p3.y) * p3.z);
-}
-
-float valueNoise(vec2 p) {
-    vec2 i = floor(p), f = fract(p);
-    vec2 u = f * f * (3.0 - 2.0 * f);
-    return mix(mix(hash12(i), hash12(i + vec2(1.0, 0.0)), u.x), mix(hash12(i + vec2(0.0, 1.0)), hash12(i + vec2(1.0, 1.0)), u.x), u.y);
-}
-
-// 細かさの違う模様を重ねたもの（雲のもこもこした形）
-float fbm(vec2 p) {
-    float v = 0.0, a = 0.5;
-    for (int i = 0; i < 5; ++i) {
-        v += a * valueNoise(p);
-        p = p * 2.03 + vec2(17.1, 9.7);
-        a *= 0.5;
-    }
-    return v;
-}
+// 空と雲は起動時に sky.comp が 1 枚の画像（uSky）に描いておき、ここではそれを読むだけ（速い・毎フレーム同じ絵）。
+// 画像: 横 = 方位、縦 = 高度 -2°〜90°（v = sqrt((高度 + 2°) / 92°)、上の行が天頂）
+layout(set = 0, binding = 13, rgba16f) uniform readonly image2D uSky;
 
 // 太陽の色（低いほど夕日のように赤みを帯びる）× 明るさ
 vec3 sunColor() {
@@ -94,17 +72,17 @@ vec3 sunColor() {
     return c * pc.sunDir.w;
 }
 
-// 雲の無い空（地面を照らす明るさの計算にも使う）
+// 雲の無い空（地面を照らす明るさの計算に使う。sky.comp の atmosphere と同じ式）
 vec3 skyBase(vec3 dir) {
     vec3 sun = normalize(pc.sunDir.xyz);
-    float up = max(dir.z, 0.0);
-    // 日なたの面（色 × 太陽の明るさ）と同じくらいの明るさに見えるよう、空は明るめにする（暗いと影が青黒くなる）
-    vec3 zenith = vec3(0.34, 0.62, 1.30);
+    float el = max(dir.z, 0.0);
+    vec3 zenith = vec3(0.20, 0.42, 1.05);
+    vec3 mid = vec3(0.55, 0.78, 1.35);
     vec3 horizon = vec3(1.45, 1.55, 1.68);
-    // 白っぽい霞は地平線のすぐ上だけ（少し上がるとすぐ青くなる）
-    vec3 sky = mix(zenith, horizon, pow(1.0 - up, 10.0));
+    vec3 sky = mix(mid, zenith, smoothstep(0.0, 1.0, pow(el, 0.6)));
+    sky = mix(sky, horizon, exp(-el * 14.0));
     float cosSun = max(dot(dir, sun), 0.0);
-    sky += vec3(1.0, 0.85, 0.65) * (pow(cosSun, 8.0) * 0.45 + pow(cosSun, 64.0) * 0.6);  // 太陽の周りの明るさ
+    sky += vec3(1.0, 0.85, 0.65) * (pow(cosSun, 8.0) * 0.45 + pow(cosSun, 64.0) * 0.6);
     float sunHeight = clamp(sun.z * 4.0, 0.0, 1.0);
     return sky * pc.misc.y * (0.15 + 0.85 * sunHeight);
 }
@@ -112,28 +90,25 @@ vec3 skyBase(vec3 dir) {
 // 地平線の霞の色（遠くの地面が溶け込む色）
 vec3 hazeColor() { return skyBase(normalize(vec3(1.0, 0.0, 0.02))) * 0.95; }
 
+vec3 skyTexel(ivec2 p, ivec2 size) {
+    p.x = (p.x % size.x + size.x) % size.x;  // 方位は一周つながっている
+    p.y = clamp(p.y, 0, size.y - 1);
+    return imageLoad(uSky, p).rgb;
+}
+
 vec3 skyRadiance(vec3 dir) {
-    if (dir.z < 0.0) return hazeColor();  // 地面より下は霞の色（地面は別に計算する）
-    vec3 sky = skyBase(dir);
-    // 雲: 高さ一定の雲の層に、空の向きを写した位置の模様（遠くの雲ほど小さく、地平線に近づくほど密に見える）
-    if (dir.z > 0.0) {
-        vec2 p = dir.xy / (dir.z + 0.05) * 1.1;
-        float d = fbm(p + vec2(3.7, 1.3));
-        float cover = smoothstep(0.50, 0.68, d) * smoothstep(0.0, 0.04, dir.z);
-        if (cover > 0.0) {
-            vec3 sun = normalize(pc.sunDir.xyz);
-            float sunHeight = clamp(sun.z * 4.0, 0.0, 1.0);
-            // もこもこ感: 太陽の方へ少しずらした所の濃さと比べ、太陽側が薄い（＝光が通る）所を明るく、反対側を灰色にする
-            float dTowardSun = fbm(p + vec2(3.7, 1.3) + normalize(sun.xy + vec2(1e-4)) * 0.08);
-            float light = clamp(0.65 + (d - dTowardSun) * 6.0, 0.25, 1.15);
-            float glow = 1.0 + 0.35 * pow(max(dot(dir, sun), 0.0), 4.0);  // 太陽に近い雲は明るい
-            vec3 white = (vec3(0.96, 0.95, 0.93) * pc.misc.y * 2.3 + sunColor() * 0.12) * glow;
-            vec3 shade = vec3(0.95, 1.0, 1.12) * pc.misc.y;
-            vec3 cloud = mix(shade, white, light / 1.15);
-            sky = mix(sky, cloud * (0.15 + 0.85 * sunHeight), cover);
-        }
-    }
-    return sky;
+    if (dir.z < -0.03) return hazeColor();  // 地面より下は霞の色（地面は別に計算する）
+    ivec2 size = imageSize(uSky);
+    const float MIN_EL = -2.0 * PI / 180.0, EL_RANGE = 92.0 * PI / 180.0;
+    float el = asin(clamp(dir.z, -1.0, 1.0));
+    float v = sqrt(clamp((el - MIN_EL) / EL_RANGE, 0.0, 1.0));
+    float u = atan(dir.y, dir.x) / (2.0 * PI) + 0.5;
+    vec2 pix = vec2(u * float(size.x), (1.0 - v) * float(size.y)) - 0.5;
+    ivec2 b = ivec2(floor(pix));
+    vec2 f = pix - vec2(b);
+    vec3 a = mix(skyTexel(b, size), skyTexel(b + ivec2(1, 0), size), f.x);
+    vec3 c = mix(skyTexel(b + ivec2(0, 1), size), skyTexel(b + ivec2(1, 1), size), f.x);
+    return mix(a, c, f.y);
 }
 
 // 太陽そのもの（見える円盤）。直接光はシャドウレイで別に計算するので、カメラから直接見たときだけ使う

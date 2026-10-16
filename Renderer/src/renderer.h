@@ -27,6 +27,8 @@ class Renderer {
 public:
     // scene は sortGlassLast() 済み（glassStart = ガラスの最初の三角形）、bvh はその並びで作ったもの。
     // RT コアが無い GPU では bvh を GPU に送って、予備の方式で描く
+    // 空と雲の画像の横の画素数（init の前に設定する。縦はその 1/4）
+    uint32_t skyWidth_ = 4096;
     void init(VkContext& ctx, const Scene& scene, uint32_t glassStart, const Bvh& bvh);
     void destroy();
     // モデルを入れ替える（Revit で変更があったとき）。描画の大きさ・カメラはそのまま
@@ -66,6 +68,7 @@ public:
 
 private:
     void uploadScene(const Scene& scene, uint32_t glassStart, const Bvh& bvh);
+    void computeSky();
     void destroyScene();
     void buildAccelerationStructures(const Scene& scene);
     void createPasses();
@@ -106,7 +109,9 @@ private:
     uint32_t staticFrames_ = 0;
     uint32_t frameIndex_ = 0;
 
-    ComputePass pathTrace_, temporal_, atrous_, composite_, overlayPass_;
+    ComputePass pathTrace_, temporal_, atrous_, composite_, skyPass_, overlayPass_;
+    Image skyImage_;  // 空と雲（起動時・太陽が変わったときに描く）
+    Vec3 skySun_;
 
     // 操作の案内
     Image overlay_[kOverlaySlots];

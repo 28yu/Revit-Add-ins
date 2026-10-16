@@ -1,6 +1,7 @@
 #include "renderer.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstring>
 
@@ -26,6 +27,9 @@ static const uint32_t kCompositeSpv[] =    // 仕上げ（色を掛け戻す・�
     ;
 static const uint32_t kOverlaySpv[] =      // 操作の案内を重ねる
 #include "overlay.spv.inc"
+    ;
+static const uint32_t kSkySpv[] =          // 空と雲の画像を前もって描く
+#include "sky.spv.inc"
     ;
 
 namespace {
@@ -59,6 +63,11 @@ struct AtrousPush {
 
 struct CompositePush {
     float exposure;
+};
+
+struct SkyPush {
+    float sunDir[4];
+    float params[4];  // 空の明るさ, 始める行, 行の数
 };
 
 struct OverlayPush {
@@ -291,14 +300,40 @@ void Renderer::init(VkContext& ctx, const Scene& scene, uint32_t glassStart, con
     exposure_ = ctx.createBuffer(sizeof(ExposureData), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                                  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
     memset(exposure_.mapped, 0, sizeof(ExposureData));
+    // 空と雲の画像（横 = 方位、縦 = 高度。縦は横の 1/4）
+    skyImage_ = ctx.createImage(skyWidth_, skyWidth_ / 4, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_USAGE_STORAGE_BIT);
     uploadScene(scene, glassStart, bvh);
     createPasses();
+    computeSky();
+}
+
+void Renderer::computeSky() {
+    auto start = std::chrono::steady_clock::now();
+    writeSet(ctx_->device, skyPass_.sets[0], {{0, skyImage_.view}});
+    const uint32_t w = skyImage_.width, h = skyImage_.height;
+    // 1 回の計算が長いと Windows が GPU を止めてしまう（2 秒）ので、少しずつ分けて計算する
+    const uint32_t rowsPerChunk = std::max(8u, (1u << 18) / w);
+    for (uint32_t row = 0; row < h; row += rowsPerChunk) {
+        VkCommandBuffer cmd = ctx_->beginOneShot();
+        if (row == 0)
+            transitionImage(cmd, skyImage_.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL,
+                            VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_WRITE_BIT);
+        uint32_t rows = std::min(rowsPerChunk, h - row);
+        SkyPush sp{{sunDir_.x, sunDir_.y, sunDir_.z, sunIntensity_}, {skyIntensity_, static_cast<float>(row), static_cast<float>(rows), 0}};
+        dispatch(cmd, skyPass_, 0, &sp, sizeof(sp), w, rows);
+        ctx_->endOneShot(cmd);
+    }
+    skySun_ = sunDir_;
+    double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+    logInfo("Sky computed: %ux%u in %.0f ms", w, h, ms);
 }
 
 void Renderer::reloadScene(const Scene& scene, uint32_t glassStart, const Bvh& bvh) {
     vkDeviceWaitIdle(ctx_->device);
     destroyScene();
     uploadScene(scene, glassStart, bvh);
+    // 太陽の向きが変わったときだけ、空を描き直す
+    if (std::fabs(sunDir_.x - skySun_.x) + std::fabs(sunDir_.y - skySun_.y) + std::fabs(sunDir_.z - skySun_.z) > 1e-5f) computeSky();
     if (output_.view) writeDescriptors();
     resetHistory_ = true;
 }
@@ -526,10 +561,11 @@ void Renderer::createPasses() {
     const VkDescriptorType IMG = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, BUF = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 
     // パストレース: 0 = 形（加速構造 / BVH の箱）, 1 = 明るさ, 2 = 位置, 3〜6 = 形・材質, 7 = 面の向き, 8 = BVH の三角形, 9 = 面の色,
-    //               10 = テクスチャの置き場所, 11 = テクスチャの画素, 12 = 照明器具の光源
+    //               10 = テクスチャの置き場所, 11 = テクスチャの画素, 12 = 照明器具の光源, 13 = 空と雲の画像
     std::vector<BindingSpec> pt = {
         {0, hardwareRt_ ? VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR : BUF},
         {1, IMG}, {2, IMG}, {3, BUF}, {4, BUF}, {5, BUF}, {6, BUF}, {7, IMG}, {9, IMG}, {10, BUF}, {11, BUF}, {12, BUF},
+        {13, IMG},
     };
     if (!hardwareRt_) pt.push_back({8, BUF});
     pathTrace_ = hardwareRt_
@@ -546,6 +582,7 @@ void Renderer::createPasses() {
 
     composite_ = createPass(dev, {{0, IMG}, {1, IMG}, {2, IMG}, {3, IMG}, {4, BUF}}, 2, sizeof(CompositePush),
                             kCompositeSpv, sizeof(kCompositeSpv), "composite");
+    skyPass_ = createPass(dev, {{0, IMG}}, 1, sizeof(SkyPush), kSkySpv, sizeof(kSkySpv), "sky");
     overlayPass_ = createPass(dev, {{0, IMG}, {1, IMG}}, kOverlaySlots, sizeof(OverlayPush), kOverlaySpv, sizeof(kOverlaySpv), "overlay");
 }
 
@@ -556,7 +593,7 @@ void Renderer::writeDescriptors() {
         std::vector<Bind> pt = {
             {1, noisy_.view}, {2, gpos_[cur].view}, {3, {}, vertices_.buffer}, {4, {}, indices_.buffer},
             {5, {}, triMaterials_.buffer}, {6, {}, materials_.buffer}, {7, gnormal_[cur].view}, {9, galbedo_.view},
-            {10, {}, texInfos_.buffer}, {11, {}, texels_.buffer}, {12, {}, lights_.buffer},
+            {10, {}, texInfos_.buffer}, {11, {}, texels_.buffer}, {12, {}, lights_.buffer}, {13, skyImage_.view},
         };
         if (hardwareRt_) {
             Bind b{0};
@@ -748,9 +785,9 @@ void Renderer::destroy() {
     if (!ctx_) return;
     VkDevice dev = ctx_->device;
     vkDeviceWaitIdle(dev);
-    for (ComputePass* p : {&pathTrace_, &temporal_, &atrous_, &composite_, &overlayPass_}) destroyPass(dev, *p);
+    for (ComputePass* p : {&pathTrace_, &temporal_, &atrous_, &composite_, &skyPass_, &overlayPass_}) destroyPass(dev, *p);
     Image* all[] = {&noisy_, &gpos_[0], &gpos_[1], &gnormal_[0], &gnormal_[1], &galbedo_, &history_[0], &history_[1],
-                    &moments_[0], &moments_[1], &filtered_[0], &filtered_[1], &albedoHist_[0], &albedoHist_[1], &output_, &overlay_[0], &overlay_[1], &overlay_[2]};
+                    &moments_[0], &moments_[1], &filtered_[0], &filtered_[1], &albedoHist_[0], &albedoHist_[1], &output_, &skyImage_, &overlay_[0], &overlay_[1], &overlay_[2]};
     for (Image* img : all) ctx_->destroyImage(*img);
     destroyScene();
     ctx_->destroyBuffer(exposure_);

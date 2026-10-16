@@ -1,0 +1,239 @@
+#version 450
+// 空と雲を前もって 1 枚の画像（空の画像）に描いておく。起動時と太陽が変わったときに 1 回だけ計算する。
+//
+//  - 大気: 天頂は濃い青、地平線に近いほど白っぽく霞む。太陽の周りは明るい
+//  - 積雲（もこもこした雲。高さ 1500〜4000 m）: 雲の中を光線で少しずつ進み、雲の濃さと、太陽の光が雲の中を
+//    通ってくる量を計算する（体積の雲）。上は日が当たって白く、底は灰色になる
+//  - 高い雲（高さ 7000 m）: 薄く流れる巻雲（すじ雲）と、小さな粒が並ぶ巻積雲（うろこ雲）
+//  - 地球の丸み: 雲の層を球の殻として扱うので、地平線に近い雲ほど小さく・密に・霞んで見える（遠近感）
+//
+// 空の画像: 横 = 方位（360°）、縦 = 高度 -2°〜90°（地平線の近くほど細かく: v = sqrt((高度 + 2°) / 92°)、上が天頂）
+layout(local_size_x = 8, local_size_y = 8) in;
+layout(set = 0, binding = 0, rgba16f) uniform writeonly image2D uSky;
+
+layout(push_constant) uniform Params {
+    vec4 sunDir;     // xyz = 太陽のある方向, w = 太陽の明るさ
+    vec4 params;     // x = 空の明るさ, y = 計算を始める行, z = 行の数
+} pc;
+
+const float PI = 3.14159265359;
+const float R_EARTH = 6360e3;
+const float CLOUD_BOTTOM = 1500.0, CLOUD_TOP = 4200.0;
+const float HIGH_CLOUD = 7500.0;
+const float MIN_EL = -2.0 * PI / 180.0, EL_RANGE = 92.0 * PI / 180.0;
+
+// --- 乱数・ノイズ --------------------------------------------------------------
+float hash13(vec3 p3) {
+    p3 = fract(p3 * 0.1031);
+    p3 += dot(p3, p3.zyx + 31.32);
+    return fract((p3.x + p3.y) * p3.z);
+}
+float hash12(vec2 p) {
+    vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+    p3 += dot(p3, p3.yzx + 33.33);
+    return fract((p3.x + p3.y) * p3.z);
+}
+vec2 hash22(vec2 p) {
+    vec3 p3 = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973));
+    p3 += dot(p3, p3.yzx + 33.33);
+    return fract((p3.xx + p3.yz) * p3.zy);
+}
+
+float noise3(vec3 p) {
+    vec3 i = floor(p), f = fract(p);
+    vec3 u = f * f * (3.0 - 2.0 * f);
+    return mix(mix(mix(hash13(i), hash13(i + vec3(1, 0, 0)), u.x), mix(hash13(i + vec3(0, 1, 0)), hash13(i + vec3(1, 1, 0)), u.x), u.y),
+               mix(mix(hash13(i + vec3(0, 0, 1)), hash13(i + vec3(1, 0, 1)), u.x), mix(hash13(i + vec3(0, 1, 1)), hash13(i + vec3(1, 1, 1)), u.x), u.y),
+               u.z);
+}
+float noise2(vec2 p) {
+    vec2 i = floor(p), f = fract(p);
+    vec2 u = f * f * (3.0 - 2.0 * f);
+    return mix(mix(hash12(i), hash12(i + vec2(1, 0)), u.x), mix(hash12(i + vec2(0, 1)), hash12(i + vec2(1, 1)), u.x), u.y);
+}
+float fbm3(vec3 p, int octaves) {
+    float v = 0.0, a = 0.5, n = 0.0;
+    for (int i = 0; i < octaves; ++i) {
+        v += a * noise3(p);
+        n += a;
+        p = p * 2.02 + vec3(13.1, 7.7, 3.3);
+        a *= 0.5;
+    }
+    return v / n;
+}
+float fbm2(vec2 p, int octaves) {
+    float v = 0.0, a = 0.5, n = 0.0;
+    for (int i = 0; i < octaves; ++i) {
+        v += a * noise2(p);
+        n += a;
+        p = mat2(1.6, 1.2, -1.2, 1.6) * p + vec2(5.3, 1.7);
+        a *= 0.5;
+    }
+    return v / n;
+}
+// 細胞状の模様（うろこ雲の粒）: 一番近い点までの距離
+float cells(vec2 p) {
+    vec2 i = floor(p), f = fract(p);
+    float d = 1.0;
+    for (int y = -1; y <= 1; ++y)
+        for (int x = -1; x <= 1; ++x) {
+            vec2 g = vec2(x, y);
+            vec2 o = hash22(i + g) * 0.8 + 0.1;
+            d = min(d, length(g + o - f));
+        }
+    return d;
+}
+
+float remap(float v, float a, float b, float c, float d) { return c + (v - a) / (b - a) * (d - c); }
+
+// --- 大気 ------------------------------------------------------------------------
+vec3 sunColor() {
+    float h = normalize(pc.sunDir.xyz).z;
+    vec3 c = mix(vec3(1.0, 0.55, 0.3), vec3(1.0, 0.9, 0.78), smoothstep(0.0, 0.45, h));
+    return c * pc.sunDir.w;
+}
+
+vec3 atmosphere(vec3 dir) {
+    vec3 sun = normalize(pc.sunDir.xyz);
+    float el = max(dir.z, 0.0);
+    // 天頂の濃い青 → 地平線の白っぽい水色（地平線から 10° くらいで青くなる）
+    vec3 zenith = vec3(0.20, 0.42, 1.05);
+    vec3 mid = vec3(0.55, 0.78, 1.35);
+    vec3 horizon = vec3(1.45, 1.55, 1.68);
+    vec3 sky = mix(mid, zenith, smoothstep(0.0, 1.0, pow(el, 0.6)));
+    sky = mix(sky, horizon, exp(-el * 14.0));
+    float cosSun = max(dot(dir, sun), 0.0);
+    sky += vec3(1.0, 0.85, 0.65) * (pow(cosSun, 8.0) * 0.45 + pow(cosSun, 64.0) * 0.6);
+    float sunHeight = clamp(sun.z * 4.0, 0.0, 1.0);
+    return sky * pc.params.x * (0.15 + 0.85 * sunHeight);
+}
+
+// --- 雲の形 ----------------------------------------------------------------------
+// 雲がどこにどのくらい出ているか（上から見た分布。0 = 晴れ、1 = 曇り）
+float coverage(vec2 xy) {
+    float c = fbm2(xy / 4200.0 + vec2(2.3, 7.1), 4);
+    return clamp(remap(c, 0.47, 0.75, 0.0, 1.0), 0.0, 1.0);
+}
+
+// 積雲の濃さ。p は地面からの高さ（z）を含む位置（m）
+float cumulusDensity(vec3 p, float height, float cov, bool detail) {
+    float h = (height - CLOUD_BOTTOM) / (CLOUD_TOP - CLOUD_BOTTOM);
+    if (h <= 0.0 || h >= 1.0 || cov <= 0.0) return 0.0;
+    // 高さの形: 底は平ら、上は丸く。よく出ている所ほど背が高い
+    float top = 0.25 + 0.6 * cov;
+    float profile = smoothstep(0.0, 0.06, h) * (1.0 - smoothstep(top * 0.5, top, h));
+    float base = fbm3(p / 700.0, 4);
+    float d = clamp(remap(base * profile, 1.0 - cov * 0.8, 1.0, 0.0, 1.0), 0.0, 1.0);
+    if (detail && d > 0.0) {
+        // 縁を細かく削って、もこもこさせる
+        float ero = fbm3(p / 220.0 + vec3(0.0, 0.0, 7.0), 3);
+        d = clamp(remap(d, ero * 0.45, 1.0, 0.0, 1.0), 0.0, 1.0);
+    }
+    return d;
+}
+
+// 球の殻（地球の中心から半径 r）と光線の交差。o は地球の中心からの位置
+float sphereExit(vec3 o, vec3 d, float r) {
+    float b = dot(o, d);
+    float c = dot(o, o) - r * r;
+    float disc = b * b - c;
+    if (disc < 0.0) return -1.0;
+    return -b + sqrt(disc);
+}
+
+// ヘニエイ・グリーンスタインの位相関数（雲は光を前方に強く散らす: 太陽の近くの雲の縁が明るく光る）
+float hg(float c, float g) { return (1.0 - g * g) / (4.0 * PI * pow(1.0 + g * g - 2.0 * g * c, 1.5)); }
+
+// --- 1 方向ぶんの空 ------------------------------------------------------------------
+vec3 skyColor(vec3 dir, vec2 pixel) {
+    vec3 sun = normalize(pc.sunDir.xyz);
+    vec3 background = atmosphere(dir);
+    if (dir.z < 0.0) return background;
+    vec3 sunCol = sunColor();
+    float sunHeight = clamp(sun.z * 4.0, 0.0, 1.0);
+    vec3 ambientTop = atmosphere(vec3(0.0, 0.0, 1.0)) * 1.1;
+    vec3 ambientBottom = vec3(0.55, 0.53, 0.5) * pc.params.x;  // 下（地面）からの照り返し
+
+    vec3 o = vec3(0.0, 0.0, R_EARTH + 2.0);
+
+    // 高い雲（巻雲・巻積雲）。2 次元の薄い層
+    vec3 color = background;
+    {
+        float t = sphereExit(o, dir, R_EARTH + HIGH_CLOUD);
+        vec3 hp = o + dir * t;
+        vec2 xy = hp.xy;
+        // 巻雲: 一方向に引き伸ばしたすじ
+        vec2 q = mat2(0.8, 0.6, -0.6, 0.8) * xy;
+        float cirrus = fbm2(q * vec2(1.0 / 9000.0, 1.0 / 2200.0) + vec2(fbm2(xy / 6000.0, 3) * 1.5), 5);
+        cirrus = smoothstep(0.55, 0.85, cirrus) * smoothstep(0.35, 0.75, fbm2(xy / 25000.0 + 4.0, 3));
+        // 巻積雲（うろこ雲）: 細かい粒が、ところどころの帯の中に並ぶ
+        float region = smoothstep(0.55, 0.75, fbm2(xy / 18000.0 + vec2(9.0, 1.0), 4));
+        float grain = 1.0 - smoothstep(0.15, 0.55, cells(xy / 520.0 + fbm2(xy / 3000.0, 2) * 1.2));
+        float alto = region * grain * smoothstep(0.35, 0.7, fbm2(xy / 1500.0, 3));
+        float a = clamp(cirrus * 0.55 + alto * 0.7, 0.0, 0.85);
+        // 遠い（地平線に近い）ほど霞む
+        a *= exp(-t / 120000.0) * smoothstep(0.0, 0.05, dir.z);
+        vec3 lit = (sunCol * 0.11 * (0.6 + 0.6 * hg(dot(dir, sun), 0.5) * 4.0) + ambientTop * 0.9) * (0.25 + 0.75 * sunHeight);
+        color = mix(color, lit, a);
+    }
+
+    // 積雲（体積の雲）
+    float tStart = sphereExit(o, dir, R_EARTH + CLOUD_BOTTOM);
+    float tEnd = sphereExit(o, dir, R_EARTH + CLOUD_TOP);
+    tEnd = min(tEnd, tStart + 30000.0);  // 地平線の近くは雲の層を斜めに長く通るので、30 km までにする
+    const int STEPS = 56;
+    float dt = (tEnd - tStart) / float(STEPS);
+    float jitter = hash12(pixel) * 0.8;
+    float transmittance = 1.0;
+    vec3 scattered = vec3(0.0);
+    float cosSun = dot(dir, sun);
+    float phase = mix(hg(cosSun, 0.6), hg(cosSun, -0.2), 0.3);
+    const float SIGMA = 0.035;  // 雲の濃さ 1 あたりの光の減り方（1/m）
+    for (int i = 0; i < STEPS; ++i) {
+        float t = tStart + (float(i) + jitter) * dt;
+        vec3 wp = o + dir * t;
+        float height = length(wp) - R_EARTH;
+        vec2 xy = wp.xy;
+        float cov = coverage(xy);
+        if (cov <= 0.0) continue;
+        float dens = cumulusDensity(vec3(xy, height), height, cov, true);
+        if (dens <= 0.0) continue;
+        // 太陽の方へ 5 歩進んで、途中の雲の濃さを足す（多いほど影になる）
+        float lightOD = 0.0;
+        for (int k = 1; k <= 5; ++k) {
+            vec3 lp = wp + sun * (120.0 * float(k * k));
+            float lh = length(lp) - R_EARTH;
+            lightOD += cumulusDensity(vec3(lp.xy, lh), lh, coverage(lp.xy), false) * 120.0 * float(2 * k - 1);
+        }
+        // 雲の中では光が何度も散らばるので、奥まで暗くはならない（弱まり方の違う 3 つを足して近似する）
+        float od = lightOD * SIGMA;
+        float beer = exp(-od) + 0.5 * exp(-od * 0.25) + 0.25 * exp(-od * 0.06);
+        float powder = 1.0 - exp(-dens * 2.0);  // 雲の内側ほど明るく見える効果（縁が暗くならないように）
+        float hFrac = clamp((height - CLOUD_BOTTOM) / (CLOUD_TOP - CLOUD_BOTTOM), 0.0, 1.0);
+        vec3 ambient = mix(ambientBottom, ambientTop, hFrac) * 0.9;
+        vec3 light = sunCol * beer * (phase * 4.0 * PI) * mix(0.5, 1.0, powder) * 0.3 + ambient;
+        float stepT = exp(-dens * SIGMA * dt);
+        // 光の足し方: その区間で散らされる量 ×（1 − 区間の透過）
+        scattered += transmittance * light * (1.0 - stepT);
+        transmittance *= stepT;
+        if (transmittance < 0.01) break;
+    }
+    // 遠い雲は大気に霞む（地平線の近くの雲がぼんやり明るくなる）
+    float fog = exp(-tStart / 45000.0);
+    vec3 cloud = scattered * (0.15 + 0.85 * sunHeight);
+    vec3 withClouds = color * transmittance + cloud;
+    return mix(color, withClouds, fog);
+}
+
+void main() {
+    ivec2 size = imageSize(uSky);
+    ivec2 p = ivec2(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y + uint(pc.params.y));
+    if (p.x >= size.x || p.y >= size.y || float(gl_GlobalInvocationID.y) >= pc.params.z) return;
+    // 画像の位置 → 向き（上の行が天頂）
+    float u = (float(p.x) + 0.5) / float(size.x);
+    float v = 1.0 - (float(p.y) + 0.5) / float(size.y);
+    float el = MIN_EL + v * v * EL_RANGE;
+    float az = (u - 0.5) * 2.0 * PI;
+    vec3 dir = vec3(cos(el) * cos(az), cos(el) * sin(az), sin(el));
+    imageStore(uSky, p, vec4(skyColor(dir, vec2(p)), 1.0));
+}
