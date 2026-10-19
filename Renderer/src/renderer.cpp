@@ -47,6 +47,7 @@ struct PathTracePush {
     float sunDir[4];
     float misc[4];
     uint32_t frame[4];
+    uint32_t look[4];  // 背景色・単色（RGBA8。a が 0 以外なら有効）
 };
 static_assert(sizeof(PathTracePush) <= 128, "push constants must fit in 128 bytes");
 
@@ -64,6 +65,7 @@ struct AtrousPush {
 
 struct CompositePush {
     float exposure;
+    uint32_t background;
 };
 
 struct SkyPush {
@@ -749,6 +751,13 @@ void Renderer::recordOverlay(VkCommandBuffer cmd, uint32_t slot, int x, int y, f
     dispatch(cmd, overlayPass_, slot, &pc, sizeof(pc), overlay_[slot].width, overlay_[slot].height);
 }
 
+void Renderer::setLook(uint32_t background, uint32_t mono) {
+    if (background == lookBackground_ && mono == lookMono_) return;
+    lookBackground_ = background;
+    lookMono_ = mono;
+    resetHistory_ = true;  // 見た目が変わったので、前のフレームを重ねない
+}
+
 void Renderer::resize(uint32_t width, uint32_t height) {
     vkDeviceWaitIdle(ctx_->device);
     Image* all[] = {&noisy_, &gpos_[0], &gpos_[1], &gnormal_[0], &gnormal_[1], &galbedo_, &history_[0], &history_[1],
@@ -810,6 +819,8 @@ void Renderer::record(VkCommandBuffer cmd, const ViewParams& view) {
     pt.frame[1] = staticFrames_;
     pt.frame[2] = view.maxBounces;
     pt.frame[3] = view.samplesPerFrame;
+    pt.look[0] = lookBackground_;
+    pt.look[1] = lookMono_;
     dispatch(cmd, pathTrace_, cur, &pt, sizeof(pt), w, h);
     computeBarrier(cmd);
 
@@ -835,7 +846,7 @@ void Renderer::record(VkCommandBuffer cmd, const ViewParams& view) {
     }
 
     // 4. 仕上げ
-    CompositePush cp{view.exposure};
+    CompositePush cp{view.exposure, lookBackground_};
     dispatch(cmd, composite_, cur, &cp, sizeof(cp), w, h);
 
     // 自動露出の集計を CPU から読めるようにする

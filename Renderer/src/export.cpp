@@ -280,6 +280,30 @@ std::string chooseSavePath(void* ownerWindow, ExportKind kind, const std::string
 #endif
 }
 
+bool chooseColor(void* ownerWindow, uint32_t& color) {
+#ifdef _WIN32
+    // 「作成した色」の欄は、開くたびに前回の内容を残す
+    static COLORREF custom[16] = {RGB(255, 255, 255), RGB(240, 240, 240), RGB(200, 200, 200), RGB(128, 128, 128),
+                                  RGB(64, 64, 64),    RGB(0, 0, 0),       RGB(232, 238, 245), RGB(245, 240, 230)};
+    CHOOSECOLORW cc{};
+    cc.lStructSize = sizeof(cc);
+    cc.hwndOwner = static_cast<HWND>(ownerWindow);
+    cc.rgbResult = static_cast<COLORREF>(color & 0xFFFFFF);  // COLORREF も 0x00BBGGRR
+    cc.lpCustColors = custom;
+    cc.Flags = CC_FULLOPEN | CC_RGBINIT;
+    if (!ChooseColorW(&cc)) return false;
+    color = static_cast<uint32_t>(cc.rgbResult) & 0xFFFFFF;
+    return true;
+#else
+    (void)ownerWindow;
+    static const uint32_t presets[] = {0xFFFFFF, 0xF0F0F0, 0x808080, 0x202020, 0xF5EEE8};
+    size_t i = 0;
+    while (i < 5 && presets[i] != (color & 0xFFFFFF)) ++i;
+    color = presets[(i + 1) % 5];
+    return true;
+#endif
+}
+
 bool writePng(const std::string& path, const std::vector<uint8_t>& rgba, uint32_t width, uint32_t height) {
     return stbi_write_png(path.c_str(), static_cast<int>(width), static_cast<int>(height), 4, rgba.data(),
                           static_cast<int>(width) * 4) != 0;

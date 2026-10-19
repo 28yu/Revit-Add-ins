@@ -11,6 +11,7 @@ layout(set = 0, binding = 4, std430) buffer Exposure { int logLumSum; int logLum
 
 layout(push_constant) uniform Params {
     float exposure;  // 明るさの倍率
+    uint background; // 背景色（RGBA8。a が 0 以外なら、空の見えている所をこの色にする）
 } pc;
 
 // ACES に近いトーンマッピング（明るい所を白飛びさせずに表示する）
@@ -29,14 +30,24 @@ void main() {
     float lumForExposure = -1.0;
     if (inside) {
         // ならす強さは atrous の中で「残っているノイズの大きさ」に合わせて自動で弱まるので、ここではそのまま使う
-        vec3 color = imageLoad(uFiltered, p).rgb * imageLoad(uAlbedo, p).rgb;
+        vec4 albedoCov = imageLoad(uAlbedo, p);
+        vec3 color = imageLoad(uFiltered, p).rgb * albedoCov.rgb;
         // 仕上げの色味: 少し暖かく（日なたの白が青白くならないように）、彩度をわずかに抑える（Enscape に近い落ち着いた色）
         vec3 graded = color * vec3(1.06, 1.0, 0.92);
         float gl = dot(graded, vec3(0.2126, 0.7152, 0.0722));
         graded = mix(vec3(gl), graded, 0.9);
-        vec3 mapped = tonemap(graded * pc.exposure);
-        imageStore(uOutput, p, vec4(pow(mapped, vec3(1.0 / 2.2)), 1.0));
-        lumForExposure = dot(color, vec3(0.2126, 0.7152, 0.0722));
+        vec3 mapped = pow(tonemap(graded * pc.exposure), vec3(1.0 / 2.2));
+        float coverage = 1.0;
+        if ((pc.background >> 24u) != 0u) {
+            // 背景色は明るさの調整を受けない（選んだ色のまま出す）
+            vec3 bg = vec3(float(pc.background & 255u), float((pc.background >> 8u) & 255u),
+                           float((pc.background >> 16u) & 255u)) / 255.0;
+            coverage = clamp(albedoCov.a, 0.0, 1.0);
+            mapped = mix(bg, mapped, coverage);
+        }
+        imageStore(uOutput, p, vec4(mapped, 1.0));
+        // 背景色の所は自動露出に数えない（暗い背景で物が白飛びしないように）
+        lumForExposure = coverage > 0.5 ? dot(color, vec3(0.2126, 0.7152, 0.0722)) : -1.0;
     }
 
     // 自動露出: 8×8 画素の平均をとってから対数にする（ざらつきの黒い点に引きずられないように）

@@ -31,6 +31,18 @@ enum ToolbarButton { kButtonImage = 0, kButtonPanorama = 1, kButtonViewer = 2, k
 // hover: カーソルが乗っているボタン（-1 = 無し）。sync: 同期のボタン（-1 = 出さない、0 = 止めている、1 = 同期中）
 ToolbarImage buildToolbarImage(float scale, int hover, int sync);
 
+// ツールバーの下の「表示」の設定（空・雲の表示と背景色、単色表示とその色）。
+// ボタンは上から「空・雲」の切り替え、背景色、「単色」の切り替え、単色の色
+enum LookButton { kLookSky = 0, kLookBackground = 1, kLookMono = 2, kLookMonoColor = 3, kLookCount = 4 };
+struct LookState {
+    bool sky = true;                  // 空・雲を出す（出さないときは背景色）
+    uint32_t background = 0xFFFFFF;   // 背景色（0xBBGGRR）
+    bool mono = false;                // 物を全部 1 色にする
+    uint32_t monoColor = 0xF0F0F0;    // 単色の色（0xBBGGRR）
+};
+// hover: カーソルが乗っているボタン（-1 = 無し）
+ToolbarImage buildLookPanelImage(float scale, int hover, const LookState& look);
+
 // 画面の上の中央に出すお知らせ（ボタンの説明・書き出しの進み具合・保存しました 等）。
 // progress: 0〜1 なら進み具合の棒を出す（負なら出さない）。lines は 1〜2 行
 HelpImage buildStatusImage(const std::vector<std::string>& lines, float progress, float scale);

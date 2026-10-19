@@ -47,7 +47,7 @@ void main() {
 
     // --- 前回のどの画素に写っていたかを求め、使えるか確かめる ---------------------
     vec3 prevColor = vec3(0.0);
-    vec3 prevAlbedo = vec3(0.0);
+    vec4 prevAlbedo = vec4(0.0);  // a = 物が見えている割合（背景色との境目をなめらかにする）
     vec2 prevMoments = vec2(0.0);
     float prevLen = 0.0;
     float weightSum = 0.0;
@@ -86,7 +86,7 @@ void main() {
                     if (dot(qn, n) < 0.9) continue;
                 }
                 vec4 h = imageLoad(uPrevHistory, q);
-                prevAlbedo += imageLoad(uPrevAlbedoHist, q).rgb * w;
+                prevAlbedo += imageLoad(uPrevAlbedoHist, q) * w;
                 prevColor += h.rgb * w;
                 prevLen += h.a * w;
                 prevMoments += imageLoad(uPrevMoments, q).xy * w;
@@ -99,7 +99,7 @@ void main() {
     float len = 1.0;
     vec3 history = color;
     vec2 moments = vec2(lum, lum * lum);
-    vec3 albedo = imageLoad(uGAlbedo, p).rgb;
+    vec4 albedo = imageLoad(uGAlbedo, p);
     if (weightSum > 0.01) {
         prevColor /= weightSum;
         prevAlbedo /= weightSum;
@@ -113,10 +113,10 @@ void main() {
 
             // 面の色は、前の結果を今の周り 3×3 の最小〜最大に収める（模様や輪郭が遅れてついてくる残像を防ぐ。
             // 面の色はノイズが無いので、収めても暗くならない）
-            vec3 aMin = vec3(1e9), aMax = vec3(-1e9);
+            vec4 aMin = vec4(1e9), aMax = vec4(-1e9);
             for (int dy = -1; dy <= 1; ++dy)
                 for (int dx = -1; dx <= 1; ++dx) {
-                    vec3 a = imageLoad(uGAlbedo, clamp(p + ivec2(dx, dy), ivec2(0), size - 1)).rgb;
+                    vec4 a = imageLoad(uGAlbedo, clamp(p + ivec2(dx, dy), ivec2(0), size - 1));
                     aMin = min(aMin, a);
                     aMax = max(aMax, a);
                 }
@@ -154,7 +154,7 @@ void main() {
     variance *= 1.0 - 0.9 * mirror;
 
     imageStore(uHistory, p, vec4(history, len));
-    imageStore(uAlbedoHist, p, vec4(albedo, 1.0));
+    imageStore(uAlbedoHist, p, albedo);
     imageStore(uMoments, p, vec4(moments, 0.0, 0.0));
     imageStore(uFiltered, p, vec4(history, variance));
 }

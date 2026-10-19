@@ -151,7 +151,8 @@ vec3 ggxReflect(vec3 v, vec3 n, float roughness) {
 }
 
 // つるつるの鏡（金属で粗さが小さい）
-bool isMirror(Material m) { return m.params.y > 0.5 && m.params.x < 0.1; }
+// 単色のときは鏡も単色の面として扱う
+bool isMirror(Material m) { return !monochrome() && m.params.y > 0.5 && m.params.x < 0.1; }
 
 float fresnelSchlick(float cosTheta, float f0) {
     return f0 + (1.0 - f0) * pow(1.0 - clamp(cosTheta, 0.0, 1.0), 5.0);
@@ -190,6 +191,7 @@ struct Primary {
     vec3 normal;
     vec3 albedo;
     float dist;
+    float background;  // 1 = 空・雲の代わりの背景色が見えている（仕上げで背景色に置き換える）
 };
 
 vec3 radiance(vec3 origin, vec3 dir, out Primary primary) {
@@ -198,6 +200,9 @@ vec3 radiance(vec3 origin, vec3 dir, out Primary primary) {
     primary.normal = -dir;
     primary.albedo = vec3(1.0);
     primary.dist = -1.0;
+    primary.background = 0.0;
+    // カメラから（ガラスだけを通って）まっすぐ見えている間。背景色・地面を消すのはこの間だけ（光の計算には空を使い続ける）
+    bool directView = true;
     vec3 result = vec3(0.0);
     vec3 throughput = vec3(1.0);
     vec3 sun = normalize(pc.sunDir.xyz);
@@ -218,6 +223,11 @@ vec3 radiance(vec3 origin, vec3 dir, out Primary primary) {
     for (uint bounce = 0u; bounce <= pc.frame.z; ++bounce) {
         Hit h = traceClosest(origin, dir);
         if (!h.found) {
+            if (directView && plainBackground()) {
+                // 空・雲を出さない: 背景色にする（地面も出さない）。色は仕上げ（composite）で塗る
+                primary.background = 1.0;
+                break;
+            }
             float tg = groundHit(origin, dir);
             if (tg > 0.0) {
                 // 地面に当たった（地面は光を跳ね返さない簡単な扱い。明るさは groundRadiance で決まる）
@@ -241,10 +251,12 @@ vec3 radiance(vec3 origin, vec3 dir, out Primary primary) {
         surfaceAt(h, dir, pos, n, gn, uv, uvPerMeter);
         coneWidth += h.t * coneSpread;
         Material m = materials[triMaterials[h.tri]];
-        vec3 albedo = m.color.rgb;
+        // 単色: ガラスと照明器具（自己発光）以外は、選んだ色・つや消しにする
+        bool mono = monochrome() && !h.glass && m.params.z <= 0.0;
+        vec3 albedo = mono ? monoColor() : m.color.rgb;
         float slant = max(abs(dot(dir, gn)), 0.2);  // 斜めに見ると引き伸ばされる
         float footprintM = coneWidth / slant * uvPerMeter;  // 光の筋が面の上で覆う幅（面の上の位置の単位 = メートル）
-        if (m.tex.x >= 0) {
+        if (m.tex.x >= 0 && !mono) {
             vec2 uvC = mapUv(m.colorMap0, m.colorMap1, uv);
             float lod = textureLod(m.tex.x, footprintM * mapScale(m.colorMap0, m.colorMap1));
             albedo *= sampleTextureLod(m.tex.x, uvC, lod, true).rgb;
@@ -264,7 +276,7 @@ vec3 radiance(vec3 origin, vec3 dir, out Primary primary) {
                 primary.hit = true;
                 primary.dist = travelled + h.t;
                 // 鏡・金属は、映り込みそのものが見えているので色で割らない
-                vec3 a = m.params.y > 0.5 ? vec3(1.0) : max(albedo, vec3(0.02));
+                vec3 a = m.params.y > 0.5 && !mono ? vec3(1.0) : max(albedo, vec3(0.02));
                 if (viaMirror) {
                     // 虚像: カメラから見て、鏡までの距離＋鏡からの距離だけ奥にある。向きも鏡で折り返す
                     primary.pos = camOrigin + camDir * primary.dist;
@@ -277,8 +289,8 @@ vec3 radiance(vec3 origin, vec3 dir, out Primary primary) {
                 }
             }
         }
-        float roughness = clamp(m.params.x, 0.02, 1.0);
-        float metallic = m.params.y;
+        float roughness = mono ? 0.6 : clamp(m.params.x, 0.02, 1.0);
+        float metallic = mono ? 0.0 : m.params.y;
         result += throughput * albedo * m.params.z;  // 自己発光（照明器具など）
 
         if (h.glass) {
@@ -293,6 +305,7 @@ vec3 radiance(vec3 origin, vec3 dir, out Primary primary) {
             continue;
         }
 
+        directView = false;
         vec3 v = dir;
         float cosV = max(dot(-v, n), 0.0);
         // 金属は色付きの反射だけ、金属でない物は「反射（白）」か「拡散（物の色）」を確率で選ぶ
@@ -375,7 +388,8 @@ void primaryGeometry(vec3 origin, vec3 dir, out vec3 pos, out vec3 normal, out f
     for (int i = 0; i < 8; ++i) {
         Hit h = traceClosest(origin, dir);
         if (!h.found) {
-            float tg = groundHit(origin, dir);
+            // 空・雲を出さないときは、まっすぐ見える地面も出さない（radiance と同じ扱い）
+            float tg = plainBackground() && !viaMirror ? -1.0 : groundHit(origin, dir);
             if (tg > 0.0) {
                 dist = travelled + tg;
                 pos = viaMirror ? camOrigin + camDir * dist : origin + dir * tg;
@@ -430,6 +444,7 @@ void main() {
     uint spp = max(pc.frame.w, 1u);
     vec3 demod = vec3(0.0);   // 色で割った明るさ（1 回ずつ、その回の面の色で割ってから平均する）
     vec3 albedo = vec3(0.0);  // 面の色の平均
+    float background = 0.0;   // 背景色が見えている割合（輪郭をなめらかにするため割合で持つ）
     for (uint s = 0u; s < spp; ++s) {
         // ピクセル内の位置を毎回少しずらして、ぎざぎざを消す（止まって最初の 1 回だけは中心）
         vec2 jitter = (pc.frame.y == 0u && s == 0u) ? vec2(0.5) : vec2(rand(), rand());
@@ -442,9 +457,11 @@ void main() {
         if (lum > 50.0) c *= 50.0 / lum;
         demod += c / pr.albedo;
         albedo += pr.albedo;
+        background += pr.background;
     }
     demod /= float(spp);
     albedo /= float(spp);
+    background /= float(spp);
 
     imageStore(uNoisy, pixel, vec4(demod, 1.0));
     // 位置・向きは画素の中心で求める（輪郭で毎フレーム手前・奥が入れ替わらないように）
@@ -453,5 +470,6 @@ void main() {
     primaryGeometry(pc.camPos.xyz, cameraRay((vec2(pixel) + 0.5) / vec2(size)), gpos, gnormal, gdist, gmirror);
     imageStore(uGPos, pixel, vec4(gpos, gdist));
     imageStore(uGNormal, pixel, vec4(gnormal, gmirror));
-    imageStore(uGAlbedo, pixel, vec4(albedo, 1.0));
+    // a = 物が見えている割合（1 - 背景色の割合）。仕上げで背景色と混ぜる
+    imageStore(uGAlbedo, pixel, vec4(albedo, 1.0 - background));
 }

@@ -28,7 +28,9 @@ namespace t28 {
 namespace {
 
 // 画面に重ねる絵の置き場所（Renderer の overlay の番号）
-const uint32_t kHelpSlot = 0, kToolbarSlot = 1, kStatusSlot = 2;
+const uint32_t kHelpSlot = 0, kToolbarSlot = 1, kStatusSlot = 2, kLookSlot = 3;
+// 「表示」の設定のボタンの番号（ツールバーのボタンと区別するため 100 から）
+const int kLookIdBase = 100;
 
 struct Swapchain {
     VkSwapchainKHR handle = VK_NULL_HANDLE;
@@ -133,6 +135,7 @@ struct Navigator {
 
     // 右上のツールバー（書き出しのボタン）。位置は画面の画素
     std::vector<ToolbarImage::Rect> buttons;
+    std::vector<int> buttonIds;  // buttons と同じ並び。ツールバーは kButton*、「表示」の設定は kLookIdBase + kLook*
     int hoverButton = -1;
     bool toolbarChanged = false;
     int clickedButton = -1;   // 押されたボタン（描画の繰り返しの中で処理する）
@@ -152,7 +155,8 @@ struct Navigator {
         toFramebuffer(mx, my, fx, fy);
         for (size_t i = 0; i < buttons.size(); ++i) {
             const auto& b = buttons[i];
-            if (fx >= b.x && fx < b.x + b.w && fy >= b.y && fy < b.y + b.h) return static_cast<int>(i);
+            if (fx >= b.x && fx < b.x + b.w && fy >= b.y && fy < b.y + b.h)
+                return i < buttonIds.size() ? buttonIds[i] : static_cast<int>(i);
         }
         return -1;
     }
@@ -473,10 +477,44 @@ int runWindow(const Options& opt, Scene& scene) {
     }
     double syncTimer = 0;
 
-    ToolbarImage toolbar;
+    // --- 「表示」の設定（空・雲／背景色、単色表示／色）。前回の設定をログと同じフォルダの look.ini に残す ------
+    LookState look;
+    std::string lookPath;
+    if (!opt.logPath.empty()) {
+        size_t slash = opt.logPath.find_last_of("/\\");
+        lookPath = (slash == std::string::npos ? std::string() : opt.logPath.substr(0, slash + 1)) + "look.ini";
+        if (FILE* f = openFile(lookPath, "r")) {
+            char line[128];
+            while (fgets(line, sizeof(line), f)) {
+                unsigned v = 0;
+                if (sscanf(line, "sky=%u", &v) == 1) look.sky = v != 0;
+                else if (sscanf(line, "background=%x", &v) == 1) look.background = v & 0xFFFFFF;
+                else if (sscanf(line, "mono=%u", &v) == 1) look.mono = v != 0;
+                else if (sscanf(line, "monoColor=%x", &v) == 1) look.monoColor = v & 0xFFFFFF;
+            }
+            fclose(f);
+        }
+    }
+    auto saveLook = [&]() {
+        if (lookPath.empty()) return;
+        if (FILE* f = openFile(lookPath, "w")) {
+            fprintf(f, "sky=%d\nbackground=%06X\nmono=%d\nmonoColor=%06X\n", look.sky ? 1 : 0, look.background,
+                    look.mono ? 1 : 0, look.monoColor);
+            fclose(f);
+        }
+    };
+    auto applyLook = [&]() {
+        renderer.setLook(look.sky ? 0u : (0xFF000000u | look.background), look.mono ? (0xFF000000u | look.monoColor) : 0u);
+    };
+    applyLook();
+
+    ToolbarImage toolbar, lookPanel;
     auto updateToolbar = [&]() {
-        toolbar = buildToolbarImage(contentScale, nv.hoverButton, liveSync ? (syncOn ? 1 : 0) : -1);
+        int hover = nv.hoverButton;
+        toolbar = buildToolbarImage(contentScale, hover < kLookIdBase ? hover : -1, liveSync ? (syncOn ? 1 : 0) : -1);
         renderer.setOverlay(kToolbarSlot, toolbar.image.rgba, toolbar.image.width, toolbar.image.height);
+        lookPanel = buildLookPanelImage(contentScale, hover >= kLookIdBase ? hover - kLookIdBase : -1, look);
+        renderer.setOverlay(kLookSlot, lookPanel.image.rgba, lookPanel.image.width, lookPanel.image.height);
     };
     updateToolbar();
 
@@ -662,6 +700,25 @@ int runWindow(const Options& opt, Scene& scene) {
             toast({tr(syncOn ? "SyncResumed" : "SyncPaused")}, 3.0);
             syncTimer = 1.0;  // すぐに調べ直す
             updateToolbar();
+        } else if (nv.clickedButton >= kLookIdBase) {
+            int b = nv.clickedButton - kLookIdBase;
+            nv.clickedButton = -1;
+            if (b == kLookSky) look.sky = !look.sky;
+            else if (b == kLookMono) look.mono = !look.mono;
+            else {
+                uint32_t& color = b == kLookBackground ? look.background : look.monoColor;
+                if (chooseColor(nativeWindow, color)) {
+                    // 色を選んだら、その色が使われるように切り替えも入れる
+                    if (b == kLookBackground) look.sky = false;
+                    else look.mono = true;
+                }
+                last = std::chrono::steady_clock::now();  // 色を選ぶ画面で止まっていた時間は数えない
+            }
+            logInfo("Look: sky=%d background=%06X mono=%d color=%06X", look.sky ? 1 : 0, look.background, look.mono ? 1 : 0,
+                    look.monoColor);
+            applyLook();
+            saveLook();
+            updateToolbar();
         } else if (nv.clickedButton >= 0) {
             int b = nv.clickedButton;
             nv.clickedButton = -1;
@@ -707,6 +764,9 @@ int runWindow(const Options& opt, Scene& scene) {
             }
         } else if (glfwGetTime() < toastUntil) {
             // 「保存しました」などはボタンの説明より優先して、しばらく出したままにする
+        } else if (nv.hoverButton >= kLookIdBase) {
+            static const char* lookTips[kLookCount] = {"TipLookSky", "TipLookBackground", "TipLookMono", "TipLookMonoColor"};
+            setStatus({tr(lookTips[nv.hoverButton - kLookIdBase])}, -1);
         } else if (nv.hoverButton >= 0) {
             setStatus({tr(tipKeys[nv.hoverButton])}, -1);
         } else {
@@ -782,14 +842,28 @@ int runWindow(const Options& opt, Scene& scene) {
         int helpX = margin, helpY = static_cast<int>(sc.extent.height) - static_cast<int>(help.height) - margin;
         int barX = static_cast<int>(sc.extent.width) - static_cast<int>(toolbar.image.width) - margin, barY = margin;
         nv.buttons.clear();
+        nv.buttonIds.clear();
+        // 「表示」の設定はツールバーのすぐ下、右に寄せる
+        int lookX = static_cast<int>(sc.extent.width) - static_cast<int>(lookPanel.image.width) - margin;
+        int lookY = barY + static_cast<int>(toolbar.image.height) + margin / 2;
         if (!nv.exporting) {
             renderer.recordOverlay(cmd, kHelpSlot, helpX, helpY, nv.showHelp ? 0.95f : 0.8f);
             renderer.recordOverlay(cmd, kToolbarSlot, barX, barY, 0.95f);
-            for (const auto& b : toolbar.buttons) nv.buttons.push_back({barX + b.x, barY + b.y, b.w, b.h});
+            renderer.recordOverlay(cmd, kLookSlot, lookX, lookY, 0.95f);
+            for (size_t i = 0; i < toolbar.buttons.size(); ++i) {
+                const auto& b = toolbar.buttons[i];
+                nv.buttons.push_back({barX + b.x, barY + b.y, b.w, b.h});
+                nv.buttonIds.push_back(static_cast<int>(i));
+            }
+            for (size_t i = 0; i < lookPanel.buttons.size(); ++i) {
+                const auto& b = lookPanel.buttons[i];
+                nv.buttons.push_back({lookX + b.x, lookY + b.y, b.w, b.h});
+                nv.buttonIds.push_back(kLookIdBase + static_cast<int>(i));
+            }
         }
         if (status.width > 0) {
             int statusX = (static_cast<int>(sc.extent.width) - static_cast<int>(status.width)) / 2;
-            int statusY = nv.exporting ? margin : margin * 2 + static_cast<int>(toolbar.image.height);
+            int statusY = nv.exporting ? margin : lookY + static_cast<int>(lookPanel.image.height) + margin / 2;
             renderer.recordOverlay(cmd, kStatusSlot, statusX, statusY, 1.0f);
         }
         nv.toggleX = helpX + help.toggleX;

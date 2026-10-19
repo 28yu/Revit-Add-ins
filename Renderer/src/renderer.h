@@ -36,6 +36,9 @@ public:
 
     // 描画する大きさを変える（履歴も捨てる）
     void resize(uint32_t width, uint32_t height);
+    // 見た目の切り替え。色は RGBA8（r が下位 8 ビット）で、a が 0 なら使わない。
+    // background: 空・雲の代わりに出す背景色 / mono: 物を全部この色にする
+    void setLook(uint32_t background, uint32_t mono);
     // 履歴を捨てて最初からやり直す
     void resetAccumulation() { resetHistory_ = true; }
     // カメラが止まってから描いたフレーム数
@@ -52,7 +55,7 @@ public:
 
     // 画面に重ねる絵（操作の案内・ツールバー・進み具合）。slot ごとに 1 枚の RGBA の画像を持ち、recordOverlay で target に重ねる。
     // target は画面と同じ大きさの画像（小さく描いて拡大するときも、文字がぼやけないように拡大後に重ねる）
-    static const uint32_t kOverlaySlots = 3;
+    static const uint32_t kOverlaySlots = 4;
     void setOverlay(uint32_t slot, const std::vector<uint8_t>& rgba, uint32_t width, uint32_t height);
     void setOverlayTarget(const Image& target);
     void recordOverlay(VkCommandBuffer cmd, uint32_t slot, int x, int y, float opacity);
@@ -104,6 +107,7 @@ private:
     Image noisy_, gpos_[2], gnormal_[2], galbedo_, history_[2], moments_[2], filtered_[2], albedoHist_[2], output_;
     bool imagesFresh_ = false;  // 作り直した直後（レイアウトの切り替えが必要）
     bool resetHistory_ = true;
+    uint32_t lookBackground_ = 0, lookMono_ = 0;
     bool hasLastView_ = false;
     ViewParams lastView_;
     uint32_t staticFrames_ = 0;

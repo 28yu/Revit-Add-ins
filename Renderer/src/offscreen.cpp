@@ -43,6 +43,7 @@ int runOffscreen(const Options& opt, Scene& scene) {
     Renderer renderer;
     renderer.skyWidth_ = static_cast<uint32_t>(opt.skySize);
     renderer.init(ctx, scene, glassStart, bvh);
+    renderer.setLook(opt.lookBackground, opt.lookMono);
     uint32_t w = static_cast<uint32_t>(opt.width), h = static_cast<uint32_t>(opt.height);
     renderer.resize(w, h);
 

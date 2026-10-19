@@ -17,6 +17,9 @@ enum class ExportKind { Image, Panorama, Viewer };
 // 保存先を選ぶ画面を出す（Windows）。キャンセルなら空。
 // Windows 以外（動作確認用）は、環境変数 T28_EXPORT_DIR（無ければ今のフォルダ）に既定の名前で保存する
 std::string chooseSavePath(void* ownerWindow, ExportKind kind, const std::string& defaultName);
+// 色を選ぶ画面を出す（Windows の標準の画面。色の調整もできる）。color は 0xBBGGRR。選んだら true。
+// Windows 以外（動作確認用）は、決まった色を順に切り替える
+bool chooseColor(void* ownerWindow, uint32_t& color);
 // 既定のファイル名（日付_ビュー名.拡張子。例: 261016_3D 南東.png）。ファイル名に使えない文字は _ にする
 std::string defaultExportName(const std::string& viewName, ExportKind kind);
 // パスのファイル名の部分

@@ -14,6 +14,19 @@ struct Entry {
 };
 
 static const Entry kStrings[] = {
+    {"LookSky", "空・雲を表示", "Show sky", "显示天空"},
+    {"LookBackground", "背景色", "Background", "背景色"},
+    {"LookMono", "単色で表示", "Single color", "单色显示"},
+    {"LookMonoColor", "色", "Color", "颜色"},
+    {"TipLookSky", "空と雲を出す / 出さない（出さないときは背景色で塗ります）",
+     "Show or hide the sky and clouds (when hidden, the background color is used)",
+     "显示 / 隐藏天空和云（隐藏时使用背景色）"},
+    {"TipLookBackground", "空・雲を出さないときの背景色を選びます", "Choose the background color used when the sky is hidden",
+     "选择隐藏天空时的背景色"},
+    {"TipLookMono", "物の色をすべて 1 つの色にします（ガラスと照明はそのまま）",
+     "Draw all objects in one color (glass and lights are kept)", "将所有物体显示为同一颜色（玻璃和灯光保持不变）"},
+    {"TipLookMonoColor", "単色で表示するときの色を選びます", "Choose the color used for single-color display",
+     "选择单色显示时的颜色"},
     {"Crashed",
      "描画プログラムが予期せず終了しました。\n"
      "記録（%LOCALAPPDATA%\\Tools28\\Render\\render.log）を開発者に送っていただけると、原因を調べられます。",

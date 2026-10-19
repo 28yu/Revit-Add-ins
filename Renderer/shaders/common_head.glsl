@@ -47,9 +47,18 @@ layout(push_constant) uniform Params {
     vec4 sunDir;      // xyz = 太陽のある方向, w = 太陽の明るさ
     vec4 misc;        // x = 照明器具の光源の数, y = 空の明るさ, z = ガラス三角形の開始位置（三角形番号）, w = 1 画素の幅（1 m 先で何 m か）
     uvec4 frame;      // x = フレーム番号, y = 止まってからのフレーム数, z = 最大反射回数, w = 1 フレームで計算する回数
+    uvec4 look;       // x = 背景色（RGBA8。a が 0 以外なら空・雲を出さずにこの色）, y = 単色（RGBA8。a が 0 以外なら全部この色）
 } pc;
 
 const float PI = 3.14159265359;
+
+// 見た目の切り替え（ウィンドウ右上の「表示」の設定）
+bool plainBackground() { return (pc.look.x >> 24u) != 0u; }
+bool monochrome() { return (pc.look.y >> 24u) != 0u; }
+vec3 monoColor() {
+    vec3 c = vec3(float(pc.look.y & 255u), float((pc.look.y >> 8u) & 255u), float((pc.look.y >> 16u) & 255u)) / 255.0;
+    return pow(c, vec3(2.2));  // 選んだ色（sRGB）を明るさの値に直す
+}
 
 // --- 乱数（PCG） ---------------------------------------------------------
 uint rngState;
