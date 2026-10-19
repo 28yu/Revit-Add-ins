@@ -84,6 +84,7 @@ static int run(int argc, char** argv) {
     setLanguage(lang ? lang : systemLanguage());
     if (opt.logPath.empty() && opt.outputPath.empty()) opt.logPath = defaultLogPath();
     if (!opt.logPath.empty()) logOpen(opt.logPath);
+    installCrashHandler();
     logInfo("Tools28Render start (scene=%s, output=%s, embedded=%d)", opt.scenePath.c_str(), opt.outputPath.c_str(),
             embedded ? 1 : 0);
 

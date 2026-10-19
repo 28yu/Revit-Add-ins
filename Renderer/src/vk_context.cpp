@@ -1,14 +1,20 @@
 #include "vk_context.h"
 
+#include <algorithm>
 #include <cstring>
 
-#include "log.h"
 #include "i18n.h"
+#include "log.h"
 
 namespace t28 {
 
 void vkCheck(VkResult result, const char* what) {
-    if (result != VK_SUCCESS) fatal("%s (Vulkan error %d)", what, static_cast<int>(result));
+    if (result == VK_SUCCESS) return;
+    // よくある原因は分かる言葉で伝える（大きなモデルで起きやすい）
+    if (result == VK_ERROR_DEVICE_LOST) fatal("%s\n(%s, Vulkan error %d)", tr("DeviceLost"), what, static_cast<int>(result));
+    if (result == VK_ERROR_OUT_OF_DEVICE_MEMORY || result == VK_ERROR_OUT_OF_HOST_MEMORY)
+        fatal("%s\n(%s, Vulkan error %d)", tr("OutOfGpuMemory"), what, static_cast<int>(result));
+    fatal("%s (Vulkan error %d)", what, static_cast<int>(result));
 }
 
 // レイトレーシングに必要な拡張機能
@@ -108,6 +114,13 @@ void VkContext::init(const std::vector<const char*>& instanceExtensions,
     if (!physical) fatal("%s", tr("NoGpu"));
     gpuName = properties.deviceName;
     logInfo("Using GPU: %s (%s)", gpuName.c_str(), hardwareRt ? "hardware ray tracing" : "software BVH");
+    VkPhysicalDeviceMemoryProperties mem;
+    vkGetPhysicalDeviceMemoryProperties(physical, &mem);
+    for (uint32_t h = 0; h < mem.memoryHeapCount; ++h)
+        if (mem.memoryHeaps[h].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT)
+            deviceLocalBytes = std::max(deviceLocalBytes, mem.memoryHeaps[h].size);
+    logInfo("GPU memory %.0f MB, max storage buffer %.0f MB", deviceLocalBytes / 1048576.0,
+            properties.limits.maxStorageBufferRange / 1048576.0);
 
     // --- 論理デバイスを作る -----------------------------------------------
     std::vector<const char*> deviceExts;
@@ -181,6 +194,10 @@ Buffer VkContext::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMe
     mai.allocationSize = req.size;
     mai.memoryTypeIndex = findMemoryType(req.memoryTypeBits, props);
     vkCheck(vkAllocateMemory(device, &mai, nullptr, &b.memory), "vkAllocateMemory (buffer)");
+    if (props & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) {
+        b.allocated = req.size;
+        allocatedDeviceBytes += req.size;
+    }
     vkCheck(vkBindBufferMemory(device, b.buffer, b.memory, 0), "vkBindBufferMemory");
 
     if (props & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
@@ -196,6 +213,7 @@ Buffer VkContext::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMe
 void VkContext::destroyBuffer(Buffer& b) {
     if (b.buffer) vkDestroyBuffer(device, b.buffer, nullptr);
     if (b.memory) vkFreeMemory(device, b.memory, nullptr);
+    allocatedDeviceBytes -= b.allocated;
     b = Buffer{};
 }
 
@@ -235,6 +253,8 @@ Image VkContext::createImage(uint32_t w, uint32_t h, VkFormat format, VkImageUsa
     mai.allocationSize = req.size;
     mai.memoryTypeIndex = findMemoryType(req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
     vkCheck(vkAllocateMemory(device, &mai, nullptr, &img.memory), "vkAllocateMemory (image)");
+    img.allocated = req.size;
+    allocatedDeviceBytes += req.size;
     vkCheck(vkBindImageMemory(device, img.image, img.memory, 0), "vkBindImageMemory");
 
     VkImageViewCreateInfo vci{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
@@ -250,6 +270,7 @@ void VkContext::destroyImage(Image& img) {
     if (img.view) vkDestroyImageView(device, img.view, nullptr);
     if (img.image) vkDestroyImage(device, img.image, nullptr);
     if (img.memory) vkFreeMemory(device, img.memory, nullptr);
+    allocatedDeviceBytes -= img.allocated;
     img = Image{};
 }
 

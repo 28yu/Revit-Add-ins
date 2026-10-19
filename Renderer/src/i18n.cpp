@@ -14,6 +14,52 @@ struct Entry {
 };
 
 static const Entry kStrings[] = {
+    {"Crashed",
+     "描画プログラムが予期せず終了しました。\n"
+     "記録（%LOCALAPPDATA%\\Tools28\\Render\\render.log）を開発者に送っていただけると、原因を調べられます。",
+     "The renderer stopped unexpectedly.\n"
+     "Please send the log (%LOCALAPPDATA%\\Tools28\\Render\\render.log) to the developer so the cause can be investigated.",
+     "渲染程序意外终止。\n"
+     "请将日志（%LOCALAPPDATA%\\Tools28\\Render\\render.log）发送给开发者，以便调查原因。"},
+    {"CrashedStack",
+     "描画プログラムが予期せず終了しました（処理の深さの上限を超えました）。\n"
+     "記録（%LOCALAPPDATA%\\Tools28\\Render\\render.log）を開発者に送ってください。",
+     "The renderer stopped unexpectedly (stack overflow).\n"
+     "Please send the log (%LOCALAPPDATA%\\Tools28\\Render\\render.log) to the developer.",
+     "渲染程序意外终止（超出处理深度上限）。\n"
+     "请将日志（%LOCALAPPDATA%\\Tools28\\Render\\render.log）发送给开发者。"},
+    {"OutOfMemory",
+     "メモリが足りないため、描画を続けられませんでした。\n"
+     "ほかのアプリを閉じるか、3D ビューの切断ボックスで表示する範囲を狭めてから、もう一度お試しください。",
+     "Not enough memory to continue rendering.\n"
+     "Close other apps or narrow the 3D view with a section box, then try again.",
+     "内存不足，无法继续渲染。\n"
+     "请关闭其他应用程序，或用剖面框缩小 3D 视图的显示范围后重试。"},
+    {"OutOfGpuMemory",
+     "GPU のメモリが足りないため、描画を続けられませんでした。\n"
+     "3D ビューの切断ボックスで表示する範囲を狭めるか、表示するカテゴリを減らしてから、もう一度お試しください。",
+     "Not enough GPU memory to continue rendering.\n"
+     "Narrow the 3D view with a section box or hide some categories, then try again.",
+     "GPU 内存不足，无法继续渲染。\n"
+     "请用剖面框缩小 3D 视图的显示范围或减少显示的类别后重试。"},
+    {"DeviceLost",
+     "GPU の処理に時間がかかりすぎたため、Windows が GPU をリセットしました。\n"
+     "3D ビューの切断ボックスで表示する範囲を狭めるか、表示するカテゴリを減らしてから、もう一度お試しください。",
+     "The GPU took too long and Windows reset it.\n"
+     "Narrow the 3D view with a section box or hide some categories, then try again.",
+     "GPU 处理时间过长，Windows 已重置 GPU。\n"
+     "请用剖面框缩小 3D 视图的显示范围或减少显示的类别后重试。"},
+    {"ModelTooLarge",
+     "モデルが大きすぎて、この GPU では扱えません。\n"
+     "3D ビューの切断ボックスで表示する範囲を狭めるか、表示するカテゴリを減らしてから、もう一度お試しください。",
+     "The model is too large for this GPU.\n"
+     "Narrow the 3D view with a section box or hide some categories, then try again.",
+     "模型过大，此 GPU 无法处理。\n"
+     "请用剖面框缩小 3D 视图的显示范围或减少显示的类别后重试。"},
+    {"QualityLowered",
+     "モデルが大きいため、解像度を下げて描いています",
+     "The model is large, so it is drawn at a lower resolution",
+     "模型较大，正在以较低分辨率渲染"},
     {"NoVulkan",
      "Vulkan（GPU を動かす仕組み）を使えません。GPU のドライバーを最新にしてください。",
      "Vulkan is not available. Please update your GPU driver.",

@@ -13,5 +13,7 @@ void logInfo(const char* fmt, ...);
 void logError(const char* fmt, ...);
 // 致命的なエラー: 記録して、Windows ではメッセージ画面も出し、終了する
 [[noreturn]] void fatal(const char* fmt, ...);
+// 想定外の異常終了・メモリ不足を記録し、メッセージを出してから終わるようにする
+void installCrashHandler();
 
 }  // namespace t28

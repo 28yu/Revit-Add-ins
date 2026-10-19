@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstring>
 
+#include "i18n.h"
 #include "log.h"
 
 namespace t28 {
@@ -114,10 +115,13 @@ uint8_t linearToSrgb(float l) {
     return static_cast<uint8_t>(s * 255.0f + 0.5f);
 }
 
-// 全テクスチャを 1 つの並びに詰める。段ごとに縦横半分にした画像も後ろに続けて入れる
-void packTextures(const std::vector<Texture>& textures, std::vector<GpuTexInfo>& infos, std::vector<uint32_t>& texels) {
+// 全テクスチャを 1 つの並びに詰める。段ごとに縦横半分にした画像も後ろに続けて入れる。
+// maxSize より大きい画像は、縦横とも maxSize 以下になる段から入れる（大きなモデルで GPU のメモリに収めるため）
+void packTextures(const std::vector<Texture>& textures, std::vector<GpuTexInfo>& infos, std::vector<uint32_t>& texels,
+                  uint32_t maxSize) {
     for (const Texture& t : textures) {
-        GpuTexInfo info{static_cast<uint32_t>(texels.size()), t.width, t.height, 0};
+        GpuTexInfo info{0, 0, 0, 0};
+        bool started = false;
         uint32_t w = t.width, h = t.height;
         // 色の画像は明るさに直してから平均する（sRGB のまま平均すると縮小した段が暗くなる）。凹凸の画像はそのまま平均する
         auto toLinear = [&](uint8_t c) { return t.linear ? c / 255.0f : srgbToLinear(c); };
@@ -128,12 +132,19 @@ void packTextures(const std::vector<Texture>& textures, std::vector<GpuTexInfo>&
         for (size_t i = 0; i < level.size(); ++i)
             level[i] = (i % 4 == 3) ? t.rgba[i] / 255.0f : toLinear(t.rgba[i]);
         while (true) {
-            for (size_t i = 0; i < static_cast<size_t>(w) * h; ++i) {
+            bool keep = (w <= maxSize && h <= maxSize) || (w == 1 && h == 1);
+            if (keep && !started) {
+                started = true;
+                info.offset = static_cast<uint32_t>(texels.size());
+                info.width = w;
+                info.height = h;
+            }
+            for (size_t i = 0; keep && i < static_cast<size_t>(w) * h; ++i) {
                 uint32_t r = toByte(level[i * 4]), g = toByte(level[i * 4 + 1]), b = toByte(level[i * 4 + 2]);
                 uint32_t a = static_cast<uint32_t>(std::min(std::max(level[i * 4 + 3], 0.0f), 1.0f) * 255.0f + 0.5f);
                 texels.push_back(r | (g << 8) | (b << 16) | (a << 24));
             }
-            ++info.levels;
+            if (keep) ++info.levels;
             if (w == 1 && h == 1) break;
             uint32_t nw = std::max(w / 2, 1u), nh = std::max(h / 2, 1u);
             std::vector<float> next(static_cast<size_t>(nw) * nh * 4, 0.0f);
@@ -360,6 +371,15 @@ void Renderer::uploadScene(const Scene& scene, uint32_t glassStart, const Bvh& b
     const VkBufferUsageFlags geomUsage =
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
         (hardwareRt_ ? VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR : 0);
+    // 形状のデータが 1 つの記憶領域の上限を超えると、GPU が範囲外を読んで落ちる。分かる言葉で止める
+    const VkDeviceSize vertexBytes = scene.vertices.size() * sizeof(Vertex);
+    const VkDeviceSize indexBytes = scene.indices.size() * sizeof(uint32_t);
+    const VkDeviceSize storageLimit = ctx.properties.limits.maxStorageBufferRange;
+    // 予備の方式（RT コアの無い GPU）では、自分でたどる BVH も 1 つの記憶領域に入れる
+    const VkDeviceSize bvhBytes = hardwareRt_ ? 0 : bvh.nodes().size() * sizeof(BvhNode);
+    if (vertexBytes > storageLimit || indexBytes > storageLimit || bvhBytes > storageLimit)
+        fatal("%s\n(vertices %.0f MB, indices %.0f MB, BVH %.0f MB, limit %.0f MB)", tr("ModelTooLarge"),
+              vertexBytes / 1048576.0, indexBytes / 1048576.0, bvhBytes / 1048576.0, storageLimit / 1048576.0);
     vertices_ = ctx.createDeviceBuffer(scene.vertices.data(), scene.vertices.size() * sizeof(Vertex), geomUsage);
     indices_ = ctx.createDeviceBuffer(scene.indices.data(), scene.indices.size() * sizeof(uint32_t), geomUsage);
     triMaterials_ = ctx.createDeviceBuffer(scene.triMaterials.data(), scene.triMaterials.size() * sizeof(uint32_t),
@@ -393,9 +413,20 @@ void Renderer::uploadScene(const Scene& scene, uint32_t glassStart, const Bvh& b
     lights_ = ctx.createDeviceBuffer(lights.data(), lights.size() * sizeof(GpuLight), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
     logInfo("Lights: %u", lightCount_);
 
+    // 1 つの記憶領域の上限（GPU ごとに違う）と GPU のメモリの 1/4 に収まるまで、テクスチャを縮める
+    const VkDeviceSize maxRange = ctx.properties.limits.maxStorageBufferRange;
+    const VkDeviceSize texBudget = std::min<VkDeviceSize>(maxRange, ctx.deviceLocalBytes > 0 ? ctx.deviceLocalBytes / 4 : maxRange);
     std::vector<GpuTexInfo> texInfos;
     std::vector<uint32_t> texels;
-    packTextures(scene.textures, texInfos, texels);
+    for (uint32_t maxSize = 16384;; maxSize /= 2) {
+        texInfos.clear();
+        texels.clear();
+        packTextures(scene.textures, texInfos, texels, maxSize);
+        if (texels.size() * sizeof(uint32_t) <= texBudget || maxSize <= 64) {
+            if (maxSize < 16384) logInfo("Textures reduced to %u px to fit GPU memory", maxSize);
+            break;
+        }
+    }
     texInfos_ = ctx.createDeviceBuffer(texInfos.data(), texInfos.size() * sizeof(GpuTexInfo), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
     texels_ = ctx.createDeviceBuffer(texels.data(), texels.size() * sizeof(uint32_t), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
     logInfo("Textures: %zu (%.1f MB)", scene.textures.size(), texels.size() * 4.0 / (1024.0 * 1024.0));
@@ -407,6 +438,7 @@ void Renderer::uploadScene(const Scene& scene, uint32_t glassStart, const Bvh& b
         bvhTris_ = ctx.createDeviceBuffer(bvh.triIndices().data(), bvh.triIndices().size() * sizeof(uint32_t), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
         logInfo("BVH uploaded: %zu nodes", bvh.nodes().size());
     }
+    logInfo("GPU memory used: %.0f MB of %.0f MB", ctx.allocatedDeviceBytes / 1048576.0, ctx.deviceLocalBytes / 1048576.0);
 }
 
 // --- 加速構造（光線の当たり判定を速くするための索引） ----------------------------
@@ -426,7 +458,9 @@ Renderer::AccelStruct Renderer::buildBlas(VkDeviceSize indexOffsetBytes, uint32_
 
     VkAccelerationStructureBuildGeometryInfoKHR build{VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR};
     build.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
-    build.flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR;
+    // 作った後に詰め直せるようにする（大きなモデルで GPU のメモリを節約するため）
+    build.flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR |
+                  VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR;
     build.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
     build.geometryCount = 1;
     build.pGeometries = &geom;
@@ -459,10 +493,54 @@ Renderer::AccelStruct Renderer::buildBlas(VkDeviceSize indexOffsetBytes, uint32_
     build.scratchData.deviceAddress = alignUp(scratch.address, align);
     VkAccelerationStructureBuildRangeInfoKHR range{triangleCount, 0, 0, 0};
     const VkAccelerationStructureBuildRangeInfoKHR* ranges = &range;
+    VkQueryPoolCreateInfo qpi{VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO};
+    qpi.queryType = VK_QUERY_TYPE_ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR;
+    qpi.queryCount = 1;
+    VkQueryPool queryPool = VK_NULL_HANDLE;
+    vkCheck(vkCreateQueryPool(ctx_->device, &qpi, nullptr, &queryPool), "vkCreateQueryPool");
+
     VkCommandBuffer cmd = ctx_->beginOneShot();
+    vkCmdResetQueryPool(cmd, queryPool, 0, 1);
     vkCmdBuildAccelerationStructuresKHR(cmd, 1, &build, &ranges);
+    VkMemoryBarrier mb{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
+    mb.srcAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR;
+    mb.dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR;
+    vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
+                         VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR, 0, 1, &mb, 0, nullptr, 0, nullptr);
+    vkCmdWriteAccelerationStructuresPropertiesKHR(cmd, 1, &as.handle,
+                                                  VK_QUERY_TYPE_ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR, queryPool, 0);
     ctx_->endOneShot(cmd);
     ctx_->destroyBuffer(scratch);
+
+    // 詰め直した大きさで作り直して写す（元の大きさの半分ほどになることが多い）
+    VkDeviceSize compactSize = 0;
+    VkResult qr = vkGetQueryPoolResults(ctx_->device, queryPool, 0, 1, sizeof(compactSize), &compactSize, sizeof(compactSize),
+                                        VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT);
+    vkDestroyQueryPool(ctx_->device, queryPool, nullptr);
+    if (qr == VK_SUCCESS && compactSize > 0 && compactSize < sizes.accelerationStructureSize) {
+        AccelStruct compact;
+        compact.buffer = ctx_->createBuffer(compactSize,
+                                            VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+                                            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+        VkAccelerationStructureCreateInfoKHR cci{VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR};
+        cci.buffer = compact.buffer.buffer;
+        cci.size = compactSize;
+        cci.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
+        vkCheck(vkCreateAccelerationStructureKHR(ctx_->device, &cci, nullptr, &compact.handle), "vkCreateAccelerationStructureKHR (compact)");
+        VkCopyAccelerationStructureInfoKHR copy{VK_STRUCTURE_TYPE_COPY_ACCELERATION_STRUCTURE_INFO_KHR};
+        copy.src = as.handle;
+        copy.dst = compact.handle;
+        copy.mode = VK_COPY_ACCELERATION_STRUCTURE_MODE_COMPACT_KHR;
+        VkCommandBuffer copyCmd = ctx_->beginOneShot();
+        vkCmdCopyAccelerationStructureKHR(copyCmd, &copy);
+        ctx_->endOneShot(copyCmd);
+        logInfo("BLAS: %u triangles, %.1f MB -> %.1f MB (compacted)", triangleCount,
+                sizes.accelerationStructureSize / 1048576.0, compactSize / 1048576.0);
+        destroyAccel(as);
+        as = compact;
+    } else {
+        logInfo("BLAS: %u triangles, %.1f MB", triangleCount, sizes.accelerationStructureSize / 1048576.0);
+    }
 
     VkAccelerationStructureDeviceAddressInfoKHR ai{VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR};
     ai.accelerationStructure = as.handle;

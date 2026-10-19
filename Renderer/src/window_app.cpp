@@ -1,6 +1,7 @@
 // ウィンドウで表示して、マウスとキーボードで歩き回るモード。
 #include <algorithm>
 #include <chrono>
+#include <functional>
 #include <cmath>
 #include <cstdio>
 #include <filesystem>
@@ -335,7 +336,11 @@ int runWindow(const Options& opt, Scene& scene) {
 
     // RT コアの無い GPU では、半分の大きさで描いて拡大する（速さを保つため）
     float renderScale = opt.renderScale > 0 ? opt.renderScale : (ctx.hardwareRt ? 1.0f : 0.5f);
-    logInfo("Render scale %.2f", renderScale);
+    // 描く大きさの上限。重いときは自動で下げ、軽くなったらここまで戻す（adaptQuality）
+    const float maxRenderScale = renderScale;
+    // 最初は小さめに描き、軽ければすぐに戻す（重いモデルで、最初の 1 枚に時間がかかりすぎて GPU がリセットされないように）
+    if (opt.renderScale <= 0) renderScale = std::min(renderScale, 0.5f);
+    logInfo("Render scale %.2f (max %.2f)", renderScale, maxRenderScale);
 
     Swapchain sc;
     Image display;  // 画面と同じ大きさの画像（描画結果を拡大して写し、案内を重ねてから画面に出す）
@@ -354,6 +359,63 @@ int runWindow(const Options& opt, Scene& scene) {
         renderer.setOverlayTarget(display);
     };
     recreate();
+
+    // --- 重いモデルでの自動調整 ---------------------------------------------
+    // Windows は GPU の 1 回の処理が約 2 秒を超えると GPU をリセットし、描画プログラムが落ちる。
+    // 1 枚に時間がかかるようになったら描く大きさ（と光の跳ね返りの回数）を下げ、軽くなったら少しずつ戻す
+    const float kMinRenderScale = 0.25f;
+    uint32_t activeBounces = opt.bounces;
+    int slowFrames = 0;
+    double fastSeconds = 0;
+    bool loweredNotified = false;
+    bool everSlow = false;  // 一度でも重かったら、戻すのはゆっくりにする
+    std::function<void(const std::vector<std::string>&, double)> notify;  // 後で toast を入れる
+    auto applyScale = [&](float scale) {
+        renderScale = scale;
+        rs = {std::max(16u, static_cast<uint32_t>(sc.extent.width * renderScale)),
+              std::max(16u, static_cast<uint32_t>(sc.extent.height * renderScale))};
+        renderer.resize(rs.width, rs.height);
+    };
+    auto adaptQuality = [&](double gpuTime, float dt) {
+        auto lower = [&](float factor) {
+            if (renderScale > kMinRenderScale + 1e-3f) {
+                applyScale(std::max(kMinRenderScale, renderScale * factor));
+            } else if (activeBounces > 1) {
+                --activeBounces;
+            } else {
+                return;
+            }
+            logInfo("Frame took %.0f ms: render scale %.2f, bounces %u (GPU memory %.0f MB)", gpuTime * 1000.0, renderScale,
+                    activeBounces, ctx.allocatedDeviceBytes / 1048576.0);
+            if (!loweredNotified && notify) {
+                notify({tr("QualityLowered")}, 4.0);
+                loweredNotified = true;
+            }
+            slowFrames = 0;
+            fastSeconds = 0;
+            everSlow = true;
+        };
+        if (gpuTime > 1.0) {
+            lower(0.5f);  // 危ない: すぐに大きく下げる
+        } else if (gpuTime > 0.25) {
+            if (++slowFrames >= 3) lower(0.75f);
+        } else {
+            slowFrames = 0;
+        }
+        // 続けて軽ければ、1 段ずつ戻す（先に跳ね返りの回数、次に大きさ）。
+        // 起動直後で一度も重くなっていなければ 0.5 秒ごと、重くなったことがあれば 5 秒ごと
+        fastSeconds = gpuTime < 0.05 ? fastSeconds + dt : 0;
+        if (fastSeconds > (everSlow ? 5.0 : 0.5)) {
+            fastSeconds = 0;
+            if (activeBounces < opt.bounces) {
+                ++activeBounces;
+                logInfo("Restored bounces %u", activeBounces);
+            } else if (renderScale < maxRenderScale - 1e-3f) {
+                applyScale(std::min(maxRenderScale, renderScale / 0.75f));
+                logInfo("Restored render scale %.2f", renderScale);
+            }
+        }
+    };
 
     CameraController cam;
     cam.setFrom(scene.camera);
@@ -434,6 +496,7 @@ int runWindow(const Options& opt, Scene& scene) {
         setStatus(lines, -1);
         toastUntil = glfwGetTime() + seconds;
     };
+    notify = [&](const std::vector<std::string>& lines, double seconds) { toast(lines, seconds); };
 
     // --- 書き出し -------------------------------------------------------------
     // 画像・360°は、ウィンドウの描画を一時的に書き出す大きさに切り替え、決めた回数だけ足し合わせてから保存する
@@ -670,7 +733,7 @@ int runWindow(const Options& opt, Scene& scene) {
         if (acq != VK_SUCCESS && acq != VK_SUBOPTIMAL_KHR) vkCheck(acq, "vkAcquireNextImageKHR");
 
         ViewParams view = cam.view();
-        view.maxBounces = opt.bounces;
+        view.maxBounces = activeBounces;
         view.samplesPerFrame = samplesPerFrame;
         view.exposure = nv.autoExposure ? exposure.current : std::exp2(nv.evOffset);
         if (nv.exporting) view = job.view;
@@ -766,6 +829,7 @@ int runWindow(const Options& opt, Scene& scene) {
         si.pCommandBuffers = &cmd;
         si.signalSemaphoreCount = 1;
         si.pSignalSemaphores = &sc.renderDone[imageIndex];
+        const auto submitTime = std::chrono::steady_clock::now();
         vkCheck(vkQueueSubmit(ctx.queue, 1, &si, fence), "vkQueueSubmit");
 
         VkPresentInfoKHR pi{VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};
@@ -778,8 +842,10 @@ int runWindow(const Options& opt, Scene& scene) {
         if (pres == VK_ERROR_OUT_OF_DATE_KHR || pres == VK_SUBOPTIMAL_KHR) needResize = true;
         else if (pres != VK_SUCCESS) vkCheck(pres, "vkQueuePresentKHR");
 
-        vkWaitForFences(ctx.device, 1, &fence, VK_TRUE, UINT64_MAX);
+        // GPU がリセットされたとき（VK_ERROR_DEVICE_LOST）は、ここで分かる言葉で知らせて終わる
+        vkCheck(vkWaitForFences(ctx.device, 1, &fence, VK_TRUE, UINT64_MAX), "vkWaitForFences");
         vkResetFences(ctx.device, 1, &fence);
+        const double gpuTime = std::chrono::duration<double>(std::chrono::steady_clock::now() - submitTime).count();
         if (nv.exporting) {
             // 書き出し中は明るさを変えない（書き出しを始めたときの明るさのまま）
             renderer.finishFrame();
@@ -790,6 +856,7 @@ int runWindow(const Options& opt, Scene& scene) {
         }
         // 動いている間はゆっくり、止まった直後に素早く合わせると目が疲れにくい
         exposure.update(renderer.finishFrame(), nv.evOffset, 0.9f);
+        adaptQuality(gpuTime, dt);
 
         if (opt.exitAfterFrames > 0 && static_cast<int>(renderer.accumulatedSamples()) >= opt.exitAfterFrames) {
             logInfo("Exit after %d frames (exposure x%.2f)", opt.exitAfterFrames, exposure.current);

@@ -111,7 +111,8 @@ Revit（LiveSync.cs）                                   Tools28Render.exe（win
   起動時に `--scene` が無ければ自分の exe を調べる。言語は Windows の表示言語に合わせる
 - ビューアは署名の無い exe なので、受け取った PC で Windows の警告が出ることがある（「詳細情報」→「実行」）
 
-ログ: `%LOCALAPPDATA%\Tools28\Render\render.log`（どの GPU・方式を使ったか、速さ（10 秒ごとの fps）、エラーの内容が残る）
+ログ: `%LOCALAPPDATA%\Tools28\Render\render.log`（どの GPU・方式を使ったか、速さ（10 秒ごとの fps）、GPU メモリの使用量、エラーの内容が残る）。
+前回の起動分は `render.prev.log` に残る（落ちたあとに開き直しても、落ちたときの記録を調べられる）
 
 ## ビルド
 

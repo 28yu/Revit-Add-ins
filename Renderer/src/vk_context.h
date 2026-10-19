@@ -16,6 +16,7 @@ struct Buffer {
     VkDeviceSize size = 0;
     void* mapped = nullptr;  // CPU から見える領域なら書き込み先
     VkDeviceAddress address = 0;
+    VkDeviceSize allocated = 0;  // 実際に確保した大きさ（GPU メモリの使用量の記録用）
 };
 
 struct Image {
@@ -24,6 +25,7 @@ struct Image {
     VkImageView view = VK_NULL_HANDLE;
     VkFormat format = VK_FORMAT_UNDEFINED;
     uint32_t width = 0, height = 0;
+    VkDeviceSize allocated = 0;
 };
 
 class VkContext {
@@ -59,6 +61,9 @@ public:
     VkSurfaceKHR surface = VK_NULL_HANDLE;
     // RT コア（光の計算専用回路）を使えるか。false なら BVH を自分でたどる予備の方式で描く
     bool hardwareRt = false;
+    // GPU 専用メモリの大きさと、この描画プログラムが GPU 専用メモリに確保している量（大きなモデルの調査用）
+    VkDeviceSize deviceLocalBytes = 0;
+    VkDeviceSize allocatedDeviceBytes = 0;
 
 private:
     uint32_t findMemoryType(uint32_t typeBits, VkMemoryPropertyFlags props) const;
