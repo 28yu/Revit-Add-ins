@@ -152,6 +152,7 @@ namespace Tools28.Commands.BeamUnderLevel
                 bool overwriteExisting = dialog.OverwriteExistingFilters;
                 ElementId selectedTextNoteTypeId = dialog.SelectedTextNoteTypeId;
                 ElementId selectedBeamLabelTypeId = dialog.SelectedBeamLabelTypeId;
+                string labelText = dialog.LevelLabelText;
 
                 // 処理実行
                 int successCount = 0;
@@ -180,7 +181,7 @@ namespace Tools28.Commands.BeamUnderLevel
                     }
 
                     var result = BeamCalculator.Calculate(beam, floorHeight,
-                        refLevel.Name, familyParamSelection[familyName],
+                        refLevel.Name, labelText, familyParamSelection[familyName],
                         familyTopLevelParamSelection[familyName]);
                     calculationResults[beam.Id] = result;
 
@@ -231,7 +232,7 @@ namespace Tools28.Commands.BeamUnderLevel
                     // 凡例の製図ビューを作成
                     legendViewId = LegendManager.CreateLegendDraftingView(
                         doc, levelGroups, overwriteExisting, failureCount,
-                        selectedTextNoteTypeId);
+                        selectedTextNoteTypeId, labelText);
 
                     trans.Commit();
                     if (templateGroup != null && trans.GetStatus() == TransactionStatus.Committed)
@@ -240,7 +241,7 @@ namespace Tools28.Commands.BeamUnderLevel
 
                 // 完了ダイアログ
                 string legendInfo = legendViewId != null
-                    ? string.Format(Loc.S("Beam.LegendCreated"), LegendManager.LegendViewName)
+                    ? string.Format(Loc.S("Beam.LegendCreated"), LegendManager.GetLegendViewName(labelText))
                     : Loc.S("Beam.LegendSkipped");
 
                 string resultMessage = string.Format(Loc.S("Beam.Result"),

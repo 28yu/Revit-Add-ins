@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using Autodesk.Revit.DB;
+using Tools28.Commands.BeamCommon;
 using Tools28.Localization;
 
 namespace Tools28.Commands.BeamUnderLevel
@@ -35,6 +36,7 @@ namespace Tools28.Commands.BeamUnderLevel
         public bool OverwriteExistingFilters { get; private set; }
         public ElementId SelectedTextNoteTypeId { get; private set; }
         public ElementId SelectedBeamLabelTypeId { get; private set; }
+        public string LevelLabelText { get; private set; }
 
         public BeamUnderLevelDialog(BeamUnderLevelDialogData data)
         {
@@ -57,6 +59,8 @@ namespace Tools28.Commands.BeamUnderLevel
             txtTextTypeHint.Text = Loc.S("BeamUnder.TextTypeHint");
             txtLevelSetting.Text = Loc.S("BeamUnder.LevelSetting");
             txtRefLevel.Text = Loc.S("BeamUnder.RefLevel");
+            txtLevelLabelText.Text = Loc.S("Beam.LevelLabelText");
+            txtLevelLabelHint.Text = Loc.S("BeamUnder.LevelLabelHint");
             txtUpperLevel.Text = Loc.S("BeamUnder.UpperLevel");
             txtFloorHeight.Text = Loc.S("BeamUnder.FloorHeight");
             txtLevelHint.Text = Loc.S("BeamUnder.LevelHint");
@@ -87,6 +91,8 @@ namespace Tools28.Commands.BeamUnderLevel
 
             double refElevMm = BeamCalculator.FeetToMm(_data.RefLevel.Elevation);
             RefLevelText.Text = $"{_data.RefLevel.Name} ({refElevMm:+0;-0}mm)";
+            // 既定はビューのレベル名。任意の文字に書き換えられる
+            LevelLabelTextBox.Text = _data.RefLevel.Name;
 
             // 上位レベルドロップダウン
             var levelItems = _data.LowerLevels
@@ -530,6 +536,7 @@ namespace Tools28.Commands.BeamUnderLevel
                 _data.ViewName, _data.BeamCount, _data.BeamsByFamily.Count);
 
             summary += string.Format(Loc.S("Beam.Summary.RefLevel"), _data.RefLevel.Name);
+            summary += string.Format(Loc.S("Beam.Summary.LevelLabel"), LevelLabelText);
             summary += string.Format(Loc.S("Beam.Summary.UpperLevel"), SelectedLowerLevel.Name);
             double floorHeightMm = BeamCalculator.FeetToMm(
                 SelectedLowerLevel.Elevation - _data.RefLevel.Elevation);
@@ -569,6 +576,30 @@ namespace Tools28.Commands.BeamUnderLevel
 
         #region ナビゲーション
 
+        /// <summary>
+        /// 表記する文字を検証して LevelLabelText に入れる。不正なら案内を出して false
+        /// </summary>
+        private bool ValidateLevelLabelText()
+        {
+            string text = (LevelLabelTextBox.Text ?? "").Trim();
+            if (text.Length == 0)
+            {
+                MessageBox.Show(Loc.S("Beam.LevelLabelEmpty"), Loc.S("Common.InputError"),
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                return false;
+            }
+            // フィルタ名・凡例ビュー名にも使うため、Revit の名前に使えない文字は不可
+            char? bad = BeamLevelColors.FindInvalidNameChar(text);
+            if (bad != null)
+            {
+                MessageBox.Show(string.Format(Loc.S("Beam.LevelLabelInvalid"), bad.Value),
+                    Loc.S("Common.InputError"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                return false;
+            }
+            LevelLabelText = text;
+            return true;
+        }
+
         private void ShowStep(int step)
         {
             _currentStep = step;
@@ -596,6 +627,8 @@ namespace Tools28.Commands.BeamUnderLevel
                         MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }
+                if (!ValidateLevelLabelText())
+                    return;
 
                 InitializeStep2();
                 ShowStep(2);

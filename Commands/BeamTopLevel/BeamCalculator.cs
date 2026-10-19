@@ -196,6 +196,7 @@ namespace Tools28.Commands.BeamTopLevel
         public static BeamCalculationResult Calculate(
             FamilyInstance beam,
             string refLevelName,
+            string labelText,
             string topLevelParamName)
         {
             try
@@ -210,7 +211,8 @@ namespace Tools28.Commands.BeamTopLevel
                 if (topLevelMm == 0) topLevelMm = 0;
 
                 string sign = topLevelMm >= 0 ? "+" : "";
-                string displayValue = $"{refLevelName}{sign}{topLevelMm:0}";
+                // 表記する文字は設定画面で変更できる（既定はビューのレベル名）
+                string displayValue = $"{labelText}{sign}{topLevelMm:0}";
 
                 return new BeamCalculationResult
                 {

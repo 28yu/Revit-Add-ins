@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using Autodesk.Revit.DB;
+using Tools28.Commands.BeamCommon;
 using Tools28.Localization;
 
 namespace Tools28.Commands.BeamTopLevel
@@ -26,6 +27,7 @@ namespace Tools28.Commands.BeamTopLevel
         public bool OverwriteExistingFilters { get; private set; }
         public ElementId SelectedTextNoteTypeId { get; private set; }
         public ElementId SelectedBeamLabelTypeId { get; private set; }
+        public string LevelLabelText { get; private set; }
 
         public BeamTopLevelDialog(BeamTopLevelDialogData data)
         {
@@ -43,6 +45,8 @@ namespace Tools28.Commands.BeamTopLevel
             txtViewName.Text = Loc.S("BeamTop.ViewName");
             txtBeamCount.Text = Loc.S("BeamTop.BeamCount");
             txtRefLevel.Text = Loc.S("BeamTop.RefLevel");
+            txtLevelLabelText.Text = Loc.S("Beam.LevelLabelText");
+            txtLevelLabelHint.Text = Loc.S("BeamTop.LevelLabelHint");
             txtTextTypeSetting.Text = Loc.S("BeamTop.TextTypeSetting");
             txtLegendTextType.Text = Loc.S("BeamTop.LegendTextType");
             txtLabelTextType.Text = Loc.S("BeamTop.LabelTextType");
@@ -72,6 +76,8 @@ namespace Tools28.Commands.BeamTopLevel
 
             double refElevMm = BeamCalculator.FeetToMm(_data.RefLevel.Elevation);
             RefLevelText.Text = $"{_data.RefLevel.Name} ({refElevMm:+0;-0}mm)";
+            // 既定はビューのレベル名。任意の文字に書き換えられる
+            LevelLabelTextBox.Text = _data.RefLevel.Name;
 
             // 文字タイプドロップダウン
             if (_data.TextNoteTypes != null && _data.TextNoteTypes.Count > 0)
@@ -285,7 +291,8 @@ namespace Tools28.Commands.BeamTopLevel
             string summary = string.Format(Loc.S("Beam.Summary.Header"),
                 _data.ViewName, _data.BeamCount, _data.BeamsByFamily.Count);
 
-            summary += string.Format(Loc.S("Beam.Summary.RefLevel"), _data.RefLevel.Name) + "\n";
+            summary += string.Format(Loc.S("Beam.Summary.RefLevel"), _data.RefLevel.Name);
+            summary += string.Format(Loc.S("Beam.Summary.LevelLabel"), LevelLabelText) + "\n";
 
             summary += Loc.S("Beam.Summary.FamilyParams");
             foreach (var entry in FamilyTopLevelParamSelection)
@@ -317,6 +324,30 @@ namespace Tools28.Commands.BeamTopLevel
 
         #region ナビゲーション
 
+        /// <summary>
+        /// 表記する文字を検証して LevelLabelText に入れる。不正なら案内を出して false
+        /// </summary>
+        private bool ValidateLevelLabelText()
+        {
+            string text = (LevelLabelTextBox.Text ?? "").Trim();
+            if (text.Length == 0)
+            {
+                MessageBox.Show(Loc.S("Beam.LevelLabelEmpty"), Loc.S("Common.InputError"),
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                return false;
+            }
+            // フィルタ名・凡例ビュー名にも使うため、Revit の名前に使えない文字は不可
+            char? bad = BeamLevelColors.FindInvalidNameChar(text);
+            if (bad != null)
+            {
+                MessageBox.Show(string.Format(Loc.S("Beam.LevelLabelInvalid"), bad.Value),
+                    Loc.S("Common.InputError"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                return false;
+            }
+            LevelLabelText = text;
+            return true;
+        }
+
         private void ShowStep(int step)
         {
             _currentStep = step;
@@ -336,6 +367,9 @@ namespace Tools28.Commands.BeamTopLevel
         {
             if (_currentStep == 1)
             {
+                if (!ValidateLevelLabelText())
+                    return;
+
                 InitializeStep2();
                 ShowStep(2);
             }

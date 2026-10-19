@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Autodesk.Revit.DB;
+using Tools28.Commands.BeamCommon;
 
 namespace Tools28.Commands.BeamUnderLevel
 {
@@ -11,9 +12,15 @@ namespace Tools28.Commands.BeamUnderLevel
     public static class LegendManager
     {
         internal const string LegendViewName = "梁下端色分け凡例";
-        // フィルタ名と同じプレフィックス
-        private const string FilterPrefix = "梁下_";
         private const string ErrorFilterName = "梁下_エラー";
+
+        /// <summary>
+        /// 階ごとの凡例ビュー名（例: "梁下端色分け凡例_1FL"）。再実行時の検索キーなので多言語化しない
+        /// </summary>
+        internal static string GetLegendViewName(string labelText)
+        {
+            return LegendViewName + "_" + labelText;
+        }
 
         /// <summary>
         /// 凡例用の製図ビューを作成
@@ -22,13 +29,15 @@ namespace Tools28.Commands.BeamUnderLevel
             Document doc,
             Dictionary<string, int> levelGroups,
             bool overwriteExisting,
-            int errorCount = 0,
-            ElementId textNoteTypeId = null)
+            int errorCount,
+            ElementId textNoteTypeId,
+            string labelText)
         {
             try
             {
                 // 既存の凡例ビューを確認
-                ViewDrafting existingView = FindExistingLegendView(doc);
+                string viewName = GetLegendViewName(labelText);
+                ViewDrafting existingView = FindExistingLegendView(doc, viewName);
                 if (existingView != null)
                 {
                     if (overwriteExisting)
@@ -39,12 +48,6 @@ namespace Tools28.Commands.BeamUnderLevel
                     {
                         return null;
                     }
-                }
-
-                // 既存の凡例用FilledRegionTypeをクリーンアップ
-                if (overwriteExisting)
-                {
-                    CleanupLegendRegionTypes(doc);
                 }
 
                 // 製図ビュー用の ViewFamilyType を取得
@@ -59,11 +62,11 @@ namespace Tools28.Commands.BeamUnderLevel
                 {
                     try
                     {
-                        draftingView.Name = LegendViewName;
+                        draftingView.Name = viewName;
                     }
                     catch
                     {
-                        draftingView.Name = LegendViewName + "_" +
+                        draftingView.Name = viewName + "_" +
                             DateTime.Now.ToString("yyyyMMdd_HHmmss");
                     }
                 }
@@ -81,8 +84,8 @@ namespace Tools28.Commands.BeamUnderLevel
                     .OrderBy(kv => FilterManager.ExtractNumericValue(kv.Key))
                     .ToList();
 
-                // FilterManagerと同じ色を生成
-                List<Color> colors = FilterManager.GenerateColors(sortedLevels.Count);
+                // フィルタと同じ色（レベル差で固定）
+                Dictionary<string, Color> colors = FilterManager.ResolveColors(doc, levelGroups.Keys);
 
                 // TextNoteTypeを取得し、テキストサイズを基準にレイアウト計算
                 if (textNoteTypeId == null)
@@ -111,7 +114,7 @@ namespace Tools28.Commands.BeamUnderLevel
                 // タイトル
                 XYZ titlePos = new XYZ(0, startY, 0);
                 TextNote.Create(doc, draftingView.Id, titlePos,
-                    "梁下端色分け凡例", textNoteTypeId);
+                    viewName, textNoteTypeId);
                 startY -= (textHeight + titleGap);
 
                 // 各レベル行
@@ -119,8 +122,9 @@ namespace Tools28.Commands.BeamUnderLevel
                 {
                     string displayValue = sortedLevels[i].Key;
                     int beamCount = sortedLevels[i].Value;
-                    Color color = colors[i];
-                    string typeName = FilterPrefix + displayValue;
+                    Color color = colors[displayValue];
+                    // 色の保存先のタイプを使う（各階の凡例で共通。削除しない）
+                    string typeName = BeamLevelColors.ColorTypeName(FilterManager.ColorTypePrefix, displayValue);
 
                     double rowY = startY - rowPitch * i;
 
@@ -168,7 +172,7 @@ namespace Tools28.Commands.BeamUnderLevel
             string typeName,
             double x, double y, double width, double height)
         {
-            // FilledRegionTypeを作成（フィルタ名と同じ名前）
+            // FilledRegionTypeを取得または作成（レベル差ごとの名前）
             ElementId regionTypeId = GetOrCreateFilledRegionType(
                 doc, solidFillPatternId, color, typeName);
             if (regionTypeId == null)
@@ -192,7 +196,7 @@ namespace Tools28.Commands.BeamUnderLevel
 
         /// <summary>
         /// 指定色のFilledRegionTypeを取得または作成
-        /// タイプ名はフィルタ名と同じ（例: 梁下_2FL+2800）
+        /// タイプ名はレベル差ごと（例: 梁下端色_+2800）。各階の凡例で共通
         /// </summary>
         private static ElementId GetOrCreateFilledRegionType(
             Document doc, ElementId solidFillPatternId,
@@ -204,10 +208,9 @@ namespace Tools28.Commands.BeamUnderLevel
                 .Cast<FilledRegionType>()
                 .FirstOrDefault(t => t.Name == typeName);
 
+            // 他の階の凡例でも使っているため削除せず、そのまま使う
             if (existing != null)
-            {
-                doc.Delete(existing.Id);
-            }
+                return existing.Id;
 
             // ベースとなるFilledRegionTypeを取得
             var baseType = new FilteredElementCollector(doc)
@@ -251,13 +254,13 @@ namespace Tools28.Commands.BeamUnderLevel
         /// <summary>
         /// 既存の凡例製図ビューを検索
         /// </summary>
-        private static ViewDrafting FindExistingLegendView(Document doc)
+        private static ViewDrafting FindExistingLegendView(Document doc, string viewName)
         {
+            // 前方一致にすると別の階の凡例（"…凡例_2FL" など）を上書きしてしまうため完全一致で探す
             return new FilteredElementCollector(doc)
                 .OfClass(typeof(ViewDrafting))
                 .Cast<ViewDrafting>()
-                .FirstOrDefault(v => v.Name == LegendViewName ||
-                    v.Name.StartsWith(LegendViewName + "_"));
+                .FirstOrDefault(v => v.Name == viewName);
         }
 
         /// <summary>
@@ -314,23 +317,6 @@ namespace Tools28.Commands.BeamUnderLevel
                 .FirstOrDefault(fp => fp.GetFillPattern().IsSolidFill);
 
             return fillPattern?.Id;
-        }
-
-        /// <summary>
-        /// 凡例用のFilledRegionTypeをクリーンアップ
-        /// </summary>
-        private static void CleanupLegendRegionTypes(Document doc)
-        {
-            var legendTypes = new FilteredElementCollector(doc)
-                .OfClass(typeof(FilledRegionType))
-                .Cast<FilledRegionType>()
-                .Where(t => t.Name.StartsWith(FilterPrefix))
-                .ToList();
-
-            foreach (var type in legendTypes)
-            {
-                try { doc.Delete(type.Id); } catch { }
-            }
         }
     }
 }

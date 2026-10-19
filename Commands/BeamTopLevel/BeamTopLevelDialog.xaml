@@ -168,6 +168,7 @@
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
 
                             <TextBlock x:Name="txtViewName" Grid.Row="0" Grid.Column="0" Style="{StaticResource LabelStyle}"
@@ -184,7 +185,14 @@
                                        Text="参照レベル:"/>
                             <TextBlock Grid.Row="2" Grid.Column="1" Style="{StaticResource ValueStyle}"
                                        x:Name="RefLevelText"/>
+
+                            <TextBlock x:Name="txtLevelLabelText" Grid.Row="3" Grid.Column="0" Style="{StaticResource LabelStyle}"
+                                       Text="表記する文字:" VerticalAlignment="Center"/>
+                            <TextBox Grid.Row="3" Grid.Column="1" x:Name="LevelLabelTextBox"
+                                     FontSize="12" Padding="4,3" Margin="0,2" VerticalContentAlignment="Center"/>
                         </Grid>
+                        <TextBlock x:Name="txtLevelLabelHint" Style="{StaticResource NoteStyle}" TextWrapping="Wrap"
+                                   Text="※ 梁ラベル・凡例に表示するレベルの文字です。色はレベル差（-50 など）で決まり、各階で共通です"/>
                     </StackPanel>
                 </Border>
 

@@ -125,6 +125,7 @@ namespace Tools28.Commands.BeamTopLevel
                 bool overwriteExisting = dialog.OverwriteExistingFilters;
                 ElementId selectedTextNoteTypeId = dialog.SelectedTextNoteTypeId;
                 ElementId selectedBeamLabelTypeId = dialog.SelectedBeamLabelTypeId;
+                string labelText = dialog.LevelLabelText;
 
                 // 処理実行
                 int successCount = 0;
@@ -149,7 +150,7 @@ namespace Tools28.Commands.BeamTopLevel
                     }
 
                     var result = BeamCalculator.Calculate(beam,
-                        refLevel.Name, familyTopLevelParamSelection[familyName]);
+                        refLevel.Name, labelText, familyTopLevelParamSelection[familyName]);
                     calculationResults[beam.Id] = result;
 
                     if (result.Success)
@@ -199,7 +200,7 @@ namespace Tools28.Commands.BeamTopLevel
                     // 凡例の製図ビューを作成
                     legendViewId = LegendManager.CreateLegendDraftingView(
                         doc, levelGroups, overwriteExisting, failureCount,
-                        selectedTextNoteTypeId);
+                        selectedTextNoteTypeId, labelText);
 
                     trans.Commit();
                     if (templateGroup != null && trans.GetStatus() == TransactionStatus.Committed)
@@ -208,7 +209,7 @@ namespace Tools28.Commands.BeamTopLevel
 
                 // 完了ダイアログ
                 string legendInfo = legendViewId != null
-                    ? string.Format(Loc.S("Beam.LegendCreated"), LegendManager.LegendViewName)
+                    ? string.Format(Loc.S("Beam.LegendCreated"), LegendManager.GetLegendViewName(labelText))
                     : Loc.S("Beam.LegendSkipped");
 
                 string resultMessage = string.Format(Loc.S("Beam.Result"),

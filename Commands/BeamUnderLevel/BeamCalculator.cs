@@ -342,6 +342,7 @@ namespace Tools28.Commands.BeamUnderLevel
             FamilyInstance beam,
             double floorHeight,
             string refLevelName,
+            string labelText,
             string heightParamName,
             string topLevelParamName)
         {
@@ -373,7 +374,8 @@ namespace Tools28.Commands.BeamUnderLevel
                 if (bottomLevelMm == 0) bottomLevelMm = 0;
 
                 string sign = bottomLevelMm >= 0 ? "+" : "";
-                string displayValue = $"{refLevelName}{sign}{bottomLevelMm:0}";
+                // 表記する文字は設定画面で変更できる（既定はビューのレベル名）
+                string displayValue = $"{labelText}{sign}{bottomLevelMm:0}";
 
                 return new BeamCalculationResult
                 {

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Autodesk.Revit.DB;
+using Tools28.Commands.BeamCommon;
 
 namespace Tools28.Commands.BeamUnderLevel
 {
@@ -13,6 +14,9 @@ namespace Tools28.Commands.BeamUnderLevel
         // フィルタ名のプレフィックス
         private const string FilterPrefix = "梁下_";
         private const string ErrorFilterName = "梁下_エラー";
+
+        // レベル差ごとの色の保存先（塗潰し領域タイプ名の接頭辞）。検索キーなので変更・多言語化禁止
+        internal const string ColorTypePrefix = "梁下端色_";
 
         /// <summary>
         /// 色分けフィルタを作成しビューに適用
@@ -37,8 +41,8 @@ namespace Tools28.Commands.BeamUnderLevel
                 .OrderBy(kv => ExtractNumericValue(kv.Key))
                 .ToList();
 
-            // 色を生成
-            List<Color> colors = GenerateColors(sortedLevels.Count);
+            // レベル差ごとに固定した色（各階で同じレベル差は同じ色）
+            Dictionary<string, Color> colors = ResolveColors(doc, levelGroups.Keys);
 
             // 既存フィルタを削除（上書きモード）
             if (overwriteExisting)
@@ -47,7 +51,6 @@ namespace Tools28.Commands.BeamUnderLevel
             }
 
             // 各レベル値のフィルタを作成
-            int colorIndex = 0;
             foreach (var entry in sortedLevels)
             {
                 string displayValue = entry.Key;
@@ -87,11 +90,10 @@ namespace Tools28.Commands.BeamUnderLevel
                     else if (!overwriteExisting)
                     {
                         // 上書きしない場合は、このビューの既存の色をそのまま残す
-                        colorIndex++;
                         continue;
                     }
 
-                    Color color = colors[colorIndex];
+                    Color color = colors[displayValue];
                     OverrideGraphicSettings overrides = CreateColorOverrides(
                         color, solidFillPatternId);
 
@@ -101,8 +103,6 @@ namespace Tools28.Commands.BeamUnderLevel
                 {
                     // フィルタ作成失敗はスキップ
                 }
-
-                colorIndex++;
             }
 
             // エラー梁用フィルタ（エラーがある場合のみ）
@@ -240,6 +240,14 @@ namespace Tools28.Commands.BeamUnderLevel
                 .FirstOrDefault(fp => fp.GetFillPattern().IsSolidFill);
 
             return fillPattern?.Id;
+        }
+
+        /// <summary>
+        /// 表示値ごとの色（レベル差で固定。凡例と同じ色を使う）
+        /// </summary>
+        internal static Dictionary<string, Color> ResolveColors(Document doc, IEnumerable<string> displayValues)
+        {
+            return BeamLevelColors.Resolve(doc, ColorTypePrefix, displayValues.ToList(), GenerateColors(20));
         }
 
         /// <summary>

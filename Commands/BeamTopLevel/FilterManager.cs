@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Autodesk.Revit.DB;
+using Tools28.Commands.BeamCommon;
 
 namespace Tools28.Commands.BeamTopLevel
 {
@@ -12,6 +13,9 @@ namespace Tools28.Commands.BeamTopLevel
     {
         private const string FilterPrefix = "梁天端_";
         private const string ErrorFilterName = "梁天端_エラー";
+
+        // レベル差ごとの色の保存先（塗潰し領域タイプ名の接頭辞）。検索キーなので変更・多言語化禁止
+        internal const string ColorTypePrefix = "梁天端色_";
 
         /// <summary>
         /// 色分けフィルタを作成しビューに適用
@@ -34,14 +38,14 @@ namespace Tools28.Commands.BeamTopLevel
                 .OrderBy(kv => ExtractNumericValue(kv.Key))
                 .ToList();
 
-            List<Color> colors = GenerateColors(sortedLevels.Count);
+            // レベル差ごとに固定した色（各階で同じレベル差は同じ色）
+            Dictionary<string, Color> colors = ResolveColors(doc, levelGroups.Keys);
 
             if (overwriteExisting)
             {
                 RemoveExistingFilters(doc, activeView);
             }
 
-            int colorIndex = 0;
             foreach (var entry in sortedLevels)
             {
                 string displayValue = entry.Key;
@@ -81,11 +85,10 @@ namespace Tools28.Commands.BeamTopLevel
                     else if (!overwriteExisting)
                     {
                         // 上書きしない場合は、このビューの既存の色をそのまま残す
-                        colorIndex++;
                         continue;
                     }
 
-                    Color color = colors[colorIndex];
+                    Color color = colors[displayValue];
                     OverrideGraphicSettings overrides = CreateColorOverrides(
                         color, solidFillPatternId);
 
@@ -95,8 +98,6 @@ namespace Tools28.Commands.BeamTopLevel
                 {
                     // フィルタ作成失敗はスキップ
                 }
-
-                colorIndex++;
             }
 
             if (errorCount > 0)
@@ -212,6 +213,14 @@ namespace Tools28.Commands.BeamTopLevel
                 .FirstOrDefault(fp => fp.GetFillPattern().IsSolidFill);
 
             return fillPattern?.Id;
+        }
+
+        /// <summary>
+        /// 表示値ごとの色（レベル差で固定。凡例と同じ色を使う）
+        /// </summary>
+        internal static Dictionary<string, Color> ResolveColors(Document doc, IEnumerable<string> displayValues)
+        {
+            return BeamLevelColors.Resolve(doc, ColorTypePrefix, displayValues.ToList(), GenerateColors(20));
         }
 
         internal static double ExtractNumericValue(string displayValue)
