@@ -75,6 +75,10 @@ struct Scene {
     Vec3 sunDir{0.5f, -0.6f, 0.62f};     // 太陽のある方向
     float sunIntensity = 5.0f;
     float skyIntensity = 1.0f;
+    // 時間帯を変えるとき（太陽の通り道を求める）に使う敷地の情報。Revit の「場所」と「太陽の設定」から
+    float latitude = 35.7f;    // 緯度（度。北が正）
+    float trueNorth = 0.0f;    // 真北の向き（ラジアン。Revit のプロジェクトの位置の角度）
+    float dayOfYear = 80.0f;   // 1 月 1 日 = 1（既定は春分のころ）
 
     // 不透明な三角形を前、ガラスの三角形を後ろに並べ替える。
     // 戻り値: ガラスの最初の三角形番号（＝不透明な三角形の数）
@@ -88,6 +92,10 @@ struct Scene {
 bool loadScene(const std::string& path, Scene& scene, std::string& error, long offset = 0);
 // シーンを同じ形式で書き出す（ビューアの exe に埋め込むときに使う）
 void saveScene(const Scene& scene, std::vector<uint8_t>& out);
+// 時刻（時）の太陽の向き。敷地の緯度・真北・日付から求める（時刻は太陽の動きに合わせた時刻で、正午に真南）
+Vec3 sunDirectionAt(const Scene& scene, float hour);
+// 太陽の向きが何時ごろか（時間帯のつまみの最初の位置に使う）
+float hourOfSun(const Scene& scene, Vec3 dir);
 // 動作確認用の部屋（窓・柱・ガラス・鏡）
 Scene makeTestScene();
 

@@ -5,7 +5,7 @@
 //   Tools28Render --test-scene                             確認用の部屋をウィンドウで表示
 //   Tools28Render --scene model.t28s --output out.png      画像だけ作って終わる
 //       [--width 1280 --height 720 --samples 256 --panorama]
-// 見た目: --background RRGGBB / --mono RRGGBB / --no-ground / --transparent（画像だけ作るとき）
+// 見た目: --background RRGGBB / --mono RRGGBB / --no-ground / --transparent / --time 時（画像だけ作るとき）
 // その他: --log ファイル / --gpu 番号 / --bounces 回数 / --exposure EV / --no-auto-exposure / --render-scale 倍率
 //         --software（RT コアを使わない予備の方式で描く。動作確認用）
 #include <algorithm>
@@ -73,6 +73,7 @@ static int run(int argc, char** argv) {
         // 見た目の確認用: --background RRGGBB（空・雲の代わりの背景色）/ --mono RRGGBB（物を全部この色に）
         else if (a == "--no-ground") opt.hideGround = true;
         else if (a == "--transparent") opt.transparent = true;
+        else if (a == "--time") opt.timeHour = static_cast<float>(std::atof(next()));
         else if (a == "--background" || a == "--mono") {
             unsigned rgb = static_cast<unsigned>(std::strtoul(next(), nullptr, 16));
             uint32_t bgr = 0xFF000000u | ((rgb & 0xFF) << 16) | (rgb & 0xFF00) | ((rgb >> 16) & 0xFF);

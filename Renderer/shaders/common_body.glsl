@@ -160,7 +160,6 @@ float fresnelSchlick(float cosTheta, float f0) {
 
 // --- 地面 -----------------------------------------------------------------
 // モデルの一番下の高さに、どこまでも続く地面がある（Enscape と同じく、ベージュの地面が地平線の霞に溶け込む）
-const vec3 GROUND_ALBEDO = vec3(0.44, 0.40, 0.37);
 
 // 光線が地面に当たる距離（当たらなければ負）
 float groundHit(vec3 origin, vec3 dir) {
@@ -174,9 +173,9 @@ vec3 groundRadiance(vec3 p, float distance) {
     vec3 sun = normalize(pc.sunDir.xyz);
     // 空の光（真上と横の平均）と、周りの日なたの地面からの照り返し（影の中が青黒くならないように）
     vec3 light = skyBase(vec3(0.0, 0.0, 1.0)) * 0.35 + skyBase(normalize(vec3(sun.xy, 0.3))) * 0.35 +
-                 GROUND_ALBEDO * sunColor() * max(sun.z, 0.0) * 0.25;
+                 groundAlbedo() * sunColor() * max(sun.z, 0.0) * 0.25;
     if (sun.z > 0.0 && !occluded(p + vec3(0.0, 0.0, 0.002), sun)) light += sunColor() * sun.z;
-    vec3 c = GROUND_ALBEDO * light;
+    vec3 c = groundAlbedo() * light;
     // 遠くの地面は少し暗く・灰色になる（地平線の明るい空との差で、遠さが分かる）
     float haze = 1.0 - exp(-distance / 900.0);
     vec3 far = vec3(dot(c, vec3(0.2126, 0.7152, 0.0722))) * vec3(0.55, 0.56, 0.59);
@@ -238,7 +237,7 @@ vec3 radiance(vec3 origin, vec3 dir, out Primary primary) {
                     primary.dist = travelled + tg;
                     primary.pos = viaMirror ? camOrigin + camDir * primary.dist : gp;
                     primary.normal = viaMirror ? reflect(vec3(0.0, 0.0, 1.0), mirrorN) : vec3(0.0, 0.0, 1.0);
-                    primary.albedo = viaMirror ? max(mirrorTint * GROUND_ALBEDO, vec3(0.02)) : GROUND_ALBEDO;
+                    primary.albedo = viaMirror ? max(mirrorTint * groundAlbedo(), vec3(0.02)) : groundAlbedo();
                 }
                 result += throughput * groundRadiance(gp, travelled + tg);
                 break;

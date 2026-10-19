@@ -137,6 +137,9 @@ struct Navigator {
     std::vector<ToolbarImage::Rect> buttons;
     std::vector<int> buttonIds;  // buttons と同じ並び。ツールバーは kButton*、「表示」の設定は kLookIdBase + kLook*
     int hoverButton = -1;
+    // 時間帯のつまみ: ドラッグ中か、まだ反映していない位置（画面の画素）があるか、離したか
+    bool sliderDrag = false, sliderPending = false, sliderReleased = false;
+    double sliderX = 0;
     bool toolbarChanged = false;
     int clickedButton = -1;   // 押されたボタン（描画の繰り返しの中で処理する）
     bool exporting = false;   // 書き出し中（カメラの操作を止め、Esc で中止）
@@ -212,11 +215,25 @@ struct Navigator {
         lastY = my;
         if (action == GLFW_RELEASE) {
             drag = Drag::None;
+            if (sliderDrag) {
+                sliderDrag = false;
+                sliderReleased = true;
+                sliderPending = true;
+            }
             return;
         }
         if (exporting) return;
         if (button == GLFW_MOUSE_BUTTON_LEFT) {
             int b = buttonAt(mx, my);
+            if (b == kLookIdBase + kLookTime) {
+                // 時間帯のつまみ: 押した位置に動かし、そのままドラッグで動かせる
+                double fy;
+                toFramebuffer(mx, my, sliderX, fy);
+                sliderDrag = true;
+                sliderPending = true;
+                drag = Drag::None;
+                return;
+            }
             if (b >= 0) {
                 clickedButton = b;
                 drag = Drag::None;
@@ -254,6 +271,12 @@ struct Navigator {
         float dx = static_cast<float>(mx - lastX), dy = static_cast<float>(my - lastY);
         lastX = mx;
         lastY = my;
+        if (sliderDrag) {
+            double fy;
+            toFramebuffer(mx, my, sliderX, fy);
+            sliderPending = true;
+            return;
+        }
         int hover = drag == Drag::None && !exporting ? buttonAt(mx, my) : -1;
         if (hover != hoverButton) {
             hoverButton = hover;
@@ -487,12 +510,15 @@ int runWindow(const Options& opt, Scene& scene) {
             char line[128];
             while (fgets(line, sizeof(line), f)) {
                 unsigned v = 0;
+                float hourValue = 0;
                 if (sscanf(line, "sky=%u", &v) == 1) look.sky = v != 0;
                 else if (sscanf(line, "background=%x", &v) == 1) look.background = v & 0xFFFFFF;
                 else if (sscanf(line, "mono=%u", &v) == 1) look.mono = v != 0;
                 else if (sscanf(line, "monoColor=%x", &v) == 1) look.monoColor = v & 0xFFFFFF;
                 else if (sscanf(line, "ground=%u", &v) == 1) look.ground = v != 0;
                 else if (sscanf(line, "transparentPng=%u", &v) == 1) look.transparentPng = v != 0;
+                else if (sscanf(line, "groundColor=%x", &v) == 1) look.groundColor = v & 0xFFFFFF;
+                else if (sscanf(line, "timeHour=%f", &hourValue) == 1) look.timeHour = hourValue;
             }
             fclose(f);
         }
@@ -500,23 +526,42 @@ int runWindow(const Options& opt, Scene& scene) {
     auto saveLook = [&]() {
         if (lookPath.empty()) return;
         if (FILE* f = openFile(lookPath, "w")) {
-            fprintf(f, "sky=%d\nbackground=%06X\nground=%d\nmono=%d\nmonoColor=%06X\ntransparentPng=%d\n", look.sky ? 1 : 0,
-                    look.background, look.ground ? 1 : 0, look.mono ? 1 : 0, look.monoColor, look.transparentPng ? 1 : 0);
+            fprintf(f, "sky=%d\nbackground=%06X\nground=%d\ngroundColor=%06X\nmono=%d\nmonoColor=%06X\ntransparentPng=%d\ntimeHour=%.2f\n",
+                    look.sky ? 1 : 0, look.background, look.ground ? 1 : 0, look.groundColor, look.mono ? 1 : 0, look.monoColor,
+                    look.transparentPng ? 1 : 0, look.timeHour);
             fclose(f);
         }
     };
     auto applyLook = [&]() {
         renderer.setLook(look.sky ? 0u : (0xFF000000u | look.background), look.mono ? (0xFF000000u | look.monoColor) : 0u,
-                         !look.ground);
+                         !look.ground, 0xFF000000u | look.groundColor);
     };
     applyLook();
+    // 時間帯: つまみで選んだ時刻の太陽にする（負なら Revit の「太陽の設定」のまま）
+    auto applySun = [&]() {
+        look.revitHour = hourOfSun(scene, scene.sunDir);
+        if (look.timeHour >= 0) {
+            look.timeHour = std::min(std::max(look.timeHour, kTimeFirstHour), kTimeLastHour);
+            renderer.setSunDirection(sunDirectionAt(scene, look.timeHour));
+        } else {
+            renderer.setSunDirection(scene.sunDir);
+        }
+    };
+    applySun();
+    double lastSunUpdate = 0;
 
     ToolbarImage toolbar, lookPanel;
+    int timeTrackX = 0, timeTrackW = 0;  // 時間帯のつまみの範囲（画面の画素）
     auto updateToolbar = [&]() {
         int hover = nv.hoverButton;
-        toolbar = buildToolbarImage(contentScale, hover < kLookIdBase ? hover : -1, liveSync ? (syncOn ? 1 : 0) : -1);
+        // 書き出しのボタンと「表示」の設定は、広いほうに幅をそろえる
+        int tbHover = hover < kLookIdBase ? hover : -1, lookHover = hover >= kLookIdBase ? hover - kLookIdBase : -1;
+        int sync = liveSync ? (syncOn ? 1 : 0) : -1;
+        int w = static_cast<int>(std::max(buildToolbarImage(contentScale, -1, sync).image.width,
+                                          buildLookPanelImage(contentScale, -1, look).image.width));
+        toolbar = buildToolbarImage(contentScale, tbHover, sync, w);
         renderer.setOverlay(kToolbarSlot, toolbar.image.rgba, toolbar.image.width, toolbar.image.height);
-        lookPanel = buildLookPanelImage(contentScale, hover >= kLookIdBase ? hover - kLookIdBase : -1, look);
+        lookPanel = buildLookPanelImage(contentScale, lookHover, look, w);
         renderer.setOverlay(kLookSlot, lookPanel.image.rgba, lookPanel.image.width, lookPanel.image.height);
     };
     updateToolbar();
@@ -716,17 +761,22 @@ int runWindow(const Options& opt, Scene& scene) {
             else if (b == kLookMono) look.mono = !look.mono;
             else if (b == kLookGround) look.ground = !look.ground;
             else if (b == kLookTransparent) look.transparentPng = !look.transparentPng;
-            else {
-                uint32_t& color = b == kLookBackground ? look.background : look.monoColor;
+            else if (b == kLookTimeReset) {
+                look.timeHour = -1;  // Revit の「太陽の設定」に戻す
+                applySun();
+            } else {
+                uint32_t& color = b == kLookBackground ? look.background : b == kLookGroundColor ? look.groundColor : look.monoColor;
                 if (chooseColor(nativeWindow, color)) {
                     // 色を選んだら、その色が使われるように切り替えも入れる
                     if (b == kLookBackground) look.sky = false;
+                    else if (b == kLookGroundColor) look.ground = true;
                     else look.mono = true;
                 }
                 last = std::chrono::steady_clock::now();  // 色を選ぶ画面で止まっていた時間は数えない
             }
-            logInfo("Look: sky=%d background=%06X ground=%d mono=%d color=%06X transparentPng=%d", look.sky ? 1 : 0,
-                    look.background, look.ground ? 1 : 0, look.mono ? 1 : 0, look.monoColor, look.transparentPng ? 1 : 0);
+            logInfo("Look: sky=%d background=%06X ground=%d groundColor=%06X mono=%d color=%06X transparentPng=%d time=%.2f",
+                    look.sky ? 1 : 0, look.background, look.ground ? 1 : 0, look.groundColor, look.mono ? 1 : 0, look.monoColor,
+                    look.transparentPng ? 1 : 0, look.timeHour);
             applyLook();
             saveLook();
             updateToolbar();
@@ -750,6 +800,11 @@ int runWindow(const Options& opt, Scene& scene) {
                     Bvh nextBvh;
                     uint32_t nextGlass = prepareScene(next, nextBvh);
                     renderer.reloadScene(next, nextGlass, nextBvh);
+                    scene.sunDir = next.sunDir;  // 時間帯を Revit のままにしているときは新しい太陽を使う
+                    scene.latitude = next.latitude;
+                    scene.trueNorth = next.trueNorth;
+                    scene.dayOfYear = next.dayOfYear;
+                    applySun();
                     scene = std::move(next);
                     bvh = std::move(nextBvh);
                     sceneStamp = st;
@@ -759,6 +814,23 @@ int runWindow(const Options& opt, Scene& scene) {
                     logInfo("Live sync: could not read the scene yet (%s)", error.c_str());
                 }
             }
+        }
+        // 時間帯のつまみ: 空を描き直すのに時間がかかるので、ドラッグ中は 0.15 秒に 1 回だけ反映する
+        if (nv.sliderPending && (nv.sliderReleased || glfwGetTime() - lastSunUpdate > 0.15) && timeTrackW > 0) {
+            float f = static_cast<float>((nv.sliderX - timeTrackX) / timeTrackW);
+            float hour = kTimeFirstHour + std::min(std::max(f, 0.0f), 1.0f) * (kTimeLastHour - kTimeFirstHour);
+            hour = std::round(hour * 4.0f) / 4.0f;  // 15 分刻み
+            if (hour != look.timeHour) {
+                look.timeHour = hour;
+                applySun();
+                updateToolbar();
+            }
+            if (nv.sliderReleased) {
+                logInfo("Time of day: %.2f h", look.timeHour);
+                saveLook();
+            }
+            nv.sliderPending = nv.sliderReleased = false;
+            lastSunUpdate = glfwGetTime();
         }
         if (nv.toolbarChanged) {
             updateToolbar();
@@ -776,8 +848,9 @@ int runWindow(const Options& opt, Scene& scene) {
         } else if (glfwGetTime() < toastUntil) {
             // 「保存しました」などはボタンの説明より優先して、しばらく出したままにする
         } else if (nv.hoverButton >= kLookIdBase) {
-            static const char* lookTips[kLookCount] = {"TipLookSky", "TipLookBackground", "TipLookMono", "TipLookMonoColor",
-                                                       "TipLookGround", "TipLookTransparent"};
+            static const char* lookTips[kLookCount] = {"TipLookSky",    "TipLookBackground",  "TipLookMono",
+                                                       "TipLookMonoColor", "TipLookGround", "TipLookTransparent",
+                                                       "TipLookGroundColor", "TipLookTimeReset", "TipLookTime"};
             setStatus({tr(lookTips[nv.hoverButton - kLookIdBase])}, -1);
         } else if (nv.hoverButton >= 0) {
             setStatus({tr(tipKeys[nv.hoverButton])}, -1);
@@ -855,14 +928,9 @@ int runWindow(const Options& opt, Scene& scene) {
         int barX = static_cast<int>(sc.extent.width) - static_cast<int>(toolbar.image.width) - margin, barY = margin;
         nv.buttons.clear();
         nv.buttonIds.clear();
-        // 「表示」の設定はツールバー（画像の書き出し）の左に横に並べ、上をそろえる。
-        // ウィンドウが狭くて左の案内と重なりそうなときだけ、ツールバーの下に回す
-        int lookX = barX - static_cast<int>(lookPanel.image.width) - margin / 2;
-        int lookY = barY;
-        if (lookX < margin) {
-            lookX = static_cast<int>(sc.extent.width) - static_cast<int>(lookPanel.image.width) - margin;
-            lookY = barY + static_cast<int>(toolbar.image.height) + margin / 2;
-        }
+        // 「表示」の設定はツールバー（書き出しのボタン）のすぐ下。幅はツールバーとそろえてある
+        int lookX = barX;
+        int lookY = barY + static_cast<int>(toolbar.image.height) + margin / 2;
         // 上の中央のお知らせは、ツールバーと「表示」の設定のうち下に長いほうの下に出す
         const int panelsBottom = std::max(barY + static_cast<int>(toolbar.image.height), lookY + static_cast<int>(lookPanel.image.height));
         if (!nv.exporting) {
@@ -879,6 +947,8 @@ int runWindow(const Options& opt, Scene& scene) {
                 nv.buttons.push_back({lookX + b.x, lookY + b.y, b.w, b.h});
                 nv.buttonIds.push_back(kLookIdBase + static_cast<int>(i));
             }
+            timeTrackX = lookX + lookPanel.buttons[kLookTime].x;
+            timeTrackW = lookPanel.buttons[kLookTime].w;
         }
         if (status.width > 0) {
             int statusX = (static_cast<int>(sc.extent.width) - static_cast<int>(status.width)) / 2;

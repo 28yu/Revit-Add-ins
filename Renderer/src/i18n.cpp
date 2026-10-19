@@ -14,6 +14,14 @@ struct Entry {
 };
 
 static const Entry kStrings[] = {
+    {"LookTime", "時間帯", "Time of day", "时间段"},
+    {"LookTimeRevit", "Revit の設定", "Revit setting", "Revit 设置"},
+    {"TipLookGroundColor", "地面の色を選びます", "Choose the ground color", "选择地面颜色"},
+    {"TipLookTimeReset", "押すと Revit の「太陽の設定」に戻します", "Click to go back to the Revit sun setting",
+     "单击恢复为 Revit 的日光设置"},
+    {"TipLookTime", "つまみを動かすと、朝から夕方まで太陽と空が変わります（敷地の緯度と日付から計算）",
+     "Drag to change the sun and sky from morning to evening (from the site latitude and date)",
+     "拖动滑块可将太阳和天空从早晨调整到傍晚（根据场地纬度和日期计算）"},
     {"LookGround", "地面・地平線を表示", "Show ground", "显示地面"},
     {"LookTransparent", "PNG の背景を透明に", "Transparent PNG", "PNG 背景透明"},
     {"TipLookGround", "地面と地平線を出す / 出さない（影の計算などには使い続けます）",

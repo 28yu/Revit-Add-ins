@@ -190,6 +190,10 @@ namespace Tools28.Commands.RealtimeRender
                 scene.SunX = (float)(Math.Sin(a) * Math.Cos(altitude));
                 scene.SunY = (float)(Math.Cos(a) * Math.Cos(altitude));
                 scene.SunZ = (float)Math.Sin(altitude);
+                // 描画プログラムで時間帯を変えるとき（太陽の通り道）に使う
+                scene.TrueNorth = (float)trueNorth;
+                try { scene.Latitude = (float)(doc.SiteLocation.Latitude * 180 / Math.PI); } catch (Exception) { }
+                try { scene.DayOfYear = sun.GetFrameTime(sun.ActiveFrame).DayOfYear; } catch (Exception) { }
                 DiagLog.Cmd("RealtimeRender",
                     $"太陽: 方位={azimuth * 180 / Math.PI:F1}° 高度={altitude * 180 / Math.PI:F1}° 真北補正={trueNorth * 180 / Math.PI:F1}°");
             }

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <cstdlib>
 #include <functional>
 #include <string>
@@ -501,7 +502,7 @@ void syncIcon(Canvas& c, float cx, float cy, float s, const Color& col) {
 
 }  // namespace
 
-ToolbarImage buildToolbarImage(float s, int hover, int sync) {
+ToolbarImage buildToolbarImage(float s, int hover, int sync, int minWidth) {
     std::vector<const char*> labels = {"ExportImage", "ExportPanorama", "ExportViewer"};
     if (sync >= 0) labels.push_back(sync > 0 ? "SyncOn" : "SyncOff");
     // 書き出しのボタンには、保存されるファイルの種類を小さな札で出す（どれが exe・html か分かるように）
@@ -518,6 +519,12 @@ ToolbarImage buildToolbarImage(float s, int hover, int sync) {
         total += w + gap;
     }
     total += pad - gap;
+    if (minWidth > total) {
+        // 下の「表示」の設定と幅をそろえるため、余った幅をボタンに等しく配る
+        float extra = (minWidth - total) / count;
+        for (float& w : widths) w += extra;
+        total = static_cast<float>(minWidth);
+    }
     int width = static_cast<int>(std::ceil(total));
     int height = static_cast<int>(std::ceil(pad * 2 + iconH + labelH + badgeH + 6 * s));
     Canvas c(width, height);
@@ -564,34 +571,40 @@ ToolbarImage buildToolbarImage(float s, int hover, int sync) {
     return tb;
 }
 
-ToolbarImage buildLookPanelImage(float s, int hover, const LookState& look) {
+ToolbarImage buildLookPanelImage(float s, int hover, const LookState& look, int minWidth) {
     const float pad = 8 * s, rowH = 26 * s, labelPx = 12 * s, box = 14 * s, swatchW = 34 * s, gap = 10 * s;
-    // 1 行 = チェックボックス（＋使うときは色の見本）。色の見本は、その色が使われるときだけはっきり出す
+    // 1 行 = チェックボックス（＋色の見本を行の右端に）。色の見本は、その色が使われるときだけはっきり出す
     struct Row {
         const char* label;
         bool checked;
         int checkId;
-        int colorId;          // 色の見本が無い行は -1
-        const char* colorLabel;
+        int colorId;  // 色の見本が無い行は -1
         uint32_t color;
         bool colorActive;
     };
     const Row rows[] = {
-        {tr("LookSky"), look.sky, kLookSky, kLookBackground, tr("LookBackground"), look.background, !look.sky},
-        {tr("LookGround"), look.ground, kLookGround, -1, nullptr, 0, false},
-        {tr("LookMono"), look.mono, kLookMono, kLookMonoColor, tr("LookMonoColor"), look.monoColor, look.mono},
-        {tr("LookTransparent"), look.transparentPng, kLookTransparent, -1, nullptr, 0, false},
+        {tr("LookSky"), look.sky, kLookSky, kLookBackground, look.background, !look.sky},
+        {tr("LookGround"), look.ground, kLookGround, kLookGroundColor, look.groundColor, look.ground},
+        {tr("LookMono"), look.mono, kLookMono, kLookMonoColor, look.monoColor, look.mono},
+        {tr("LookTransparent"), look.transparentPng, kLookTransparent, -1, 0, false},
     };
     const int rowCount = 4;
-    float labelW = 0, colorLabelW = 0;
-    for (const Row& r : rows) {
-        labelW = std::max(labelW, textWidth(r.label, labelPx));
-        if (r.colorLabel) colorLabelW = std::max(colorLabelW, textWidth(r.colorLabel, labelPx));
+    // 時間帯: 1 行目に「時間帯」と今の時刻（Revit の設定のままなら、その旨）、2 行目につまみ
+    std::string timeText;
+    if (look.timeHour < 0) {
+        timeText = tr("LookTimeRevit");
+    } else {
+        int minutes = static_cast<int>(std::lround(look.timeHour * 60.0f));
+        char buf[16];
+        snprintf(buf, sizeof(buf), "%d:%02d", minutes / 60, minutes % 60);
+        timeText = buf;
     }
-    float checkW = box + 6 * s + labelW + 8 * s;
-    float colorW = swatchW + 6 * s + colorLabelW + 8 * s;
-    int width = static_cast<int>(std::ceil(pad * 2 + checkW + gap + colorW));
-    int height = static_cast<int>(std::ceil(pad * 2 + rowH * rowCount));
+    float labelW = textWidth(tr("LookTime"), labelPx) + 12 * s + textWidth(tr("LookTimeRevit"), labelPx);
+    for (const Row& r : rows) labelW = std::max(labelW, textWidth(r.label, labelPx));
+    float colorW = swatchW + 8 * s;
+    int width = static_cast<int>(std::ceil(std::max<float>(pad * 2 + box + 6 * s + labelW + 8 * s + gap + colorW, minWidth)));
+    float checkW = width - pad * 2 - gap - colorW;
+    int height = static_cast<int>(std::ceil(pad * 2 + rowH * (rowCount + 2) + 4 * s));
     Canvas c(width, height);
     auto panel = [&](float x, float y) { return sdRoundBox(x, y, width / 2.0f, height / 2.0f, width / 2.0f, height / 2.0f, 8 * s); };
     c.fill(panel, 0, 0, static_cast<float>(width), static_cast<float>(height), kPanel);
@@ -601,15 +614,17 @@ ToolbarImage buildLookPanelImage(float s, int hover, const LookState& look) {
     auto toColor = [](uint32_t bgr) {
         return Color{(bgr & 255) / 255.0f, ((bgr >> 8) & 255) / 255.0f, ((bgr >> 16) & 255) / 255.0f, 1.0f};
     };
+    auto highlight = [&](float x0, float y0, float w, float h) {
+        c.fill([&](float px, float py) { return sdRoundBox(px, py, x0 + w / 2, y0 + h / 2, w / 2, h / 2 - 1 * s, 5 * s); },
+               x0, y0, x0 + w, y0 + h, Color{1, 1, 1, 0.16f});
+    };
     for (int row = 0; row < rowCount; ++row) {
         const Row& r = rows[row];
         float y0 = pad + rowH * row, cy = y0 + rowH / 2;
 
         // チェックボックスと言葉（言葉の上を押しても切り替わる）
         float x0 = pad;
-        if (hover == r.checkId)
-            c.fill([&](float px, float py) { return sdRoundBox(px, py, x0 + checkW / 2, cy, checkW / 2, rowH / 2 - 1 * s, 5 * s); },
-                   x0, y0, x0 + checkW, y0 + rowH, Color{1, 1, 1, 0.16f});
+        if (hover == r.checkId) highlight(x0, y0, checkW, rowH);
         float bx = x0 + 4 * s + box / 2;
         auto boxSd = [&](float px, float py) { return sdRoundBox(px, py, bx, cy, box / 2, box / 2, 3 * s); };
         if (r.checked) {
@@ -626,21 +641,48 @@ ToolbarImage buildLookPanelImage(float s, int hover, const LookState& look) {
         tb.buttons[r.checkId] = {static_cast<int>(x0), static_cast<int>(y0), static_cast<int>(checkW), static_cast<int>(rowH)};
         if (r.colorId < 0) continue;
 
-        // 色の見本（押すと色を選ぶ画面）
-        float cx0 = pad + checkW + gap;
-        if (hover == r.colorId)
-            c.fill([&](float px, float py) { return sdRoundBox(px, py, cx0 + colorW / 2, cy, colorW / 2, rowH / 2 - 1 * s, 5 * s); },
-                   cx0, y0, cx0 + colorW, y0 + rowH, Color{1, 1, 1, 0.16f});
-        float sx = cx0 + 4 * s + swatchW / 2;
+        // 色の見本（押すと色を選ぶ画面）。何の色かは、カーソルを乗せたときの説明で出す
+        float cx0 = width - pad - colorW;
+        if (hover == r.colorId) highlight(cx0, y0, colorW, rowH);
+        float sx = cx0 + colorW / 2;
         Color sw = toColor(r.color);
         if (!r.colorActive) sw.a = 0.35f;
         auto swSd = [&](float px, float py) { return sdRoundBox(px, py, sx, cy, swatchW / 2, box / 2, 3 * s); };
         c.fill(swSd, sx - swatchW, cy - box, sx + swatchW, cy + box, sw);
         c.stroke(swSd, 1.0f * s, sx - swatchW, cy - box, sx + swatchW, cy + box, Color{1, 1, 1, r.colorActive ? 0.8f : 0.35f});
-        float lx = sx + swatchW / 2 + 6 * s;
-        c.textCentered(r.colorLabel, lx + textWidth(r.colorLabel, labelPx) / 2, cy, labelPx, r.colorActive ? kWhite : kDim);
         tb.buttons[r.colorId] = {static_cast<int>(cx0), static_cast<int>(y0), static_cast<int>(colorW), static_cast<int>(rowH)};
     }
+
+    // --- 時間帯 ---------------------------------------------------------------
+    float ty0 = pad + rowH * rowCount + 4 * s;
+    c.stroke([&](float px, float py) { return sdSegment(px, py, pad + 4 * s, ty0 - 2 * s, width - pad - 4 * s, ty0 - 2 * s); },
+             1.0f * s, pad, ty0 - 3 * s, static_cast<float>(width) - pad, ty0 - 1 * s, Color{1, 1, 1, 0.18f});
+    // 1 行目: 「時間帯」と時刻。押すと Revit の設定に戻す
+    float lineW = width - pad * 2;
+    if (hover == kLookTimeReset) highlight(pad, ty0, lineW, rowH);
+    float tcy = ty0 + rowH / 2;
+    c.textCentered(tr("LookTime"), pad + 4 * s + textWidth(tr("LookTime"), labelPx) / 2, tcy, labelPx, kWhite);
+    float valueW = textWidth(timeText, labelPx);
+    c.textCentered(timeText, width - pad - 4 * s - valueW / 2, tcy, labelPx, look.timeHour < 0 ? kDim : kAccent);
+    tb.buttons[kLookTimeReset] = {static_cast<int>(pad), static_cast<int>(ty0), static_cast<int>(lineW), static_cast<int>(rowH)};
+    // 2 行目: つまみ。目盛りは 6・9・12・15・18 時
+    float sy0 = ty0 + rowH, scy = sy0 + rowH / 2;
+    float trackX0 = pad + 10 * s, trackX1 = width - pad - 10 * s;
+    auto xOfHour = [&](float h) { return trackX0 + (trackX1 - trackX0) * (h - kTimeFirstHour) / (kTimeLastHour - kTimeFirstHour); };
+    for (int h = 6; h <= 18; h += 3) {
+        float x = xOfHour(static_cast<float>(h));
+        c.stroke([&](float px, float py) { return sdSegment(px, py, x, scy + 5 * s, x, scy + 8 * s); }, 1.0f * s, x - 2 * s,
+                 scy + 4 * s, x + 2 * s, scy + 9 * s, Color{1, 1, 1, 0.45f});
+    }
+    auto track = [&](float px, float py) { return sdRoundBox(px, py, (trackX0 + trackX1) / 2, scy, (trackX1 - trackX0) / 2, 2 * s, 2 * s); };
+    c.fill(track, trackX0 - 2 * s, scy - 3 * s, trackX1 + 2 * s, scy + 3 * s, Color{1, 1, 1, 0.35f});
+    float hour = look.timeHour < 0 ? look.revitHour : look.timeHour;
+    float kx = xOfHour(std::min(std::max(hour, kTimeFirstHour), kTimeLastHour));
+    float kr = (hover == kLookTime ? 7.0f : 6.0f) * s;
+    c.fill([&](float px, float py) { return std::sqrt((px - kx) * (px - kx) + (py - scy) * (py - scy)) - kr; }, kx - kr - 1, scy - kr - 1,
+           kx + kr + 1, scy + kr + 1, look.timeHour < 0 ? Color{0.85f, 0.85f, 0.85f, 1.0f} : kAccent);
+    // つまみの当たり判定は、目盛りの端から端まで（行の高さいっぱい）
+    tb.buttons[kLookTime] = {static_cast<int>(trackX0), static_cast<int>(sy0), static_cast<int>(trackX1 - trackX0), static_cast<int>(rowH)};
     tb.image = finish(c);
     return tb;
 }

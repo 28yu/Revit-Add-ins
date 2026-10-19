@@ -46,6 +46,7 @@ int runOffscreen(const Options& opt, Scene& scene) {
     renderer.init(ctx, scene, glassStart, bvh);
     renderer.setLook(opt.lookBackground, opt.lookMono, opt.hideGround);
     renderer.setTransparentOutput(opt.transparent);
+    if (opt.timeHour >= 0) renderer.setSunDirection(sunDirectionAt(scene, opt.timeHour));
     uint32_t w = static_cast<uint32_t>(opt.width), h = static_cast<uint32_t>(opt.height);
     renderer.resize(w, h);
 

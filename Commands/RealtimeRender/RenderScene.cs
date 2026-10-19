@@ -22,6 +22,10 @@ namespace Tools28.Commands.RealtimeRender
         public float SunZ { get; set; } = 0.62f;
         public float SunIntensity { get; set; } = 5f;
         public float SkyIntensity { get; set; } = 1f;
+        // 描画プログラムで時間帯を変えるときに使う敷地の情報（緯度=度、真北=ラジアン、日付=1月1日が1）
+        public float Latitude { get; set; } = 35.7f;
+        public float TrueNorth { get; set; } = 0f;
+        public float DayOfYear { get; set; } = 80f;
 
         public int TriangleCount => Triangles.Count / 4;
 

@@ -25,7 +25,8 @@ namespace t28 {
 //   uint32   テクスチャ数 → 各: uint32 幅, 高さ, 種類（bit0: 1 = 色ではないデータ）, 画素（RGBA 各 1 バイト）
 //   uint32   光源数       → 各: float 位置x,y,z, 大きさ, 明るさr,g,b, 種類（0 = 全方向, 1 = 半球, 2 = スポット）,
 //                               向きx,y,z, cos（落ち始め）, cos（届く範囲）
-static const uint32_t kVersion = 3;
+// 4: 太陽の後ろに 緯度・真北・日付（年の何日目）を追加。3 も読める（その 3 つは既定値）
+static const uint32_t kVersion = 4;
 
 namespace {
 class Reader {
@@ -62,7 +63,7 @@ bool loadScene(const std::string& path, Scene& scene, std::string& error, long o
     char magic[4];
     uint32_t version = 0;
     if (!r.readBytes(magic, 4) || memcmp(magic, "T28S", 4) != 0) return fail("not a T28S file");
-    if (!r.read(version) || version != kVersion) return fail("unsupported version (please update Tools28)");
+    if (!r.read(version) || (version != kVersion && version != 3)) return fail("unsupported version (please update Tools28)");
 
     float cam[10];
     if (!r.readFloats(cam, 10)) return fail("truncated camera");
@@ -76,6 +77,13 @@ bool loadScene(const std::string& path, Scene& scene, std::string& error, long o
     scene.sunDir = {sun[0], sun[1], sun[2]};
     scene.sunIntensity = sun[3];
     scene.skyIntensity = sun[4];
+    if (version >= 4) {
+        float site[3];
+        if (!r.readFloats(site, 3)) return fail("truncated site");
+        scene.latitude = site[0];
+        scene.trueNorth = site[1];
+        scene.dayOfYear = site[2];
+    }
 
     uint32_t materialCount = 0;
     if (!r.read(materialCount) || materialCount > 1000000) return fail("bad material count");
@@ -172,6 +180,7 @@ void saveScene(const Scene& scene, std::vector<uint8_t>& out) {
     const Camera& c = scene.camera;
     for (float v : {c.eye.x, c.eye.y, c.eye.z, c.forward.x, c.forward.y, c.forward.z, c.up.x, c.up.y, c.up.z, c.fovY}) put(out, v);
     for (float v : {scene.sunDir.x, scene.sunDir.y, scene.sunDir.z, scene.sunIntensity, scene.skyIntensity}) put(out, v);
+    for (float v : {scene.latitude, scene.trueNorth, scene.dayOfYear}) put(out, v);
     put(out, static_cast<uint32_t>(scene.materials.size()));
     for (const Material& m : scene.materials) {
         for (float v : {m.r, m.g, m.b, m.opacity, m.roughness, m.metallic, m.emissive, m.f0}) put(out, v);
@@ -272,6 +281,39 @@ struct Builder {
     }
 };
 }  // namespace
+
+namespace {
+const float kPi = 3.14159265f;
+// 太陽の赤緯（季節で変わる太陽の高さのずれ。夏至で +23.4°、冬至で −23.4°）
+float declination(float dayOfYear) { return 23.44f * kPi / 180.0f * std::sin(2.0f * kPi * (284.0f + dayOfYear) / 365.0f); }
+}  // namespace
+
+Vec3 sunDirectionAt(const Scene& scene, float hour) {
+    float lat = scene.latitude * kPi / 180.0f, dec = declination(scene.dayOfYear);
+    float h = (hour - 12.0f) * 15.0f * kPi / 180.0f;  // 時角（正午で 0、1 時間で 15°）
+    float sinEl = std::sin(lat) * std::sin(dec) + std::cos(lat) * std::cos(dec) * std::cos(h);
+    float el = std::asin(std::max(-1.0f, std::min(1.0f, sinEl)));
+    // 方位（真北から時計回り）
+    float denom = std::cos(el) * std::cos(lat);
+    float cosAz = std::fabs(denom) < 1e-5f ? 1.0f : (std::sin(dec) - sinEl * std::sin(lat)) / denom;
+    float az = std::acos(std::max(-1.0f, std::min(1.0f, cosAz)));
+    if (h > 0) az = 2.0f * kPi - az;  // 午後は西側
+    // Revit 側（RealtimeRenderCommand.ApplySun）と同じ向きの取り方（真北の補正を足す。+Y がプロジェクトの北）
+    float a = az + scene.trueNorth;
+    return {std::sin(a) * std::cos(el), std::cos(a) * std::cos(el), std::sin(el)};
+}
+
+float hourOfSun(const Scene& scene, Vec3 dir) {
+    float lat = scene.latitude * kPi / 180.0f, dec = declination(scene.dayOfYear);
+    float el = std::asin(std::max(-1.0f, std::min(1.0f, dir.z)));
+    float az = std::atan2(dir.x, dir.y) - scene.trueNorth;
+    float denom = std::cos(lat) * std::cos(dec);
+    float cosH = std::fabs(denom) < 1e-5f ? 1.0f : (std::sin(el) - std::sin(lat) * std::sin(dec)) / denom;
+    float h = std::acos(std::max(-1.0f, std::min(1.0f, cosH))) * 180.0f / kPi / 15.0f;
+    // 東側（方位が 0〜180°）なら午前
+    bool east = std::sin(az) > 0.0f;
+    return 12.0f + (east ? -h : h);
+}
 
 Scene makeTestScene() {
     Scene s;

@@ -29,14 +29,17 @@ struct ToolbarImage {
 };
 enum ToolbarButton { kButtonImage = 0, kButtonPanorama = 1, kButtonViewer = 2, kButtonSync = 3, kButtonCount = 4 };
 // hover: カーソルが乗っているボタン（-1 = 無し）。sync: 同期のボタン（-1 = 出さない、0 = 止めている、1 = 同期中）
-ToolbarImage buildToolbarImage(float scale, int hover, int sync);
+// width: この幅より狭ければボタンを広げてこの幅にする（0 = 中身に合わせる。下の「表示」の設定と幅をそろえるため）
+ToolbarImage buildToolbarImage(float scale, int hover, int sync, int width = 0);
 
 // ツールバーの下の「表示」の設定。上から
-//   空・雲を表示（＋背景色）／地面・地平線を表示／単色で表示（＋色）／PNG の背景を透明に
+//   空・雲を表示（＋背景色）／地面・地平線を表示（＋地面の色）／単色で表示（＋色）／PNG の背景を透明に／時間帯（つまみ）
 enum LookButton {
     kLookSky = 0, kLookBackground = 1, kLookMono = 2, kLookMonoColor = 3, kLookGround = 4, kLookTransparent = 5,
-    kLookCount = 6
+    kLookGroundColor = 6, kLookTimeReset = 7, kLookTime = 8, kLookCount = 9
 };
+// 時間帯のつまみの範囲（時）
+const float kTimeFirstHour = 5.0f, kTimeLastHour = 19.0f;
 struct LookState {
     bool sky = true;                  // 空・雲を出す（出さないときは背景色）
     uint32_t background = 0xFFFFFF;   // 背景色（0xBBGGRR）
@@ -44,9 +47,13 @@ struct LookState {
     bool mono = false;                // 物を全部 1 色にする
     uint32_t monoColor = 0xF0F0F0;    // 単色の色（0xBBGGRR）
     bool transparentPng = false;      // 画像（PNG）の書き出しで、背景を透明にする
+    uint32_t groundColor = 0xA2A8B0;  // 地面の色（0xBBGGRR。既定はこれまでの地面の色）
+    float timeHour = -1.0f;           // 時間帯（時。負なら Revit の「太陽の設定」のまま）
+    float revitHour = 12.0f;          // Revit の太陽が何時ごろか（つまみの位置に使う）
 };
 // hover: カーソルが乗っているボタン（-1 = 無し）
-ToolbarImage buildLookPanelImage(float scale, int hover, const LookState& look);
+// width: この幅より狭ければ広げる（0 = 中身に合わせる）
+ToolbarImage buildLookPanelImage(float scale, int hover, const LookState& look, int width = 0);
 
 // 画面の上の中央に出すお知らせ（ボタンの説明・書き出しの進み具合・保存しました 等）。
 // progress: 0〜1 なら進み具合の棒を出す（負なら出さない）。lines は 1〜2 行

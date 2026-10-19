@@ -752,13 +752,21 @@ void Renderer::recordOverlay(VkCommandBuffer cmd, uint32_t slot, int x, int y, f
     dispatch(cmd, overlayPass_, slot, &pc, sizeof(pc), overlay_[slot].width, overlay_[slot].height);
 }
 
-void Renderer::setLook(uint32_t background, uint32_t mono, bool hideGround) {
+void Renderer::setLook(uint32_t background, uint32_t mono, bool hideGround, uint32_t ground) {
     uint32_t flags = hideGround ? 1u : 0u;
-    if (background == lookBackground_ && mono == lookMono_ && flags == lookFlags_) return;
+    if (background == lookBackground_ && mono == lookMono_ && flags == lookFlags_ && ground == lookGround_) return;
     lookBackground_ = background;
     lookMono_ = mono;
     lookFlags_ = flags;
+    lookGround_ = ground;
     resetHistory_ = true;  // 見た目が変わったので、前のフレームを重ねない
+}
+
+void Renderer::setSunDirection(Vec3 dir) {
+    if (std::fabs(dir.x - sunDir_.x) + std::fabs(dir.y - sunDir_.y) + std::fabs(dir.z - sunDir_.z) < 1e-6f) return;
+    sunDir_ = dir;
+    computeSky();
+    resetHistory_ = true;
 }
 
 void Renderer::setTransparentOutput(bool transparent) {
@@ -832,6 +840,7 @@ void Renderer::record(VkCommandBuffer cmd, const ViewParams& view) {
     pt.look[0] = transparentOutput_ ? (lookBackground_ | 0xFF000000u) : lookBackground_;
     pt.look[1] = lookMono_;
     pt.look[2] = lookFlags_;
+    pt.look[3] = lookGround_;
     dispatch(cmd, pathTrace_, cur, &pt, sizeof(pt), w, h);
     computeBarrier(cmd);
 

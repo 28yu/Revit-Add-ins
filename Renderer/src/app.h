@@ -28,6 +28,7 @@ struct Options {
     // 画像だけ作るときの見た目（動作確認用）: 0 = 使わない、それ以外は 0xFFBBGGRR
     uint32_t lookBackground = 0, lookMono = 0;
     bool hideGround = false, transparent = false;
+    float timeHour = -1.0f;  // 時間帯（時。負なら Revit の太陽のまま）
     bool liveSync = false;         // Revit での変更を受け取る（シーンファイルの更新を見張る）。Revit から --live で指定
     int exportSamples = 0;
     int skySize = 4096;            // 空と雲の画像の横の画素数（動作確認で短くするときは小さくする）

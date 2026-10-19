@@ -48,7 +48,7 @@ layout(push_constant) uniform Params {
     vec4 misc;        // x = 照明器具の光源の数, y = 空の明るさ, z = ガラス三角形の開始位置（三角形番号）, w = 1 画素の幅（1 m 先で何 m か）
     uvec4 frame;      // x = フレーム番号, y = 止まってからのフレーム数, z = 最大反射回数, w = 1 フレームで計算する回数
     uvec4 look;       // x = 背景色（RGBA8。a が 0 以外なら空・雲を出さずにこの色）, y = 単色（RGBA8。a が 0 以外なら全部この色）,
-                      // z = 1 なら地面（と地平線）をまっすぐには見せない
+                      // z = 1 なら地面（と地平線）をまっすぐには見せない, w = 地面の色（RGBA8。a が 0 なら既定の色）
 } pc;
 
 const float PI = 3.14159265359;
@@ -57,6 +57,12 @@ const float PI = 3.14159265359;
 bool plainBackground() { return (pc.look.x >> 24u) != 0u; }
 bool monochrome() { return (pc.look.y >> 24u) != 0u; }
 bool hideGround() { return (pc.look.z & 1u) != 0u; }
+// 地面の色（look.w。a が 0 なら既定の色）
+vec3 groundAlbedo() {
+    if ((pc.look.w >> 24u) == 0u) return vec3(0.44, 0.40, 0.37);
+    vec3 c = vec3(float(pc.look.w & 255u), float((pc.look.w >> 8u) & 255u), float((pc.look.w >> 16u) & 255u)) / 255.0;
+    return pow(c, vec3(2.2));
+}
 vec3 monoColor() {
     vec3 c = vec3(float(pc.look.y & 255u), float((pc.look.y >> 8u) & 255u), float((pc.look.y >> 16u) & 255u)) / 255.0;
     return pow(c, vec3(2.2));  // 選んだ色（sRGB）を明るさの値に直す
@@ -80,6 +86,8 @@ layout(set = 0, binding = 13, rgba16f) uniform readonly image2D uSky;
 vec3 sunColor() {
     float h = normalize(pc.sunDir.xyz).z;
     vec3 c = mix(vec3(1.0, 0.55, 0.3), vec3(1.0, 0.9, 0.78), smoothstep(0.0, 0.45, h));
+    // 朝夕の低い太陽は、空気の中を長く通るので弱く赤い
+    c *= mix(0.3, 1.0, smoothstep(0.0, 0.3, h));
     return c * pc.sunDir.w;
 }
 
@@ -87,15 +95,20 @@ vec3 sunColor() {
 vec3 skyBase(vec3 dir) {
     vec3 sun = normalize(pc.sunDir.xyz);
     float el = max(dir.z, 0.0);
-    vec3 zenith = vec3(0.20, 0.42, 1.05);
-    vec3 mid = vec3(0.55, 0.78, 1.35);
+    // 朝夕（太陽が低い）ほど、天頂は紫がかった濃い青、太陽の側の地平線は橙色になる
+    float dusk = 1.0 - smoothstep(0.0, 0.35, sun.z);
+    vec3 zenith = mix(vec3(0.20, 0.42, 1.05), vec3(0.16, 0.20, 0.55), dusk * 0.8);
+    vec3 mid = mix(vec3(0.55, 0.78, 1.35), vec3(0.62, 0.62, 1.05), dusk * 0.7);
     vec3 horizon = vec3(1.45, 1.55, 1.68);
+    float towardSun = dot(normalize(dir.xy + vec2(1e-5)), normalize(sun.xy + vec2(1e-5))) * 0.5 + 0.5;
+    horizon = mix(horizon, mix(vec3(1.25, 1.0, 1.05), vec3(2.1, 1.05, 0.5), towardSun * towardSun), dusk);
     vec3 sky = mix(mid, zenith, smoothstep(0.0, 1.0, pow(el, 0.6)));
-    sky = mix(sky, horizon, exp(-el * 14.0));
+    sky = mix(sky, horizon, exp(-el * mix(14.0, 6.0, dusk)));
     float cosSun = max(dot(dir, sun), 0.0);
-    sky += vec3(1.0, 0.85, 0.65) * (pow(cosSun, 8.0) * 0.45 + pow(cosSun, 64.0) * 0.6);
-    float sunHeight = clamp(sun.z * 4.0, 0.0, 1.0);
-    return sky * pc.misc.y * (0.15 + 0.85 * sunHeight);
+    sky += mix(vec3(1.0, 0.85, 0.65), vec3(1.2, 0.6, 0.3), dusk) * (pow(cosSun, 8.0) * 0.45 + pow(cosSun, 64.0) * 0.6);
+    // 明るさ: 昼は 1、日の出・日の入りで約 0.4、太陽が地平線の下に沈むほど暗くなる（薄明）
+    float t = clamp((sun.z + 0.2) / 0.45, 0.0, 1.0);
+    return sky * pc.misc.y * (0.02 + 0.98 * t * t * (3.0 - 2.0 * t));
 }
 
 // 地平線の霞の色（遠くの地面が溶け込む色）
