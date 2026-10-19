@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using Autodesk.Revit.DB;
+using Tools28.Localization;
 
 namespace Tools28.Commands.BeamCommon
 {
@@ -14,6 +15,10 @@ namespace Tools28.Commands.BeamCommon
         public bool Skipped { get; set; }
         /// <summary>モデルに凡例ビューが無いため、製図ビューで作った</summary>
         public bool UsedDraftingFallback { get; set; }
+        /// <summary>同名の製図ビュー（旧版で作った凡例）を上書きした</summary>
+        public bool ReusedDraftingView { get; set; }
+        /// <summary>作成に失敗したときの理由</summary>
+        public string Error { get; set; }
     }
 
     /// <summary>
@@ -21,6 +26,7 @@ namespace Tools28.Commands.BeamCommon
     ///
     /// Revit API には凡例ビューを新規作成する手段が無いため、モデル内の既存の凡例ビューを
     /// 複製して作る。凡例ビューが1つも無いモデルでは、従来どおり製図ビューで作る。
+    /// 同名の凡例があり上書きする場合は、そのビュー自体を描き直す（種類は変えない）。
     /// </summary>
     public static class BeamLegendViews
     {
@@ -39,43 +45,36 @@ namespace Tools28.Commands.BeamCommon
         }
 
         /// <summary>
-        /// 凡例を描くビューを用意する（トランザクション内で呼ぶ）。既存なら中身を消して再利用する
+        /// 凡例を描くビューを用意する（トランザクション内で呼ぶ）。
+        /// 同名のビューがあれば、種類（凡例ビュー／製図ビュー）に関係なくそのビューの中身を消して描き直す
+        /// （シートに配置した凡例をそのまま残すため）。無ければ凡例ビューを新しく作る
         /// </summary>
         public static BeamLegendResult Prepare(Document doc, string viewName, bool overwriteExisting)
         {
             View existing = Find(doc, viewName);
-            if (existing != null && !overwriteExisting)
-                return new BeamLegendResult { Skipped = true };
-
-            View legendSource = FindLegendToDuplicate(doc);
-
-            // 既存は中身を消して使い回す（シートに配置した凡例を残すため）。
-            // 旧版の製図ビューは、凡例ビューを作れないモデルに限り使い回す
-            if (existing != null &&
-                (existing.ViewType == ViewType.Legend || legendSource == null))
+            if (existing != null)
             {
+                if (!overwriteExisting)
+                    return new BeamLegendResult { Skipped = true };
+
                 ClearViewContents(doc, existing);
+                if (!existing.IsValidObject)
+                    return new BeamLegendResult { Error = Loc.S("Beam.LegendViewLost") };
                 return new BeamLegendResult
                 {
                     View = existing,
-                    UsedDraftingFallback = existing.ViewType != ViewType.Legend
+                    ReusedDraftingView = existing.ViewType == ViewType.DraftingView
                 };
-            }
-
-            if (existing != null)
-            {
-                // 旧版の製図ビューの凡例。シートに置かれている場合があるので消さずに名前だけ変える
-                try { existing.Name = viewName + "（旧）"; } catch (Exception) { }
             }
 
             View view = null;
             bool fallback = false;
+            View legendSource = FindLegendToDuplicate(doc);
             if (legendSource != null)
             {
+                // 「複製」は詳細（文字・塗潰し領域など）を写さないので、空の凡例ビューができる
                 ElementId newId = legendSource.Duplicate(ViewDuplicateOption.Duplicate);
                 view = doc.GetElement(newId) as View;
-                if (view != null)
-                    ClearViewContents(doc, view);
             }
             if (view == null)
             {
@@ -111,19 +110,31 @@ namespace Tools28.Commands.BeamCommon
         }
 
         /// <summary>
-        /// ビューの中身（文字・塗潰し領域・凡例コンポーネントなど）だけを削除する
+        /// ビューの中身（文字・塗潰し領域・線・凡例コンポーネントなど描いたもの）だけを削除する。
+        /// ⚠ ビューに属する要素をすべて消すと、ビューと一体の内部要素まで消えて
+        ///   ビュー自体が削除されるため、描画要素の種類に絞って消す
         /// </summary>
         private static void ClearViewContents(Document doc, View view)
         {
-            var ids = new FilteredElementCollector(doc, view.Id)
+            var ids = new FilteredElementCollector(doc)
+                .WherePasses(new ElementOwnerViewFilter(view.Id))
                 .WhereElementIsNotElementType()
-                .Where(e => e.Id != view.Id && e.OwnerViewId == view.Id)
+                .Where(IsDrawnElement)
                 .Select(e => e.Id)
                 .ToList();
             foreach (var id in ids)
             {
                 try { doc.Delete(id); } catch (Exception) { }
             }
+        }
+
+        private static bool IsDrawnElement(Element e)
+        {
+            if (e is TextNote || e is FilledRegion || e is CurveElement ||
+                e is Dimension || e is IndependentTag || e is FamilyInstance)
+                return true;
+            Category cat = e.Category;
+            return cat != null && cat.Id.Equals(new ElementId(BuiltInCategory.OST_LegendComponents));
         }
     }
 }

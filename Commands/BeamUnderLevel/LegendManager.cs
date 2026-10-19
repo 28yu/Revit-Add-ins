@@ -33,10 +33,11 @@ namespace Tools28.Commands.BeamUnderLevel
             ElementId textNoteTypeId,
             string labelText)
         {
+            BeamLegendResult legend = null;
             try
             {
                 string viewName = GetLegendViewName(labelText);
-                BeamLegendResult legend = BeamLegendViews.Prepare(doc, viewName, overwriteExisting);
+                legend = BeamLegendViews.Prepare(doc, viewName, overwriteExisting);
                 View legendView = legend.View;
                 if (legendView == null)
                     return legend;
@@ -126,9 +127,14 @@ namespace Tools28.Commands.BeamUnderLevel
 
                 return legend;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                return new BeamLegendResult();
+                // 失敗の理由を完了画面とログに出す（黙って失敗すると、何が起きたか分からないため）
+                DiagLog.Write($"[BeamUnder Legend] 凡例の作成に失敗: {ex}");
+                if (legend == null)
+                    legend = new BeamLegendResult();
+                legend.Error = ex.Message;
+                return legend;
             }
         }
 

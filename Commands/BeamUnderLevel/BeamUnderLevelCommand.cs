@@ -246,16 +246,26 @@ namespace Tools28.Commands.BeamUnderLevel
                 // 完了ダイアログ
                 string legendName = legend?.View != null ? legend.View.Name : LegendManager.GetLegendViewName(labelText);
                 string legendInfo;
-                if (legend?.View != null)
+                if (legend?.Error != null)
+                    legendInfo = string.Format(Loc.S("Beam.LegendFailed"), legend.Error);
+                else if (legend?.View != null)
                 {
                     legendInfo = string.Format(Loc.S("Beam.LegendCreated"), legendName);
                     if (legend.UsedDraftingFallback)
                         legendInfo += Loc.S("Beam.LegendDraftingFallback");
+                    if (legend.ReusedDraftingView)
+                        legendInfo += Loc.S("Beam.LegendReusedDrafting");
                 }
                 else if (legend != null && legend.Skipped)
                     legendInfo = string.Format(Loc.S("Beam.LegendSkippedNamed"), legendName);
                 else
-                    legendInfo = Loc.S("Beam.LegendFailed");
+                    legendInfo = string.Format(Loc.S("Beam.LegendFailed"), "-");
+
+                // 作成した凡例を開く（どこにできたか分かるように）。開けなくても処理は成功扱い
+                if (legend?.View != null && legend.Error == null)
+                {
+                    try { uidoc.ActiveView = legend.View; } catch (Exception) { }
+                }
 
                 string resultMessage = string.Format(Loc.S("Beam.Result"),
                     beams.Count, successCount, failureCount, levelGroups.Count, legendInfo);
