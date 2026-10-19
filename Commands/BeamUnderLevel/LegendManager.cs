@@ -7,7 +7,7 @@ using Tools28.Commands.BeamCommon;
 namespace Tools28.Commands.BeamUnderLevel
 {
     /// <summary>
-    /// 梁下端色分け凡例の製図ビューを作成
+    /// 梁下端色分けの凡例（凡例ビュー）を作成
     /// </summary>
     public static class LegendManager
     {
@@ -23,9 +23,9 @@ namespace Tools28.Commands.BeamUnderLevel
         }
 
         /// <summary>
-        /// 凡例用の製図ビューを作成
+        /// 凡例を作成する（凡例ビュー。モデルに凡例ビューが無い場合は製図ビュー）
         /// </summary>
-        public static ElementId CreateLegendDraftingView(
+        public static BeamLegendResult CreateLegendView(
             Document doc,
             Dictionary<string, int> levelGroups,
             bool overwriteExisting,
@@ -35,49 +35,18 @@ namespace Tools28.Commands.BeamUnderLevel
         {
             try
             {
-                // 既存の凡例ビューを確認
                 string viewName = GetLegendViewName(labelText);
-                ViewDrafting existingView = FindExistingLegendView(doc, viewName);
-                if (existingView != null)
-                {
-                    if (overwriteExisting)
-                    {
-                        ClearViewContents(doc, existingView);
-                    }
-                    else
-                    {
-                        return null;
-                    }
-                }
+                BeamLegendResult legend = BeamLegendViews.Prepare(doc, viewName, overwriteExisting);
+                View legendView = legend.View;
+                if (legendView == null)
+                    return legend;
 
-                // 製図ビュー用の ViewFamilyType を取得
-                ElementId viewFamilyTypeId = GetDraftingViewFamilyTypeId(doc);
-                if (viewFamilyTypeId == null)
-                    return null;
-
-                // 製図ビューを作成
-                // 既存の凡例ビューは中身を消して再利用する（シート上の配置を残すため）
-                ViewDrafting draftingView = existingView ?? ViewDrafting.Create(doc, viewFamilyTypeId);
-                if (existingView == null)
-                {
-                    try
-                    {
-                        draftingView.Name = viewName;
-                    }
-                    catch
-                    {
-                        draftingView.Name = viewName + "_" +
-                            DateTime.Now.ToString("yyyyMMdd_HHmmss");
-                    }
-                }
-
-                // 尺度を1:1に設定
-                draftingView.Scale = 1;
+                try { legendView.Scale = 1; } catch (Exception) { }
 
                 // ベタ塗りパターンを取得
                 ElementId solidFillPatternId = GetSolidFillPatternId(doc);
                 if (solidFillPatternId == null)
-                    return draftingView.Id;
+                    return legend;
 
                 // レベル値でソート（FilterManagerと同じロジック）
                 var sortedLevels = levelGroups
@@ -91,7 +60,7 @@ namespace Tools28.Commands.BeamUnderLevel
                 if (textNoteTypeId == null)
                     textNoteTypeId = GetDefaultTextNoteTypeId(doc);
                 if (textNoteTypeId == null)
-                    return draftingView.Id;
+                    return legend;
 
                 double textHeight = GetTextHeight(doc, textNoteTypeId);
 
@@ -113,7 +82,7 @@ namespace Tools28.Commands.BeamUnderLevel
 
                 // タイトル
                 XYZ titlePos = new XYZ(0, startY, 0);
-                TextNote.Create(doc, draftingView.Id, titlePos,
+                TextNote.Create(doc, legendView.Id, titlePos,
                     viewName, textNoteTypeId);
                 startY -= (textHeight + titleGap);
 
@@ -129,14 +98,14 @@ namespace Tools28.Commands.BeamUnderLevel
                     double rowY = startY - rowPitch * i;
 
                     // 色付き矩形を作成
-                    CreateColoredRectangle(doc, draftingView.Id,
+                    CreateColoredRectangle(doc, legendView.Id,
                         solidFillPatternId, color, typeName,
                         0, rowY, rectWidth, rectHeight);
 
                     // テキストラベル
                     XYZ textPos = new XYZ(textOffsetX, rowY + textYOffset, 0);
                     string label = $"- {displayValue}（{beamCount}本）";
-                    TextNote.Create(doc, draftingView.Id, textPos,
+                    TextNote.Create(doc, legendView.Id, textPos,
                         label, textNoteTypeId);
                 }
 
@@ -145,21 +114,21 @@ namespace Tools28.Commands.BeamUnderLevel
                 {
                     double errorRowY = startY - rowPitch * sortedLevels.Count;
 
-                    CreateColoredRectangle(doc, draftingView.Id,
+                    CreateColoredRectangle(doc, legendView.Id,
                         solidFillPatternId, new Color(255, 100, 100),
                         ErrorFilterName,
                         0, errorRowY, rectWidth, rectHeight);
 
                     XYZ errorTextPos = new XYZ(textOffsetX, errorRowY + textYOffset, 0);
-                    TextNote.Create(doc, draftingView.Id, errorTextPos,
+                    TextNote.Create(doc, legendView.Id, errorTextPos,
                         "- エラー", textNoteTypeId);
                 }
 
-                return draftingView.Id;
+                return legend;
             }
             catch (Exception)
             {
-                return null;
+                return new BeamLegendResult();
             }
         }
 
@@ -249,48 +218,6 @@ namespace Tools28.Commands.BeamUnderLevel
             }
             // フォールバック: 2.5mm
             return 2.5 / 304.8;
-        }
-
-        /// <summary>
-        /// 既存の凡例製図ビューを検索
-        /// </summary>
-        private static ViewDrafting FindExistingLegendView(Document doc, string viewName)
-        {
-            // 前方一致にすると別の階の凡例（"…凡例_2FL" など）を上書きしてしまうため完全一致で探す
-            return new FilteredElementCollector(doc)
-                .OfClass(typeof(ViewDrafting))
-                .Cast<ViewDrafting>()
-                .FirstOrDefault(v => v.Name == viewName);
-        }
-
-        /// <summary>
-        /// 凡例ビューの中身（文字・塗潰し領域など）だけを削除する。
-        /// ビュー自体を削除して作り直すと、シートに配置した凡例が消えてしまうため
-        /// </summary>
-        private static void ClearViewContents(Document doc, View view)
-        {
-            var ids = new FilteredElementCollector(doc, view.Id)
-                .WhereElementIsNotElementType()
-                .Where(e => e.Id != view.Id && e.OwnerViewId == view.Id)
-                .Select(e => e.Id)
-                .ToList();
-            foreach (var id in ids)
-            {
-                try { doc.Delete(id); } catch { }
-            }
-        }
-
-        /// <summary>
-        /// 製図ビューのViewFamilyTypeIdを取得
-        /// </summary>
-        private static ElementId GetDraftingViewFamilyTypeId(Document doc)
-        {
-            var viewFamilyType = new FilteredElementCollector(doc)
-                .OfClass(typeof(ViewFamilyType))
-                .Cast<ViewFamilyType>()
-                .FirstOrDefault(vft => vft.ViewFamily == ViewFamily.Drafting);
-
-            return viewFamilyType?.Id;
         }
 
         /// <summary>

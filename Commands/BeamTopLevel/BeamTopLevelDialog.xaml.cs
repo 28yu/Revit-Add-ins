@@ -28,6 +28,8 @@ namespace Tools28.Commands.BeamTopLevel
         public ElementId SelectedTextNoteTypeId { get; private set; }
         public ElementId SelectedBeamLabelTypeId { get; private set; }
         public string LevelLabelText { get; private set; }
+        /// <summary>同名の凡例を上書きすると確認した</summary>
+        public bool OverwriteLegendConfirmed { get; private set; }
 
         public BeamTopLevelDialog(BeamTopLevelDialogData data)
         {
@@ -343,6 +345,21 @@ namespace Tools28.Commands.BeamTopLevel
                 MessageBox.Show(string.Format(Loc.S("Beam.LevelLabelInvalid"), bad.Value),
                     Loc.S("Common.InputError"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 return false;
+            }
+            // 同じ文字の凡例が既にある（別の階で同じ文字を使った等）。黙って上書きせず確認する
+            OverwriteLegendConfirmed = false;
+            if (_data.LegendExists != null && _data.LegendExists(text))
+            {
+                var answer = MessageBox.Show(
+                    string.Format(Loc.S("Beam.LegendNameExists"), LegendManager.GetLegendViewName(text)),
+                    Loc.S("Beam.LegendNameExistsTitle"), MessageBoxButton.YesNo, MessageBoxImage.Warning);
+                if (answer != MessageBoxResult.Yes)
+                {
+                    LevelLabelTextBox.Focus();
+                    LevelLabelTextBox.SelectAll();
+                    return false;
+                }
+                OverwriteLegendConfirmed = true;
             }
             LevelLabelText = text;
             return true;

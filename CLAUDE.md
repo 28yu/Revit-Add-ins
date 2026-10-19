@@ -42,7 +42,7 @@ string sheetName = string.Format(Loc.S("Sheet.NewSheetName", modelLang), sheetNu
 別言語環境で再実行したときに既存要素を発見できず、重複作成や削除漏れを起こす。
 
 - `Commands/BeamTopLevel/`, `Commands/BeamUnderLevel/` — `ParameterManager.Param*`（共有パラメータ名）、
-  `FilterManager.FilterPrefix` / `ErrorFilterName`、`LegendManager.LegendViewName`（階ごとの凡例名 `GetLegendViewName()` = `梁天端色分け凡例_<表記する文字>`）、
+  `FilterManager.FilterPrefix` / `ErrorFilterName`、`LegendManager.LegendViewName`（階ごとの凡例名 `GetLegendViewName()` = `梁天端色分け凡例_<表記する文字>`。凡例ビュー／旧版は製図ビュー）、
   `FilterManager.ColorTypePrefix`（`梁天端色_` / `梁下端色_`：レベル差ごとの色を保存する塗潰し領域タイプ。`Commands/BeamCommon/BeamLevelColors.cs`）
 - `Commands/FormworkCalculator/` — `FormworkParameterManager.Param*` / `*Label`、
   `ScheduleCreator.ScheduleName`、`FormworkSheetCreator.SheetName`、`FormworkVisualizer.AnalysisViewName` 系、

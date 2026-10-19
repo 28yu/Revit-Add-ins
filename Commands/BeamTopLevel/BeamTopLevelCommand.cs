@@ -5,6 +5,7 @@ using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using RevitApp = Autodesk.Revit.ApplicationServices.Application;
+using Tools28.Commands.BeamCommon;
 using Tools28.Localization;
 
 namespace Tools28.Commands.BeamTopLevel
@@ -110,7 +111,9 @@ namespace Tools28.Commands.BeamTopLevel
                     BeamsByFamily = beamsByFamily,
                     TopLevelParamCandidates = topLevelParamCandidates,
                     AdditionalLevelParams = additionalLevelParams,
-                    TextNoteTypes = textNoteTypes
+                    TextNoteTypes = textNoteTypes,
+                    // 表記する文字の重複（別の階で同じ文字を使った）を画面で知らせるため
+                    LegendExists = name => BeamLegendViews.Find(doc, LegendManager.GetLegendViewName(name)) != null
                 };
 
                 var dialog = new BeamTopLevelDialog(dialogData);
@@ -169,7 +172,7 @@ namespace Tools28.Commands.BeamTopLevel
                     .ToDictionary(g => g.Key, g => g.Count());
 
                 // パラメータ作成・値の書き込み・フィルタ作成をトランザクションで実行
-                ElementId legendViewId = null;
+                BeamLegendResult legend = null;
                 using (Transaction trans = new Transaction(doc, Loc.S("BeamTop.Txn.Apply")))
                 {
                     trans.Start();
@@ -198,8 +201,9 @@ namespace Tools28.Commands.BeamTopLevel
                         levelGroups, overwriteExisting, failureCount);
 
                     // 凡例の製図ビューを作成
-                    legendViewId = LegendManager.CreateLegendDraftingView(
-                        doc, levelGroups, overwriteExisting, failureCount,
+                    // 同名の凡例を上書きすると画面で確認済みなら、上書きのチェックが無くても作り直す
+                    legend = LegendManager.CreateLegendView(
+                        doc, levelGroups, overwriteExisting || dialog.OverwriteLegendConfirmed, failureCount,
                         selectedTextNoteTypeId, labelText);
 
                     trans.Commit();
@@ -208,9 +212,18 @@ namespace Tools28.Commands.BeamTopLevel
                 }
 
                 // 完了ダイアログ
-                string legendInfo = legendViewId != null
-                    ? string.Format(Loc.S("Beam.LegendCreated"), LegendManager.GetLegendViewName(labelText))
-                    : Loc.S("Beam.LegendSkipped");
+                string legendName = legend?.View != null ? legend.View.Name : LegendManager.GetLegendViewName(labelText);
+                string legendInfo;
+                if (legend?.View != null)
+                {
+                    legendInfo = string.Format(Loc.S("Beam.LegendCreated"), legendName);
+                    if (legend.UsedDraftingFallback)
+                        legendInfo += Loc.S("Beam.LegendDraftingFallback");
+                }
+                else if (legend != null && legend.Skipped)
+                    legendInfo = string.Format(Loc.S("Beam.LegendSkippedNamed"), legendName);
+                else
+                    legendInfo = Loc.S("Beam.LegendFailed");
 
                 string resultMessage = string.Format(Loc.S("Beam.Result"),
                     beams.Count, successCount, failureCount, levelGroups.Count, legendInfo);
