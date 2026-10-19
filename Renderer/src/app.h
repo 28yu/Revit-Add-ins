@@ -27,6 +27,7 @@ struct Options {
     bool forceSoftware = false;    // RT コアがあっても予備の方式で描く（動作確認用）
     // 画像だけ作るときの見た目（動作確認用）: 0 = 使わない、それ以外は 0xFFBBGGRR
     uint32_t lookBackground = 0, lookMono = 0;
+    bool hideGround = false, transparent = false;
     bool liveSync = false;         // Revit での変更を受け取る（シーンファイルの更新を見張る）。Revit から --live で指定
     int exportSamples = 0;
     int skySize = 4096;            // 空と雲の画像の横の画素数（動作確認で短くするときは小さくする）
@@ -115,7 +116,8 @@ inline uint32_t prepareScene(Scene& scene, Bvh& bvh) {
 }
 
 // GPU の画像（RGBA8、GENERAL レイアウト）を CPU 側に写す。終わると GENERAL に戻す
-std::vector<uint8_t> readImageRgba(VkContext& ctx, const Image& image);
+// keepAlpha: 不透明度をそのまま残す（背景を透明にした PNG の書き出し）
+std::vector<uint8_t> readImageRgba(VkContext& ctx, const Image& image, bool keepAlpha = false);
 
 int runOffscreen(const Options& opt, Scene& scene);
 int runWindow(const Options& opt, Scene& scene);

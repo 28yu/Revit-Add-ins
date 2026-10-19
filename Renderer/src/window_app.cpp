@@ -491,6 +491,8 @@ int runWindow(const Options& opt, Scene& scene) {
                 else if (sscanf(line, "background=%x", &v) == 1) look.background = v & 0xFFFFFF;
                 else if (sscanf(line, "mono=%u", &v) == 1) look.mono = v != 0;
                 else if (sscanf(line, "monoColor=%x", &v) == 1) look.monoColor = v & 0xFFFFFF;
+                else if (sscanf(line, "ground=%u", &v) == 1) look.ground = v != 0;
+                else if (sscanf(line, "transparentPng=%u", &v) == 1) look.transparentPng = v != 0;
             }
             fclose(f);
         }
@@ -498,13 +500,14 @@ int runWindow(const Options& opt, Scene& scene) {
     auto saveLook = [&]() {
         if (lookPath.empty()) return;
         if (FILE* f = openFile(lookPath, "w")) {
-            fprintf(f, "sky=%d\nbackground=%06X\nmono=%d\nmonoColor=%06X\n", look.sky ? 1 : 0, look.background,
-                    look.mono ? 1 : 0, look.monoColor);
+            fprintf(f, "sky=%d\nbackground=%06X\nground=%d\nmono=%d\nmonoColor=%06X\ntransparentPng=%d\n", look.sky ? 1 : 0,
+                    look.background, look.ground ? 1 : 0, look.mono ? 1 : 0, look.monoColor, look.transparentPng ? 1 : 0);
             fclose(f);
         }
     };
     auto applyLook = [&]() {
-        renderer.setLook(look.sky ? 0u : (0xFF000000u | look.background), look.mono ? (0xFF000000u | look.monoColor) : 0u);
+        renderer.setLook(look.sky ? 0u : (0xFF000000u | look.background), look.mono ? (0xFF000000u | look.monoColor) : 0u,
+                         !look.ground);
     };
     applyLook();
 
@@ -545,6 +548,7 @@ int runWindow(const Options& opt, Scene& scene) {
         ViewParams view;
         uint32_t width = 0, height = 0;
         int samples = 0, done = 0, lastPercent = -1;
+        bool transparent = false;  // 背景を透明にした PNG
     } job;
     VkPhysicalDeviceMemoryProperties memProps;
     vkGetPhysicalDeviceMemoryProperties(ctx.physical, &memProps);
@@ -612,7 +616,11 @@ int runWindow(const Options& opt, Scene& scene) {
             job.samples = ctx.hardwareRt ? 512 : 128;
         }
         if (opt.exportSamples > 0) job.samples = opt.exportSamples;
-        logInfo("Export start: %s %ux%u, %d samples", path.c_str(), job.width, job.height, job.samples);
+        // PNG の書き出しで「背景を透明に」なら、空（と消した地面）の所を透明にして描く
+        job.transparent = kind == ExportKind::Image && look.transparentPng;
+        renderer.setTransparentOutput(job.transparent);
+        logInfo("Export start: %s %ux%u, %d samples%s", path.c_str(), job.width, job.height, job.samples,
+                job.transparent ? ", transparent background" : "");
         renderer.resize(job.width, job.height);
         nv.exporting = true;
         nv.cancelExport = false;
@@ -621,7 +629,7 @@ int runWindow(const Options& opt, Scene& scene) {
     };
     auto finishExport = [&](bool cancelled) {
         if (!cancelled) {
-            std::vector<uint8_t> rgba = readImageRgba(ctx, renderer.output());
+            std::vector<uint8_t> rgba = readImageRgba(ctx, renderer.output(), job.transparent);
             bool ok = job.kind == ExportKind::Image ? writePng(job.path, rgba, job.width, job.height)
                                                     : writePanoramaHtml(job.path, rgba, job.width, job.height, opt.title);
             logInfo("Export %s: %s", ok ? "done" : "FAILED", job.path.c_str());
@@ -634,6 +642,7 @@ int runWindow(const Options& opt, Scene& scene) {
             toast({tr("ExportCancelled")});
         }
         nv.exporting = false;
+        renderer.setTransparentOutput(false);
         nv.cancelExport = false;
         renderer.resize(rs.width, rs.height);
         nv.toolbarChanged = true;
@@ -705,6 +714,8 @@ int runWindow(const Options& opt, Scene& scene) {
             nv.clickedButton = -1;
             if (b == kLookSky) look.sky = !look.sky;
             else if (b == kLookMono) look.mono = !look.mono;
+            else if (b == kLookGround) look.ground = !look.ground;
+            else if (b == kLookTransparent) look.transparentPng = !look.transparentPng;
             else {
                 uint32_t& color = b == kLookBackground ? look.background : look.monoColor;
                 if (chooseColor(nativeWindow, color)) {
@@ -714,8 +725,8 @@ int runWindow(const Options& opt, Scene& scene) {
                 }
                 last = std::chrono::steady_clock::now();  // 色を選ぶ画面で止まっていた時間は数えない
             }
-            logInfo("Look: sky=%d background=%06X mono=%d color=%06X", look.sky ? 1 : 0, look.background, look.mono ? 1 : 0,
-                    look.monoColor);
+            logInfo("Look: sky=%d background=%06X ground=%d mono=%d color=%06X transparentPng=%d", look.sky ? 1 : 0,
+                    look.background, look.ground ? 1 : 0, look.mono ? 1 : 0, look.monoColor, look.transparentPng ? 1 : 0);
             applyLook();
             saveLook();
             updateToolbar();
@@ -765,7 +776,8 @@ int runWindow(const Options& opt, Scene& scene) {
         } else if (glfwGetTime() < toastUntil) {
             // 「保存しました」などはボタンの説明より優先して、しばらく出したままにする
         } else if (nv.hoverButton >= kLookIdBase) {
-            static const char* lookTips[kLookCount] = {"TipLookSky", "TipLookBackground", "TipLookMono", "TipLookMonoColor"};
+            static const char* lookTips[kLookCount] = {"TipLookSky", "TipLookBackground", "TipLookMono", "TipLookMonoColor",
+                                                       "TipLookGround", "TipLookTransparent"};
             setStatus({tr(lookTips[nv.hoverButton - kLookIdBase])}, -1);
         } else if (nv.hoverButton >= 0) {
             setStatus({tr(tipKeys[nv.hoverButton])}, -1);

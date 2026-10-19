@@ -223,12 +223,13 @@ vec3 radiance(vec3 origin, vec3 dir, out Primary primary) {
     for (uint bounce = 0u; bounce <= pc.frame.z; ++bounce) {
         Hit h = traceClosest(origin, dir);
         if (!h.found) {
-            if (directView && plainBackground()) {
-                // 空・雲を出さない: 背景色にする（地面も出さない）。色は仕上げ（composite）で塗る
+            // 地面を消すのは、カメラからまっすぐ見える所だけ（光の計算では地面を使い続ける）
+            float tg = directView && hideGround() ? -1.0 : groundHit(origin, dir);
+            if (tg <= 0.0 && directView && plainBackground()) {
+                // 空・雲を出さない: 背景色にする。色は仕上げ（composite）で塗る
                 primary.background = 1.0;
                 break;
             }
-            float tg = groundHit(origin, dir);
             if (tg > 0.0) {
                 // 地面に当たった（地面は光を跳ね返さない簡単な扱い。明るさは groundRadiance で決まる）
                 vec3 gp = origin + dir * tg;
@@ -388,8 +389,8 @@ void primaryGeometry(vec3 origin, vec3 dir, out vec3 pos, out vec3 normal, out f
     for (int i = 0; i < 8; ++i) {
         Hit h = traceClosest(origin, dir);
         if (!h.found) {
-            // 空・雲を出さないときは、まっすぐ見える地面も出さない（radiance と同じ扱い）
-            float tg = plainBackground() && !viaMirror ? -1.0 : groundHit(origin, dir);
+            // 地面を消すときは、まっすぐ見える地面を出さない（radiance と同じ扱い）
+            float tg = hideGround() && !viaMirror ? -1.0 : groundHit(origin, dir);
             if (tg > 0.0) {
                 dist = travelled + tg;
                 pos = viaMirror ? camOrigin + camDir * dist : origin + dir * tg;

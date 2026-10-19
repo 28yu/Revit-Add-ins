@@ -11,7 +11,7 @@
 
 namespace t28 {
 
-std::vector<uint8_t> readImageRgba(VkContext& ctx, const Image& image) {
+std::vector<uint8_t> readImageRgba(VkContext& ctx, const Image& image, bool keepAlpha) {
     const uint32_t w = image.width, h = image.height;
     Buffer readback = ctx.createBuffer(static_cast<VkDeviceSize>(w) * h * 4, VK_BUFFER_USAGE_TRANSFER_DST_BIT,
                                        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
@@ -30,8 +30,9 @@ std::vector<uint8_t> readImageRgba(VkContext& ctx, const Image& image) {
     std::vector<uint8_t> rgba(static_cast<const uint8_t*>(readback.mapped),
                               static_cast<const uint8_t*>(readback.mapped) + static_cast<size_t>(w) * h * 4);
     ctx.destroyBuffer(readback);
-    // 透明にならないよう、不透明度はすべて 255 にする
-    for (size_t i = 3; i < rgba.size(); i += 4) rgba[i] = 255;
+    // 透明の書き出し以外は、透明にならないよう不透明度をすべて 255 にする
+    if (!keepAlpha)
+        for (size_t i = 3; i < rgba.size(); i += 4) rgba[i] = 255;
     return rgba;
 }
 
@@ -43,7 +44,8 @@ int runOffscreen(const Options& opt, Scene& scene) {
     Renderer renderer;
     renderer.skyWidth_ = static_cast<uint32_t>(opt.skySize);
     renderer.init(ctx, scene, glassStart, bvh);
-    renderer.setLook(opt.lookBackground, opt.lookMono);
+    renderer.setLook(opt.lookBackground, opt.lookMono, opt.hideGround);
+    renderer.setTransparentOutput(opt.transparent);
     uint32_t w = static_cast<uint32_t>(opt.width), h = static_cast<uint32_t>(opt.height);
     renderer.resize(w, h);
 
@@ -116,7 +118,7 @@ int runOffscreen(const Options& opt, Scene& scene) {
         logInfo("Final camera: eye %.4f %.4f %.4f yaw %.5f pitch %.5f", cam.eye.x, cam.eye.y, cam.eye.z, cam.yaw, cam.pitch);
 
     // GPU の画像を CPU 側に写して PNG に保存する
-    std::vector<uint8_t> rgba = readImageRgba(ctx, renderer.output());
+    std::vector<uint8_t> rgba = readImageRgba(ctx, renderer.output(), opt.transparent);
     int ok = stbi_write_png(opt.outputPath.c_str(), static_cast<int>(w), static_cast<int>(h), 4, rgba.data(),
                             static_cast<int>(w) * 4);
     vkDestroyFence(ctx.device, fence, nullptr);

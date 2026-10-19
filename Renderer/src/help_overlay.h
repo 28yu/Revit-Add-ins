@@ -31,14 +31,19 @@ enum ToolbarButton { kButtonImage = 0, kButtonPanorama = 1, kButtonViewer = 2, k
 // hover: カーソルが乗っているボタン（-1 = 無し）。sync: 同期のボタン（-1 = 出さない、0 = 止めている、1 = 同期中）
 ToolbarImage buildToolbarImage(float scale, int hover, int sync);
 
-// ツールバーの下の「表示」の設定（空・雲の表示と背景色、単色表示とその色）。
-// ボタンは上から「空・雲」の切り替え、背景色、「単色」の切り替え、単色の色
-enum LookButton { kLookSky = 0, kLookBackground = 1, kLookMono = 2, kLookMonoColor = 3, kLookCount = 4 };
+// ツールバーの下の「表示」の設定。上から
+//   空・雲を表示（＋背景色）／地面・地平線を表示／単色で表示（＋色）／PNG の背景を透明に
+enum LookButton {
+    kLookSky = 0, kLookBackground = 1, kLookMono = 2, kLookMonoColor = 3, kLookGround = 4, kLookTransparent = 5,
+    kLookCount = 6
+};
 struct LookState {
     bool sky = true;                  // 空・雲を出す（出さないときは背景色）
     uint32_t background = 0xFFFFFF;   // 背景色（0xBBGGRR）
+    bool ground = true;               // 地面（と地平線）を出す
     bool mono = false;                // 物を全部 1 色にする
     uint32_t monoColor = 0xF0F0F0;    // 単色の色（0xBBGGRR）
+    bool transparentPng = false;      // 画像（PNG）の書き出しで、背景を透明にする
 };
 // hover: カーソルが乗っているボタン（-1 = 無し）
 ToolbarImage buildLookPanelImage(float scale, int hover, const LookState& look);

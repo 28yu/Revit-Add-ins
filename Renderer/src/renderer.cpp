@@ -66,6 +66,7 @@ struct AtrousPush {
 struct CompositePush {
     float exposure;
     uint32_t background;
+    uint32_t transparent;
 };
 
 struct SkyPush {
@@ -751,11 +752,19 @@ void Renderer::recordOverlay(VkCommandBuffer cmd, uint32_t slot, int x, int y, f
     dispatch(cmd, overlayPass_, slot, &pc, sizeof(pc), overlay_[slot].width, overlay_[slot].height);
 }
 
-void Renderer::setLook(uint32_t background, uint32_t mono) {
-    if (background == lookBackground_ && mono == lookMono_) return;
+void Renderer::setLook(uint32_t background, uint32_t mono, bool hideGround) {
+    uint32_t flags = hideGround ? 1u : 0u;
+    if (background == lookBackground_ && mono == lookMono_ && flags == lookFlags_) return;
     lookBackground_ = background;
     lookMono_ = mono;
+    lookFlags_ = flags;
     resetHistory_ = true;  // 見た目が変わったので、前のフレームを重ねない
+}
+
+void Renderer::setTransparentOutput(bool transparent) {
+    if (transparent == transparentOutput_) return;
+    transparentOutput_ = transparent;
+    resetHistory_ = true;
 }
 
 void Renderer::resize(uint32_t width, uint32_t height) {
@@ -819,8 +828,10 @@ void Renderer::record(VkCommandBuffer cmd, const ViewParams& view) {
     pt.frame[1] = staticFrames_;
     pt.frame[2] = view.maxBounces;
     pt.frame[3] = view.samplesPerFrame;
-    pt.look[0] = lookBackground_;
+    // 透明にするときは、空が見える所を「背景」として印を付ける（色は使わない）
+    pt.look[0] = transparentOutput_ ? (lookBackground_ | 0xFF000000u) : lookBackground_;
     pt.look[1] = lookMono_;
+    pt.look[2] = lookFlags_;
     dispatch(cmd, pathTrace_, cur, &pt, sizeof(pt), w, h);
     computeBarrier(cmd);
 
@@ -846,7 +857,7 @@ void Renderer::record(VkCommandBuffer cmd, const ViewParams& view) {
     }
 
     // 4. 仕上げ
-    CompositePush cp{view.exposure, lookBackground_};
+    CompositePush cp{view.exposure, lookBackground_, transparentOutput_ ? 1u : 0u};
     dispatch(cmd, composite_, cur, &cp, sizeof(cp), w, h);
 
     // 自動露出の集計を CPU から読めるようにする

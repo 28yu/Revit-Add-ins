@@ -37,8 +37,10 @@ public:
     // 描画する大きさを変える（履歴も捨てる）
     void resize(uint32_t width, uint32_t height);
     // 見た目の切り替え。色は RGBA8（r が下位 8 ビット）で、a が 0 なら使わない。
-    // background: 空・雲の代わりに出す背景色 / mono: 物を全部この色にする
-    void setLook(uint32_t background, uint32_t mono);
+    // background: 空・雲の代わりに出す背景色 / mono: 物を全部この色にする / hideGround: 地面（と地平線）を見せない
+    void setLook(uint32_t background, uint32_t mono, bool hideGround);
+    // 背景（空・雲、地面を消したときはその分も）を透明にして描く（PNG の書き出し用）
+    void setTransparentOutput(bool transparent);
     // 履歴を捨てて最初からやり直す
     void resetAccumulation() { resetHistory_ = true; }
     // カメラが止まってから描いたフレーム数
@@ -107,7 +109,8 @@ private:
     Image noisy_, gpos_[2], gnormal_[2], galbedo_, history_[2], moments_[2], filtered_[2], albedoHist_[2], output_;
     bool imagesFresh_ = false;  // 作り直した直後（レイアウトの切り替えが必要）
     bool resetHistory_ = true;
-    uint32_t lookBackground_ = 0, lookMono_ = 0;
+    uint32_t lookBackground_ = 0, lookMono_ = 0, lookFlags_ = 0;
+    bool transparentOutput_ = false;
     bool hasLastView_ = false;
     ViewParams lastView_;
     uint32_t staticFrames_ = 0;

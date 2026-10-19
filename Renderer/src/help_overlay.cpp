@@ -566,14 +566,32 @@ ToolbarImage buildToolbarImage(float s, int hover, int sync) {
 
 ToolbarImage buildLookPanelImage(float s, int hover, const LookState& look) {
     const float pad = 8 * s, rowH = 26 * s, labelPx = 12 * s, box = 14 * s, swatchW = 34 * s, gap = 10 * s;
-    const char* rowLabels[2] = {tr("LookSky"), tr("LookMono")};
-    const char* colorLabels[2] = {tr("LookBackground"), tr("LookMonoColor")};
-    float labelW = std::max(textWidth(rowLabels[0], labelPx), textWidth(rowLabels[1], labelPx));
-    float colorLabelW = std::max(textWidth(colorLabels[0], labelPx), textWidth(colorLabels[1], labelPx));
+    // 1 行 = チェックボックス（＋使うときは色の見本）。色の見本は、その色が使われるときだけはっきり出す
+    struct Row {
+        const char* label;
+        bool checked;
+        int checkId;
+        int colorId;          // 色の見本が無い行は -1
+        const char* colorLabel;
+        uint32_t color;
+        bool colorActive;
+    };
+    const Row rows[] = {
+        {tr("LookSky"), look.sky, kLookSky, kLookBackground, tr("LookBackground"), look.background, !look.sky},
+        {tr("LookGround"), look.ground, kLookGround, -1, nullptr, 0, false},
+        {tr("LookMono"), look.mono, kLookMono, kLookMonoColor, tr("LookMonoColor"), look.monoColor, look.mono},
+        {tr("LookTransparent"), look.transparentPng, kLookTransparent, -1, nullptr, 0, false},
+    };
+    const int rowCount = 4;
+    float labelW = 0, colorLabelW = 0;
+    for (const Row& r : rows) {
+        labelW = std::max(labelW, textWidth(r.label, labelPx));
+        if (r.colorLabel) colorLabelW = std::max(colorLabelW, textWidth(r.colorLabel, labelPx));
+    }
     float checkW = box + 6 * s + labelW + 8 * s;
     float colorW = swatchW + 6 * s + colorLabelW + 8 * s;
     int width = static_cast<int>(std::ceil(pad * 2 + checkW + gap + colorW));
-    int height = static_cast<int>(std::ceil(pad * 2 + rowH * 2));
+    int height = static_cast<int>(std::ceil(pad * 2 + rowH * rowCount));
     Canvas c(width, height);
     auto panel = [&](float x, float y) { return sdRoundBox(x, y, width / 2.0f, height / 2.0f, width / 2.0f, height / 2.0f, 8 * s); };
     c.fill(panel, 0, 0, static_cast<float>(width), static_cast<float>(height), kPanel);
@@ -583,21 +601,18 @@ ToolbarImage buildLookPanelImage(float s, int hover, const LookState& look) {
     auto toColor = [](uint32_t bgr) {
         return Color{(bgr & 255) / 255.0f, ((bgr >> 8) & 255) / 255.0f, ((bgr >> 16) & 255) / 255.0f, 1.0f};
     };
-    for (int row = 0; row < 2; ++row) {
-        bool checked = row == 0 ? look.sky : look.mono;
-        // 背景色は「空・雲」を消したときだけ、単色の色は「単色」のときだけ使う（使わないときは薄く出す）
-        bool colorActive = row == 0 ? !look.sky : look.mono;
-        int checkId = row == 0 ? kLookSky : kLookMono, colorId = row == 0 ? kLookBackground : kLookMonoColor;
+    for (int row = 0; row < rowCount; ++row) {
+        const Row& r = rows[row];
         float y0 = pad + rowH * row, cy = y0 + rowH / 2;
 
         // チェックボックスと言葉（言葉の上を押しても切り替わる）
         float x0 = pad;
-        if (hover == checkId)
+        if (hover == r.checkId)
             c.fill([&](float px, float py) { return sdRoundBox(px, py, x0 + checkW / 2, cy, checkW / 2, rowH / 2 - 1 * s, 5 * s); },
                    x0, y0, x0 + checkW, y0 + rowH, Color{1, 1, 1, 0.16f});
         float bx = x0 + 4 * s + box / 2;
         auto boxSd = [&](float px, float py) { return sdRoundBox(px, py, bx, cy, box / 2, box / 2, 3 * s); };
-        if (checked) {
+        if (r.checked) {
             c.fill(boxSd, bx - box, cy - box, bx + box, cy + box, kAccent);
             c.stroke([&](float px, float py) {
                 return std::min(sdSegment(px, py, bx - box * 0.28f, cy, bx - box * 0.06f, cy + box * 0.24f),
@@ -607,23 +622,24 @@ ToolbarImage buildLookPanelImage(float s, int hover, const LookState& look) {
             c.stroke(boxSd, 1.5f * s, bx - box, cy - box, bx + box, cy + box, kWhite);
         }
         float tx = bx + box / 2 + 6 * s;
-        c.textCentered(rowLabels[row], tx + textWidth(rowLabels[row], labelPx) / 2, cy, labelPx, kWhite);
-        tb.buttons[checkId] = {static_cast<int>(x0), static_cast<int>(y0), static_cast<int>(checkW), static_cast<int>(rowH)};
+        c.textCentered(r.label, tx + textWidth(r.label, labelPx) / 2, cy, labelPx, kWhite);
+        tb.buttons[r.checkId] = {static_cast<int>(x0), static_cast<int>(y0), static_cast<int>(checkW), static_cast<int>(rowH)};
+        if (r.colorId < 0) continue;
 
         // 色の見本（押すと色を選ぶ画面）
         float cx0 = pad + checkW + gap;
-        if (hover == colorId)
+        if (hover == r.colorId)
             c.fill([&](float px, float py) { return sdRoundBox(px, py, cx0 + colorW / 2, cy, colorW / 2, rowH / 2 - 1 * s, 5 * s); },
                    cx0, y0, cx0 + colorW, y0 + rowH, Color{1, 1, 1, 0.16f});
         float sx = cx0 + 4 * s + swatchW / 2;
-        Color sw = toColor(row == 0 ? look.background : look.monoColor);
-        if (!colorActive) sw.a = 0.35f;
+        Color sw = toColor(r.color);
+        if (!r.colorActive) sw.a = 0.35f;
         auto swSd = [&](float px, float py) { return sdRoundBox(px, py, sx, cy, swatchW / 2, box / 2, 3 * s); };
         c.fill(swSd, sx - swatchW, cy - box, sx + swatchW, cy + box, sw);
-        c.stroke(swSd, 1.0f * s, sx - swatchW, cy - box, sx + swatchW, cy + box, Color{1, 1, 1, colorActive ? 0.8f : 0.35f});
+        c.stroke(swSd, 1.0f * s, sx - swatchW, cy - box, sx + swatchW, cy + box, Color{1, 1, 1, r.colorActive ? 0.8f : 0.35f});
         float lx = sx + swatchW / 2 + 6 * s;
-        c.textCentered(colorLabels[row], lx + textWidth(colorLabels[row], labelPx) / 2, cy, labelPx, colorActive ? kWhite : kDim);
-        tb.buttons[colorId] = {static_cast<int>(cx0), static_cast<int>(y0), static_cast<int>(colorW), static_cast<int>(rowH)};
+        c.textCentered(r.colorLabel, lx + textWidth(r.colorLabel, labelPx) / 2, cy, labelPx, r.colorActive ? kWhite : kDim);
+        tb.buttons[r.colorId] = {static_cast<int>(cx0), static_cast<int>(y0), static_cast<int>(colorW), static_cast<int>(rowH)};
     }
     tb.image = finish(c);
     return tb;

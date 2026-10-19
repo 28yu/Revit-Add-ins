@@ -14,6 +14,13 @@ struct Entry {
 };
 
 static const Entry kStrings[] = {
+    {"LookGround", "地面・地平線を表示", "Show ground", "显示地面"},
+    {"LookTransparent", "PNG の背景を透明に", "Transparent PNG", "PNG 背景透明"},
+    {"TipLookGround", "地面と地平線を出す / 出さない（影の計算などには使い続けます）",
+     "Show or hide the ground and horizon (still used for lighting)", "显示 / 隐藏地面和地平线（仍用于光照计算）"},
+    {"TipLookTransparent", "画像（PNG）を書き出すとき、空（と消した地面）の所を透明にします",
+     "When exporting an image (PNG), make the sky (and hidden ground) transparent",
+     "导出图像（PNG）时，将天空（及隐藏的地面）部分设为透明"},
     {"LookSky", "空・雲を表示", "Show sky", "显示天空"},
     {"LookBackground", "背景色", "Background", "背景色"},
     {"LookMono", "単色で表示", "Single color", "单色显示"},
