@@ -855,9 +855,16 @@ int runWindow(const Options& opt, Scene& scene) {
         int barX = static_cast<int>(sc.extent.width) - static_cast<int>(toolbar.image.width) - margin, barY = margin;
         nv.buttons.clear();
         nv.buttonIds.clear();
-        // 「表示」の設定はツールバーのすぐ下、右に寄せる
-        int lookX = static_cast<int>(sc.extent.width) - static_cast<int>(lookPanel.image.width) - margin;
-        int lookY = barY + static_cast<int>(toolbar.image.height) + margin / 2;
+        // 「表示」の設定はツールバー（画像の書き出し）の左に横に並べ、上をそろえる。
+        // ウィンドウが狭くて左の案内と重なりそうなときだけ、ツールバーの下に回す
+        int lookX = barX - static_cast<int>(lookPanel.image.width) - margin / 2;
+        int lookY = barY;
+        if (lookX < margin) {
+            lookX = static_cast<int>(sc.extent.width) - static_cast<int>(lookPanel.image.width) - margin;
+            lookY = barY + static_cast<int>(toolbar.image.height) + margin / 2;
+        }
+        // 上の中央のお知らせは、ツールバーと「表示」の設定のうち下に長いほうの下に出す
+        const int panelsBottom = std::max(barY + static_cast<int>(toolbar.image.height), lookY + static_cast<int>(lookPanel.image.height));
         if (!nv.exporting) {
             renderer.recordOverlay(cmd, kHelpSlot, helpX, helpY, nv.showHelp ? 0.95f : 0.8f);
             renderer.recordOverlay(cmd, kToolbarSlot, barX, barY, 0.95f);
@@ -875,7 +882,7 @@ int runWindow(const Options& opt, Scene& scene) {
         }
         if (status.width > 0) {
             int statusX = (static_cast<int>(sc.extent.width) - static_cast<int>(status.width)) / 2;
-            int statusY = nv.exporting ? margin : lookY + static_cast<int>(lookPanel.image.height) + margin / 2;
+            int statusY = nv.exporting ? margin : panelsBottom + margin / 2;
             renderer.recordOverlay(cmd, kStatusSlot, statusX, statusY, 1.0f);
         }
         nv.toggleX = helpX + help.toggleX;
