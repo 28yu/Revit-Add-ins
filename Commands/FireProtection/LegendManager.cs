@@ -28,7 +28,12 @@ namespace Tools28.Commands.FireProtection
                 if (existingView != null)
                 {
                     if (overwriteExisting)
+                    {
                         ClearViewContents(doc, existingView);
+                        // 念のため: 消している途中でビューが無くなった場合は新しく作る
+                        if (!existingView.IsValidObject)
+                            existingView = null;
+                    }
                     else
                         return null;
                 }
@@ -190,8 +195,9 @@ namespace Tools28.Commands.FireProtection
 
                 return draftingView.Id;
             }
-            catch
+            catch (Exception ex)
             {
+                DiagLog.WriteTo(FilledRegionCreator.FireLogFile, $"凡例作成エラー: {ex}");
                 return null;
             }
         }
@@ -326,20 +332,32 @@ namespace Tools28.Commands.FireProtection
         }
 
         /// <summary>
-        /// 凡例ビューの中身（文字・塗潰し領域など）だけを削除する。
-        /// ビュー自体を削除して作り直すと、シートに配置した凡例が消えてしまうため
+        /// 凡例ビューの中身（文字・塗潰し領域・線など描いたもの）だけを削除する。
+        /// ビュー自体を削除して作り直すと、シートに配置した凡例が消えてしまうため。
+        /// ⚠ ビューに属する要素をすべて消すと、ビューと一体の内部要素まで消えて
+        ///   ビュー自体が削除される（梁レベル色分けで実機確認）ため、描画要素の種類に絞って消す
         /// </summary>
         private static void ClearViewContents(Document doc, View view)
         {
-            var ids = new FilteredElementCollector(doc, view.Id)
+            var ids = new FilteredElementCollector(doc)
+                .WherePasses(new ElementOwnerViewFilter(view.Id))
                 .WhereElementIsNotElementType()
-                .Where(e => e.Id != view.Id && e.OwnerViewId == view.Id)
+                .Where(IsDrawnElement)
                 .Select(e => e.Id)
                 .ToList();
             foreach (var id in ids)
             {
                 try { doc.Delete(id); } catch { }
             }
+        }
+
+        private static bool IsDrawnElement(Element e)
+        {
+            if (e is TextNote || e is FilledRegion || e is CurveElement ||
+                e is Dimension || e is IndependentTag || e is FamilyInstance)
+                return true;
+            Category cat = e.Category;
+            return cat != null && cat.Id.Equals(new ElementId(BuiltInCategory.OST_LegendComponents));
         }
 
         private static ElementId GetDraftingViewFamilyTypeId(Document doc)
