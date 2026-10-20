@@ -10,7 +10,8 @@ namespace Tools28.Commands.RealtimeRender
     internal static class SceneWriter
     {
         // 4: 太陽の後ろに 緯度・真北・日付を追加（描画プログラムで時間帯を変えるため）
-        private const uint Version = 4;
+        // 5: その後ろに 3D ビューのレンダリング設定（照明・背景・地面の色・雲の量）を追加
+        private const uint Version = 5;
 
         public static void Write(string path, RenderScene scene)
         {
@@ -35,6 +36,11 @@ namespace Tools28.Commands.RealtimeRender
                 w.Write(scene.Latitude);
                 w.Write(scene.TrueNorth);
                 w.Write(scene.DayOfYear);
+                w.Write((uint)((scene.SunOn ? 1 : 0) | (scene.ArtificialOn ? 2 : 0)));
+                w.Write(scene.BackgroundMode);
+                w.Write(scene.BackgroundColor);
+                w.Write(scene.GroundColor);
+                w.Write(scene.CloudAmount);
 
                 w.Write((uint)scene.Materials.Count);
                 foreach (RenderMaterial m in scene.Materials)

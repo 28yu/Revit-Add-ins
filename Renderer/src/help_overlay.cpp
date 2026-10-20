@@ -585,10 +585,12 @@ ToolbarImage buildLookPanelImage(float s, int hover, const LookState& look, int 
     const Row rows[] = {
         {tr("LookSky"), look.sky, kLookSky, kLookBackground, look.background, !look.sky},
         {tr("LookGround"), look.ground, kLookGround, kLookGroundColor, look.groundColor, look.ground},
+        {tr("LookSun"), look.sun, kLookSun, -1, 0, false},
+        {tr("LookLights"), look.lights, kLookLights, -1, 0, false},
         {tr("LookMono"), look.mono, kLookMono, kLookMonoColor, look.monoColor, look.mono},
         {tr("LookTransparent"), look.transparentPng, kLookTransparent, -1, 0, false},
     };
-    const int rowCount = 4;
+    const int rowCount = 6;
     // 時間帯: 1 行目に「時間帯」と今の時刻（Revit の設定のままなら、その旨）、2 行目につまみ
     std::string timeText;
     if (look.timeHour < 0) {

@@ -26,6 +26,13 @@ namespace Tools28.Commands.RealtimeRender
         public float Latitude { get; set; } = 35.7f;
         public float TrueNorth { get; set; } = 0f;
         public float DayOfYear { get; set; } = 80f;
+        // 3D ビューの「レンダリング設定」（描画ウィンドウの最初の見た目。ウィンドウで変えればそちらが優先）
+        public bool SunOn { get; set; } = true;          // 照明のスキームで太陽を使う
+        public bool ArtificialOn { get; set; } = true;   // 照明のスキームで人工照明を使う
+        public uint BackgroundMode { get; set; }         // 0 = 空, 1 = 色（グラデーションも）, 2 = 透明
+        public uint BackgroundColor { get; set; } = 0xFFFFFF;  // 0xBBGGRR
+        public uint GroundColor { get; set; }            // 0xFFBBGGRR（グラデーションの地面の色。0 なら指定なし）
+        public float CloudAmount { get; set; } = 0.5f;   // 0 = 雲なし 〜 1 = 曇り
 
         public int TriangleCount => Triangles.Count / 4;
 

@@ -13,7 +13,7 @@ layout(set = 0, binding = 0, rgba16f) uniform writeonly image2D uSky;
 
 layout(push_constant) uniform Params {
     vec4 sunDir;     // xyz = 太陽のある方向, w = 太陽の明るさ
-    vec4 params;     // x = 空の明るさ, y = 計算を始める行, z = 行の数
+    vec4 params;     // x = 空の明るさ, y = 計算を始める行, z = 行の数, w = 雲の量（0 = なし 〜 1 = 曇り。0.5 が標準）
 } pc;
 
 const float PI = 3.14159265359;
@@ -118,8 +118,12 @@ vec3 atmosphere(vec3 dir) {
 // --- 雲の形 ----------------------------------------------------------------------
 // 雲がどこにどのくらい出ているか（上から見た分布。0 = 晴れ、1 = 曇り）
 float coverage(vec2 xy) {
+    float amount = pc.params.w;
+    if (amount <= 0.0) return 0.0;  // 雲なし（Revit の「空: 雲なし」）
     float c = fbm2(xy / 4200.0 + vec2(2.3, 7.1), 4);
-    return clamp(remap(c, 0.47, 0.75, 0.0, 1.0), 0.0, 1.0);
+    // 雲の量が多いほど、雲になる所の下限を下げる（0.5 でこれまでと同じ 0.47）
+    float lo = 0.47 + (0.5 - amount) * 0.5;
+    return clamp(remap(c, lo, lo + 0.28, 0.0, 1.0), 0.0, 1.0);
 }
 
 // 積雲の濃さ。p は地面からの高さ（z）を含む位置（m）
@@ -177,7 +181,8 @@ vec3 skyColor(vec3 dir, vec2 pixel) {
         float region = smoothstep(0.55, 0.75, fbm2(xy / 18000.0 + vec2(9.0, 1.0), 4));
         float grain = 1.0 - smoothstep(0.15, 0.55, cells(xy / 520.0 + fbm2(xy / 3000.0, 2) * 1.2));
         float alto = region * grain * smoothstep(0.35, 0.7, fbm2(xy / 1500.0, 3));
-        float a = clamp(cirrus * 0.55 + alto * 0.7, 0.0, 0.85);
+        // 雲の量が少ないときは高い雲も減らす（雲なしでは出さない）
+        float a = clamp(cirrus * 0.55 + alto * 0.7, 0.0, 0.85) * smoothstep(0.0, 0.3, pc.params.w);
         // 遠い（地平線に近い）ほど霞む
         a *= exp(-t / 120000.0) * smoothstep(0.0, 0.05, dir.z);
         vec3 lit = (sunCol * 0.11 * (0.6 + 0.6 * hg(dot(dir, sun), 0.5) * 4.0) + ambientTop * 0.9) * (0.25 + 0.75 * sunHeight);

@@ -33,10 +33,11 @@ enum ToolbarButton { kButtonImage = 0, kButtonPanorama = 1, kButtonViewer = 2, k
 ToolbarImage buildToolbarImage(float scale, int hover, int sync, int width = 0);
 
 // ツールバーの下の「表示」の設定。上から
-//   空・雲を表示（＋背景色）／地面・地平線を表示（＋地面の色）／単色で表示（＋色）／PNG の背景を透明に／時間帯（つまみ）
+//   空・雲を表示（＋背景色）／地面・地平線を表示（＋地面の色）／太陽の光／照明器具／単色で表示（＋色）／
+//   PNG の背景を透明に／時間帯（つまみ）
 enum LookButton {
     kLookSky = 0, kLookBackground = 1, kLookMono = 2, kLookMonoColor = 3, kLookGround = 4, kLookTransparent = 5,
-    kLookGroundColor = 6, kLookTimeReset = 7, kLookTime = 8, kLookCount = 9
+    kLookGroundColor = 6, kLookTimeReset = 7, kLookTime = 8, kLookSun = 9, kLookLights = 10, kLookCount = 11
 };
 // 時間帯のつまみの範囲（時）
 const float kTimeFirstHour = 5.0f, kTimeLastHour = 19.0f;
@@ -50,6 +51,8 @@ struct LookState {
     uint32_t groundColor = 0xA2A8B0;  // 地面の色（0xBBGGRR。既定はこれまでの地面の色）
     float timeHour = -1.0f;           // 時間帯（時。負なら Revit の「太陽の設定」のまま）
     float revitHour = 12.0f;          // Revit の太陽が何時ごろか（つまみの位置に使う）
+    bool sun = true;                  // 太陽の光（直射と空の明るさ）
+    bool lights = true;               // 照明器具の光
 };
 // hover: カーソルが乗っているボタン（-1 = 無し）
 // width: この幅より狭ければ広げる（0 = 中身に合わせる）

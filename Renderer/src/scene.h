@@ -64,6 +64,21 @@ struct Camera {
     float fovY = 50.0f;  // 縦の画角（度）
 };
 
+// 3D ビューの「レンダリング設定」（描画ウィンドウを開いたときの最初の見た目にする。ウィンドウで変えればそちらが優先）
+struct RevitLook {
+    bool sun = true;              // 照明のスキームで太陽を使う
+    bool artificial = true;       // 照明のスキームで人工照明（照明器具）を使う
+    int background = 0;           // 0 = 空, 1 = 色（グラデーションも）, 2 = 透明
+    uint32_t backgroundColor = 0xFFFFFF;  // 0xBBGGRR
+    uint32_t groundColor = 0;     // 0xFFBBGGRR（グラデーションの地面の色。a が 0 なら指定なし）
+    float cloudAmount = 0.5f;     // 雲の量（0 = 雲なし 〜 1 = 曇り。0.5 がこれまでの見た目）
+    bool operator==(const RevitLook& o) const {
+        return sun == o.sun && artificial == o.artificial && background == o.background &&
+               backgroundColor == o.backgroundColor && groundColor == o.groundColor && cloudAmount == o.cloudAmount;
+    }
+    bool operator!=(const RevitLook& o) const { return !(*this == o); }
+};
+
 struct Scene {
     std::vector<Vertex> vertices;
     std::vector<uint32_t> indices;       // 3つで1つの三角形
@@ -79,6 +94,7 @@ struct Scene {
     float latitude = 35.7f;    // 緯度（度。北が正）
     float trueNorth = 0.0f;    // 真北の向き（ラジアン。Revit のプロジェクトの位置の角度）
     float dayOfYear = 80.0f;   // 1 月 1 日 = 1（既定は春分のころ）
+    RevitLook revitLook;
 
     // 不透明な三角形を前、ガラスの三角形を後ろに並べ替える。
     // 戻り値: ガラスの最初の三角形番号（＝不透明な三角形の数）

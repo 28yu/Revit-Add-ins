@@ -47,6 +47,11 @@ namespace Tools28.Commands.RealtimeRender
                 DiagLog.Cmd("RealtimeRender", $"開始 view={view.Name}");
                 var watch = Stopwatch.StartNew();
 
+                // フェーズの「上書き」表示のマテリアル。まだ選んでいないモデルでは選ぶ画面を出す（Shift を押しながらなら選び直す）
+                bool shift = (System.Windows.Input.Keyboard.Modifiers & System.Windows.Input.ModifierKeys.Shift) != 0;
+                PhaseMaterials.Resolve(doc, view, commandData, true, shift, out bool phaseCancelled);
+                if (phaseCancelled) return Result.Cancelled;
+
                 var exportedIds = new HashSet<ElementId>();
                 RenderScene scene = ExportScene(doc, view, exportedIds);
                 if (scene.TriangleCount == 0)
@@ -87,7 +92,9 @@ namespace Tools28.Commands.RealtimeRender
         internal static RenderScene ExportScene(Document doc, View3D view, HashSet<ElementId> elementIds = null)
         {
             var watch = Stopwatch.StartNew();
-            var context = new SceneExportContext(doc);
+            // フェーズの「上書き」表示のマテリアル（選んだ内容を使う。ライブ同期では画面を出さない）
+            PhaseOverrides phase = PhaseMaterials.Resolve(doc, view, null, false, false, out _);
+            var context = new SceneExportContext(doc, phase);
             var exporter = new CustomExporter(doc, context) { IncludeGeometricObjects = false };
             exporter.Export(view);
 
@@ -105,6 +112,7 @@ namespace Tools28.Commands.RealtimeRender
             {
                 scene.Camera = BuildCamera(view, scene);
                 ApplySun(doc, view, scene);
+                ApplyRenderingSettings(view, scene);
             }
             return scene;
         }
@@ -171,6 +179,64 @@ namespace Tools28.Commands.RealtimeRender
             }
             return 50f;
         }
+
+        /// <summary>
+        /// 3D ビューのプロパティの「レンダリング設定」（照明のスキーム・背景）を、描画ウィンドウの最初の見た目にする。
+        /// 露出（露出値・彩度など）は描画プログラムの自動露出と考え方が違うので使わない。
+        /// </summary>
+        private static void ApplyRenderingSettings(View3D view, RenderScene scene)
+        {
+            try
+            {
+                RenderingSettings rs = view.GetRenderingSettings();
+                switch (rs.LightingSource)
+                {
+                    case LightingSource.ExteriorSun:
+                    case LightingSource.InteriorSun:
+                        scene.SunOn = true; scene.ArtificialOn = false; break;
+                    case LightingSource.ExteriorArtificial:
+                    case LightingSource.InteriorArtificial:
+                        scene.SunOn = false; scene.ArtificialOn = true; break;
+                    default:
+                        scene.SunOn = true; scene.ArtificialOn = true; break;
+                }
+
+                BackgroundStyle style = rs.BackgroundStyle;
+                switch (style)
+                {
+                    case BackgroundStyle.SkyNoClouds: scene.CloudAmount = 0f; break;
+                    case BackgroundStyle.SkyVeryFewClouds: scene.CloudAmount = 0.25f; break;
+                    case BackgroundStyle.SkyFewClouds: scene.CloudAmount = 0.5f; break;
+                    case BackgroundStyle.SkyCloudy: scene.CloudAmount = 0.75f; break;
+                    case BackgroundStyle.SkyVeryCloudy: scene.CloudAmount = 1f; break;
+                    case BackgroundStyle.Transparent: scene.BackgroundMode = 2; break;
+                    case BackgroundStyle.Color:
+                        BackgroundSettings bg = rs.GetBackgroundSettings();
+                        scene.BackgroundMode = 1;
+                        if (bg is ColorBackgroundSettings color && color.Color.IsValid)
+                            scene.BackgroundColor = ToBgr(color.Color);
+                        else if (bg is GradientBackgroundSettings gradient)
+                        {
+                            // グラデーション: 空の色を背景色に、地面の色を地面の色にする（描画プログラムの背景は 1 色）
+                            if (gradient.SkyColor.IsValid) scene.BackgroundColor = ToBgr(gradient.SkyColor);
+                            if (gradient.GroundColor.IsValid) scene.GroundColor = 0xFF000000u | ToBgr(gradient.GroundColor);
+                        }
+                        break;
+                    default:
+                        // 画像の背景は描画プログラムでは使えないので、空にする
+                        break;
+                }
+                DiagLog.Cmd("RealtimeRender",
+                    $"レンダリング設定: 照明={rs.LightingSource} 背景={style} → 太陽={scene.SunOn} 照明器具={scene.ArtificialOn} " +
+                    $"背景={scene.BackgroundMode} 色={scene.BackgroundColor:X6} 地面={scene.GroundColor:X8} 雲={scene.CloudAmount}");
+            }
+            catch (Exception ex)
+            {
+                DiagLog.Cmd("RealtimeRender", $"レンダリング設定を読めませんでした: {ex.Message}");
+            }
+        }
+
+        private static uint ToBgr(Color c) => (uint)(c.Red | (c.Green << 8) | (c.Blue << 16));
 
         /// <summary>
         /// ビューの「太陽の設定」から太陽の方向を求める。

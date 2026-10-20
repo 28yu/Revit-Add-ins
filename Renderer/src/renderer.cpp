@@ -333,7 +333,7 @@ void Renderer::computeSky() {
             transitionImage(cmd, skyImage_.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL,
                             VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_WRITE_BIT);
         uint32_t rows = std::min(rowsPerChunk, h - row);
-        SkyPush sp{{sunDir_.x, sunDir_.y, sunDir_.z, sunIntensity_}, {skyIntensity_, static_cast<float>(row), static_cast<float>(rows), 0}};
+        SkyPush sp{{sunDir_.x, sunDir_.y, sunDir_.z, effectiveSun()}, {effectiveSky(), static_cast<float>(row), static_cast<float>(rows), cloudAmount_}};
         dispatch(cmd, skyPass_, 0, &sp, sizeof(sp), w, rows);
         ctx_->endOneShot(cmd);
     }
@@ -769,6 +769,23 @@ void Renderer::setSunDirection(Vec3 dir) {
     resetHistory_ = true;
 }
 
+void Renderer::setLighting(bool sun, bool artificial) {
+    if (sun == sunOn_ && artificial == lightsOn_) return;
+    bool skyChanged = sun != sunOn_;
+    sunOn_ = sun;
+    lightsOn_ = artificial;
+    if (skyChanged) computeSky();
+    resetHistory_ = true;
+}
+
+void Renderer::setCloudAmount(float amount) {
+    amount = std::max(0.0f, std::min(1.0f, amount));
+    if (std::fabs(amount - cloudAmount_) < 1e-4f) return;
+    cloudAmount_ = amount;
+    computeSky();
+    resetHistory_ = true;
+}
+
 void Renderer::setTransparentOutput(bool transparent) {
     if (transparent == transparentOutput_) return;
     transparentOutput_ = transparent;
@@ -826,9 +843,9 @@ void Renderer::record(VkCommandBuffer cmd, const ViewParams& view) {
     pt.camForward[3] = view.panorama ? 1.0f : 0.0f;
     pt.camRight[0] = view.right.x; pt.camRight[1] = view.right.y; pt.camRight[2] = view.right.z; pt.camRight[3] = aspect;
     pt.camUp[0] = view.up.x; pt.camUp[1] = view.up.y; pt.camUp[2] = view.up.z; pt.camUp[3] = groundZ_;
-    pt.sunDir[0] = sunDir_.x; pt.sunDir[1] = sunDir_.y; pt.sunDir[2] = sunDir_.z; pt.sunDir[3] = sunIntensity_;
-    pt.misc[0] = static_cast<float>(lightCount_);
-    pt.misc[1] = skyIntensity_;
+    pt.sunDir[0] = sunDir_.x; pt.sunDir[1] = sunDir_.y; pt.sunDir[2] = sunDir_.z; pt.sunDir[3] = effectiveSun();
+    pt.misc[0] = lightsOn_ ? static_cast<float>(lightCount_) : 0.0f;
+    pt.misc[1] = effectiveSky();
     pt.misc[2] = static_cast<float>(glassStart_);
     // 1 画素が 1 m 先で何 m の幅になるか（テクスチャの縮小した段を選ぶのに使う）
     pt.misc[3] = view.panorama ? 2.0f * 3.14159265f / static_cast<float>(w) : 2.0f * tanHalf / static_cast<float>(h);

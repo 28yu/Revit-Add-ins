@@ -14,6 +14,12 @@ struct Entry {
 };
 
 static const Entry kStrings[] = {
+    {"LookSun", "太陽の光", "Sunlight", "阳光"},
+    {"LookLights", "照明器具", "Light fixtures", "灯具"},
+    {"TipLookSun", "太陽の光と空の明るさを使う / 使わない（最初は 3D ビューの「照明」の設定に合わせます）",
+     "Use sunlight and skylight or not (starts from the 3D view lighting setting)", "是否使用阳光和天空光（初始值与 3D 视图的照明设置一致）"},
+    {"TipLookLights", "照明器具の光を使う / 使わない（最初は 3D ビューの「照明」の設定に合わせます）",
+     "Use light fixtures or not (starts from the 3D view lighting setting)", "是否使用灯具光源（初始值与 3D 视图的照明设置一致）"},
     {"LookTime", "時間帯", "Time of day", "时间段"},
     {"LookTimeRevit", "Revit の設定", "Revit setting", "Revit 设置"},
     {"TipLookGroundColor", "地面の色を選びます", "Choose the ground color", "选择地面颜色"},

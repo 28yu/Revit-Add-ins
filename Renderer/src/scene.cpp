@@ -25,8 +25,9 @@ namespace t28 {
 //   uint32   テクスチャ数 → 各: uint32 幅, 高さ, 種類（bit0: 1 = 色ではないデータ）, 画素（RGBA 各 1 バイト）
 //   uint32   光源数       → 各: float 位置x,y,z, 大きさ, 明るさr,g,b, 種類（0 = 全方向, 1 = 半球, 2 = スポット）,
 //                               向きx,y,z, cos（落ち始め）, cos（届く範囲）
-// 4: 太陽の後ろに 緯度・真北・日付（年の何日目）を追加。3 も読める（その 3 つは既定値）
-static const uint32_t kVersion = 4;
+// 4: 太陽の後ろに 緯度・真北・日付（年の何日目）を追加。
+// 5: その後ろに 3D ビューのレンダリング設定（照明・背景・地面の色・雲の量）を追加。3・4 も読める（足りない分は既定値）
+static const uint32_t kVersion = 5;
 
 namespace {
 class Reader {
@@ -63,7 +64,7 @@ bool loadScene(const std::string& path, Scene& scene, std::string& error, long o
     char magic[4];
     uint32_t version = 0;
     if (!r.readBytes(magic, 4) || memcmp(magic, "T28S", 4) != 0) return fail("not a T28S file");
-    if (!r.read(version) || (version != kVersion && version != 3)) return fail("unsupported version (please update Tools28)");
+    if (!r.read(version) || version < 3 || version > kVersion) return fail("unsupported version (please update Tools28)");
 
     float cam[10];
     if (!r.readFloats(cam, 10)) return fail("truncated camera");
@@ -83,6 +84,18 @@ bool loadScene(const std::string& path, Scene& scene, std::string& error, long o
         scene.latitude = site[0];
         scene.trueNorth = site[1];
         scene.dayOfYear = site[2];
+    }
+    if (version >= 5) {
+        uint32_t lighting = 0, background = 0, bgColor = 0, groundColor = 0;
+        float clouds = 0.5f;
+        if (!r.read(lighting) || !r.read(background) || !r.read(bgColor) || !r.read(groundColor) || !r.read(clouds))
+            return fail("truncated rendering settings");
+        scene.revitLook.sun = (lighting & 1u) != 0;
+        scene.revitLook.artificial = (lighting & 2u) != 0;
+        scene.revitLook.background = static_cast<int>(std::min<uint32_t>(background, 2));
+        scene.revitLook.backgroundColor = bgColor & 0xFFFFFF;
+        scene.revitLook.groundColor = groundColor;
+        scene.revitLook.cloudAmount = std::max(0.0f, std::min(1.0f, clouds));
     }
 
     uint32_t materialCount = 0;
@@ -181,6 +194,12 @@ void saveScene(const Scene& scene, std::vector<uint8_t>& out) {
     for (float v : {c.eye.x, c.eye.y, c.eye.z, c.forward.x, c.forward.y, c.forward.z, c.up.x, c.up.y, c.up.z, c.fovY}) put(out, v);
     for (float v : {scene.sunDir.x, scene.sunDir.y, scene.sunDir.z, scene.sunIntensity, scene.skyIntensity}) put(out, v);
     for (float v : {scene.latitude, scene.trueNorth, scene.dayOfYear}) put(out, v);
+    const RevitLook& rl = scene.revitLook;
+    put(out, static_cast<uint32_t>((rl.sun ? 1u : 0u) | (rl.artificial ? 2u : 0u)));
+    put(out, static_cast<uint32_t>(rl.background));
+    put(out, rl.backgroundColor);
+    put(out, rl.groundColor);
+    put(out, rl.cloudAmount);
     put(out, static_cast<uint32_t>(scene.materials.size()));
     for (const Material& m : scene.materials) {
         for (float v : {m.r, m.g, m.b, m.opacity, m.roughness, m.metallic, m.emissive, m.f0}) put(out, v);

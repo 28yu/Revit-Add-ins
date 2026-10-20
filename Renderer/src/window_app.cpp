@@ -532,9 +532,31 @@ int runWindow(const Options& opt, Scene& scene) {
             fclose(f);
         }
     };
+    // 3D ビューの「レンダリング設定」を最初の見た目にする（look.ini より優先。そのあとウィンドウで変えればそちらが優先）。
+    // 時間帯も、開くたびに Revit の「太陽の設定」から始める
+    auto applyRevitLook = [&](const RevitLook& rl) {
+        look.sun = rl.sun;
+        look.lights = rl.artificial;
+        if (rl.background == 0) {
+            look.sky = true;
+        } else {
+            look.sky = false;
+            if (rl.background == 1) look.background = rl.backgroundColor;
+            else look.transparentPng = true;  // 背景「透明」: PNG の書き出しで背景を透明にする
+        }
+        if ((rl.groundColor >> 24) != 0) look.groundColor = rl.groundColor & 0xFFFFFF;
+        renderer.setCloudAmount(rl.cloudAmount);
+    };
+    RevitLook lastRevitLook = scene.revitLook;
+    applyRevitLook(lastRevitLook);
+    look.timeHour = -1.0f;
+    logInfo("Revit rendering settings: sun=%d artificial=%d background=%d color=%06X ground=%08X clouds=%.2f",
+            lastRevitLook.sun ? 1 : 0, lastRevitLook.artificial ? 1 : 0, lastRevitLook.background, lastRevitLook.backgroundColor,
+            lastRevitLook.groundColor, lastRevitLook.cloudAmount);
     auto applyLook = [&]() {
         renderer.setLook(look.sky ? 0u : (0xFF000000u | look.background), look.mono ? (0xFF000000u | look.monoColor) : 0u,
                          !look.ground, 0xFF000000u | look.groundColor);
+        renderer.setLighting(look.sun, look.lights);
     };
     applyLook();
     // 時間帯: つまみで選んだ時刻の太陽にする（負なら Revit の「太陽の設定」のまま）
@@ -761,6 +783,8 @@ int runWindow(const Options& opt, Scene& scene) {
             else if (b == kLookMono) look.mono = !look.mono;
             else if (b == kLookGround) look.ground = !look.ground;
             else if (b == kLookTransparent) look.transparentPng = !look.transparentPng;
+            else if (b == kLookSun) look.sun = !look.sun;
+            else if (b == kLookLights) look.lights = !look.lights;
             else if (b == kLookTimeReset) {
                 look.timeHour = -1;  // Revit の「太陽の設定」に戻す
                 applySun();
@@ -774,9 +798,9 @@ int runWindow(const Options& opt, Scene& scene) {
                 }
                 last = std::chrono::steady_clock::now();  // 色を選ぶ画面で止まっていた時間は数えない
             }
-            logInfo("Look: sky=%d background=%06X ground=%d groundColor=%06X mono=%d color=%06X transparentPng=%d time=%.2f",
-                    look.sky ? 1 : 0, look.background, look.ground ? 1 : 0, look.groundColor, look.mono ? 1 : 0, look.monoColor,
-                    look.transparentPng ? 1 : 0, look.timeHour);
+            logInfo("Look: sky=%d background=%06X ground=%d groundColor=%06X sun=%d lights=%d mono=%d color=%06X transparentPng=%d time=%.2f",
+                    look.sky ? 1 : 0, look.background, look.ground ? 1 : 0, look.groundColor, look.sun ? 1 : 0, look.lights ? 1 : 0,
+                    look.mono ? 1 : 0, look.monoColor, look.transparentPng ? 1 : 0, look.timeHour);
             applyLook();
             saveLook();
             updateToolbar();
@@ -805,6 +829,14 @@ int runWindow(const Options& opt, Scene& scene) {
                     scene.trueNorth = next.trueNorth;
                     scene.dayOfYear = next.dayOfYear;
                     applySun();
+                    // Revit でレンダリング設定を変えたときは、その項目を新しい設定に合わせる
+                    if (next.revitLook != lastRevitLook) {
+                        lastRevitLook = next.revitLook;
+                        applyRevitLook(lastRevitLook);
+                        applyLook();
+                        nv.toolbarChanged = true;
+                        logInfo("Live sync: Revit rendering settings changed");
+                    }
                     scene = std::move(next);
                     bvh = std::move(nextBvh);
                     sceneStamp = st;
@@ -850,7 +882,8 @@ int runWindow(const Options& opt, Scene& scene) {
         } else if (nv.hoverButton >= kLookIdBase) {
             static const char* lookTips[kLookCount] = {"TipLookSky",    "TipLookBackground",  "TipLookMono",
                                                        "TipLookMonoColor", "TipLookGround", "TipLookTransparent",
-                                                       "TipLookGroundColor", "TipLookTimeReset", "TipLookTime"};
+                                                       "TipLookGroundColor", "TipLookTimeReset", "TipLookTime",
+                                                       "TipLookSun", "TipLookLights"};
             setStatus({tr(lookTips[nv.hoverButton - kLookIdBase])}, -1);
         } else if (nv.hoverButton >= 0) {
             setStatus({tr(tipKeys[nv.hoverButton])}, -1);

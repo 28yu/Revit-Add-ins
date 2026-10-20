@@ -22,6 +22,9 @@ namespace Tools28.Commands.RealtimeRender
 
         private int _currentMaterial;
         private ElementId _currentElement = ElementId.InvalidElementId;
+        // フェーズの「グラフィックの上書き」: 今の要素を描くマテリアル（上書きしないなら InvalidElementId）
+        private readonly PhaseOverrides _phase;
+        private ElementId _phaseMaterial = ElementId.InvalidElementId;
 
         public RenderScene Scene { get; } = new RenderScene();
         public int ElementCount { get; private set; }
@@ -30,8 +33,9 @@ namespace Tools28.Commands.RealtimeRender
         /// <summary>見つからなかったテクスチャ画像（ログ用）。</summary>
         public IReadOnlyList<string> MissingTextures => _textures.Missing;
 
-        public SceneExportContext(Document doc)
+        public SceneExportContext(Document doc, PhaseOverrides phase = null)
         {
+            _phase = phase;
             _documents.Push(doc);
             _transforms.Push(Transform.Identity);
             _textures = new TextureLoader(doc.PathName, doc.Application.VersionNumber);
@@ -60,6 +64,7 @@ namespace Tools28.Commands.RealtimeRender
         public RenderNodeAction OnElementBegin(ElementId elementId)
         {
             _currentElement = elementId;
+            _phaseMaterial = PhaseMaterialOf(elementId);
             // 書き出した要素（このモデルの物だけ。リンクの中の要素はリンク自体で見る）。ライブ同期で、削除された要素が
             // 描いていた物かどうかを調べるのに使う
             if (_documents.Count == 1) ElementIds.Add(elementId);
@@ -113,9 +118,32 @@ namespace Tools28.Commands.RealtimeRender
             }
         }
 
+        /// <summary>
+        /// このビューのフェーズで「上書き」表示になる要素なら、上書きのマテリアル（このモデルの要素だけ。リンクはフェーズの対応が別）。
+        /// </summary>
+        private ElementId PhaseMaterialOf(ElementId elementId)
+        {
+            if (_phase == null || _documents.Count != 1) return ElementId.InvalidElementId;
+            try
+            {
+                Element e = _documents.Peek().GetElement(elementId);
+                if (e == null || !e.HasPhases()) return ElementId.InvalidElementId;
+                return _phase.Materials.TryGetValue(e.GetPhaseStatus(_phase.ViewPhaseId), out ElementId m) ? m : ElementId.InvalidElementId;
+            }
+            catch (Exception)
+            {
+                return ElementId.InvalidElementId;
+            }
+        }
+
         public void OnMaterial(MaterialNode node)
         {
             Document doc = _documents.Peek();
+            if (_phaseMaterial != ElementId.InvalidElementId && doc.GetElement(_phaseMaterial) is Material phaseMaterial)
+            {
+                UsePhaseMaterial(doc, phaseMaterial);
+                return;
+            }
             Color color = node.Color;
             bool hasColor = color != null && color.IsValid;
             byte r = hasColor ? color.Red : (byte)180, g = hasColor ? color.Green : (byte)180, b = hasColor ? color.Blue : (byte)180;
@@ -132,12 +160,37 @@ namespace Tools28.Commands.RealtimeRender
             if (doc != null && node.MaterialId != null && node.MaterialId != ElementId.InvalidElementId)
                 name = (doc.GetElement(node.MaterialId) as Material)?.Name ?? "";
 
+            _currentMaterial = AddMaterial(key, name, r, g, b, node.Transparency, node.Smoothness,
+                () => node.HasOverriddenAppearance ? node.GetAppearanceOverride() : node.GetAppearance());
+        }
+
+        /// <summary>フェーズの上書きのマテリアルで描く（マテリアルの要素の色・外観から作る）。</summary>
+        private void UsePhaseMaterial(Document doc, Material m)
+        {
+            string key = $"phase|{doc.PathName}|{m.Id}";
+            if (_materialIndex.TryGetValue(key, out int index))
+            {
+                _currentMaterial = index;
+                return;
+            }
+            Color c = m.Color;
+            bool valid = c != null && c.IsValid;
+            _currentMaterial = AddMaterial(key, m.Name, valid ? c.Red : (byte)180, valid ? c.Green : (byte)180, valid ? c.Blue : (byte)180,
+                m.Transparency / 100.0, m.Smoothness,
+                () => (doc.GetElement(m.AppearanceAssetId) as AppearanceAssetElement)?.GetRenderingAsset());
+        }
+
+        /// <summary>
+        /// マテリアルを作って登録し、その番号を返す。getAsset はマテリアルの「外観」（無ければ null）。
+        /// </summary>
+        private int AddMaterial(string key, string name, byte r, byte g, byte b, double transparency, int smoothness, Func<Asset> getAsset)
+        {
             // マテリアルの「外観」タブの内容（色・イメージ・反射率・粗さ など）
             AppearanceInfo appearance = null;
             try
             {
-                Asset asset = node.HasOverriddenAppearance ? node.GetAppearanceOverride() : node.GetAppearance();
-                appearance = AppearanceReader.Read(asset);
+                Asset asset = getAsset();
+                if (asset != null) appearance = AppearanceReader.Read(asset);
             }
             catch (Exception ex)
             {
@@ -153,9 +206,9 @@ namespace Tools28.Commands.RealtimeRender
                 R = (float)SrgbToLinear(srgb[0]),
                 G = (float)SrgbToLinear(srgb[1]),
                 B = (float)SrgbToLinear(srgb[2]),
-                Opacity = (float)Clamp(1.0 - node.Transparency, 0, 1),
+                Opacity = (float)Clamp(1.0 - transparency, 0, 1),
                 // Revit の「滑らかさ」0〜100 → 粗さ 1〜0（外観に粗さがあればそちらを使う）
-                Roughness = (float)Clamp(1.0 - node.Smoothness / 100.0, 0.05, 1),
+                Roughness = (float)Clamp(1.0 - smoothness / 100.0, 0.05, 1),
                 Metallic = MaterialHints.LooksMetallic(name) ? 1f : 0f,
             };
 
@@ -206,14 +259,14 @@ namespace Tools28.Commands.RealtimeRender
             if (MaterialHints.LooksLikeGlass(name) && material.Opacity > 0.5f)
                 material.Opacity = 0.3f;
 
-            index = Scene.Materials.Count;
+            int index = Scene.Materials.Count;
             Scene.Materials.Add(material);
             _materialIndex[key] = index;
-            _currentMaterial = index;
             DiagLog.Cmd("RealtimeRender",
                 $"マテリアル: {name} 色={BitmapInfo.FormatColor(srgb)} 画像={(material.ColorTexture >= 0 ? appearance?.ColorImage?.Paths : "-")} " +
                 $"凹凸={(material.BumpTexture >= 0 ? $"{appearance?.BumpImage?.Paths} 種類={material.BumpType} 深さ={material.BumpDepth:G3}" : "-")} " +
                 $"粗さ={material.Roughness:F2} 反射率={material.F0:F2} 不透明度={material.Opacity:F2} 金属={material.Metallic}");
+            return index;
         }
 
         /// <summary>

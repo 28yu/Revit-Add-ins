@@ -42,6 +42,13 @@ public:
     void setLook(uint32_t background, uint32_t mono, bool hideGround, uint32_t ground = 0);
     // 太陽の向きを変える（時間帯の切り替え）。空を描き直すので少し時間がかかる
     void setSunDirection(Vec3 dir);
+    // 照明: 太陽（と空の明るさ）を使うか、照明器具を使うか（3D ビューの「照明のスキーム」と「表示」の設定）
+    void setLighting(bool sun, bool artificial);
+    // 雲の量（0 = なし 〜 1 = 曇り。0.5 が標準）。空を描き直す
+    void setCloudAmount(float amount);
+    // 太陽を消したときは、直射を 0 に、空の明るさを夜に近い暗さにする
+    float effectiveSun() const { return sunOn_ ? sunIntensity_ : 0.0f; }
+    float effectiveSky() const { return sunOn_ ? skyIntensity_ : skyIntensity_ * 0.04f; }
     // 背景（空・雲、地面を消したときはその分も）を透明にして描く（PNG の書き出し用）
     void setTransparentOutput(bool transparent);
     // 履歴を捨てて最初からやり直す
@@ -100,6 +107,8 @@ private:
     Buffer texInfos_, texels_;  // テクスチャ（Revit の外観の「イメージ」「レリーフ パターン」）
     Buffer lights_;             // 照明器具の光源
     uint32_t lightCount_ = 0;
+    bool sunOn_ = true, lightsOn_ = true;
+    float cloudAmount_ = 0.5f;
     float groundZ_ = 0.0f;      // 地面の高さ（モデルの一番下）
     Buffer bvhNodes_, bvhTris_;  // 予備の方式（RT コア無し）で使う
     AccelStruct blasOpaque_, blasGlass_, tlas_;

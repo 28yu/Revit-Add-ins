@@ -44,6 +44,9 @@ int runOffscreen(const Options& opt, Scene& scene) {
     Renderer renderer;
     renderer.skyWidth_ = static_cast<uint32_t>(opt.skySize);
     renderer.init(ctx, scene, glassStart, bvh);
+    // 3D ビューの「レンダリング設定」（照明・雲の量）
+    renderer.setLighting(scene.revitLook.sun, scene.revitLook.artificial);
+    renderer.setCloudAmount(scene.revitLook.cloudAmount);
     renderer.setLook(opt.lookBackground, opt.lookMono, opt.hideGround);
     renderer.setTransparentOutput(opt.transparent);
     if (opt.timeHour >= 0) renderer.setSunDirection(sunDirectionAt(scene, opt.timeHour));
