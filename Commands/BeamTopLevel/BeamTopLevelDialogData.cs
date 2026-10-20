@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Autodesk.Revit.DB;
+using Tools28.Commands.BeamCommon;
 
 namespace Tools28.Commands.BeamTopLevel
 {
@@ -16,6 +17,8 @@ namespace Tools28.Commands.BeamTopLevel
         public Dictionary<string, List<ParamCandidate>> TopLevelParamCandidates { get; set; }
         public Dictionary<string, List<string>> AdditionalLevelParams { get; set; }
         public List<TextNoteTypeItem> TextNoteTypes { get; set; }
+        /// <summary>構造フレームタグのタイプ（梁ラベルを梁タグで付ける場合）</summary>
+        public List<BeamTagTypeItem> TagTypes { get; set; }
         /// <summary>表記する文字に対応する凡例が既にあるか</summary>
         public Func<string, bool> LegendExists { get; set; }
     }

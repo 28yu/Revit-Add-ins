@@ -197,7 +197,7 @@ namespace Tools28.Commands.BeamTopLevel
             return 2.5 / 304.8;
         }
 
-        private static void RemoveExistingBeamLabels(Document doc, View activeView)
+        public static void RemoveExistingBeamLabels(Document doc, View activeView)
         {
             foreach (var note in FindExistingBeamLabels(doc, activeView))
             {

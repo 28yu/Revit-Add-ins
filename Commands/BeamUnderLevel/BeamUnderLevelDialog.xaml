@@ -190,13 +190,17 @@
                 <Border Grid.Row="1" Background="White" BorderBrush="#D3D3D3"
                         BorderThickness="1" CornerRadius="3" Padding="15,12" Margin="0,0,0,15">
                     <StackPanel>
-                        <TextBlock x:Name="txtTextTypeSetting" Style="{StaticResource SectionHeader}" Text="文字タイプ設定"/>
+                        <TextBlock x:Name="txtTextTypeSetting" Style="{StaticResource SectionHeader}" Text="凡例・梁ラベル設定"/>
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="150"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
                             <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="8"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="8"/>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="8"/>
                                 <RowDefinition Height="Auto"/>
@@ -208,14 +212,36 @@
                                       x:Name="TextNoteTypeComboBox"
                                       Style="{StaticResource ComboBoxStyle}"/>
 
-                            <TextBlock x:Name="txtLabelTextType" Grid.Row="2" Grid.Column="0" Style="{StaticResource LabelStyle}"
+                            <TextBlock x:Name="txtLabelMode" Grid.Row="2" Grid.Column="0" Style="{StaticResource LabelStyle}"
+                                       Text="梁ラベルの表記:" VerticalAlignment="Center"/>
+                            <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                <RadioButton x:Name="LabelModeTextRadio" GroupName="LabelMode" Content="文字" FontSize="12"
+                                             IsChecked="True" VerticalContentAlignment="Center" Checked="LabelMode_Changed"/>
+                                <RadioButton x:Name="LabelModeTagRadio" GroupName="LabelMode" Content="梁タグ" FontSize="12"
+                                             Margin="20,0,0,0" VerticalContentAlignment="Center" Checked="LabelMode_Changed"/>
+                            </StackPanel>
+
+                            <TextBlock x:Name="txtLabelTextType" Grid.Row="4" Grid.Column="0" Style="{StaticResource LabelStyle}"
                                        Text="梁ラベルの文字タイプ:" VerticalAlignment="Center"/>
-                            <ComboBox Grid.Row="2" Grid.Column="1"
+                            <ComboBox Grid.Row="4" Grid.Column="1"
                                       x:Name="BeamLabelTypeComboBox"
                                       Style="{StaticResource ComboBoxStyle}"/>
+
+                            <TextBlock x:Name="txtLabelTagType" Grid.Row="4" Grid.Column="0" Style="{StaticResource LabelStyle}"
+                                       Text="梁タグのタイプ:" VerticalAlignment="Center" Visibility="Collapsed"/>
+                            <ComboBox Grid.Row="4" Grid.Column="1"
+                                      x:Name="BeamTagTypeComboBox"
+                                      Style="{StaticResource ComboBoxStyle}" Visibility="Collapsed"/>
+
+                            <CheckBox x:Name="HorizontalBraceCheckBox" Grid.Row="6" Grid.Column="0" Grid.ColumnSpan="2"
+                                      Content="水平ブレースにも梁ラベルを付ける" FontSize="12" VerticalContentAlignment="Center"/>
                         </Grid>
-                        <TextBlock x:Name="txtTextTypeHint" Style="{StaticResource NoteStyle}"
-                                   Text="※ 凡例は製図ビューの文字、梁ラベルは天井伏図上の梁に表示する文字です"/>
+                        <TextBlock x:Name="txtTextTypeHint" Style="{StaticResource NoteStyle}" TextWrapping="Wrap"
+                                   Text="※ 凡例は凡例ビューの文字、梁ラベルは天井伏図上の梁に表示する文字です"/>
+                        <TextBlock x:Name="txtTagHint" Style="{StaticResource NoteStyle}" TextWrapping="Wrap" Visibility="Collapsed"
+                                   Text="※ 梁タグ"/>
+                        <TextBlock x:Name="txtBraceHint" Style="{StaticResource NoteStyle}" TextWrapping="Wrap"
+                                   Text="※ 鉛直ブレース"/>
                     </StackPanel>
                 </Border>
 

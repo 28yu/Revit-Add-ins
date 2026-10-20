@@ -234,7 +234,7 @@ namespace Tools28.Commands.BeamUnderLevel
         /// <summary>
         /// 既存の梁ラベルを削除
         /// </summary>
-        private static void RemoveExistingBeamLabels(Document doc, View activeView)
+        public static void RemoveExistingBeamLabels(Document doc, View activeView)
         {
             foreach (var note in FindExistingBeamLabels(doc, activeView))
             {

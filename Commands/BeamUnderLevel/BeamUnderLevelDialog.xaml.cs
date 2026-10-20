@@ -36,6 +36,11 @@ namespace Tools28.Commands.BeamUnderLevel
         public bool OverwriteExistingFilters { get; private set; }
         public ElementId SelectedTextNoteTypeId { get; private set; }
         public ElementId SelectedBeamLabelTypeId { get; private set; }
+        /// <summary>梁ラベルを文字ではなく梁タグで付ける</summary>
+        public bool UseBeamTag { get; private set; }
+        public ElementId SelectedBeamTagTypeId { get; private set; }
+        /// <summary>水平ブレースにも梁ラベルを付ける（鉛直ブレースには常に付けない）</summary>
+        public bool IncludeHorizontalBraces { get; private set; }
         public string LevelLabelText { get; private set; }
         /// <summary>同名の凡例を上書きすると確認した</summary>
         public bool OverwriteLegendConfirmed { get; private set; }
@@ -59,6 +64,13 @@ namespace Tools28.Commands.BeamUnderLevel
             txtLegendTextType.Text = Loc.S("BeamUnder.LegendTextType");
             txtLabelTextType.Text = Loc.S("BeamUnder.LabelTextType");
             txtTextTypeHint.Text = Loc.S("BeamUnder.TextTypeHint");
+            txtLabelMode.Text = Loc.S("Beam.LabelMode");
+            LabelModeTextRadio.Content = Loc.S("Beam.LabelModeText");
+            LabelModeTagRadio.Content = Loc.S("Beam.LabelModeTag");
+            txtLabelTagType.Text = Loc.S("Beam.LabelTagType");
+            txtTagHint.Text = string.Format(Loc.S("Beam.TagHint"), ParameterManager.ParamDisplay);
+            HorizontalBraceCheckBox.Content = Loc.S("Beam.HorizontalBrace");
+            txtBraceHint.Text = Loc.S("Beam.BraceHint");
             txtLevelSetting.Text = Loc.S("BeamUnder.LevelSetting");
             txtRefLevel.Text = Loc.S("BeamUnder.RefLevel");
             txtLevelLabelText.Text = Loc.S("Beam.LevelLabelText");
@@ -119,6 +131,39 @@ namespace Tools28.Commands.BeamUnderLevel
                 BeamLabelTypeComboBox.ItemsSource = _data.TextNoteTypes;
                 BeamLabelTypeComboBox.SelectedIndex = 0;
             }
+
+            // 梁タグのタイプ。名前に「下端」を含むタグがあれば最初に選んでおく
+            if (_data.TagTypes != null && _data.TagTypes.Count > 0)
+            {
+                BeamTagTypeComboBox.ItemsSource = _data.TagTypes;
+                int preferred = _data.TagTypes.FindIndex(t => t.Name.Contains("下端"));
+                BeamTagTypeComboBox.SelectedIndex = preferred >= 0 ? preferred : 0;
+            }
+            else
+            {
+                LabelModeTagRadio.IsEnabled = false;
+                LabelModeTagRadio.ToolTip = Loc.S("Beam.TagNoneLoaded");
+                ToolTipService.SetShowOnDisabled(LabelModeTagRadio, true);
+            }
+        }
+
+        /// <summary>
+        /// 梁ラベルの表記（文字／梁タグ）の切り替えに合わせて、選ぶ欄を入れ替える
+        /// </summary>
+        private void LabelMode_Changed(object sender, RoutedEventArgs e)
+        {
+            // 画面の読み込み中（まだ欄が作られていない）にも呼ばれる
+            if (BeamLabelTypeComboBox == null || BeamTagTypeComboBox == null ||
+                txtLabelTextType == null || txtLabelTagType == null || txtTagHint == null)
+                return;
+            bool tag = LabelModeTagRadio.IsChecked == true;
+            var textVis = tag ? System.Windows.Visibility.Collapsed : System.Windows.Visibility.Visible;
+            var tagVis = tag ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+            txtLabelTextType.Visibility = textVis;
+            BeamLabelTypeComboBox.Visibility = textVis;
+            txtLabelTagType.Visibility = tagVis;
+            BeamTagTypeComboBox.Visibility = tagVis;
+            txtTagHint.Visibility = tagVis;
 
             UpdateFloorHeight();
         }
@@ -539,6 +584,12 @@ namespace Tools28.Commands.BeamUnderLevel
 
             summary += string.Format(Loc.S("Beam.Summary.RefLevel"), _data.RefLevel.Name);
             summary += string.Format(Loc.S("Beam.Summary.LevelLabel"), LevelLabelText);
+            if (LabelModeTagRadio.IsChecked == true)
+                summary += string.Format(Loc.S("Beam.Summary.LabelTag"), BeamTagTypeComboBox.SelectedItem);
+            else
+                summary += string.Format(Loc.S("Beam.Summary.LabelText"), BeamLabelTypeComboBox.SelectedItem);
+            summary += HorizontalBraceCheckBox.IsChecked == true
+                ? Loc.S("Beam.Summary.HBraceOn") : Loc.S("Beam.Summary.HBraceOff");
             summary += string.Format(Loc.S("Beam.Summary.UpperLevel"), SelectedLowerLevel.Name);
             double floorHeightMm = BeamCalculator.FeetToMm(
                 SelectedLowerLevel.Elevation - _data.RefLevel.Elevation);
@@ -583,6 +634,12 @@ namespace Tools28.Commands.BeamUnderLevel
         /// </summary>
         private bool ValidateLevelLabelText()
         {
+            if (LabelModeTagRadio.IsChecked == true && BeamTagTypeComboBox.SelectedItem == null)
+            {
+                MessageBox.Show(Loc.S("Beam.SelectTagType"), Loc.S("Common.InputError"),
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                return false;
+            }
             string text = (LevelLabelTextBox.Text ?? "").Trim();
             if (text.Length == 0)
             {
@@ -690,6 +747,9 @@ namespace Tools28.Commands.BeamUnderLevel
                 SelectedTextNoteTypeId = selectedTextType?.Id;
                 var selectedBeamLabelType = BeamLabelTypeComboBox.SelectedItem as TextNoteTypeItem;
                 SelectedBeamLabelTypeId = selectedBeamLabelType?.Id;
+                UseBeamTag = LabelModeTagRadio.IsChecked == true;
+                SelectedBeamTagTypeId = (BeamTagTypeComboBox.SelectedItem as BeamTagTypeItem)?.Id;
+                IncludeHorizontalBraces = HorizontalBraceCheckBox.IsChecked == true;
                 DialogResult = true;
                 Close();
             }

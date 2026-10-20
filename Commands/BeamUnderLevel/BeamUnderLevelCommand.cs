@@ -137,6 +137,7 @@ namespace Tools28.Commands.BeamUnderLevel
                     TopLevelParamCandidates = topLevelParamCandidates,
                     AdditionalLevelParams = additionalLevelParams,
                     TextNoteTypes = textNoteTypes,
+                    TagTypes = BeamTagPlacer.CollectTagTypes(doc),
                     // 表記する文字の重複（別の階で同じ文字を使った）を画面で知らせるため
                     LegendExists = name => BeamLegendViews.Find(doc, LegendManager.GetLegendViewName(name)) != null
                 };
@@ -156,6 +157,14 @@ namespace Tools28.Commands.BeamUnderLevel
                 ElementId selectedTextNoteTypeId = dialog.SelectedTextNoteTypeId;
                 ElementId selectedBeamLabelTypeId = dialog.SelectedBeamLabelTypeId;
                 string labelText = dialog.LevelLabelText;
+                bool useBeamTag = dialog.UseBeamTag;
+                ElementId selectedBeamTagTypeId = dialog.SelectedBeamTagTypeId;
+
+                // 梁ラベル（文字・梁タグ）を付ける梁。鉛直ブレースには付けず、水平ブレースは設定に従う
+                var labelBeams = beams
+                    .Where(b => BeamFramingKind.ShouldLabel(b, dialog.IncludeHorizontalBraces))
+                    .ToList();
+                int skippedBraceCount = beams.Count - labelBeams.Count;
 
                 // 処理実行
                 int successCount = 0;
@@ -205,6 +214,7 @@ namespace Tools28.Commands.BeamUnderLevel
 
                 // パラメータ作成・値の書き込み・フィルタ作成をトランザクションで実行
                 BeamLegendResult legend = null;
+                BeamTagResult tagResult = null;
                 using (Transaction trans = new Transaction(doc, Loc.S("BeamUnder.Txn.Apply")))
                 {
                     trans.Start();
@@ -220,11 +230,22 @@ namespace Tools28.Commands.BeamUnderLevel
                         ParameterManager.WriteValues(beam, result);
                     }
 
-                    // 梁ラベル（TextNote）の作成
-                    if (selectedBeamLabelTypeId != null)
+                    // 梁ラベルの作成（文字 = TextNote ／ 梁タグ = IndependentTag）
+                    if (useBeamTag)
+                    {
+                        // 文字の梁ラベルから切り替えた場合に、前回の文字が残らないようにする
+                        if (overwriteExisting)
+                            BeamLabelManager.RemoveExistingBeamLabels(doc, activeView);
+                        var displayValues = calculationResults
+                            .Where(kv => kv.Value.Success)
+                            .ToDictionary(kv => kv.Key, kv => kv.Value.DisplayValue);
+                        tagResult = BeamTagPlacer.CreateTags(doc, activeView,
+                            labelBeams, displayValues, selectedBeamTagTypeId, overwriteExisting);
+                    }
+                    else if (selectedBeamLabelTypeId != null)
                     {
                         BeamLabelManager.CreateBeamLabels(doc, activeView,
-                            beams, calculationResults, selectedBeamLabelTypeId,
+                            labelBeams, calculationResults, selectedBeamLabelTypeId,
                             overwriteExisting);
                     }
 
@@ -269,6 +290,16 @@ namespace Tools28.Commands.BeamUnderLevel
 
                 string resultMessage = string.Format(Loc.S("Beam.Result"),
                     beams.Count, successCount, failureCount, levelGroups.Count, legendInfo);
+
+                if (tagResult != null)
+                {
+                    resultMessage += string.Format(Loc.S("Beam.TagResult"), tagResult.Created);
+                    if (tagResult.ValueNotShown > 0)
+                        resultMessage += string.Format(Loc.S("Beam.TagValueNotShown"),
+                            tagResult.ValueNotShown, ParameterManager.ParamDisplay);
+                }
+                if (skippedBraceCount > 0)
+                    resultMessage += string.Format(Loc.S("Beam.LabelSkippedBraces"), skippedBraceCount);
 
                 if (failureCount > 0)
                 {
