@@ -249,7 +249,7 @@
                         <TextBlock x:Name="txtTextTypeHint" Style="{StaticResource NoteStyle}" TextWrapping="Wrap"
                                    Text="※ 凡例は凡例ビューの文字、梁ラベルは平面ビュー上の梁に表示する文字です"/>
                         <TextBlock x:Name="txtTagHint" Style="{StaticResource NoteStyle}" TextWrapping="Wrap" Visibility="Collapsed"
-                                   Text="※ 梁タグ"/>
+                                   Text="※ 梁レベルが表示されるよう設定済みの梁タグを選んでください"/>
                         <TextBlock x:Name="txtBraceHint" Style="{StaticResource NoteStyle}" TextWrapping="Wrap"
                                    Text="※ 鉛直ブレース"/>
                     </StackPanel>

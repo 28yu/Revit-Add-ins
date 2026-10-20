@@ -31,16 +31,12 @@ namespace Tools28.Commands.BeamCommon
     public class BeamTagResult
     {
         public int Created { get; set; }
-        /// <summary>作ったタグのうち、レベルの値が表示されていないもの（タグのラベルにパラメータが無い等）</summary>
-        public int ValueNotShown { get; set; }
     }
 
     /// <summary>
     /// 梁天端・梁下端色分けで、レベルの文字の代わりに梁タグを配置する。
-    ///
-    /// タグに表示する内容はタグファミリのラベルで決まり、API ではラベルを作れない。
-    /// そのため、このツールが書き込む共有パラメータ（梁天端_表示 / 梁下_表示）を
-    /// ラベルに入れたタグファミリを、利用者が用意しておく必要がある。
+    /// タグに表示する内容はタグファミリ側で決まるため、梁レベルが表示されるよう
+    /// 設定済みのタグを利用者が選ぶ前提とする（このツールはタグを置くだけ）。
     /// </summary>
     public static class BeamTagPlacer
     {
@@ -61,12 +57,12 @@ namespace Tools28.Commands.BeamCommon
         /// <summary>
         /// 梁タグを配置する（トランザクション内で、梁にパラメータ値を書き込んだ後に呼ぶ）
         /// </summary>
-        /// <param name="displayValues">梁ID → タグに表示されるはずの値（例: "1FL-50"）。ここにある梁だけに付ける</param>
+        /// <param name="targetIds">タグを付ける梁（レベルを算出できた梁）</param>
         public static BeamTagResult CreateTags(
             Document doc,
             View view,
             IEnumerable<FamilyInstance> beams,
-            IDictionary<ElementId, string> displayValues,
+            ICollection<ElementId> targetIds,
             ElementId tagTypeId,
             bool overwriteExisting)
         {
@@ -74,8 +70,7 @@ namespace Tools28.Commands.BeamCommon
             if (tagTypeId == null || tagTypeId == ElementId.InvalidElementId)
                 return result;
 
-            var targets = beams.Where(b => displayValues.ContainsKey(b.Id)).ToList();
-            var targetIds = new HashSet<ElementId>(targets.Select(b => b.Id));
+            var targets = beams.Where(b => targetIds.Contains(b.Id)).ToList();
 
             // このビューにある同じタイプのタグ（梁ID → タグ）
             var existing = new Dictionary<ElementId, List<IndependentTag>>();
@@ -104,7 +99,6 @@ namespace Tools28.Commands.BeamCommon
                 existing.Clear();
             }
 
-            var created = new List<KeyValuePair<IndependentTag, string>>();
             foreach (var beam in targets)
             {
                 // 上書きしない場合、既に同じタイプのタグがある梁には付けない（再実行で重ならないように）
@@ -143,31 +137,13 @@ namespace Tools28.Commands.BeamCommon
                     }
 #endif
                     if (tag != null)
-                        created.Add(new KeyValuePair<IndependentTag, string>(tag, displayValues[beam.Id]));
+                        result.Created++;
                 }
                 catch (Exception)
                 {
                     // タグを付けられない梁はスキップ
                 }
             }
-
-            result.Created = created.Count;
-            if (created.Count == 0)
-                return result;
-
-            // タグに値が表示されているか確かめる（ラベルにパラメータが入っていないタグを選んだ場合に知らせる）
-            try
-            {
-                doc.Regenerate();
-                foreach (var kv in created)
-                {
-                    string text = "";
-                    try { text = kv.Key.TagText ?? ""; } catch (Exception) { }
-                    if (!text.Contains(kv.Value))
-                        result.ValueNotShown++;
-                }
-            }
-            catch (Exception) { }
 
             return result;
         }

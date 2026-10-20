@@ -68,7 +68,7 @@ namespace Tools28.Commands.BeamUnderLevel
             LabelModeTextRadio.Content = Loc.S("Beam.LabelModeText");
             LabelModeTagRadio.Content = Loc.S("Beam.LabelModeTag");
             txtLabelTagType.Text = Loc.S("Beam.LabelTagType");
-            txtTagHint.Text = string.Format(Loc.S("Beam.TagHint"), ParameterManager.ParamDisplay);
+            txtTagHint.Text = Loc.S("Beam.TagHint");
             HorizontalBraceCheckBox.Content = Loc.S("Beam.HorizontalBrace");
             txtBraceHint.Text = Loc.S("Beam.BraceHint");
             txtLevelSetting.Text = Loc.S("BeamUnder.LevelSetting");

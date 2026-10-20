@@ -204,11 +204,11 @@ namespace Tools28.Commands.BeamTopLevel
                         // 文字の梁ラベルから切り替えた場合に、前回の文字が残らないようにする
                         if (overwriteExisting)
                             BeamLabelManager.RemoveExistingBeamLabels(doc, activeView);
-                        var displayValues = calculationResults
+                        var succeededIds = new HashSet<ElementId>(calculationResults
                             .Where(kv => kv.Value.Success)
-                            .ToDictionary(kv => kv.Key, kv => kv.Value.DisplayValue);
+                            .Select(kv => kv.Key));
                         tagResult = BeamTagPlacer.CreateTags(doc, activeView,
-                            labelBeams, displayValues, selectedBeamTagTypeId, overwriteExisting);
+                            labelBeams, succeededIds, selectedBeamTagTypeId, overwriteExisting);
                     }
                     else if (selectedBeamLabelTypeId != null)
                     {
@@ -260,12 +260,7 @@ namespace Tools28.Commands.BeamTopLevel
                     beams.Count, successCount, failureCount, levelGroups.Count, legendInfo);
 
                 if (tagResult != null)
-                {
                     resultMessage += string.Format(Loc.S("Beam.TagResult"), tagResult.Created);
-                    if (tagResult.ValueNotShown > 0)
-                        resultMessage += string.Format(Loc.S("Beam.TagValueNotShown"),
-                            tagResult.ValueNotShown, ParameterManager.ParamDisplay);
-                }
                 if (skippedBraceCount > 0)
                     resultMessage += string.Format(Loc.S("Beam.LabelSkippedBraces"), skippedBraceCount);
 
