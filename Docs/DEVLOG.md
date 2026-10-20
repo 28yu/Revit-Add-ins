@@ -604,7 +604,11 @@ git pull origin main
   （どのパラメータを表示するかはタグファミリ側の設定。ダイアログに一行で案内する）。
   当初は「ラベルに `梁天端_表示` を入れたタグ」を前提にし、配置後に `TagText` を確かめて警告していたが、
   利用者が自分のパラメータで設定済みのタグを使う運用のため撤廃した（2026-10-20）
-- タグは梁の中点に置く。2022 以降は `TagOrientation.AnyModelDirection` ＋ `RotationAngle` で梁の向きに回す
+- タグは**文字の梁ラベルと同じ位置**（梁の脇・梁の中央、余白はタグ高さの 0.3 倍）に置く。タグの大きさと基準点は
+  タグファミリごとに違うので、梁の中点に置いて `doc.Regenerate()` → タグの外形（`get_BoundingBox(view)`）を
+  梁の向き／直交方向に投影して測り、`TagHeadPosition` をずらす（`BeamTagPlacer.MoveBesideBeams`）。
+  外形は軸に沿った箱なので、斜めの梁では少しだけ梁から離れる。梁幅の取得は `BeamCommon/BeamLabelGeometry.cs` に共通化
+- 2022 以降は `TagOrientation.AnyModelDirection` ＋ `RotationAngle` で梁の向きに回す
   （2021 は API が無いので水平／垂直のどちらか近い方）。タグ付けされた梁の取得も 2021 だけ `TaggedLocalElementId`
 - 上書き時は**同じタイプのタグだけ**付け直す（符号タグなど他のタイプには触れない）。文字から切り替えた場合に備えて、
   このツールの文字ラベルも消す。上書きしない場合は、同じタイプのタグが既にある梁には付けない

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 using Autodesk.Revit.DB;
+using Tools28.Commands.BeamCommon;
 
 namespace Tools28.Commands.BeamTopLevel
 {
@@ -115,73 +116,11 @@ namespace Tools28.Commands.BeamTopLevel
             XYZ direction = (endPoint - startPoint);
             direction = new XYZ(direction.X, direction.Y, 0).Normalize();
 
-            double beamWidth = GetBeamWidthFromParameters(beam);
-
-            if (beamWidth <= 0)
-            {
-                BoundingBoxXYZ bb = beam.get_BoundingBox(activeView);
-                if (bb != null)
-                {
-                    XYZ normal = new XYZ(-direction.Y, direction.X, 0);
-
-                    XYZ[] corners = new[]
-                    {
-                        new XYZ(bb.Min.X, bb.Min.Y, 0),
-                        new XYZ(bb.Max.X, bb.Min.Y, 0),
-                        new XYZ(bb.Min.X, bb.Max.Y, 0),
-                        new XYZ(bb.Max.X, bb.Max.Y, 0)
-                    };
-
-                    double minProj = double.MaxValue;
-                    double maxProj = double.MinValue;
-                    foreach (var corner in corners)
-                    {
-                        double proj = corner.X * normal.X + corner.Y * normal.Y;
-                        minProj = Math.Min(minProj, proj);
-                        maxProj = Math.Max(maxProj, proj);
-                    }
-
-                    beamWidth = maxProj - minProj;
-                }
-            }
-
-            if (beamWidth < 200.0 / 304.8)
-                beamWidth = 200.0 / 304.8;
+            double beamWidth = BeamLabelGeometry.GetBeamWidth(beam, activeView, direction);
 
             midPoint = new XYZ(midPoint.X, midPoint.Y, 0);
 
             return Tuple.Create(midPoint, direction, beamWidth);
-        }
-
-        private static double GetBeamWidthFromParameters(FamilyInstance beam)
-        {
-            string[] widthParamNames = { "b", "B", "幅", "梁幅", "W", "w", "Width", "width" };
-
-            foreach (string name in widthParamNames)
-            {
-                Parameter param = beam.LookupParameter(name);
-                if (param != null && param.StorageType == StorageType.Double)
-                {
-                    double val = param.AsDouble();
-                    if (val > 0) return val;
-                }
-            }
-
-            ElementType beamType = beam.Symbol;
-            if (beamType != null)
-            {
-                foreach (string name in widthParamNames)
-                {
-                    Parameter param = beamType.LookupParameter(name);
-                    if (param != null && param.StorageType == StorageType.Double)
-                    {
-                        double val = param.AsDouble();
-                        if (val > 0) return val;
-                    }
-                }
-            }
-
-            return 0;
         }
 
         private static double GetTextHeight(Document doc, ElementId textNoteTypeId)
