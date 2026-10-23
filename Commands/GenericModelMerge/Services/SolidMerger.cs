@@ -20,6 +20,15 @@ namespace Tools28.Commands.GenericModelMerge.Services
 
         /// <summary>結合 (Boolean) に失敗し、単独の形状として残した個数。</summary>
         public int UnionFailedCount { get; set; }
+
+        /// <summary>形状がすべて切断ボックスの外側にあり、対象外にした要素数。</summary>
+        public int OutsideSectionBoxCount { get; set; }
+
+        /// <summary>切断ボックスの外側を切り取った形状の数。</summary>
+        public int ClippedCount { get; set; }
+
+        /// <summary>切断ボックスで切り取れず、元の形のまま入れた形状の数。</summary>
+        public int ClipFailedCount { get; set; }
     }
 
     /// <summary>
@@ -35,7 +44,9 @@ namespace Tools28.Commands.GenericModelMerge.Services
         /// <summary>接触判定の許容値（フィート）。約 0.3 mm。</summary>
         private const double TouchTolerance = 0.001;
 
-        public static MergeResult Build(Document doc, IList<ElementId> elementIds, MergeCombineMode mode)
+        /// <param name="clipper">切断ボックスが有効なビューなら、その外側を切り取る。null なら切らない。</param>
+        public static MergeResult Build(Document doc, IList<ElementId> elementIds, MergeCombineMode mode,
+            SectionBoxClipper clipper)
         {
             var result = new MergeResult();
 
@@ -59,11 +70,32 @@ namespace Tools28.Commands.GenericModelMerge.Services
                 }
 
                 BoundingBoxXYZ bb = null;
-                try { bb = e.get_BoundingBox(null); } catch { }
+                if (clipper != null)
+                {
+                    solids = clipper.Clip(solids);
+                    if (solids.Count == 0)
+                    {
+                        // 切断ボックスの面に触れているだけで、中身はすべて外側
+                        result.OutsideSectionBoxCount++;
+                        continue;
+                    }
+                    // 切り取った後の形で「くっついているか」を判定する
+                    bb = BoundsOf(solids);
+                }
+                else
+                {
+                    try { bb = e.get_BoundingBox(null); } catch { }
+                }
 
                 perElement.Add(solids);
                 boxes.Add(bb);
                 result.SourceElementIds.Add(id);
+            }
+
+            if (clipper != null)
+            {
+                result.ClippedCount = clipper.ClippedCount;
+                result.ClipFailedCount = clipper.FailedCount;
             }
 
             switch (mode)
@@ -161,6 +193,29 @@ namespace Tools28.Commands.GenericModelMerge.Services
                 list.AddRange(perElement[i]);
             }
             return new List<List<Solid>>(groups.Values);
+        }
+
+        /// <summary>複数の Solid をまとめて囲む外形範囲（ワールド座標）。</summary>
+        private static BoundingBoxXYZ BoundsOf(List<Solid> solids)
+        {
+            XYZ min = null, max = null;
+            foreach (var s in solids)
+            {
+                BoundingBoxXYZ bb;
+                try { bb = s.GetBoundingBox(); } catch { continue; }
+                if (bb == null) continue;
+                Transform t = bb.Transform ?? Transform.Identity;
+                foreach (double x in new[] { bb.Min.X, bb.Max.X })
+                foreach (double y in new[] { bb.Min.Y, bb.Max.Y })
+                foreach (double z in new[] { bb.Min.Z, bb.Max.Z })
+                {
+                    XYZ p = t.OfPoint(new XYZ(x, y, z));
+                    min = min == null ? p : new XYZ(Math.Min(min.X, p.X), Math.Min(min.Y, p.Y), Math.Min(min.Z, p.Z));
+                    max = max == null ? p : new XYZ(Math.Max(max.X, p.X), Math.Max(max.Y, p.Y), Math.Max(max.Z, p.Z));
+                }
+            }
+            if (min == null) return null;
+            return new BoundingBoxXYZ { Min = min, Max = max };
         }
 
         private static int Find(int[] parent, int i)

@@ -49,9 +49,14 @@ namespace Tools28.Commands.GenericModelMerge.Views
             foreach (var row in _categories)
                 row.PropertyChanged += Category_PropertyChanged;
 
-            cmbMaterial.ItemsSource = materials;
-            if (materials != null && materials.Count > 0)
-                cmbMaterial.SelectedIndex = 0;
+            // 先頭は「元の材質のまま」（Id = InvalidElementId）。既定はこれにする
+            var materialItems = new List<MaterialRow>
+            {
+                new MaterialRow { Id = ElementId.InvalidElementId, Name = Loc.S("GmMerge.Material.Keep") },
+            };
+            if (materials != null) materialItems.AddRange(materials);
+            cmbMaterial.ItemsSource = materialItems;
+            cmbMaterial.SelectedIndex = 0;
 
             txtName.Text = $"{Loc.S("GmMerge.DefaultName", _modelLang)}_{DateTime.Now:yyyyMMdd_HHmm}";
 

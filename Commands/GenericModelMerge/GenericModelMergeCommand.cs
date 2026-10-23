@@ -97,11 +97,16 @@ namespace Tools28.Commands.GenericModelMerge
             MergeOptions options, List<ElementId> targetIds)
         {
             // --- 形状の読み取りと結合（読み取りのみ。トランザクションは不要） ---
-            var merged = SolidMerger.Build(doc, targetIds, options.CombineMode);
+            // 切断ボックスが有効なら、その外側にはみ出した部分を切り取る
+            var clipper = SectionBoxClipper.FromView(view);
+            var merged = SolidMerger.Build(doc, targetIds, options.CombineMode, clipper);
             DiagLog.Write($"[CMD:GenericModelMerge] 形状 {merged.Solids.Count} 個 / " +
                           $"元要素 {merged.SourceElementIds.Count} 個 / " +
                           $"形状なし {merged.NoGeometryCount} 個 / " +
-                          $"結合失敗 {merged.UnionFailedCount} 個");
+                          $"結合失敗 {merged.UnionFailedCount} 個 / " +
+                          $"切断ボックス={(clipper != null ? "有効" : "なし")} " +
+                          $"切取 {merged.ClippedCount} 個 / 切取失敗 {merged.ClipFailedCount} 個 / " +
+                          $"範囲外 {merged.OutsideSectionBoxCount} 個");
 
             if (merged.Solids.Count == 0)
             {
@@ -157,11 +162,16 @@ namespace Tools28.Commands.GenericModelMerge
 
                 if (options.OutputKind == MergeOutputKind.Family)
                 {
-                    createdId = FamilyBuilder.LoadAndPlace(doc, options.FamilyPath);
+                    var place = FamilyBuilder.LoadAndPlace(doc, options.FamilyPath);
+                    createdId = place.InstanceId;
                     if (createdId == ElementId.InvalidElementId)
                     {
                         t.RollBack();
-                        TaskDialog.Show(Loc.S("GmMerge.Title"), Loc.S("GmMerge.Err.LoadFailed"));
+                        DiagLog.Write($"[CMD:GenericModelMerge] ファミリの読み込み/配置に失敗: loaded={place.Loaded} {place.ErrorMessage}");
+                        string msg = place.Loaded
+                            ? string.Format(Loc.S("GmMerge.Err.PlaceFailed"), place.ErrorMessage, options.FamilyPath)
+                            : Loc.S("GmMerge.Err.LoadFailed");
+                        TaskDialog.Show(Loc.S("GmMerge.Title"), msg);
                         return Result.Failed;
                     }
                 }
@@ -186,6 +196,10 @@ namespace Tools28.Commands.GenericModelMerge
                     return Result.Failed;
                 }
 
+                // API で作った要素の「構築フェーズ」はビューのフェーズと一致するとは限らない。
+                // ずれるとビューのフェーズフィルタで見えなくなるため、ビューのフェーズに合わせる
+                MatchViewPhase(doc, view, createdId);
+
                 if (options.HideSourceElements)
                     hiddenCount = HideSourceElements(doc, view, merged.SourceElementIds, createdId);
 
@@ -199,7 +213,17 @@ namespace Tools28.Commands.GenericModelMerge
                 }
             }
 
-            ShowResult(merged, options, dsOutcome, famOutcome, hiddenCount);
+            // 作った要素がこのビューで本当に見えているか確かめ、見えなければ理由を伝える。
+            // 作ったものを選択しておくと、見えないビューでもプロパティや ID で確認できる
+            var hiddenReasons = FindVisibilityProblems(doc, view, createdId);
+            try
+            {
+                commandData.Application.ActiveUIDocument?.Selection
+                    .SetElementIds(new List<ElementId> { createdId });
+            }
+            catch { }
+
+            ShowResult(merged, options, dsOutcome, famOutcome, hiddenCount, createdId, hiddenReasons);
             DiagLog.Cmd("GenericModelMerge", "完了");
             return Result.Succeeded;
         }
@@ -285,11 +309,22 @@ namespace Tools28.Commands.GenericModelMerge
             MergeResult merged, MergeOptions options,
             DirectShapeBuilder.BuildOutcome dsOutcome,
             FamilyBuilder.FamilyFileOutcome famOutcome,
-            int hiddenCount)
+            int hiddenCount,
+            ElementId createdId,
+            List<string> hiddenReasons)
         {
             var sb = new StringBuilder();
             sb.AppendLine(string.Format(Loc.S("GmMerge.Result.Created"),
                 merged.SourceElementIds.Count, merged.Solids.Count));
+            sb.AppendLine(string.Format(Loc.S("GmMerge.Result.Selected"), createdId.IntValue()));
+
+            if (hiddenReasons != null && hiddenReasons.Count > 0)
+            {
+                sb.AppendLine();
+                sb.AppendLine(Loc.S("GmMerge.Result.NotVisible"));
+                foreach (var r in hiddenReasons) sb.AppendLine(r);
+                sb.AppendLine();
+            }
 
             if (options.OutputKind == MergeOutputKind.Family && famOutcome != null)
                 sb.AppendLine(string.Format(Loc.S("GmMerge.Result.SavedTo"), famOutcome.SavedPath));
@@ -299,6 +334,15 @@ namespace Tools28.Commands.GenericModelMerge
 
             if (merged.NoGeometryCount > 0)
                 sb.AppendLine(string.Format(Loc.S("GmMerge.Result.NoGeometry"), merged.NoGeometryCount));
+
+            if (merged.ClippedCount > 0)
+                sb.AppendLine(string.Format(Loc.S("GmMerge.Result.Clipped"), merged.ClippedCount));
+
+            if (merged.OutsideSectionBoxCount > 0)
+                sb.AppendLine(string.Format(Loc.S("GmMerge.Result.Outside"), merged.OutsideSectionBoxCount));
+
+            if (merged.ClipFailedCount > 0)
+                sb.AppendLine(string.Format(Loc.S("GmMerge.Result.ClipFailed"), merged.ClipFailedCount));
 
             if (merged.UnionFailedCount > 0)
                 sb.AppendLine(string.Format(Loc.S("GmMerge.Result.UnionFailed"), merged.UnionFailedCount));
@@ -318,6 +362,98 @@ namespace Tools28.Commands.GenericModelMerge
             }
 
             TaskDialog.Show(Loc.S("GmMerge.Title"), sb.ToString().TrimEnd());
+        }
+
+        /// <summary>作った要素の構築フェーズをビューのフェーズに合わせる。</summary>
+        private static void MatchViewPhase(Document doc, View view, ElementId createdId)
+        {
+            try
+            {
+                ElementId phaseId = view.get_Parameter(BuiltInParameter.VIEW_PHASE)?.AsElementId();
+                if (phaseId == null || phaseId == ElementId.InvalidElementId) return;
+
+                var e = doc.GetElement(createdId);
+                var p = e?.get_Parameter(BuiltInParameter.PHASE_CREATED);
+                if (p == null || p.IsReadOnly) return;
+
+                ElementId before = p.AsElementId();
+                if (before == phaseId) return;
+                p.Set(phaseId);
+                DiagLog.Write($"[CMD:GenericModelMerge] 構築フェーズをビューに合わせた {before?.IntValue()} → {phaseId.IntValue()}");
+            }
+            catch (Exception ex)
+            {
+                DiagLog.Write($"[CMD:GenericModelMerge] フェーズの設定に失敗: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 作った要素がビューに表示されていなければ、考えられる理由を返す（表示されていれば空）。
+        /// ビューの設定は利用者のものなので、勝手に変えずに知らせるだけにする。
+        /// </summary>
+        private static List<string> FindVisibilityProblems(Document doc, View view, ElementId createdId)
+        {
+            var reasons = new List<string>();
+            var gm = new ElementId(BuiltInCategory.OST_GenericModel);
+            try
+            {
+                bool visible = new FilteredElementCollector(doc, view.Id)
+                    .OfCategoryId(gm)
+                    .WhereElementIsNotElementType()
+                    .ToElementIds()
+                    .Contains(createdId);
+                if (visible) return reasons;
+
+                var created = doc.GetElement(createdId);
+
+                if (view.IsInTemporaryViewMode(TemporaryViewMode.TemporaryHideIsolate))
+                    reasons.Add(Loc.S("GmMerge.Reason.TempMode"));
+
+                try
+                {
+                    if (view.GetCategoryHidden(gm))
+                        reasons.Add(Loc.S("GmMerge.Reason.Category"));
+                }
+                catch { }
+
+                foreach (var filterId in view.GetFilters())
+                {
+                    try
+                    {
+                        if (view.GetFilterVisibility(filterId)) continue;
+                        if (!(doc.GetElement(filterId) is ParameterFilterElement pfe)) continue;
+                        if (!pfe.GetCategories().Contains(gm)) continue;
+                        var rule = pfe.GetElementFilter();
+                        if (rule == null || created == null || rule.PassesFilter(created))
+                            reasons.Add(string.Format(Loc.S("GmMerge.Reason.Filter"), pfe.Name));
+                    }
+                    catch { }
+                }
+
+                if (doc.IsWorkshared && created != null)
+                {
+                    try
+                    {
+                        if (!view.IsWorksetVisible(created.WorksetId))
+                        {
+                            string ws = doc.GetWorksetTable().GetWorkset(created.WorksetId)?.Name;
+                            reasons.Add(string.Format(Loc.S("GmMerge.Reason.Workset"), ws));
+                        }
+                    }
+                    catch { }
+                }
+
+                if (reasons.Count == 0)
+                    reasons.Add(Loc.S("GmMerge.Reason.Unknown"));
+
+                DiagLog.Write("[CMD:GenericModelMerge] 作成した要素がビューに表示されていない: "
+                              + string.Join(" / ", reasons));
+            }
+            catch (Exception ex)
+            {
+                DiagLog.Write($"[CMD:GenericModelMerge] 表示の確認に失敗: {ex.Message}");
+            }
+            return reasons;
         }
 
         /// <summary>ファミリテンプレートが自動で見つからないときに手動で選んでもらう。</summary>

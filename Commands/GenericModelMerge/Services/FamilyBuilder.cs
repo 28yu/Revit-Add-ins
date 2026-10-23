@@ -82,9 +82,12 @@ namespace Tools28.Commands.GenericModelMerge.Services
                     // 材質はファミリ文書側に同名で作り直して割り当てる。
                     // ElementTransformUtils.CopyElements は「ファミリとプロジェクト間では
                     // コピーできません」というエラーになるため使えない。
-                    ElementId famMaterialId = ElementId.InvalidElementId;
-                    if (materialId != null && materialId != ElementId.InvalidElementId)
-                        famMaterialId = EnsureMaterial(projectDoc, famDoc, materialId);
+                    // 材質を選ばなかった（元の材質のまま）場合は、形状ごとに元の材質を引き継ぐ
+                    bool keepOriginal = materialId == null || materialId == ElementId.InvalidElementId;
+                    var materialMap = new Dictionary<ElementId, ElementId>();
+                    ElementId famMaterialId = keepOriginal
+                        ? ElementId.InvalidElementId
+                        : EnsureMaterial(projectDoc, famDoc, materialId);
 
                     foreach (var solid in solids)
                     {
@@ -94,7 +97,21 @@ namespace Tools28.Commands.GenericModelMerge.Services
                             if (ffe == null) { outcome.FailedSolidCount++; continue; }
                             outcome.CreatedSolidCount++;
 
-                            if (famMaterialId != ElementId.InvalidElementId)
+                            if (keepOriginal)
+                            {
+                                // FreeFormElement は形状1つにつき材質1つなので、面積がいちばん大きい面の材質を使う
+                                ElementId src = DominantMaterial(solid);
+                                if (src == ElementId.InvalidElementId) continue;
+                                if (!materialMap.TryGetValue(src, out var famId))
+                                {
+                                    famId = EnsureMaterial(projectDoc, famDoc, src);
+                                    materialMap[src] = famId;
+                                }
+                                if (famId == ElementId.InvalidElementId) continue;
+                                var p = ffe.get_Parameter(BuiltInParameter.MATERIAL_ID_PARAM);
+                                if (p != null && !p.IsReadOnly) p.Set(famId);
+                            }
+                            else if (famMaterialId != ElementId.InvalidElementId)
                             {
                                 var p = ffe.get_Parameter(BuiltInParameter.MATERIAL_ID_PARAM);
                                 if (p != null && !p.IsReadOnly && p.Set(famMaterialId))
@@ -165,11 +182,27 @@ namespace Tools28.Commands.GenericModelMerge.Services
             }
         }
 
+        /// <summary>Phase B の結果。</summary>
+        internal class PlaceOutcome
+        {
+            public ElementId InstanceId { get; set; } = ElementId.InvalidElementId;
+            /// <summary>失敗したときの理由（画面に出す）。</summary>
+            public string ErrorMessage { get; set; }
+            /// <summary>読み込みには成功したか（配置だけ失敗したかの区別）。</summary>
+            public bool Loaded { get; set; }
+        }
+
         /// <summary>
         /// Phase B: .rfa をロードして原点に配置する。プロジェクトのトランザクション内で呼ぶこと。
+        ///
+        /// 形状はプロジェクトの座標のまま持ち込んでいるので、インスタンスの原点が
+        /// プロジェクトの原点 (0,0,0) に来ないと元の位置からずれる。配置後に原点を確かめ、
+        /// ずれていれば移動して合わせる。
         /// </summary>
-        public static ElementId LoadAndPlace(Document doc, string familyPath)
+        public static PlaceOutcome LoadAndPlace(Document doc, string familyPath)
         {
+            var outcome = new PlaceOutcome();
+
             Family family;
             if (!doc.LoadFamily(familyPath, new OverwriteFamilyLoadOptions(), out family) || family == null)
             {
@@ -179,20 +212,87 @@ namespace Tools28.Commands.GenericModelMerge.Services
                     .OfClass(typeof(Family))
                     .Cast<Family>()
                     .FirstOrDefault(f => f.Name == name);
-                if (family == null) return ElementId.InvalidElementId;
+                if (family == null) return outcome;
             }
+            outcome.Loaded = true;
 
             var symbolId = family.GetFamilySymbolIds().FirstOrDefault();
-            if (symbolId == null || symbolId == ElementId.InvalidElementId)
-                return ElementId.InvalidElementId;
+            var symbol = symbolId == null ? null : doc.GetElement(symbolId) as FamilySymbol;
+            if (symbol == null)
+            {
+                outcome.ErrorMessage = "FamilySymbol not found";
+                return outcome;
+            }
+            if (!symbol.IsActive) { symbol.Activate(); doc.Regenerate(); }
 
-            var symbol = doc.GetElement(symbolId) as FamilySymbol;
-            if (symbol == null) return ElementId.InvalidElementId;
-            if (!symbol.IsActive) symbol.Activate();
+            FamilyPlacementType placement = family.FamilyPlacementType;
+            DiagLog.Write($"[CMD:GenericModelMerge] ファミリ配置 type={placement}");
 
-            var instance = doc.Create.NewFamilyInstance(
-                XYZ.Zero, symbol, StructuralType.NonStructural);
-            return instance?.Id ?? ElementId.InvalidElementId;
+            FamilyInstance instance = null;
+            try
+            {
+                if (placement == FamilyPlacementType.OneLevelBased ||
+                    placement == FamilyPlacementType.WorkPlaneBased)
+                {
+                    instance = doc.Create.NewFamilyInstance(XYZ.Zero, symbol, StructuralType.NonStructural);
+                }
+                else
+                {
+                    // 面・壁などに取り付けるテンプレートで作られたファミリは、ホストなしでは置けない
+                    outcome.ErrorMessage = string.Format(
+                        Tools28.Localization.Loc.S("GmMerge.Err.HostedTemplate"), placement);
+                    return outcome;
+                }
+            }
+            catch (Exception ex)
+            {
+                outcome.ErrorMessage = ex.Message;
+                return outcome;
+            }
+
+            if (instance == null)
+            {
+                outcome.ErrorMessage = "NewFamilyInstance returned null";
+                return outcome;
+            }
+
+            // 原点がずれていたら (0,0,0) へ戻す（レベルの高さ分だけ上下にずれる場合など）
+            try
+            {
+                doc.Regenerate();
+                XYZ origin = instance.GetTransform().Origin;
+                if (origin.GetLength() > 1e-6)
+                {
+                    DiagLog.Write($"[CMD:GenericModelMerge] 配置原点のずれを補正 ({origin.X:0.###},{origin.Y:0.###},{origin.Z:0.###}) ft");
+                    ElementTransformUtils.MoveElement(doc, instance.Id, origin.Negate());
+                }
+            }
+            catch (Exception ex)
+            {
+                DiagLog.Write($"[CMD:GenericModelMerge] 配置原点の確認に失敗: {ex.Message}");
+            }
+
+            outcome.InstanceId = instance.Id;
+            return outcome;
+        }
+
+        /// <summary>
+        /// 形状の中で面積がいちばん大きい面の材質。材質が付いていなければ InvalidElementId。
+        /// </summary>
+        private static ElementId DominantMaterial(Solid solid)
+        {
+            var areaById = new Dictionary<ElementId, double>();
+            foreach (Face f in solid.Faces)
+            {
+                ElementId id;
+                try { id = f.MaterialElementId; } catch { continue; }
+                if (id == null || id == ElementId.InvalidElementId) continue;
+                double a;
+                try { a = f.Area; } catch { a = 0; }
+                areaById[id] = (areaById.TryGetValue(id, out var cur) ? cur : 0) + a;
+            }
+            if (areaById.Count == 0) return ElementId.InvalidElementId;
+            return areaById.OrderByDescending(kv => kv.Value).First().Key;
         }
 
         /// <summary>
@@ -265,15 +365,30 @@ namespace Tools28.Commands.GenericModelMerge.Services
                 if (hit != null) return hit;
             }
 
+            // 部分一致では「一般モデル(面ベース)」のようなホスト付きのテンプレートを除く。
+            // ホスト付きで作ったファミリは、取り付け先が無いと配置できないため
             foreach (var name in exact)
             {
                 var hit = files.FirstOrDefault(f =>
-                    Path.GetFileNameWithoutExtension(f)
-                        .IndexOf(name, StringComparison.OrdinalIgnoreCase) >= 0);
+                {
+                    string n = Path.GetFileNameWithoutExtension(f);
+                    return n.IndexOf(name, StringComparison.OrdinalIgnoreCase) >= 0 && !IsHostedTemplateName(n);
+                });
                 if (hit != null) return hit;
             }
 
             return null;
+        }
+
+        private static readonly string[] HostedTemplateWords =
+        {
+            "ベース", "based", "基于", "adaptive", "アダプティブ", "自适应", "pattern", "パターン", "图案",
+        };
+
+        private static bool IsHostedTemplateName(string fileName)
+        {
+            return HostedTemplateWords.Any(w =>
+                fileName.IndexOf(w, StringComparison.OrdinalIgnoreCase) >= 0);
         }
 
         /// <summary>同名ファミリがロード済みでも上書きする。</summary>
