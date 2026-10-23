@@ -11,6 +11,17 @@ namespace Tools28.Commands.GenericModelMerge.Models
         Family,
     }
 
+    /// <summary>一般モデルファミリで作るときに、書き出す・配置するのどちらを行うか。</summary>
+    internal enum MergeFamilyAction
+    {
+        /// <summary>.rfa を保存し、このプロジェクトにも読み込んで配置する。</summary>
+        SaveAndPlace,
+        /// <summary>.rfa を保存するだけ。プロジェクトには読み込まない。</summary>
+        SaveOnly,
+        /// <summary>プロジェクトに読み込んで配置するだけ。.rfa は残さない（一時フォルダに作って削除する）。</summary>
+        PlaceOnly,
+    }
+
     /// <summary>複数要素の形状を「一つのかたまり」にまとめる方法。</summary>
     internal enum MergeCombineMode
     {
@@ -37,7 +48,19 @@ namespace Tools28.Commands.GenericModelMerge.Models
         /// <summary>生成する要素／ファミリの名前。</summary>
         public string Name { get; set; } = "";
 
-        /// <summary>Family 出力時の保存先 .rfa パス。</summary>
+        /// <summary>Family 出力時に、書き出す・配置するのどちらを行うか。</summary>
+        public MergeFamilyAction FamilyAction { get; set; } = MergeFamilyAction.SaveAndPlace;
+
+        /// <summary>Family 出力で配置する（SaveOnly 以外）か。</summary>
+        public bool PlacesFamily => FamilyAction != MergeFamilyAction.SaveOnly;
+
+        /// <summary>Family 出力で .rfa を残す（PlaceOnly 以外）か。</summary>
+        public bool KeepsFamilyFile => FamilyAction != MergeFamilyAction.PlaceOnly;
+
+        /// <summary>
+        /// Family 出力時の .rfa パス。PlaceOnly のときは一時フォルダ内のパスで、処理後に削除する。
+        /// （ロードしたファミリの名前はファイル名になるため、一時ファイルも作成する名前で作る）
+        /// </summary>
         public string FamilyPath { get; set; } = "";
     }
 }

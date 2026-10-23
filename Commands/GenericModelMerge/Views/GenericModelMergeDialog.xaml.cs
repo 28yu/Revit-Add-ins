@@ -78,6 +78,12 @@ namespace Tools28.Commands.GenericModelMerge.Views
             txtDirectShapeHint.Text = Loc.S("GmMerge.Output.DirectShape.Hint");
             rbFamily.Content = Loc.S("GmMerge.Output.Family");
             txtFamilyHint.Text = Loc.S("GmMerge.Output.Family.Hint");
+            rbFamSaveAndPlace.Content = Loc.S("GmMerge.FamAction.SaveAndPlace");
+            txtFamSaveAndPlaceHint.Text = Loc.S("GmMerge.FamAction.SaveAndPlace.Hint");
+            rbFamSaveOnly.Content = Loc.S("GmMerge.FamAction.SaveOnly");
+            txtFamSaveOnlyHint.Text = Loc.S("GmMerge.FamAction.SaveOnly.Hint");
+            rbFamPlaceOnly.Content = Loc.S("GmMerge.FamAction.PlaceOnly");
+            txtFamPlaceOnlyHint.Text = Loc.S("GmMerge.FamAction.PlaceOnly.Hint");
 
             grpCombine.Header = Loc.S("GmMerge.Combine");
             rbKeepShapes.Content = Loc.S("GmMerge.Combine.Keep");
@@ -132,7 +138,30 @@ namespace Tools28.Commands.GenericModelMerge.Views
             txtNameHint.Text = rbFamily.IsChecked == true
                 ? Loc.S("GmMerge.Name.Hint.Family")
                 : Loc.S("GmMerge.Name.Hint");
+            UpdateFamilyActionState();
         }
+
+        private void FamilyAction_Changed(object sender, RoutedEventArgs e)
+        {
+            UpdateFamilyActionState();
+        }
+
+        /// <summary>
+        /// 書き出す／配置するの選択肢はファミリで作るときだけ選べる。
+        /// 「書き出すだけ」はプロジェクトに何も置かないので、元の要素の非表示も行わない。
+        /// </summary>
+        private void UpdateFamilyActionState()
+        {
+            if (pnlFamilyAction == null || chkHideSource == null) return;
+            bool family = rbFamily.IsChecked == true;
+            pnlFamilyAction.IsEnabled = family;
+            chkHideSource.IsEnabled = !(family && rbFamSaveOnly.IsChecked == true);
+        }
+
+        private MergeFamilyAction SelectedFamilyAction =>
+            rbFamSaveOnly.IsChecked == true ? MergeFamilyAction.SaveOnly :
+            rbFamPlaceOnly.IsChecked == true ? MergeFamilyAction.PlaceOnly :
+            MergeFamilyAction.SaveAndPlace;
 
         private void btnRun_Click(object sender, RoutedEventArgs e)
         {
@@ -168,9 +197,24 @@ namespace Tools28.Commands.GenericModelMerge.Views
 
             if (options.OutputKind == MergeOutputKind.Family)
             {
-                string path = AskFamilyPath(name);
-                if (string.IsNullOrEmpty(path)) return;   // 保存先ダイアログでキャンセル
-                options.FamilyPath = path;
+                options.FamilyAction = SelectedFamilyAction;
+                if (!options.PlacesFamily) options.HideSourceElements = false;
+
+                if (options.KeepsFamilyFile)
+                {
+                    string path = AskFamilyPath(name);
+                    if (string.IsNullOrEmpty(path)) return;   // 保存先ダイアログでキャンセル
+                    options.FamilyPath = path;
+                }
+                else
+                {
+                    // 配置するだけ: 保存先は聞かず、一時フォルダに作って読み込んだあと消す。
+                    // ファミリ名はファイル名になるので、入力された名前のファイルにする
+                    options.FamilyPath = Path.Combine(
+                        Path.GetTempPath(),
+                        GenericModelMergeCommand.TempFolderPrefix + Guid.NewGuid().ToString("N"),
+                        SanitizeFileName(name) + ".rfa");
+                }
             }
 
             Options = options;

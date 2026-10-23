@@ -165,6 +165,24 @@
                                          Style="{StaticResource OptionTitleStyle}"
                                          Checked="OutputKind_Changed"/>
                             <TextBlock x:Name="txtFamilyHint" Style="{StaticResource OptionHintStyle}"/>
+
+                            <!-- ファミリで作るときだけ選べる: 書き出す・配置するのどちらを行うか -->
+                            <StackPanel x:Name="pnlFamilyAction" Margin="20,0,0,0" IsEnabled="False">
+                                <RadioButton x:Name="rbFamSaveAndPlace" GroupName="FamilyAction"
+                                             Style="{StaticResource OptionTitleStyle}" IsChecked="True"
+                                             Checked="FamilyAction_Changed"/>
+                                <TextBlock x:Name="txtFamSaveAndPlaceHint" Style="{StaticResource OptionHintStyle}"/>
+
+                                <RadioButton x:Name="rbFamSaveOnly" GroupName="FamilyAction"
+                                             Style="{StaticResource OptionTitleStyle}"
+                                             Checked="FamilyAction_Changed"/>
+                                <TextBlock x:Name="txtFamSaveOnlyHint" Style="{StaticResource OptionHintStyle}"/>
+
+                                <RadioButton x:Name="rbFamPlaceOnly" GroupName="FamilyAction"
+                                             Style="{StaticResource OptionTitleStyle}"
+                                             Checked="FamilyAction_Changed"/>
+                                <TextBlock x:Name="txtFamPlaceOnlyHint" Style="{StaticResource OptionHintStyle}"/>
+                            </StackPanel>
                         </StackPanel>
                     </GroupBox>
 

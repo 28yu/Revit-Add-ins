@@ -82,7 +82,16 @@ namespace Tools28.Commands.GenericModelMerge
                     if (confirm != TaskDialogResult.Yes) return Result.Cancelled;
                 }
 
-                return Run(commandData, doc, view, options, targetIds);
+                try
+                {
+                    return Run(commandData, doc, view, options, targetIds);
+                }
+                finally
+                {
+                    // 「配置するだけ」で一時フォルダに作った .rfa は、成否にかかわらず消す
+                    if (options.OutputKind == MergeOutputKind.Family && !options.KeepsFamilyFile)
+                        DeleteTempFamily(options.FamilyPath);
+                }
             }
             catch (Exception ex)
             {
@@ -91,6 +100,25 @@ namespace Tools28.Commands.GenericModelMerge
                 return Result.Failed;
             }
         }
+
+        /// <summary>「配置するだけ」で使った一時フォルダを削除する。失敗しても処理は成功扱い。</summary>
+        private static void DeleteTempFamily(string familyPath)
+        {
+            try
+            {
+                string dir = Path.GetDirectoryName(familyPath);
+                if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir) &&
+                    Path.GetFileName(dir).StartsWith(TempFolderPrefix, StringComparison.Ordinal))
+                    Directory.Delete(dir, true);
+            }
+            catch (Exception ex)
+            {
+                DiagLog.Write($"[CMD:GenericModelMerge] 一時ファイルの削除に失敗: {ex.Message}");
+            }
+        }
+
+        /// <summary>「配置するだけ」で .rfa を一時的に置くフォルダ名の先頭。削除対象の目印にもする。</summary>
+        internal const string TempFolderPrefix = "Tools28_GmMerge_";
 
         private Result Run(
             ExternalCommandData commandData, Document doc, View3D view,
@@ -131,6 +159,9 @@ namespace Tools28.Commands.GenericModelMerge
                     }
                 }
 
+                if (!options.KeepsFamilyFile)
+                    Directory.CreateDirectory(Path.GetDirectoryName(options.FamilyPath));
+
                 famOutcome = FamilyBuilder.CreateFamilyFile(
                     commandData.Application.Application, doc, merged.Solids,
                     template, options.FamilyPath, options.MaterialId);
@@ -141,6 +172,15 @@ namespace Tools28.Commands.GenericModelMerge
                     TaskDialog.Show(Loc.S("GmMerge.Title"),
                         string.Format(Loc.S("GmMerge.Err.FamilyFailed"), famOutcome.ErrorMessage));
                     return Result.Failed;
+                }
+
+                // 「書き出すだけ」はここで終わり。プロジェクトは変更しない（元の要素も非表示にしない）
+                if (!options.PlacesFamily)
+                {
+                    ShowResult(merged, options, null, famOutcome, 0,
+                        ElementId.InvalidElementId, null);
+                    DiagLog.Cmd("GenericModelMerge", "完了（書き出しのみ）");
+                    return Result.Succeeded;
                 }
             }
 
@@ -168,9 +208,10 @@ namespace Tools28.Commands.GenericModelMerge
                     {
                         t.RollBack();
                         DiagLog.Write($"[CMD:GenericModelMerge] ファミリの読み込み/配置に失敗: loaded={place.Loaded} {place.ErrorMessage}");
-                        string msg = place.Loaded
-                            ? string.Format(Loc.S("GmMerge.Err.PlaceFailed"), place.ErrorMessage, options.FamilyPath)
-                            : Loc.S("GmMerge.Err.LoadFailed");
+                        string msg = !place.Loaded ? Loc.S("GmMerge.Err.LoadFailed")
+                            : options.KeepsFamilyFile
+                                ? string.Format(Loc.S("GmMerge.Err.PlaceFailed"), place.ErrorMessage, options.FamilyPath)
+                                : string.Format(Loc.S("GmMerge.Err.PlaceFailedNoFile"), place.ErrorMessage);
                         TaskDialog.Show(Loc.S("GmMerge.Title"), msg);
                         return Result.Failed;
                     }
@@ -316,7 +357,8 @@ namespace Tools28.Commands.GenericModelMerge
             var sb = new StringBuilder();
             sb.AppendLine(string.Format(Loc.S("GmMerge.Result.Created"),
                 merged.SourceElementIds.Count, merged.Solids.Count));
-            sb.AppendLine(string.Format(Loc.S("GmMerge.Result.Selected"), createdId.IntValue()));
+            if (createdId != null && createdId != ElementId.InvalidElementId)
+                sb.AppendLine(string.Format(Loc.S("GmMerge.Result.Selected"), createdId.IntValue()));
 
             if (hiddenReasons != null && hiddenReasons.Count > 0)
             {
@@ -327,7 +369,12 @@ namespace Tools28.Commands.GenericModelMerge
             }
 
             if (options.OutputKind == MergeOutputKind.Family && famOutcome != null)
-                sb.AppendLine(string.Format(Loc.S("GmMerge.Result.SavedTo"), famOutcome.SavedPath));
+            {
+                if (options.KeepsFamilyFile)
+                    sb.AppendLine(string.Format(Loc.S("GmMerge.Result.SavedTo"), famOutcome.SavedPath));
+                if (!options.PlacesFamily)
+                    sb.AppendLine(Loc.S("GmMerge.Result.NotPlaced"));
+            }
 
             if (hiddenCount > 0)
                 sb.AppendLine(string.Format(Loc.S("GmMerge.Result.Hidden"), hiddenCount));
