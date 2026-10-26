@@ -72,6 +72,8 @@
     <Resource Include="Resources\Icons\viewport_paste.png" />
     <Resource Include="Resources\Icons\viewport_copy_16.png" />
     <Resource Include="Resources\Icons\viewport_paste_16.png" />
+    <Resource Include="Resources\Icons\viewport_match.png" />
+    <Resource Include="Resources\Icons\viewport_match_16.png" />
     <Resource Include="Resources\Icons\cropbox_copy.png" />
     <Resource Include="Resources\Icons\cropbox_paste.png" />
     <Resource Include="Resources\Icons\cropbox_copy_16.png" />

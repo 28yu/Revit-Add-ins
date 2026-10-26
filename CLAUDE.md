@@ -80,7 +80,7 @@ Revit-Add-ins/
 │   ├── SheetCreation/          # シート一括作成 (WPFダイアログ付き)
 │   ├── ViewCopy/               # 3Dビュー視点コピー
 │   ├── SectionBoxCopy/         # セクションボックスコピー
-│   ├── ViewportPosition/       # ビューポート位置コピー (自動マッチング)
+│   ├── ViewportPosition/       # ビューポート位置合わせ (MA と同じ操作・自動マッチング)
 │   ├── CropBoxCopy/            # トリミング領域コピー
 │   ├── BeamTopLevel/           # 梁天端レベル色分け (平面ビュー)
 │   └── LanguageSwitch/         # 言語切替・バージョン情報・マニュアル

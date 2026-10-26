@@ -19,6 +19,15 @@ namespace Tools28.Commands.ViewportPosition
         public static ViewportAnchorInfo SourceAnchor { get; set; }
         public static bool HasCopiedPosition => CopiedPosition != null;
 
+        /// <summary>ビューポートをコピー元として覚える（位置コピー・ビューポート位置合わせ共通）。</summary>
+        public static void SetSource(Document doc, Viewport viewport, ViewportAnchorInfo anchor)
+        {
+            CopiedPosition = viewport.GetBoxCenter();
+            SourceViewportInfo = anchor?.ViewName ?? Loc.S("ViewportPos.UnknownView");
+            SourceSheetName = (doc.GetElement(viewport.SheetId) as ViewSheet)?.Name;
+            SourceAnchor = anchor;
+        }
+
         public static void Clear()
         {
             CopiedPosition = null;
@@ -748,7 +757,7 @@ namespace Tools28.Commands.ViewportPosition
         /// そろえられないもの（パース・縮尺違い・見る向き違い）は動かさない。
         /// 結果は、問題があったときだけ画面で知らせる（黙って失敗しない）。
         /// </summary>
-        private Result MoveViewports(Document doc,
+        internal static Result MoveViewports(Document doc,
             List<(ViewportAnchorInfo source, Viewport target)> moves, string transactionName)
         {
             int moved = 0;

@@ -29,8 +29,7 @@ namespace Tools28
             { "GridBubbleLeft", "Ribbon.GridBubble.Left" },
             { "GridBubbleRight", "Ribbon.GridBubble.Right" },
             { "SheetCreation", "Ribbon.Sheet.Create" },
-            { "ViewportPositionCopy", "Ribbon.Viewport.Copy" },
-            { "ViewportPositionPaste", "Ribbon.Viewport.Paste" },
+            { "ViewportPositionMatch", "Ribbon.Viewport.Match" },
             { "CropBoxCopy", "Ribbon.CropBox.Copy" },
             { "CropBoxPaste", "Ribbon.CropBox.Paste" },
             { "ViewCopy", "Ribbon.View.Copy" },
@@ -66,8 +65,7 @@ namespace Tools28
             { "GridBubbleLeft", "Ribbon.GridBubble.Left.Tip" },
             { "GridBubbleRight", "Ribbon.GridBubble.Right.Tip" },
             { "SheetCreation", "Ribbon.Sheet.Create.Tip" },
-            { "ViewportPositionCopy", "Ribbon.Viewport.Copy.Tip" },
-            { "ViewportPositionPaste", "Ribbon.Viewport.Paste.Tip" },
+            { "ViewportPositionMatch", "Ribbon.Viewport.Match.Tip" },
             { "CropBoxCopy", "Ribbon.CropBox.Copy.Tip" },
             { "CropBoxPaste", "Ribbon.CropBox.Paste.Tip" },
             { "ViewCopy", "Ribbon.View.Copy.Tip" },
@@ -332,20 +330,12 @@ namespace Tools28
 
             panel.AddSeparator();
 
-            // ビューポート位置のコピー／ペーストは縦並び（スタック）で横幅を節約
-            var vpCopyData = new PushButtonData("ViewportPositionCopy", Loc.S("Ribbon.Viewport.Copy"), assemblyPath, "Tools28.Commands.ViewportPosition.ExecuteViewportPositionCopyCommand");
-            vpCopyData.ToolTip = Loc.S("Ribbon.Viewport.Copy.Tip");
-            vpCopyData.Image = LoadImage("viewport_copy_16.png");
-            vpCopyData.LargeImage = LoadImage("viewport_copy.png");
-
-            var vpPasteData = new PushButtonData("ViewportPositionPaste", Loc.S("Ribbon.Viewport.Paste"), assemblyPath, "Tools28.Commands.ViewportPosition.ExecuteViewportPositionPasteCommand");
-            vpPasteData.ToolTip = Loc.S("Ribbon.Viewport.Paste.Tip");
-            vpPasteData.Image = LoadImage("viewport_paste_16.png");
-            vpPasteData.LargeImage = LoadImage("viewport_paste.png");
-
-            var vpStacked = panel.AddStackedItems(vpCopyData, vpPasteData);
-            _buttons["ViewportPositionCopy"] = vpStacked[0] as RibbonItem;
-            _buttons["ViewportPositionPaste"] = vpStacked[1] as RibbonItem;
+            // ビューポート位置合わせ（Revit の「タイプ プロパティを一致」と同じ操作。旧 位置コピー／位置ペーストを統合）
+            var vpMatchData = new PushButtonData("ViewportPositionMatch", Loc.S("Ribbon.Viewport.Match"), assemblyPath, "Tools28.Commands.ViewportPosition.ViewportMatchCommand");
+            vpMatchData.ToolTip = Loc.S("Ribbon.Viewport.Match.Tip");
+            vpMatchData.Image = LoadImage("viewport_match_16.png");
+            vpMatchData.LargeImage = LoadImage("viewport_match.png");
+            AddButton(panel, vpMatchData);
 
             panel.AddSeparator();
 

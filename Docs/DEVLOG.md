@@ -2495,6 +2495,22 @@ V/G の外に原因がある可能性を潰せていなかった。
 - 開発環境でのコンパイル確認: `apt-get install dotnet-sdk-8.0` で dotnet を入れ、変更したファイルだけを Nice3point.Revit.Api（2021/2024/2026）と
   ビルドする確認用プロジェクトで型を検査した（WPF の画面は Linux では扱えないので、画面のクラスは仮のもので置き換える）
 
+### ビューポート位置合わせ（1ボタン化・MA と同じ操作）（2026-10-26）
+
+- 位置コピー／位置ペーストの2ボタンを「ビューポート位置合わせ」1つに置き換えた（`ViewportMatchCommand.cs`）。操作は Revit の
+  「タイプ プロパティを一致」(MA) と同じ: コピー元をクリック → 合わせたいビューポートを続けてクリック → Esc で終了
+- `Selection.PickObject` を Esc（`OperationCanceledException`）まで繰り返す。1クリック＝1トランザクションなので Ctrl+Z で1つずつ戻せる
+- **MA の「何もない場所をクリックしてコピー元を選び直す」は API では検知できない**（PickObject は要素の無い場所のクリックを返さない）。
+  シートの空いた場所はふつう図枠の上なので、**図枠のクリック**を選び直しの合図にした（選択フィルタで図枠だけ追加で許可）
+- コピー元は終了後もクリップボード（`ViewportPositionClipboard`）に残す。別のシートでボタンを押すと、コピー元を選ばずに「合わせる」から始まる
+- クリック待ちの間に同じモデルの別のシートへ切り替えて取り消された場合は、そのシートで続ける（実機で挙動を確認すること。
+  Revit がシートの切り替えを許さない／取り消さない場合は、この分岐は通らないだけで害は無い）
+- プロジェクトブラウザでシート・ビューを選んで押すと、従来の位置ペースト（`ExecuteViewportPositionPasteCommand`）に渡して一括処理。
+  ⚠ ダブルクリックで開いた直後のシートは選択に残ることがあるので、開いているシート自身は数えない
+- 旧 `ExecuteViewportPositionCopyCommand` / `ExecuteViewportPositionPasteCommand` はリボンから外したが、一括処理の部品として残している
+- アイコン `viewport_match.png`（96px・288 DPI）/ `viewport_match_16.png`: `viewport_paste.png` のシートを使い、中を
+  「青の破線 → 矢印 → 青の実線」に描き替えた。`Resources/Icons/DesignConcept/draw_viewport_match_icon.py` で作り直せる
+
 ## GenericModelMerge（一般モデル化）開発知見（2026-08-28） {#GenericModelMerge}
 
 3Dビューに表示されている複数カテゴリの要素から形状を読み取り、一つの一般モデル

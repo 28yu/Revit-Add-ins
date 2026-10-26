@@ -39,12 +39,12 @@
     {
       "id": "ViewportPosition",
       "category": "view",
-      "icon": "icons/features/viewport_copy.png",
+      "icon": "icons/features/viewport_match.png",
       "manual": "Features/ViewportPosition.md",
       "names": {
-        "ja": "ビューポート位置コピペ",
-        "en": "Viewport Position Copy/Paste",
-        "zh": "视口位置复制粘贴"
+        "ja": "ビューポート位置合わせ",
+        "en": "Align Viewports",
+        "zh": "对齐视口"
       }
     },
     {
