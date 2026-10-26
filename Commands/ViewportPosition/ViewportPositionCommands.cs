@@ -15,11 +15,14 @@ namespace Tools28.Commands.ViewportPosition
         public static XYZ CopiedPosition { get; set; }
         public static string SourceViewportInfo { get; set; }
         public static string SourceSheetName { get; set; }
+        /// <summary>コピー元の「図の位置」。ペースト時にこれとペースト先の図の位置を合わせる。</summary>
+        public static ViewportAnchorInfo SourceAnchor { get; set; }
         public static bool HasCopiedPosition => CopiedPosition != null;
 
         public static void Clear()
         {
             CopiedPosition = null;
+            SourceAnchor = null;
             SourceViewportInfo = null;
             SourceSheetName = null;
         }
@@ -469,8 +472,16 @@ namespace Tools28.Commands.ViewportPosition
 
                 Viewport selectedViewport = viewports[0];
 
-                // 位置情報を取得
+                // 位置情報を取得（枠の中心と、図の位置の両方）
                 XYZ position = selectedViewport.GetBoxCenter();
+                ViewportAnchorInfo anchor = ViewportAnchor.Capture(doc, selectedViewport);
+
+                // パースの 3D ビューは図の位置を計算できず、枠の中心でそろえても意味が無い
+                if (anchor.IsPerspective)
+                {
+                    message = Loc.S("ViewportPos.CopyPerspective");
+                    return Result.Failed;
+                }
 
                 // 関連するビュー情報を取得
                 View relatedView = doc.GetElement(selectedViewport.ViewId) as View;
@@ -480,6 +491,7 @@ namespace Tools28.Commands.ViewportPosition
                 ViewportPositionClipboard.CopiedPosition = position;
                 ViewportPositionClipboard.SourceViewportInfo = viewInfo;
                 ViewportPositionClipboard.SourceSheetName = activeSheet.Name;
+                ViewportPositionClipboard.SourceAnchor = anchor;
 
                 return Result.Succeeded;
             }
@@ -637,35 +649,13 @@ namespace Tools28.Commands.ViewportPosition
             List<(ViewSheet sheet, List<(Viewport source, Viewport target, string reason)> matches)> allMatches,
             string modeDescription)
         {
-            using (Transaction trans = new Transaction(doc, string.Format(Loc.S("ViewportPos.Txn.AutoMatch"), modeDescription)))
-            {
-                trans.Start();
-
-                int totalSuccess = 0;
-                int totalProcessed = 0;
-
-                foreach (var (sheet, matches) in allMatches)
-                {
-                    foreach (var (source, target, reason) in matches)
-                    {
-                        totalProcessed++;
-                        try
-                        {
-                            XYZ sourcePosition = source.GetBoxCenter();
-                            target.SetBoxCenter(sourcePosition);
-                            totalSuccess++;
-                        }
-                        catch
-                        {
-                            // エラーは無視して続行
-                        }
-                    }
-                }
-
-                trans.Commit();
-            }
-
-            return Result.Succeeded;
+            // 対応付いたビューポートどうしで、図の位置を合わせる
+            var moves = allMatches
+                .SelectMany(m => m.matches)
+                .Select(m => (ViewportAnchor.Capture(doc, m.source), m.target))
+                .ToList();
+            return MoveViewports(doc, moves,
+                string.Format(Loc.S("ViewportPos.Txn.AutoMatch"), modeDescription));
         }
 
         private Result ExecuteDirectViewportPasteImpl(Document doc, ViewSheet activeSheet, List<Viewport> viewports)
@@ -744,30 +734,93 @@ namespace Tools28.Commands.ViewportPosition
         private Result ApplyPositionToViewportsImpl(Document doc, List<Viewport> viewports, string operationType,
             List<(View view, Viewport viewport, ViewSheet sheet)> detailInfo = null)
         {
-            // ビューポートに位置を適用する共通処理
-            using (Transaction trans = new Transaction(doc, string.Format(Loc.S("ViewportPos.Txn.ApplyOp"), operationType)))
+            // コピー元の図の位置（旧版でコピーした場合などに無ければ、枠の中心だけ持たせる）
+            var source = ViewportPositionClipboard.SourceAnchor
+                ?? new ViewportAnchorInfo { BoxCenter = ViewportPositionClipboard.CopiedPosition };
+            var moves = viewports.Select(vp => (source, vp)).ToList();
+            return MoveViewports(doc, moves,
+                string.Format(Loc.S("ViewportPos.Txn.ApplyOp"), operationType));
+        }
+
+        /// <summary>
+        /// ペースト先のビューポートを、コピー元と図の位置がそろうように動かす共通処理。
+        /// 図の位置を計算できないもの（Revit 2021・製図ビュー・凡例など）は枠の中心でそろえる。
+        /// そろえられないもの（パース・縮尺違い・見る向き違い）は動かさない。
+        /// 結果は、問題があったときだけ画面で知らせる（黙って失敗しない）。
+        /// </summary>
+        private Result MoveViewports(Document doc,
+            List<(ViewportAnchorInfo source, Viewport target)> moves, string transactionName)
+        {
+            int moved = 0;
+            int fallback = 0;
+            var problems = new List<string>();
+
+            using (Transaction trans = new Transaction(doc, transactionName))
             {
                 trans.Start();
 
-                int successCount = 0;
-                int errorCount = 0;
-
-                foreach (Viewport viewport in viewports)
+                foreach (var (source, target) in moves)
                 {
+                    var dst = ViewportAnchor.Capture(doc, target);
+                    string name = dst.ViewName ?? Loc.S("ViewportPos.UnknownView");
                     try
                     {
-                        viewport.SetBoxCenter(ViewportPositionClipboard.CopiedPosition);
-                        successCount++;
+                        if (source.IsPerspective || dst.IsPerspective)
+                        {
+                            problems.Add(string.Format(Loc.S("ViewportPos.Report.Item"), name,
+                                Loc.S("ViewportPos.Reason.Perspective")));
+                            continue;
+                        }
+
+                        if (source.OriginOnSheet != null && dst.OriginOnSheet != null)
+                        {
+                            string why = ViewportAnchor.Incompatibility(source, dst);
+                            if (why != null)
+                            {
+                                problems.Add(string.Format(Loc.S("ViewportPos.Report.Item"), name, why));
+                                continue;
+                            }
+                            // 図の位置の差だけ枠ごと動かす
+                            XYZ delta = source.OriginOnSheet - dst.OriginOnSheet;
+                            target.SetBoxCenter(target.GetBoxCenter() + new XYZ(delta.X, delta.Y, 0));
+                        }
+                        else
+                        {
+                            if (source.BoxCenter == null) continue;
+                            target.SetBoxCenter(source.BoxCenter);
+                            fallback++;
+                        }
+                        moved++;
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        errorCount++;
+                        DiagLog.Write($"[ViewportPos] 移動に失敗 view={name}: {ex.Message}");
+                        problems.Add(string.Format(Loc.S("ViewportPos.Report.Failed"), name, ex.Message));
                     }
                 }
 
-                trans.Commit();
+                // 何も動かなかったときは、空の操作を「元に戻す」履歴に残さない
+                if (moved > 0) trans.Commit();
+                else trans.RollBack();
+            }
 
-                // エラーがある場合のみメッセージ設定は呼び出し元で処理
+            if (fallback > 0 || problems.Count > 0)
+            {
+                var lines = new List<string>
+                {
+                    string.Format(Loc.S("ViewportPos.Report.Moved"), moved - fallback),
+                };
+                if (fallback > 0)
+                    lines.Add(string.Format(Loc.S("ViewportPos.Report.Fallback"), fallback));
+                if (problems.Count > 0)
+                {
+                    lines.Add("");
+                    lines.Add(Loc.S("ViewportPos.Report.SkippedHeader"));
+                    lines.AddRange(problems.Take(20));
+                    if (problems.Count > 20)
+                        lines.Add(string.Format(Loc.S("Import.Done.More"), problems.Count - 20));
+                }
+                TaskDialog.Show(Loc.S("ViewportPos.Report.Title"), string.Join("\n", lines));
             }
 
             return Result.Succeeded;
