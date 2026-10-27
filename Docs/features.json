@@ -53,9 +53,9 @@
       "icon": "icons/features/cropbox_copy.png",
       "manual": "Features/CropBoxCopy.md",
       "names": {
-        "ja": "トリミング領域コピペ",
-        "en": "Crop Region Copy/Paste",
-        "zh": "裁剪区域复制粘贴"
+        "ja": "トリミング領域合わせ",
+        "en": "Match Crop Region",
+        "zh": "匹配裁剪区域"
       }
     },
     {

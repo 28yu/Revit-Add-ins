@@ -4,10 +4,10 @@ using Autodesk.Revit.DB;
 namespace Tools28.Commands.ViewCopy
 {
     /// <summary>
-    /// 視点合わせ（旧 視点コピー／視点ペーストを1ボタンにまとめたもの）。流れは <see cref="View3DMatchCommandBase"/>。
+    /// 視点合わせ（旧 視点コピー／視点ペーストを1ボタンにまとめたもの）。流れは <see cref="ViewSettingMatchCommandBase"/>。
     /// </summary>
     [Transaction(TransactionMode.Manual)]
-    public class ViewMatchCommand : View3DMatchCommandBase
+    public class ViewMatchCommand : ViewSettingMatchCommandBase
     {
         protected override string KeyPrefix => "ViewMatch";
 
@@ -19,13 +19,13 @@ namespace Tools28.Commands.ViewCopy
 
         protected override string SourceDescription => ViewOrientationClipboard.SourceViewName;
 
-        protected override string CopyFrom(View3D view)
+        protected override string CopyFrom(View view)
         {
-            ViewOrientationClipboard.CopyFrom(view);
+            ViewOrientationClipboard.CopyFrom((View3D)view);
             return null;
         }
 
-        protected override void ApplyTo(View3D view) => ViewOrientationClipboard.ApplyTo(view);
+        protected override void ApplyTo(View view) => ViewOrientationClipboard.ApplyTo((View3D)view);
 
         protected override void ClearCopy() => ViewOrientationClipboard.Clear();
     }

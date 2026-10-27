@@ -2545,6 +2545,15 @@ V/G の外に原因がある可能性を潰せていなかった。
 - アイコン `view_match.png` / `sectionbox_match.png`（96px・288 DPI）: 旧アイコンのコピー側とペースト側を 60% に縮めて並べ、矢印でつないだ
   （運営者が「右下に回る矢印の印」案と見比べて選んだ）。`Resources/Icons/DesignConcept/draw_view_match_icons.py`
 
+### トリミング領域合わせ（1ボタン化）（2026-10-27）
+
+- トリミング領域 コピー／ペーストを「トリミング領域合わせ」1ボタンにした（`CropBoxMatchCommand`）。操作は視点・切断ボックス合わせと同じ（印・すぐ貼る・まとめて貼る・Esc）
+- 共通の流れを3Dビュー専用から一般のビュー向けに広げ、名前を `View3DMatchCommandBase` → **`ViewSettingMatchCommandBase`** に変えた。
+  種類ごとに `Supports(View)`（使えるビュー）・`NeedViewMessage`・`CombinesWithOthers` を決める
+- トリミング領域は主に3Dビュー以外で使うので、視点・切断ボックスの「どちらのボタンでも両方貼る」組み合わせには**入れない**（運営者の判断）
+- アイコンは今の `cropbox_copy.png` をそのまま使う（運営者の指定）。リボンは縦並び2つの小ボタン → 大きいボタン1つ（16px は `cropbox_copy_16.png`）
+- トリミング領域は要素の設定なので、Ctrl+Z は Revit の元に戻すがそのまま効く（視点のような当て直しは不要）
+
 ## GenericModelMerge（一般モデル化）開発知見（2026-08-28） {#GenericModelMerge}
 
 3Dビューに表示されている複数カテゴリの要素から形状を読み取り、一つの一般モデル

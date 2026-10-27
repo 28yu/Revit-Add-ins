@@ -124,7 +124,7 @@ namespace Tools28.Commands.ViewCopy
 
                     UIDocument uidoc = app.ActiveUIDocument;
                     if (uidoc != null && uidoc.Document.Equals(doc))
-                        View3DMatchCommandBase.RedrawOpenViews(uidoc, restored);
+                        ViewSettingMatchCommandBase.RedrawOpenViews(uidoc, restored);
                     DiagLog.Write($"[ViewMatch] 元に戻す: {restored.Count} ビューの視点を戻した");
                 }
                 catch (Exception ex)

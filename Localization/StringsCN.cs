@@ -37,6 +37,8 @@ namespace Tools28.Localization
             { "Ribbon.CropBox.Copy.Tip", "复制视图的裁剪区域" },
             { "Ribbon.CropBox.Paste", "区域粘贴" },
             { "Ribbon.CropBox.Paste.Tip", "将复制的裁剪区域粘贴到其他视图" },
+            { "Ribbon.CbMatch", "匹配\n裁剪区域" },
+            { "Ribbon.CbMatch.Tip", "统一视图的裁剪区域（与 Revit 的“匹配类型属性”用法相同）。在视图中按下时记为源，光标旁会显示标记。显示标记期间，在其他视图中按下即可立即粘贴。在项目浏览器中选择视图后按下，可一次粘贴到全部视图。按 Esc 取消。适用于楼层平面、天花板平面、剖面、立面、详图和三维视图。" },
 
             // === Ribbon: 3D View ===
             { "Ribbon.View.Copy", "复制视点" },
@@ -1101,6 +1103,12 @@ namespace Tools28.Localization
             { "CropBox.CopyError", "复制裁剪区域失败。\n{0}" },
             { "CropBox.PasteError", "应用裁剪区域失败。\n{0}" },
             { "CropBox.Txn.Paste", "应用裁剪区域" },
+            { "CbMatch.Title", "匹配裁剪区域" },
+            { "CbMatch.NothingCopied", "尚未复制裁剪区域。请打开源视图并按“匹配裁剪区域”。" },
+            { "CbMatch.Pasted", "已将裁剪区域粘贴到 {0} 个视图。\n源：{1}" },
+            { "CbMatch.Txn", "匹配裁剪区域" },
+            { "CbMatch.Error", "匹配裁剪区域时发生错误。\n{0}" },
+            { "CbMatch.SourceOff", "{0}（无裁剪；粘贴后将关闭裁剪）" },
             { "ViewportPos.NeedSheet", "请先激活图纸后再执行。" },
             { "ViewportPos.NeedViewport", "请先选择视口后再执行。" },
             { "ViewportPos.NoViewportInSelection", "所选图元中不包含视口。请选择图纸上的视口。" },

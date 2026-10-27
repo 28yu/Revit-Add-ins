@@ -37,6 +37,8 @@ namespace Tools28.Localization
             { "Ribbon.CropBox.Copy.Tip", "ビューのトリミング領域をコピーします" },
             { "Ribbon.CropBox.Paste", "領域ペースト" },
             { "Ribbon.CropBox.Paste.Tip", "コピーしたトリミング領域を他のビューに適用します" },
+            { "Ribbon.CbMatch", "トリミング領域\n合わせ" },
+            { "Ribbon.CbMatch.Tip", "ビューのトリミング領域をそろえます（Revit の「タイプ プロパティを一致」と同じ感覚）。ビューで押すとコピー元として覚え、カーソルの横に印が出ます。印が出ている間に別のビューで押すと、すぐに貼ります。プロジェクトブラウザでビューを選んで押すと、まとめて貼ります。Esc で取りやめます。平面図・天井伏図・断面図・立面図・詳細図・3Dビューで使えます。" },
 
             // === Ribbon: 3D View ===
             { "Ribbon.View.Copy", "視点コピー" },
@@ -1101,6 +1103,12 @@ namespace Tools28.Localization
             { "CropBox.CopyError", "トリミング領域のコピーに失敗しました。\n{0}" },
             { "CropBox.PasteError", "トリミング領域の適用に失敗しました。\n{0}" },
             { "CropBox.Txn.Paste", "トリミング領域の適用" },
+            { "CbMatch.Title", "トリミング領域合わせ" },
+            { "CbMatch.NothingCopied", "まだトリミング領域をコピーしていません。コピー元のビューを開いて「トリミング領域合わせ」を押してください。" },
+            { "CbMatch.Pasted", "{0} 個のビューにトリミング領域を貼りました。\nコピー元: {1}" },
+            { "CbMatch.Txn", "トリミング領域合わせ" },
+            { "CbMatch.Error", "トリミング領域合わせ中にエラーが発生しました。\n{0}" },
+            { "CbMatch.SourceOff", "{0}（トリミングなし。貼るとトリミングが OFF になります）" },
             { "ViewportPos.NeedSheet", "シートをアクティブにしてから実行してください。" },
             { "ViewportPos.NeedViewport", "ビューポートを選択してから実行してください。" },
             { "ViewportPos.NoViewportInSelection", "選択された要素にビューポートが含まれていません。シート上のビューポートを選択してください。" },

@@ -1,12 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using Autodesk.Revit.Attributes;
+﻿using Autodesk.Revit.DB;
 using Tools28.Localization;
-using Autodesk.Revit.DB;
-using Autodesk.Revit.UI;
-using Autodesk.Revit.UI.Selection;
 
 namespace Tools28.Commands.CropBoxCopy
 {
@@ -21,7 +14,7 @@ namespace Tools28.Commands.CropBoxCopy
         public string ViewTypeName { get; set; }
     }
 
-    // 静的クリップボードクラス
+    // 静的クリップボードクラス（「トリミング領域合わせ」ボタンが使う）
     public static class CropBoxClipboard
     {
         public static CropBoxData CopiedData { get; set; }
@@ -33,61 +26,9 @@ namespace Tools28.Commands.CropBoxCopy
             CopiedData = null;
             SourceName = null;
         }
-    }
 
-    // トリミング領域コピーコマンド
-    [Transaction(TransactionMode.ReadOnly)]
-    public class ExecuteCropBoxCopyCommand : IExternalCommand
-    {
-        public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
-        {
-            try
-            {
-                UIApplication uiapp = commandData.Application;
-                UIDocument uidoc = uiapp.ActiveUIDocument;
-                Document doc = uidoc.Document;
-
-                // 現在のアクティブビューを取得
-                View activeView = doc.ActiveView;
-
-                if (activeView == null)
-                {
-                    message = Loc.S("Common.NoActiveView");
-                    return Result.Failed;
-                }
-
-                // 対象ビュータイプかチェック
-                if (!IsSupportedViewType(activeView))
-                {
-                    message = string.Format(Loc.S("CropBox.UnsupportedViewType"), GetViewTypeName(activeView.ViewType));
-                    return Result.Failed;
-                }
-
-                // トリミング領域データを取得（ON/OFF関係なく）
-                CropBoxData cropBoxData = new CropBoxData
-                {
-                    IsActive = activeView.CropBoxActive,
-                    IsVisible = activeView.CropBoxActive ? activeView.CropBoxVisible : false,
-                    CropBox = activeView.CropBoxActive ? activeView.CropBox : null,
-                    SourceViewName = activeView.Name,
-                    SourceViewType = activeView.ViewType,
-                    ViewTypeName = GetViewTypeName(activeView.ViewType)
-                };
-
-                // クリップボードに保存
-                CropBoxClipboard.CopiedData = cropBoxData;
-                CropBoxClipboard.SourceName = activeView.Name;
-
-                return Result.Succeeded;
-            }
-            catch (Exception ex)
-            {
-                message = string.Format(Loc.S("CropBox.CopyError"), ex.Message);
-                return Result.Failed;
-            }
-        }
-
-        private bool IsSupportedViewType(View view)
+        /// <summary>トリミング領域を扱えるビューか（平面・天井伏・断面・立面・詳細・3D）。</summary>
+        public static bool IsSupported(View view)
         {
             ViewType viewType = view.ViewType;
             return viewType == ViewType.FloorPlan ||
@@ -98,7 +39,7 @@ namespace Tools28.Commands.CropBoxCopy
                    viewType == ViewType.ThreeD;
         }
 
-        private string GetViewTypeName(ViewType viewType)
+        public static string GetViewTypeName(ViewType viewType)
         {
             switch (viewType)
             {
@@ -111,154 +52,38 @@ namespace Tools28.Commands.CropBoxCopy
                 default: return viewType.ToString();
             }
         }
-    }
 
-    // トリミング領域ペーストコマンド
-    [Transaction(TransactionMode.Manual)]
-    public class ExecuteCropBoxPasteCommand : IExternalCommand
-    {
-        public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
+        /// <summary>ビューのトリミング領域（ON／OFF と表示の ON／OFF を含む）を覚える。</summary>
+        public static void CopyFrom(View view)
         {
-            try
+            CopiedData = new CropBoxData
             {
-                UIApplication uiapp = commandData.Application;
-                UIDocument uidoc = uiapp.ActiveUIDocument;
-                Document doc = uidoc.Document;
-
-                // コピーされたデータがあるかチェック
-                if (!CropBoxClipboard.HasCopiedData)
-                {
-                    message = Loc.S("CropBox.NothingCopied");
-                    return Result.Failed;
-                }
-
-                // プロジェクトブラウザで選択されたビューを取得
-                var selectedIds = uidoc.Selection.GetElementIds();
-                List<View> targetViews = new List<View>();
-
-                if (selectedIds.Count == 0)
-                {
-                    // 選択がない場合：アクティブビューにペースト
-                    View activeView = doc.ActiveView;
-
-                    if (activeView == null)
-                    {
-                        message = Loc.S("Common.NoActiveView");
-                        return Result.Failed;
-                    }
-
-                    if (!IsSupportedViewType(activeView))
-                    {
-                        message = string.Format(Loc.S("CropBox.UnsupportedViewType"), GetViewTypeName(activeView.ViewType));
-                        return Result.Failed;
-                    }
-
-                    targetViews.Add(activeView);
-                }
-                else
-                {
-                    // 選択がある場合：選択されたビューにペースト
-                    foreach (ElementId id in selectedIds)
-                    {
-                        Element element = doc.GetElement(id);
-                        if (element is View view && IsSupportedViewType(view))
-                        {
-                            targetViews.Add(view);
-                        }
-                    }
-
-                    if (targetViews.Count == 0)
-                    {
-                        message = Loc.S("CropBox.NoValidView");
-                        return Result.Failed;
-                    }
-                }
-
-                // トランザクション開始
-                using (Transaction trans = new Transaction(doc, Loc.S("CropBox.Txn.Paste")))
-                {
-                    trans.Start();
-
-                    CropBoxData copiedData = CropBoxClipboard.CopiedData;
-                    int successCount = 0;
-                    int failCount = 0;
-
-                    foreach (View targetView in targetViews)
-                    {
-                        try
-                        {
-                            if (copiedData.IsActive)
-                            {
-                                // コピー元がトリミングON → ペースト先もONにして領域をコピー
-
-                                // まずトリミングをONにする
-                                targetView.CropBoxActive = true;
-
-                                // トリミング領域をコピー
-                                if (copiedData.CropBox != null)
-                                {
-                                    targetView.CropBox = copiedData.CropBox;
-                                }
-
-                                // 表示/非表示設定をコピー
-                                targetView.CropBoxVisible = copiedData.IsVisible;
-                            }
-                            else
-                            {
-                                // コピー元がトリミングOFF → ペースト先もOFFにする
-                                targetView.CropBoxActive = false;
-                            }
-
-                            successCount++;
-                        }
-                        catch
-                        {
-                            failCount++;
-                        }
-                    }
-
-                    trans.Commit();
-
-                    // Revit は Result.Succeeded のとき message を表示しないため、
-                    // 部分失敗は TaskDialog で明示的に伝える。
-                    if (failCount > 0)
-                    {
-                        TaskDialog.Show(Loc.S("Common.Warning"),
-                            string.Format(Loc.S("Common.PartialFail"), successCount, failCount));
-                    }
-                }
-
-                return Result.Succeeded;
-            }
-            catch (Exception ex)
-            {
-                message = string.Format(Loc.S("CropBox.PasteError"), ex.Message);
-                return Result.Failed;
-            }
+                IsActive = view.CropBoxActive,
+                IsVisible = view.CropBoxActive ? view.CropBoxVisible : false,
+                CropBox = view.CropBoxActive ? view.CropBox : null,
+                SourceViewName = view.Name,
+                SourceViewType = view.ViewType,
+                ViewTypeName = GetViewTypeName(view.ViewType)
+            };
+            SourceName = view.Name;
         }
 
-        private bool IsSupportedViewType(View view)
+        /// <summary>覚えたトリミング領域をビューに当てる（トランザクション内で呼ぶ）。</summary>
+        public static void ApplyTo(View view)
         {
-            ViewType viewType = view.ViewType;
-            return viewType == ViewType.FloorPlan ||
-                   viewType == ViewType.CeilingPlan ||
-                   viewType == ViewType.Section ||
-                   viewType == ViewType.Elevation ||
-                   viewType == ViewType.Detail ||
-                   viewType == ViewType.ThreeD;
-        }
-
-        private string GetViewTypeName(ViewType viewType)
-        {
-            switch (viewType)
+            CropBoxData copied = CopiedData;
+            if (copied.IsActive)
             {
-                case ViewType.FloorPlan: return Loc.S("ViewType.FloorPlan");
-                case ViewType.CeilingPlan: return Loc.S("ViewType.CeilingPlan");
-                case ViewType.Section: return Loc.S("ViewType.Section");
-                case ViewType.Elevation: return Loc.S("ViewType.Elevation");
-                case ViewType.Detail: return Loc.S("ViewType.Detail");
-                case ViewType.ThreeD: return Loc.S("ViewType.ThreeD");
-                default: return viewType.ToString();
+                // コピー元がトリミングON → ペースト先もONにして領域・表示設定を写す
+                view.CropBoxActive = true;
+                if (copied.CropBox != null)
+                    view.CropBox = copied.CropBox;
+                view.CropBoxVisible = copied.IsVisible;
+            }
+            else
+            {
+                // コピー元がトリミングOFF → ペースト先もOFFにする
+                view.CropBoxActive = false;
             }
         }
     }

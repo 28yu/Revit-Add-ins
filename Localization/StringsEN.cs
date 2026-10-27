@@ -37,6 +37,8 @@ namespace Tools28.Localization
             { "Ribbon.CropBox.Copy.Tip", "Copy the crop region of a view" },
             { "Ribbon.CropBox.Paste", "Crop Paste" },
             { "Ribbon.CropBox.Paste.Tip", "Paste copied crop region to another view" },
+            { "Ribbon.CbMatch", "Match\nCrop Region" },
+            { "Ribbon.CbMatch.Tip", "Matches the crop region of views (works like Revit's Match Type Properties). Press it in a view to remember it as the source; a small mark appears next to the cursor. While the mark is shown, press it in another view to paste right away. Select views in the Project Browser and press it to paste to all of them. Press Esc to cancel. Works in floor plans, ceiling plans, sections, elevations, detail views and 3D views." },
 
             // === Ribbon: 3D View ===
             { "Ribbon.View.Copy", "Copy View" },
@@ -1102,6 +1104,12 @@ namespace Tools28.Localization
             { "CropBox.CopyError", "Failed to copy the crop region.\n{0}" },
             { "CropBox.PasteError", "Failed to apply the crop region.\n{0}" },
             { "CropBox.Txn.Paste", "Apply Crop Region" },
+            { "CbMatch.Title", "Match Crop Region" },
+            { "CbMatch.NothingCopied", "No crop region has been copied yet. Open the source view and press Match Crop Region." },
+            { "CbMatch.Pasted", "Pasted the crop region to {0} view(s).\nSource: {1}" },
+            { "CbMatch.Txn", "Match Crop Region" },
+            { "CbMatch.Error", "An error occurred while matching the crop region.\n{0}" },
+            { "CbMatch.SourceOff", "{0} (no crop; pasting turns cropping off)" },
             { "ViewportPos.NeedSheet", "Activate a sheet before running this command." },
             { "ViewportPos.NeedViewport", "Select a viewport before running this command." },
             { "ViewportPos.NoViewportInSelection", "The selection contains no viewport. Select a viewport placed on a sheet." },

@@ -30,8 +30,7 @@ namespace Tools28
             { "GridBubbleRight", "Ribbon.GridBubble.Right" },
             { "SheetCreation", "Ribbon.Sheet.Create" },
             { "ViewportPositionMatch", "Ribbon.Viewport.Match" },
-            { "CropBoxCopy", "Ribbon.CropBox.Copy" },
-            { "CropBoxPaste", "Ribbon.CropBox.Paste" },
+            { "CropBoxMatch", "Ribbon.CbMatch" },
             { "ViewMatch", "Ribbon.ViewMatch" },
             { "SectionBoxMatch", "Ribbon.SbMatch" },
             { "RoomTagAutoCreator", "Ribbon.RoomTag" },
@@ -64,8 +63,7 @@ namespace Tools28
             { "GridBubbleRight", "Ribbon.GridBubble.Right.Tip" },
             { "SheetCreation", "Ribbon.Sheet.Create.Tip" },
             { "ViewportPositionMatch", "Ribbon.Viewport.Match.Tip" },
-            { "CropBoxCopy", "Ribbon.CropBox.Copy.Tip" },
-            { "CropBoxPaste", "Ribbon.CropBox.Paste.Tip" },
+            { "CropBoxMatch", "Ribbon.CbMatch.Tip" },
             { "ViewMatch", "Ribbon.ViewMatch.Tip" },
             { "SectionBoxMatch", "Ribbon.SbMatch.Tip" },
             { "RoomTagAutoCreator", "Ribbon.RoomTag.Tip" },
@@ -335,20 +333,12 @@ namespace Tools28
 
             panel.AddSeparator();
 
-            // トリミング領域のコピー／ペーストも縦並び（スタック）
-            var cbCopyData = new PushButtonData("CropBoxCopy", Loc.S("Ribbon.CropBox.Copy"), assemblyPath, "Tools28.Commands.CropBoxCopy.ExecuteCropBoxCopyCommand");
-            cbCopyData.ToolTip = Loc.S("Ribbon.CropBox.Copy.Tip");
-            cbCopyData.Image = LoadImage("cropbox_copy_16.png");
-            cbCopyData.LargeImage = LoadImage("cropbox_copy.png");
-
-            var cbPasteData = new PushButtonData("CropBoxPaste", Loc.S("Ribbon.CropBox.Paste"), assemblyPath, "Tools28.Commands.CropBoxCopy.ExecuteCropBoxPasteCommand");
-            cbPasteData.ToolTip = Loc.S("Ribbon.CropBox.Paste.Tip");
-            cbPasteData.Image = LoadImage("cropbox_paste_16.png");
-            cbPasteData.LargeImage = LoadImage("cropbox_paste.png");
-
-            var cbStacked = panel.AddStackedItems(cbCopyData, cbPasteData);
-            _buttons["CropBoxCopy"] = cbStacked[0] as RibbonItem;
-            _buttons["CropBoxPaste"] = cbStacked[1] as RibbonItem;
+            // トリミング領域合わせ（コピー／ペーストを1ボタンにまとめた。ViewSettingMatchCommandBase）
+            var cbMatchData = new PushButtonData("CropBoxMatch", Loc.S("Ribbon.CbMatch"), assemblyPath, "Tools28.Commands.CropBoxCopy.CropBoxMatchCommand");
+            cbMatchData.ToolTip = Loc.S("Ribbon.CbMatch.Tip");
+            cbMatchData.Image = LoadImage("cropbox_copy_16.png");
+            cbMatchData.LargeImage = LoadImage("cropbox_copy.png");
+            AddButton(panel, cbMatchData);
 
             panel.AddSeparator();
 
@@ -376,7 +366,7 @@ namespace Tools28
             RibbonPanel panel = application.CreateRibbonPanel(tabName, Loc.S("Ribbon.Panel.3DView"));
             _panels.Add(panel);
 
-            // 視点・切断ボックスは、コピー／ペーストを1ボタンにまとめた「〜合わせ」（View3DMatchCommandBase）
+            // 視点・切断ボックスは、コピー／ペーストを1ボタンにまとめた「〜合わせ」（ViewSettingMatchCommandBase）
             var viewMatchData = new PushButtonData("ViewMatch", Loc.S("Ribbon.ViewMatch"), assemblyPath, "Tools28.Commands.ViewCopy.ViewMatchCommand");
             viewMatchData.ToolTip = Loc.S("Ribbon.ViewMatch.Tip");
             viewMatchData.LargeImage = LoadImage("view_match.png");
