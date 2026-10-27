@@ -111,12 +111,14 @@ namespace Tools28.Commands.ViewCopy
             {
                 MainInstruction = S("Choose"),
                 CommonButtons = TaskDialogCommonButtons.Cancel,
-                DefaultButton = TaskDialogResult.CommandLink1,
             };
             dialog.AddCommandLink(TaskDialogCommandLinkId.CommandLink1,
                 S("Paste"), string.Format(S("PasteSub"), SourceDescription));
             dialog.AddCommandLink(TaskDialogCommandLinkId.CommandLink2,
                 S("Recopy"), S("RecopySub"));
+            // ⚠ 既定のボタンは、そのコマンドリンクを追加した後でないと指定できない
+            //   （先に指定すると "Corresponding button not found. Parameter name: defaultButton"）
+            dialog.DefaultButton = TaskDialogResult.CommandLink1;
             return dialog.Show();
         }
 

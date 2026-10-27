@@ -2522,6 +2522,8 @@ V/G の外に原因がある可能性を潰せていなかった。
     ⚠ ダブルクリックで開いた直後のビューは選択に残ることがあるので、開いているビュー「だけ」の選択はこれに当たらない
   - 開いている3Dビューで未コピー → コピー元として覚え、お知らせを出す
   - 開いている3Dビューでコピー済み → TaskDialog のコマンドリンクで「このビューに貼る（既定）／このビューをコピー元にする」
+- ⚠ **TaskDialog の `DefaultButton` にコマンドリンクを指定するのは、`AddCommandLink` の後**。オブジェクト初期化子で先に指定すると、
+  表示時に `Corresponding button not found. Parameter name: defaultButton` で落ちる（実機の Revit 2022 で発生）
 - 派生クラスは「何を覚えて、どう当てるか」だけ（`ViewMatchCommand` / `SectionBoxMatchCommand`）。覚える・当てる処理はクリップボードのクラスに移した。
   旧コピー／ペーストのコマンドは使い道が無くなったので削除した
 - アイコン `view_match.png` / `sectionbox_match.png`（96px・288 DPI）: 旧アイコンのコピー側とペースト側を 60% に縮めて並べ、矢印でつないだ
