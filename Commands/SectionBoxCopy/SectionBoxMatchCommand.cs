@@ -16,6 +16,10 @@ namespace Tools28.Commands.SectionBoxCopy
 
         protected override bool HasCopied => SectionBoxClipboard.HasCopiedData;
 
+        protected override string BadgeIcon => "sectionbox_paste.png";
+
+        protected override string SourceViewName => SectionBoxClipboard.SourceViewName;
+
         protected override string SourceDescription =>
             SectionBoxClipboard.IsSectionBoxActive
                 ? SectionBoxClipboard.SourceViewName
@@ -27,5 +31,7 @@ namespace Tools28.Commands.SectionBoxCopy
         }
 
         protected override void ApplyTo(View3D view) => SectionBoxClipboard.ApplyTo(view);
+
+        protected override void ClearCopy() => SectionBoxClipboard.Clear();
     }
 }

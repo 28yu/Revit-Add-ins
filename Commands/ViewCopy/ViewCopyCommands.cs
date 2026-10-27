@@ -9,6 +9,12 @@ namespace Tools28.Commands.ViewCopy
         public static string SourceViewName { get; set; }
         public static bool HasCopiedOrientation => CopiedOrientation != null;
 
+        public static void Clear()
+        {
+            CopiedOrientation = null;
+            SourceViewName = null;
+        }
+
         /// <summary>3Dビューの視点を覚える。</summary>
         public static void CopyFrom(View3D view)
         {

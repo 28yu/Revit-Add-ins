@@ -2524,6 +2524,15 @@ V/G の外に原因がある可能性を潰せていなかった。
   - 開いている3Dビューでコピー済み → TaskDialog のコマンドリンクで「このビューに貼る（既定）／このビューをコピー元にする」
 - ⚠ **TaskDialog の `DefaultButton` にコマンドリンクを指定するのは、`AddCommandLink` の後**。オブジェクト初期化子で先に指定すると、
   表示時に `Corresponding button not found. Parameter name: defaultButton` で落ちる（実機の Revit 2022 で発生）
+- **2026-10-27 追記: 2択の画面をやめ、MA のようにカーソルの横の印で「コピーした状態」を示す**（運営者の要望）
+  - 印なしで押す → コピー元を覚えて印を出す／印ありで別のビューで押す → すぐ貼る／コピー元のビューで押す → 覚え直す／Esc → 取りやめ
+  - Revit API ではカーソルを変えられないので、`CopyBadge.cs` で**クリックがすり抜ける小さな透明の窓**（WS_EX_TRANSPARENT|LAYERED|NOACTIVATE|TOOLWINDOW）を出し、
+    `DispatcherTimer`（15ms）で `GetCursorPos` を追いかけて `SetWindowPos` で置く（画面の画素で置くので拡大率の違うモニターでもずれない）。
+    Revit が前面（前面の窓のプロセス＝Revit）かつカーソルが Revit のウィンドウ内のときだけ見せる
+  - Esc は `GetAsyncKeyState` で「押した瞬間」だけ拾う（Revit が前面のときのみ）。Revit の選択解除などの Esc でも取りやめになる（MA と同じ扱い）
+  - **まとめて貼れない報告への対応**: `RefreshActiveView` は操作中のビューしか描き直さないため、並べて表示した別のビューは貼れていても
+    変わらないように見えていた可能性が高い。貼った先のうち開いているビューは `UIView.ZoomAndCenterRectangle(現在のズーム範囲)` で描き直す。
+    まとめて貼ったときは「○個の3Dビューに貼りました」を出し、選択の中身を `[ViewMatch]` / `[SbMatch]` でログに残す（実機で原因を確定する）
 - 派生クラスは「何を覚えて、どう当てるか」だけ（`ViewMatchCommand` / `SectionBoxMatchCommand`）。覚える・当てる処理はクリップボードのクラスに移した。
   旧コピー／ペーストのコマンドは使い道が無くなったので削除した
 - アイコン `view_match.png` / `sectionbox_match.png`（96px・288 DPI）: 旧アイコンのコピー側とペースト側を 60% に縮めて並べ、矢印でつないだ

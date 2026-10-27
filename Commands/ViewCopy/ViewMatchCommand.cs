@@ -13,6 +13,10 @@ namespace Tools28.Commands.ViewCopy
 
         protected override bool HasCopied => ViewOrientationClipboard.HasCopiedOrientation;
 
+        protected override string BadgeIcon => "view_paste.png";
+
+        protected override string SourceViewName => ViewOrientationClipboard.SourceViewName;
+
         protected override string SourceDescription => ViewOrientationClipboard.SourceViewName;
 
         protected override string CopyFrom(View3D view)
@@ -22,5 +26,7 @@ namespace Tools28.Commands.ViewCopy
         }
 
         protected override void ApplyTo(View3D view) => ViewOrientationClipboard.ApplyTo(view);
+
+        protected override void ClearCopy() => ViewOrientationClipboard.Clear();
     }
 }
