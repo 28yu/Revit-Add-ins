@@ -152,6 +152,7 @@
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
                 <!-- ビュー情報 -->
@@ -252,6 +253,23 @@
                                    Text="※ 梁レベルが表示されるよう設定済みの梁タグを選んでください"/>
                         <TextBlock x:Name="txtBraceHint" Style="{StaticResource NoteStyle}" TextWrapping="Wrap"
                                    Text="※ 鉛直ブレース"/>
+                    </StackPanel>
+                </Border>
+                <!-- 色分けする梁（水平・斜め） -->
+                <Border Grid.Row="2" Background="White" BorderBrush="#D3D3D3"
+                        BorderThickness="1" CornerRadius="3" Padding="15,12" Margin="0,0,0,15">
+                    <StackPanel>
+                        <TextBlock x:Name="txtSlopeFilter" Style="{StaticResource SectionHeader}" Text="色分けする梁"/>
+                        <WrapPanel Orientation="Horizontal">
+                            <RadioButton x:Name="SlopeAllRadio" GroupName="SlopeFilter" Content="すべての梁" FontSize="12"
+                                         IsChecked="True" VerticalContentAlignment="Center" Margin="0,2,20,2"/>
+                            <RadioButton x:Name="SlopeFlatRadio" GroupName="SlopeFilter" Content="水平の梁だけ" FontSize="12"
+                                         VerticalContentAlignment="Center" Margin="0,2,20,2"/>
+                            <RadioButton x:Name="SlopeSlopedRadio" GroupName="SlopeFilter" Content="斜めの梁だけ" FontSize="12"
+                                         VerticalContentAlignment="Center" Margin="0,2,0,2"/>
+                        </WrapPanel>
+                        <TextBlock x:Name="txtSlopeHint" Style="{StaticResource NoteStyle}" TextWrapping="Wrap"
+                                   Text="※ 始点と終点の高さが違う梁を斜めの梁として自動で見分けます"/>
                     </StackPanel>
                 </Border>
             </Grid>

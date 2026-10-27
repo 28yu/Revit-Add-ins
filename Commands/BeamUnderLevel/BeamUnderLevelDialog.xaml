@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="梁下端色分け"
         Width="700"
-        Height="850"
+        Height="940"
         MinWidth="600"
         MinHeight="700"
         WindowStartupLocation="CenterScreen"
@@ -291,6 +291,23 @@
                                    Text="※ 参照レベルを基準として梁下端レベルを算出します"/>
                         <TextBlock x:Name="txtLevelLabelHint" Style="{StaticResource NoteStyle}" TextWrapping="Wrap"
                                    Text="※ 梁ラベル・凡例に表示するレベルの文字です。色はレベル差（+2800 など）で決まり、各階で共通です"/>
+                    </StackPanel>
+                </Border>
+                <!-- 色分けする梁（水平・斜め） -->
+                <Border Grid.Row="3" Background="White" BorderBrush="#D3D3D3"
+                        BorderThickness="1" CornerRadius="3" Padding="15,12" Margin="0,0,0,15">
+                    <StackPanel>
+                        <TextBlock x:Name="txtSlopeFilter" Style="{StaticResource SectionHeader}" Text="色分けする梁"/>
+                        <WrapPanel Orientation="Horizontal">
+                            <RadioButton x:Name="SlopeAllRadio" GroupName="SlopeFilter" Content="すべての梁" FontSize="12"
+                                         IsChecked="True" VerticalContentAlignment="Center" Margin="0,2,20,2"/>
+                            <RadioButton x:Name="SlopeFlatRadio" GroupName="SlopeFilter" Content="水平の梁だけ" FontSize="12"
+                                         VerticalContentAlignment="Center" Margin="0,2,20,2"/>
+                            <RadioButton x:Name="SlopeSlopedRadio" GroupName="SlopeFilter" Content="斜めの梁だけ" FontSize="12"
+                                         VerticalContentAlignment="Center" Margin="0,2,0,2"/>
+                        </WrapPanel>
+                        <TextBlock x:Name="txtSlopeHint" Style="{StaticResource NoteStyle}" TextWrapping="Wrap"
+                                   Text="※ 始点と終点の高さが違う梁を斜めの梁として自動で見分けます"/>
                     </StackPanel>
                 </Border>
             </Grid>

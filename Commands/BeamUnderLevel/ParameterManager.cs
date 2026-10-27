@@ -99,6 +99,17 @@ namespace Tools28.Commands.BeamUnderLevel
             }
         }
 
+        /// <summary>
+        /// 値を消す（今回の色分けの対象外にした梁）。表示の値が残るとフィルタで色が付いたままになるため
+        /// </summary>
+        public static void ClearValues(FamilyInstance beam)
+        {
+            SetParameterValue(beam, ParamRefLevel, "");
+            SetParameterLength(beam, ParamLevelDiff, 0);
+            SetParameterValue(beam, ParamDisplay, "");
+            SetParameterValue(beam, ParamError, "");
+        }
+
         private static bool IsParameterBound(Document doc, string paramName)
         {
             BindingMap bindingMap = doc.ParameterBindings;

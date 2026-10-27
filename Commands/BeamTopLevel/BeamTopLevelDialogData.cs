@@ -21,6 +21,8 @@ namespace Tools28.Commands.BeamTopLevel
         public List<BeamTagTypeItem> TagTypes { get; set; }
         /// <summary>表記する文字に対応する凡例が既にあるか</summary>
         public Func<string, bool> LegendExists { get; set; }
+        /// <summary>対象の梁の水平・斜めごとの本数</summary>
+        public BeamSlopeCounts SlopeCounts { get; set; }
     }
 
     /// <summary>

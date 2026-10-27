@@ -32,6 +32,8 @@ namespace Tools28.Commands.BeamTopLevel
         public ElementId SelectedBeamTagTypeId { get; private set; }
         /// <summary>水平ブレースにも梁ラベルを付ける（鉛直ブレースには常に付けない）</summary>
         public bool IncludeHorizontalBraces { get; private set; }
+        /// <summary>色分けする梁（すべて／水平だけ／斜めだけ）</summary>
+        public BeamSlopeFilter SlopeFilter { get; private set; } = BeamSlopeFilter.All;
         public string LevelLabelText { get; private set; }
         /// <summary>同名の凡例を上書きすると確認した</summary>
         public bool OverwriteLegendConfirmed { get; private set; }
@@ -64,6 +66,8 @@ namespace Tools28.Commands.BeamTopLevel
             txtLabelTagType.Text = Loc.S("Beam.LabelTagType");
             txtTagHint.Text = Loc.S("Beam.TagHint");
             HorizontalBraceCheckBox.Content = Loc.S("Beam.HorizontalBrace");
+            txtSlopeFilter.Text = Loc.S("Beam.SlopeFilter");
+            txtSlopeHint.Text = Loc.S("Beam.SlopeHint");
             txtBraceHint.Text = Loc.S("Beam.BraceHint");
             txtParamSelect.Text = Loc.S("BeamTop.ParamSelect");
             txtParamHint.Text = Loc.S("BeamTop.ParamHint");
@@ -87,6 +91,7 @@ namespace Tools28.Commands.BeamTopLevel
         {
             ViewNameText.Text = _data.ViewName;
             BeamCountText.Text = string.Format(Loc.S("Beam.CountFmt"), _data.BeamCount);
+            BeamSlopeRadios.ShowCounts(SlopeAllRadio, SlopeFlatRadio, SlopeSlopedRadio, _data.SlopeCounts);
 
             double refElevMm = BeamCalculator.FeetToMm(_data.RefLevel.Elevation);
             RefLevelText.Text = $"{_data.RefLevel.Name} ({refElevMm:+0;-0}mm)";
@@ -346,6 +351,8 @@ namespace Tools28.Commands.BeamTopLevel
                 summary += string.Format(Loc.S("Beam.Summary.LabelText"), BeamLabelTypeComboBox.SelectedItem);
             summary += HorizontalBraceCheckBox.IsChecked == true
                 ? Loc.S("Beam.Summary.HBraceOn") : Loc.S("Beam.Summary.HBraceOff");
+            summary += string.Format(Loc.S("Beam.Summary.Slope"),
+                BeamSlopeRadios.Describe(BeamSlopeRadios.Read(SlopeFlatRadio, SlopeSlopedRadio)));
             summary += "\n";
 
             summary += Loc.S("Beam.Summary.FamilyParams");
@@ -475,6 +482,7 @@ namespace Tools28.Commands.BeamTopLevel
                 UseBeamTag = LabelModeTagRadio.IsChecked == true;
                 SelectedBeamTagTypeId = (BeamTagTypeComboBox.SelectedItem as BeamTagTypeItem)?.Id;
                 IncludeHorizontalBraces = HorizontalBraceCheckBox.IsChecked == true;
+                SlopeFilter = BeamSlopeRadios.Read(SlopeFlatRadio, SlopeSlopedRadio);
                 DialogResult = true;
                 Close();
             }

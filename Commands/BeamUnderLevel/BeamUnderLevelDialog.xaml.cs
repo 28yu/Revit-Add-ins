@@ -41,6 +41,8 @@ namespace Tools28.Commands.BeamUnderLevel
         public ElementId SelectedBeamTagTypeId { get; private set; }
         /// <summary>水平ブレースにも梁ラベルを付ける（鉛直ブレースには常に付けない）</summary>
         public bool IncludeHorizontalBraces { get; private set; }
+        /// <summary>色分けする梁（すべて／水平だけ／斜めだけ）</summary>
+        public BeamSlopeFilter SlopeFilter { get; private set; } = BeamSlopeFilter.All;
         public string LevelLabelText { get; private set; }
         /// <summary>同名の凡例を上書きすると確認した</summary>
         public bool OverwriteLegendConfirmed { get; private set; }
@@ -70,6 +72,8 @@ namespace Tools28.Commands.BeamUnderLevel
             txtLabelTagType.Text = Loc.S("Beam.LabelTagType");
             txtTagHint.Text = Loc.S("Beam.TagHint");
             HorizontalBraceCheckBox.Content = Loc.S("Beam.HorizontalBrace");
+            txtSlopeFilter.Text = Loc.S("Beam.SlopeFilter");
+            txtSlopeHint.Text = Loc.S("Beam.SlopeHint");
             txtBraceHint.Text = Loc.S("Beam.BraceHint");
             txtLevelSetting.Text = Loc.S("BeamUnder.LevelSetting");
             txtRefLevel.Text = Loc.S("BeamUnder.RefLevel");
@@ -182,6 +186,14 @@ namespace Tools28.Commands.BeamUnderLevel
                 double floorHeightMm = BeamCalculator.FeetToMm(floorHeightFeet);
                 FloorHeightText.Text = $"{floorHeightMm:0}mm";
                 SelectedLowerLevel = selectedItem.Level;
+
+                // 対象は「選んだ上位レベルを参照レベルに持つ梁」なので、本数も選んだレベルで数え直す
+                var counts = _data.CountsForUpperLevel?.Invoke(selectedItem.Level.Id);
+                if (counts != null)
+                {
+                    BeamCountText.Text = string.Format(Loc.S("Beam.CountFmt"), counts.All);
+                    BeamSlopeRadios.ShowCounts(SlopeAllRadio, SlopeFlatRadio, SlopeSlopedRadio, counts);
+                }
             }
         }
 
@@ -590,6 +602,8 @@ namespace Tools28.Commands.BeamUnderLevel
                 summary += string.Format(Loc.S("Beam.Summary.LabelText"), BeamLabelTypeComboBox.SelectedItem);
             summary += HorizontalBraceCheckBox.IsChecked == true
                 ? Loc.S("Beam.Summary.HBraceOn") : Loc.S("Beam.Summary.HBraceOff");
+            summary += string.Format(Loc.S("Beam.Summary.Slope"),
+                BeamSlopeRadios.Describe(BeamSlopeRadios.Read(SlopeFlatRadio, SlopeSlopedRadio)));
             summary += string.Format(Loc.S("Beam.Summary.UpperLevel"), SelectedLowerLevel.Name);
             double floorHeightMm = BeamCalculator.FeetToMm(
                 SelectedLowerLevel.Elevation - _data.RefLevel.Elevation);
@@ -750,6 +764,7 @@ namespace Tools28.Commands.BeamUnderLevel
                 UseBeamTag = LabelModeTagRadio.IsChecked == true;
                 SelectedBeamTagTypeId = (BeamTagTypeComboBox.SelectedItem as BeamTagTypeItem)?.Id;
                 IncludeHorizontalBraces = HorizontalBraceCheckBox.IsChecked == true;
+                SlopeFilter = BeamSlopeRadios.Read(SlopeFlatRadio, SlopeSlopedRadio);
                 DialogResult = true;
                 Close();
             }

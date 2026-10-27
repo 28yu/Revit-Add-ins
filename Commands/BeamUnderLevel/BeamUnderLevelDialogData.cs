@@ -25,6 +25,8 @@ namespace Tools28.Commands.BeamUnderLevel
         public List<BeamTagTypeItem> TagTypes { get; set; }
         /// <summary>表記する文字に対応する凡例が既にあるか</summary>
         public Func<string, bool> LegendExists { get; set; }
+        /// <summary>上位レベル（の Id）を参照レベルに持つ梁の、水平・斜めごとの本数</summary>
+        public Func<ElementId, BeamSlopeCounts> CountsForUpperLevel { get; set; }
     }
 
     /// <summary>

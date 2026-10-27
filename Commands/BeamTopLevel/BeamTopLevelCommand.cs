@@ -84,6 +84,19 @@ namespace Tools28.Commands.BeamTopLevel
                     return Result.Cancelled;
                 }
 
+                // その階の梁（参照レベル＝ビューのレベル）だけに絞る。
+                // ⚠ ビューに映っている梁には、ビュー範囲によって下の階の梁も混ざる。そのままだと別の階の梁レベルが
+                //   凡例に載り、別の階の梁の値まで書き換えてしまう
+                int viewBeamCount = beams.Count;
+                beams = beams.Where(b => BeamSelection.IsOnLevel(b, refLevel.Id)).ToList();
+                int otherLevelCount = viewBeamCount - beams.Count;
+                if (beams.Count == 0)
+                {
+                    TaskDialog.Show(Loc.S("Common.Error"),
+                        string.Format(Loc.S("Beam.NoBeamsOnLevel"), refLevel.Name, otherLevelCount));
+                    return Result.Cancelled;
+                }
+
                 // ファミリ毎にグループ化
                 var beamsByFamily = beams
                     .GroupBy(b => b.Symbol.Family.Name)
@@ -114,7 +127,8 @@ namespace Tools28.Commands.BeamTopLevel
                     TextNoteTypes = textNoteTypes,
                     TagTypes = BeamTagPlacer.CollectTagTypes(doc),
                     // 表記する文字の重複（別の階で同じ文字を使った）を画面で知らせるため
-                    LegendExists = name => BeamLegendViews.Find(doc, LegendManager.GetLegendViewName(name)) != null
+                    LegendExists = name => BeamLegendViews.Find(doc, LegendManager.GetLegendViewName(name)) != null,
+                    SlopeCounts = BeamSelection.Count(beams)
                 };
 
                 var dialog = new BeamTopLevelDialog(dialogData);
@@ -132,6 +146,15 @@ namespace Tools28.Commands.BeamTopLevel
                 string labelText = dialog.LevelLabelText;
                 bool useBeamTag = dialog.UseBeamTag;
                 ElementId selectedBeamTagTypeId = dialog.SelectedBeamTagTypeId;
+
+                // 色分けする梁（すべて／水平だけ／斜めだけ）。対象外の梁は前回の値を消す（色が残らないように）
+                var skippedBySlope = beams.Where(b => !BeamSelection.Matches(b, dialog.SlopeFilter)).ToList();
+                beams = beams.Where(b => BeamSelection.Matches(b, dialog.SlopeFilter)).ToList();
+                if (beams.Count == 0)
+                {
+                    TaskDialog.Show(Loc.S("Common.Error"), Loc.S("Beam.NoBeamsForSlope"));
+                    return Result.Cancelled;
+                }
 
                 // 梁ラベル（文字・梁タグ）を付ける梁。鉛直ブレースには付けず、水平ブレースは設定に従う
                 var labelBeams = beams
@@ -198,6 +221,10 @@ namespace Tools28.Commands.BeamTopLevel
                         ParameterManager.WriteValues(beam, result);
                     }
 
+                    // 今回の色分けの対象外にした梁（水平／斜めの選択で外したもの）は値を消す
+                    foreach (var beam in skippedBySlope)
+                        ParameterManager.ClearValues(beam);
+
                     // 梁ラベルの作成（文字 = TextNote ／ 梁タグ = IndependentTag）
                     if (useBeamTag)
                     {
@@ -263,6 +290,11 @@ namespace Tools28.Commands.BeamTopLevel
                     resultMessage += string.Format(Loc.S("Beam.TagResult"), tagResult.Created);
                 if (skippedBraceCount > 0)
                     resultMessage += string.Format(Loc.S("Beam.LabelSkippedBraces"), skippedBraceCount);
+                if (otherLevelCount > 0)
+                    resultMessage += string.Format(Loc.S("Beam.ExcludedOtherLevel"), otherLevelCount, refLevel.Name);
+                if (skippedBySlope.Count > 0)
+                    resultMessage += string.Format(Loc.S("Beam.ExcludedBySlope"),
+                        skippedBySlope.Count, BeamSlopeRadios.Describe(dialog.SlopeFilter));
 
                 if (failureCount > 0)
                 {
