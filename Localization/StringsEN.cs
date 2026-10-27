@@ -1133,7 +1133,7 @@ namespace Tools28.Localization
             { "ViewportPos.Reason.Direction", "the view direction is different" },
             { "ViewportPos.Report.Title", "Paste Viewport Position" },
             { "ViewportPos.Report.Moved", "Viewports moved so that the drawings line up: {0}" },
-            { "ViewportPos.Report.Fallback", "Viewports aligned by the center of their box because the drawing position could not be calculated: {0} (Revit 2021, or drafting views, legends, etc.)" },
+            { "ViewportPos.Report.Fallback", "Viewports aligned by the center of their box because the drawing position could not be calculated: {0} (Revit 2021/2022, or drafting views, legends, etc.)" },
             { "ViewportPos.Report.SkippedHeader", "Viewports not moved:" },
             { "ViewportPos.Report.Item", "- {0}: {1}" },
             { "ViewportPos.Report.Failed", "- {0}: could not be moved ({1})" },

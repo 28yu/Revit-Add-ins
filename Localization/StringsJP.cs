@@ -1132,7 +1132,7 @@ namespace Tools28.Localization
             { "ViewportPos.Reason.Direction", "ビューの見る向きが違うため" },
             { "ViewportPos.Report.Title", "ビューポート位置のペースト" },
             { "ViewportPos.Report.Moved", "図の位置がそろうように動かしたビューポート: {0} 個" },
-            { "ViewportPos.Report.Fallback", "図の位置を計算できないため、枠の中心でそろえたビューポート: {0} 個（Revit 2021、または製図ビュー・凡例など）" },
+            { "ViewportPos.Report.Fallback", "図の位置を計算できないため、枠の中心でそろえたビューポート: {0} 個（Revit 2021・2022、または製図ビュー・凡例など）" },
             { "ViewportPos.Report.SkippedHeader", "動かさなかったビューポート:" },
             { "ViewportPos.Report.Item", "・{0} — {1}" },
             { "ViewportPos.Report.Failed", "・{0} — 動かせませんでした（{1}）" },

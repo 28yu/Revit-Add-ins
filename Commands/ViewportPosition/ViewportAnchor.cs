@@ -57,9 +57,10 @@ namespace Tools28.Commands.ViewportPosition
                 return info;
             }
 
-#if REVIT2021
-            // Revit 2021 には View.GetModelToProjectionTransforms / Viewport.GetProjectionToSheetTransform が
-            // 無い（2022 で追加）。図の位置は計算せず、枠の中心でそろえる（呼び出し側で利用者に知らせる）
+#if REVIT2021 || REVIT2022
+            // Revit 2021・2022 には View.GetModelToProjectionTransforms / Viewport.GetProjectionToSheetTransform が
+            // 無い（2023 で追加。Nice3point の各版でコンパイルして確認）。図の位置は計算せず、
+            // 枠の中心でそろえる（呼び出し側で利用者に知らせる）
 #else
             // パースビューでは例外になるので上で除外している
             try

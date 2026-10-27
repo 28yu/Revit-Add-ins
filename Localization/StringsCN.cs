@@ -1132,7 +1132,7 @@ namespace Tools28.Localization
             { "ViewportPos.Reason.Direction", "视图方向不同" },
             { "ViewportPos.Report.Title", "粘贴视口位置" },
             { "ViewportPos.Report.Moved", "已移动以使图形位置对齐的视口：{0} 个" },
-            { "ViewportPos.Report.Fallback", "因无法计算图形位置而按框中心对齐的视口：{0} 个（Revit 2021，或绘图视图、图例等）" },
+            { "ViewportPos.Report.Fallback", "因无法计算图形位置而按框中心对齐的视口：{0} 个（Revit 2021/2022，或绘图视图、图例等）" },
             { "ViewportPos.Report.SkippedHeader", "未移动的视口：" },
             { "ViewportPos.Report.Item", "・{0} — {1}" },
             { "ViewportPos.Report.Failed", "・{0} — 无法移动（{1}）" },
