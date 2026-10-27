@@ -48,9 +48,9 @@ namespace Tools28.Localization
             { "Ribbon.SectionBox.Paste", "Section Box\nPaste" },
             { "Ribbon.SectionBox.Paste.Tip", "Paste copied section box to another 3D view" },
             { "Ribbon.ViewMatch", "Match View" },
-            { "Ribbon.ViewMatch.Tip", "Matches the orientation of 3D views (works like Revit's Match Type Properties). Press it in a 3D view to remember it as the source; a small mark appears next to the cursor. While the mark is shown, press it in another 3D view to paste right away. Select 3D views in the Project Browser and press it to paste to all of them. Press Esc to cancel." },
+            { "Ribbon.ViewMatch.Tip", "Matches the orientation of 3D views (works like Revit's Match Type Properties). Press it in a 3D view to remember it as the source; a small mark appears next to the cursor. While the mark is shown, press it in another 3D view to paste right away. Select 3D views in the Project Browser and press it to paste to all of them. Press Esc to cancel. When both the orientation and the section box are copied, either button pastes both." },
             { "Ribbon.SbMatch", "Match\nSection Box" },
-            { "Ribbon.SbMatch.Tip", "Matches the section box of 3D views (works like Revit's Match Type Properties). Press it in a 3D view to remember it as the source; a small mark appears next to the cursor. While the mark is shown, press it in another 3D view to paste right away. Select 3D views in the Project Browser and press it to paste to all of them. Press Esc to cancel." },
+            { "Ribbon.SbMatch.Tip", "Matches the section box of 3D views (works like Revit's Match Type Properties). Press it in a 3D view to remember it as the source; a small mark appears next to the cursor. While the mark is shown, press it in another 3D view to paste right away. Select 3D views in the Project Browser and press it to paste to all of them. Press Esc to cancel. When both the orientation and the section box are copied, either button pastes both." },
 
             // === Ribbon: Annotation ===
             { "Ribbon.RoomTag", "Room Tag\nAuto Place" },
@@ -1091,6 +1091,8 @@ namespace Tools28.Localization
             { "SbMatch.NothingCopied", "No section box has been copied yet. Open the source 3D view and press Match Section Box." },
             { "SbMatch.Txn", "Match Section Box" },
             { "SbMatch.Pasted", "Pasted the section box to {0} 3D view(s).\nSource: {1}" },
+            { "View3DMatch.PastedBoth", "Pasted the orientation and section box to {0} 3D view(s)." },
+            { "View3DMatch.TxnBoth", "Match View and Section Box" },
             { "SbMatch.Error", "An error occurred while matching the section box.\n{0}" },
             { "SbMatch.SourceOff", "{0} (no section box; pasting turns the section box off)" },
             { "CropBox.UnsupportedViewType", "This view type ({0}) is not supported." },

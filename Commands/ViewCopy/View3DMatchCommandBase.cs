@@ -16,6 +16,7 @@ namespace Tools28.Commands.ViewCopy
     ///   - 印あり で、コピー元のビューで押す → コピー元を覚え直す
     ///   - プロジェクトブラウザで3Dビューを選んで押す → 選んだビューすべてに貼る
     ///   - Esc → コピーを取りやめ、印を消す
+    ///   - 視点と切断ボックスの両方をコピーしている（印が2つ）ときは、どちらのボタンで貼っても両方を貼る
     ///
     /// 視点・切断ボックスで違うのは「何を覚えて、どう当てるか」と文言・印の絵だけなので、それを派生クラスで書く。
     /// 文言のキーは "{KeyPrefix}.xxx"。
@@ -71,8 +72,11 @@ namespace Tools28.Commands.ViewCopy
                         message = S("NothingCopied");
                         return Result.Failed;
                     }
-                    int pasted = Paste(uiapp, doc, selectedViews);
-                    TaskDialog.Show(S("Title"), string.Format(S("Pasted"), pasted, SourceDescription));
+                    var kinds = CopiedKinds();
+                    int pasted = Paste(uiapp, doc, selectedViews, kinds);
+                    TaskDialog.Show(S("Title"), kinds.Count > 1
+                        ? string.Format(Loc.S("View3DMatch.PastedBoth"), pasted)
+                        : string.Format(S("Pasted"), pasted, SourceDescription));
                     return Result.Succeeded;
                 }
 
@@ -96,7 +100,7 @@ namespace Tools28.Commands.ViewCopy
                 }
 
                 // コピー済みで別のビュー → すぐに貼る（MA でクリックした要素に写すのと同じ）
-                Paste(uiapp, doc, new List<View3D> { active });
+                Paste(uiapp, doc, new List<View3D> { active }, CopiedKinds());
                 CopyBadge.Show(KeyPrefix, BadgeIcon, ClearCopy, uiapp.MainWindowHandle);
                 return Result.Succeeded;
             }
@@ -107,27 +111,48 @@ namespace Tools28.Commands.ViewCopy
             }
         }
 
-        /// <summary>覚えた設定を当てる。当てられた数を返す。</summary>
-        private int Paste(UIApplication uiapp, Document doc, List<View3D> targets)
+        /// <summary>
+        /// いまコピーしている種類（印が出ているもの）。押したボタンの種類は必ずコピー済みの状態で呼ぶ。
+        /// </summary>
+        private static List<View3DMatchCommandBase> CopiedKinds()
+        {
+            return new List<View3DMatchCommandBase>
+            {
+                new ViewMatchCommand(),
+                new SectionBoxCopy.SectionBoxMatchCommand(),
+            }.Where(k => k.HasCopied).ToList();
+        }
+
+        /// <summary>
+        /// コピーしている種類すべてを当てる（1つの操作なので Ctrl+Z 1回で戻る）。
+        /// すべての種類を当てられたビューの数を返す。
+        /// </summary>
+        private int Paste(UIApplication uiapp, Document doc, List<View3D> targets, List<View3DMatchCommandBase> kinds)
         {
             int success = 0;
             int failed = 0;
+            string txnName = kinds.Count > 1 ? Loc.S("View3DMatch.TxnBoth") : S("Txn");
 
-            using (Transaction trans = new Transaction(doc, S("Txn")))
+            using (Transaction trans = new Transaction(doc, txnName))
             {
                 trans.Start();
                 foreach (View3D view in targets)
                 {
-                    try
+                    bool ok = true;
+                    foreach (var kind in kinds)
                     {
-                        ApplyTo(view);
-                        success++;
+                        try
+                        {
+                            kind.ApplyTo(view);
+                        }
+                        catch (Exception ex)
+                        {
+                            DiagLog.Write($"[{kind.KeyPrefix}] 適用に失敗 view={view.Name}: {ex.Message}");
+                            ok = false;
+                        }
                     }
-                    catch (Exception ex)
-                    {
-                        DiagLog.Write($"[{KeyPrefix}] 適用に失敗 view={view.Name}: {ex.Message}");
-                        failed++;
-                    }
+                    if (ok) success++;
+                    else failed++;
                 }
                 trans.Commit();
             }

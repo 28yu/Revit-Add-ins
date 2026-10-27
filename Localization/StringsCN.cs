@@ -48,9 +48,9 @@ namespace Tools28.Localization
             { "Ribbon.SectionBox.Paste", "剖面框\n粘贴" },
             { "Ribbon.SectionBox.Paste.Tip", "将复制的剖面框粘贴到其他3D视图" },
             { "Ribbon.ViewMatch", "匹配视角" },
-            { "Ribbon.ViewMatch.Tip", "统一三维视图的视角（与 Revit 的“匹配类型属性”用法相同）。在三维视图中按下时记为源，光标旁会显示标记。显示标记期间，在其他三维视图中按下即可立即粘贴。在项目浏览器中选择三维视图后按下，可一次粘贴到全部视图。按 Esc 取消。" },
+            { "Ribbon.ViewMatch.Tip", "统一三维视图的视角（与 Revit 的“匹配类型属性”用法相同）。在三维视图中按下时记为源，光标旁会显示标记。显示标记期间，在其他三维视图中按下即可立即粘贴。在项目浏览器中选择三维视图后按下，可一次粘贴到全部视图。按 Esc 取消。同时复制了视角和剖面框时，按任一按钮都会同时粘贴两者。" },
             { "Ribbon.SbMatch", "匹配\n剖面框" },
-            { "Ribbon.SbMatch.Tip", "统一三维视图的剖面框（与 Revit 的“匹配类型属性”用法相同）。在三维视图中按下时记为源，光标旁会显示标记。显示标记期间，在其他三维视图中按下即可立即粘贴。在项目浏览器中选择三维视图后按下，可一次粘贴到全部视图。按 Esc 取消。" },
+            { "Ribbon.SbMatch.Tip", "统一三维视图的剖面框（与 Revit 的“匹配类型属性”用法相同）。在三维视图中按下时记为源，光标旁会显示标记。显示标记期间，在其他三维视图中按下即可立即粘贴。在项目浏览器中选择三维视图后按下，可一次粘贴到全部视图。按 Esc 取消。同时复制了视角和剖面框时，按任一按钮都会同时粘贴两者。" },
 
             // === Ribbon: Annotation ===
             { "Ribbon.RoomTag", "房间标签\n自动放置" },
@@ -1090,6 +1090,8 @@ namespace Tools28.Localization
             { "SbMatch.NothingCopied", "尚未复制剖面框。请打开源三维视图并按“匹配剖面框”。" },
             { "SbMatch.Txn", "匹配剖面框" },
             { "SbMatch.Pasted", "已将剖面框粘贴到 {0} 个三维视图。\n源：{1}" },
+            { "View3DMatch.PastedBoth", "已将视角和剖面框粘贴到 {0} 个三维视图。" },
+            { "View3DMatch.TxnBoth", "匹配视角和剖面框" },
             { "SbMatch.Error", "匹配剖面框时发生错误。\n{0}" },
             { "SbMatch.SourceOff", "{0}（无剖面框；粘贴后剖面框将关闭）" },
             { "CropBox.UnsupportedViewType", "不支持该视图类型（{0}）。" },
