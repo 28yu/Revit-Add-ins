@@ -2561,6 +2561,13 @@ V/G の外に原因がある可能性を潰せていなかった。
 - アイコン `view_match.png` / `sectionbox_match.png`（96px・288 DPI）: 旧アイコンのコピー側とペースト側を 60% に縮めて並べ、矢印でつないだ
   （運営者が「右下に回る矢印の印」案と見比べて選んだ）。`Resources/Icons/DesignConcept/draw_view_match_icons.py`
 
+### Linux でのアドイン全体のコンパイル確認（2026-10-27）
+- `scripts/compile-check/run.sh`: Tools28.csproj と同じ .cs 一式を、Nice3point.Revit.Api の各版（2021〜2026）に対してコンパイルする
+- WPF の XAML コンパイル（WindowsDesktop SDK）は Linux の dotnet に無いので、`gen_xaml_stub.py` が XAML の `x:Class` / `x:Name` から
+  partial クラス（部品のフィールドと空の `InitializeComponent`）を作って補う。`ToggleButton` / `Popup` は `Controls.Primitives` 名前空間
+- .NET 8 側は `EnableWindowsTargeting=true` ＋ `FrameworkReference Microsoft.WindowsDesktop.App.WPF` で WPF の型を参照できる（`UseWPF` は不可）
+- 誤りを入れると「失敗」とファイル・行が出ることを確認済み。XAML 自体の誤りと実機の動きは確認できない
+
 ### トリミング領域合わせ（1ボタン化）（2026-10-27）
 
 - トリミング領域 コピー／ペーストを「トリミング領域合わせ」1ボタンにした（`CropBoxMatchCommand`）。操作は視点・切断ボックス合わせと同じ（印・すぐ貼る・まとめて貼る・Esc）
