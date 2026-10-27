@@ -32,10 +32,8 @@ namespace Tools28
             { "ViewportPositionMatch", "Ribbon.Viewport.Match" },
             { "CropBoxCopy", "Ribbon.CropBox.Copy" },
             { "CropBoxPaste", "Ribbon.CropBox.Paste" },
-            { "ViewCopy", "Ribbon.View.Copy" },
-            { "ViewPaste", "Ribbon.View.Paste" },
-            { "SectionBoxCopy", "Ribbon.SectionBox.Copy" },
-            { "SectionBoxPaste", "Ribbon.SectionBox.Paste" },
+            { "ViewMatch", "Ribbon.ViewMatch" },
+            { "SectionBoxMatch", "Ribbon.SbMatch" },
             { "RoomTagAutoCreator", "Ribbon.RoomTag" },
             { "Room3DColor", "Ribbon.Room3DColor" },
             { "FilledRegionSplitMerge2", "Ribbon.FilledRegion" },
@@ -68,10 +66,8 @@ namespace Tools28
             { "ViewportPositionMatch", "Ribbon.Viewport.Match.Tip" },
             { "CropBoxCopy", "Ribbon.CropBox.Copy.Tip" },
             { "CropBoxPaste", "Ribbon.CropBox.Paste.Tip" },
-            { "ViewCopy", "Ribbon.View.Copy.Tip" },
-            { "ViewPaste", "Ribbon.View.Paste.Tip" },
-            { "SectionBoxCopy", "Ribbon.SectionBox.Copy.Tip" },
-            { "SectionBoxPaste", "Ribbon.SectionBox.Paste.Tip" },
+            { "ViewMatch", "Ribbon.ViewMatch.Tip" },
+            { "SectionBoxMatch", "Ribbon.SbMatch.Tip" },
             { "RoomTagAutoCreator", "Ribbon.RoomTag.Tip" },
             { "Room3DColor", "Ribbon.Room3DColor.Tip" },
             { "FilledRegionSplitMerge2", "Ribbon.FilledRegion.Tip" },
@@ -380,27 +376,18 @@ namespace Tools28
             RibbonPanel panel = application.CreateRibbonPanel(tabName, Loc.S("Ribbon.Panel.3DView"));
             _panels.Add(panel);
 
-            var viewCopyData = new PushButtonData("ViewCopy", Loc.S("Ribbon.View.Copy"), assemblyPath, "Tools28.Commands.ViewCopy.ExecuteViewCopyCommand");
-            viewCopyData.ToolTip = Loc.S("Ribbon.View.Copy.Tip");
-            viewCopyData.LargeImage = LoadImage("view_copy.png");
-            AddButton(panel, viewCopyData);
-
-            var viewPasteData = new PushButtonData("ViewPaste", Loc.S("Ribbon.View.Paste"), assemblyPath, "Tools28.Commands.ViewCopy.ExecuteViewPasteCommand");
-            viewPasteData.ToolTip = Loc.S("Ribbon.View.Paste.Tip");
-            viewPasteData.LargeImage = LoadImage("view_paste.png");
-            AddButton(panel, viewPasteData);
+            // 視点・切断ボックスは、コピー／ペーストを1ボタンにまとめた「〜合わせ」（View3DMatchCommandBase）
+            var viewMatchData = new PushButtonData("ViewMatch", Loc.S("Ribbon.ViewMatch"), assemblyPath, "Tools28.Commands.ViewCopy.ViewMatchCommand");
+            viewMatchData.ToolTip = Loc.S("Ribbon.ViewMatch.Tip");
+            viewMatchData.LargeImage = LoadImage("view_match.png");
+            AddButton(panel, viewMatchData);
 
             panel.AddSeparator();
 
-            var sbCopyData = new PushButtonData("SectionBoxCopy", Loc.S("Ribbon.SectionBox.Copy"), assemblyPath, "Tools28.Commands.SectionBoxCopy.ExecuteSectionBoxCopyCommand");
-            sbCopyData.ToolTip = Loc.S("Ribbon.SectionBox.Copy.Tip");
-            sbCopyData.LargeImage = LoadImage("sectionbox_copy.png");
-            AddButton(panel, sbCopyData);
-
-            var sbPasteData = new PushButtonData("SectionBoxPaste", Loc.S("Ribbon.SectionBox.Paste"), assemblyPath, "Tools28.Commands.SectionBoxCopy.ExecuteSectionBoxPasteCommand");
-            sbPasteData.ToolTip = Loc.S("Ribbon.SectionBox.Paste.Tip");
-            sbPasteData.LargeImage = LoadImage("sectionbox_paste.png");
-            AddButton(panel, sbPasteData);
+            var sbMatchData = new PushButtonData("SectionBoxMatch", Loc.S("Ribbon.SbMatch"), assemblyPath, "Tools28.Commands.SectionBoxCopy.SectionBoxMatchCommand");
+            sbMatchData.ToolTip = Loc.S("Ribbon.SbMatch.Tip");
+            sbMatchData.LargeImage = LoadImage("sectionbox_match.png");
+            AddButton(panel, sbMatchData);
         }
 
         private void CreateAnnotationPanel(UIControlledApplication application, string tabName, string assemblyPath)

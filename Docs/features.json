@@ -61,23 +61,23 @@
     {
       "id": "ViewCopy3D",
       "category": "view",
-      "icon": "icons/features/view_copy.png",
+      "icon": "icons/features/view_match.png",
       "manual": "Features/ViewCopy3D.md",
       "names": {
-        "ja": "3D視点コピペ",
-        "en": "3D View Copy/Paste",
-        "zh": "3D视点复制粘贴"
+        "ja": "視点合わせ",
+        "en": "Match View",
+        "zh": "匹配视角"
       }
     },
     {
       "id": "SectionBoxCopy",
       "category": "view",
-      "icon": "icons/features/sectionbox_copy.png",
+      "icon": "icons/features/sectionbox_match.png",
       "manual": "Features/SectionBoxCopy.md",
       "names": {
-        "ja": "切断ボックスコピペ",
-        "en": "Section Box Copy/Paste",
-        "zh": "剖面框复制粘贴"
+        "ja": "切断ボックス合わせ",
+        "en": "Match Section Box",
+        "zh": "匹配剖面框"
       }
     },
     {

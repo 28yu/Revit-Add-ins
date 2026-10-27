@@ -78,8 +78,8 @@ Revit-Add-ins/
 ├── Commands/                   # 機能コマンド群
 │   ├── GridBubble/             # 通り芯・レベルの符号表示切替
 │   ├── SheetCreation/          # シート一括作成 (WPFダイアログ付き)
-│   ├── ViewCopy/               # 3Dビュー視点コピー
-│   ├── SectionBoxCopy/         # セクションボックスコピー
+│   ├── ViewCopy/               # 3Dビュー視点合わせ（View3DMatchCommandBase: 3Dビュー設定の1ボタン化の共通部分）
+│   ├── SectionBoxCopy/         # 切断ボックス合わせ
 │   ├── ViewportPosition/       # ビューポート位置合わせ (MA と同じ操作・自動マッチング)
 │   ├── CropBoxCopy/            # トリミング領域コピー
 │   ├── BeamTopLevel/           # 梁天端レベル色分け (平面ビュー)

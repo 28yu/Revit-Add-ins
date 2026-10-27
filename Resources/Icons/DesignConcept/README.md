@@ -98,6 +98,10 @@
 - 生成: `draw_viewport_match_icon.py`（96px は 288 DPI、16px は 96px の縮小）
 - ※ 旧 `viewport_copy` / `viewport_paste` はリボンから外した（ファイルは残している）
 
+#### `view_match` / `sectionbox_match`（視点合わせ／切断ボックス合わせ）
+- 旧 `view_copy`（左上）→ 矢印 → 旧 `view_paste`（右下）を 60% に縮めて並べる（切断ボックスも同様）
+- 生成: `draw_view_match_icons.py`。※ 旧コピー／ペーストのアイコンはリボンから外した（ファイルは素材として残す）
+
 #### `view_copy`（3Dビューコピー）
 - アイソメトリック立方体（淡い青系3色）、6頂点定義（Vt/Vtr/Vtl/Vc/Vbr/Vbl/Vb）
 - cx=16, cy=15, dx=12, dy=7
