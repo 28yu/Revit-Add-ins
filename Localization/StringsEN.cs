@@ -1085,6 +1085,7 @@ namespace Tools28.Localization
             { "ViewMatch.Title", "Match View" },
             { "ViewMatch.NothingCopied", "No view orientation has been copied yet. Open the source 3D view and press Match View." },
             { "ViewMatch.Txn", "Match View" },
+            { "ViewMatch.TxnUndo", "Undo Match View" },
             { "ViewMatch.Pasted", "Pasted the orientation to {0} 3D view(s).\nSource: {1}" },
             { "ViewMatch.Error", "An error occurred while matching the view.\n{0}" },
             { "SbMatch.Title", "Match Section Box" },

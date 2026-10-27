@@ -1084,6 +1084,7 @@ namespace Tools28.Localization
             { "ViewMatch.Title", "匹配视角" },
             { "ViewMatch.NothingCopied", "尚未复制视角。请打开源三维视图并按“匹配视角”。" },
             { "ViewMatch.Txn", "匹配视角" },
+            { "ViewMatch.TxnUndo", "撤销匹配视角" },
             { "ViewMatch.Pasted", "已将视角粘贴到 {0} 个三维视图。\n源：{1}" },
             { "ViewMatch.Error", "匹配视角时发生错误。\n{0}" },
             { "SbMatch.Title", "匹配剖面框" },

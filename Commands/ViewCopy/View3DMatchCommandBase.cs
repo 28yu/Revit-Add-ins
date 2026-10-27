@@ -133,6 +133,13 @@ namespace Tools28.Commands.ViewCopy
             int failed = 0;
             string txnName = kinds.Count > 1 ? Loc.S("View3DMatch.TxnBoth") : S("Txn");
 
+            // 視点は Revit の Ctrl+Z で戻らないため、貼る前の視点を覚えておく（ViewOrientationUndo）
+            if (kinds.Any(k => k is ViewMatchCommand))
+            {
+                ViewOrientationUndo.EnsureReady(uiapp);
+                ViewOrientationUndo.Remember(doc, txnName, targets);
+            }
+
             using (Transaction trans = new Transaction(doc, txnName))
             {
                 trans.Start();
@@ -173,7 +180,7 @@ namespace Tools28.Commands.ViewCopy
         /// ⚠ RefreshActiveView は操作中のビューしか描き直さないため、並べて表示している別のビューは
         ///   貼れていても見た目が変わらず「貼れていない」ように見えた。ズーム範囲を同じ値で設定し直して描き直させる
         /// </summary>
-        private void RedrawOpenViews(UIDocument uidoc, List<View3D> targets)
+        internal static void RedrawOpenViews(UIDocument uidoc, List<View3D> targets)
         {
             try
             {
@@ -190,7 +197,7 @@ namespace Tools28.Commands.ViewCopy
                     }
                     catch (Exception ex)
                     {
-                        DiagLog.Write($"[{KeyPrefix}] 描き直しに失敗: {ex.Message}");
+                        DiagLog.Write($"[View3DMatch] 描き直しに失敗: {ex.Message}");
                     }
                 }
             }

@@ -1084,6 +1084,7 @@ namespace Tools28.Localization
             { "ViewMatch.Title", "視点合わせ" },
             { "ViewMatch.NothingCopied", "まだ視点をコピーしていません。コピー元の3Dビューを開いて「視点合わせ」を押してください。" },
             { "ViewMatch.Txn", "視点合わせ" },
+            { "ViewMatch.TxnUndo", "視点合わせを元に戻す" },
             { "ViewMatch.Pasted", "{0} 個の3Dビューに視点を貼りました。\nコピー元: {1}" },
             { "ViewMatch.Error", "視点合わせ中にエラーが発生しました。\n{0}" },
             { "SbMatch.Title", "切断ボックス合わせ" },
