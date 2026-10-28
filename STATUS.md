@@ -18,6 +18,9 @@
   dotnet が無ければ `apt-get install dotnet-sdk-8.0`。⚠ API の有無は版ごとに違う（例: ビューポートの変換 API は 2023 から）ので**必ず全版で確認**
 - XAML 自体の誤り（イベント名の綴りなど）と実機の動きは確認できない
 
+- **テスト用インストーラ**（このセッションの全変更入り・2026-10-28）: Actions run 40609626098 の `28Tools_Setup`（ブランチ `build/match-buttons-test`）。
+  運営者の方針: **このセッションの作業は次回のアップデート（v2.8 以降）に盛り込む**
+
 ### 次のセッションでやること
 1. 梁レベル色分けの実機確認の続き（3階→4階で凡例に4階だけ／完了画面の除外本数／水平・斜めの選択と本数／梁下端の画面のはみ出し）
 2. ⚠ **マニュアルを `Docs/Features/` に直接書いてしまった**（ViewportPosition・ViewCopy3D・SectionBoxCopy・CropBoxCopy・GenericModelMerge・BeamLevelColor）。
