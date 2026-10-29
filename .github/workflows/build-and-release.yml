@@ -125,8 +125,10 @@ jobs:
 
           # 全DLL（Tools28.dll + ClosedXML等の依存ライブラリ）
           Copy-Item "bin/Release/Revit$ver/*.dll" "$tools28Dir/"
-          # リアルタイムレンダリングの描画プログラム
+          # リアルタイムレンダリングの描画プログラム（と、仕上げに使う Open Image Denoise の oidn フォルダ）
           Copy-Item "bin/Release/Revit$ver/Tools28Render.exe" "$tools28Dir/"
+          Copy-Item "bin/Release/Revit$ver/oidn" "$tools28Dir/" -Recurse
+          if (-not (Test-Path "$tools28Dir/oidn/OpenImageDenoise.dll")) { Write-Error "oidn フォルダがビルド出力にありません"; exit 1 }
           Copy-Item "Packages/$ver/28Tools/Tools28.addin" "$tools28Dir/Tools28.addin"
 
       - name: Upload artifact

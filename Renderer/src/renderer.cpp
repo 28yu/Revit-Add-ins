@@ -945,11 +945,13 @@ void Renderer::setTransparentOutput(bool transparent) {
 
 void Renderer::resize(uint32_t width, uint32_t height) {
     vkDeviceWaitIdle(ctx_->device);
+    releaseDenoise();
     Image* all[] = {&noisy_, &gpos_[0], &gpos_[1], &gnormal_[0], &gnormal_[1], &galbedo_, &history_[0], &history_[1],
                     &moments_[0], &moments_[1], &filtered_[0], &filtered_[1], &albedoHist_[0], &albedoHist_[1], &output_,
                     &local_[0], &local_[1]};
     for (Image* img : all) ctx_->destroyImage(*img);
-    const VkImageUsageFlags storage = VK_IMAGE_USAGE_STORAGE_BIT;
+    // 写し出し・書き戻し（仕上げの Open Image Denoise）にも使うので、転送もできるようにしておく
+    const VkImageUsageFlags storage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
     for (Image* img : {&local_[0], &local_[1]})
         *img = ctx_->createImage((width + 7) / 8, (height + 7) / 8, VK_FORMAT_R32G32B32A32_SFLOAT, storage);
     for (Image* img : {&gpos_[0], &gpos_[1], &history_[0], &history_[1],
@@ -967,10 +969,10 @@ void Renderer::resize(uint32_t width, uint32_t height) {
 }
 
 VkDeviceSize Renderer::imageBytes(uint32_t width, uint32_t height) {
-    // resize と同じ並び: 32 ビット×4 が 10 枚、16 ビット×4 が 3 枚、8 ビット×4 が 2 枚、縦横 1/8 の 32 ビット×4 が 2 枚
+    // resize と同じ並び: 32 ビット×4 が 10 枚（＋仕上げの結果 1 枚）、16 ビット×4 が 3 枚、8 ビット×4 が 2 枚、縦横 1/8 の 32 ビット×4 が 2 枚
     const VkDeviceSize px = static_cast<VkDeviceSize>(width) * height;
     const VkDeviceSize small = static_cast<VkDeviceSize>((width + 7) / 8) * ((height + 7) / 8);
-    return px * (10 * 16 + 3 * 8 + 2 * 4) + small * 2 * 16;
+    return px * (11 * 16 + 3 * 8 + 2 * 4) + small * 2 * 16;
 }
 
 void Renderer::dispatch(VkCommandBuffer cmd, const ComputePass& pass, uint32_t set, const void* push, uint32_t pushSize,
@@ -1001,7 +1003,14 @@ void Renderer::record(VkCommandBuffer cmd, const ViewParams& view) {
 
     const bool reset = resetHistory_ || !hasLastView_;
     const bool moved = !reset && !sameView(view, lastView_);
-    if (reset || moved) staticFrames_ = 0;
+    if (reset || moved) {
+        staticFrames_ = 0;
+        // 仕上げの結果は止まっている間の画だけに使う。計算中のものも、できあがったら捨てる
+        ++oidnGeneration_;
+        denoisedValid_ = false;
+        oidnNextAt_ = 12;
+    }
+    recordDenoiseUpload(cmd);
     const uint32_t cur = frameIndex_ & 1u;
     const uint32_t w = output_.width, h = output_.height;
     const float tanHalf = std::tan(view.fovY * 0.5f * 3.14159265f / 180.0f);
@@ -1068,11 +1077,38 @@ void Renderer::record(VkCommandBuffer cmd, const ViewParams& view) {
     dispatch(cmd, temporal_, cur, &tp, sizeof(tp), w, h);
     computeBarrier(cmd);
 
-    // 3. 周りの画素と平均する（間隔を広げながらくり返す）
-    for (int i = 0; i < kAtrousIterations; ++i) {
-        AtrousPush ap{spatialDenoise_ ? 1 << i : 0};
-        dispatch(cmd, atrous_, cur * 2 + (i % 2), &ap, sizeof(ap), w, h);
-        computeBarrier(cmd);
+    // 止まっている間: 足し合わせた結果を CPU の Open Image Denoise に回す（決まったフレームごと、または頼まれたとき）
+    if (oidn_ && !reset && !moved && oidnState_ == 0 &&
+        (oidnForce_ || (autoFinalDenoise_ && staticFrames_ + 1 >= oidnNextAt_))) {
+        recordDenoiseCapture(cmd, cur);
+        oidnNextAt_ = std::max(oidnNextAt_, staticFrames_ + 1) * 4;
+        oidnForce_ = false;
+    }
+
+    // 3. 周りの画素と平均する（間隔を広げながらくり返す）。止まっていて仕上げの結果があれば、代わりにそれを使う
+    denoisedUsed_ = denoisedValid_ && !reset && !moved;
+    if (denoisedUsed_) {
+        VkMemoryBarrier toCopy{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
+        toCopy.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
+        toCopy.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
+        vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
+                             VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 1, &toCopy, 0, nullptr, 0, nullptr);
+        VkImageCopy region{};
+        region.srcSubresource = region.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+        region.extent = {w, h, 1};
+        vkCmdCopyImage(cmd, denoised_.image, VK_IMAGE_LAYOUT_GENERAL, filtered_[kAtrousIterations % 2].image,
+                       VK_IMAGE_LAYOUT_GENERAL, 1, &region);
+        VkMemoryBarrier toCompute{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
+        toCompute.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        toCompute.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+        vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 1, &toCompute, 0,
+                             nullptr, 0, nullptr);
+    } else {
+        for (int i = 0; i < kAtrousIterations; ++i) {
+            AtrousPush ap{spatialDenoise_ ? 1 << i : 0};
+            dispatch(cmd, atrous_, cur * 2 + (i % 2), &ap, sizeof(ap), w, h);
+            computeBarrier(cmd);
+        }
     }
 
     // 4. 大まかな明るさ（ローカルトーンマッピング用。自動露出の集計も）
@@ -1111,6 +1147,7 @@ void Renderer::record(VkCommandBuffer cmd, const ViewParams& view) {
 }
 
 float Renderer::finishFrame() {
+    startDenoiseJob();
     const auto* data = static_cast<const ExposureData*>(exposure_.mapped);
     if (data->logLumCount <= 0) return -1.0f;
     float avgLog2 = static_cast<float>(data->logLumSum) / 64.0f / static_cast<float>(data->logLumCount);
@@ -1141,10 +1178,145 @@ float Renderer::finishFrame() {
     return std::exp2(avgLog2);
 }
 
+// --- 止まっている間の仕上げ（Open Image Denoise）-------------------------------------
+// 1. record: 足し合わせた明るさ・面の色・面の向きを、CPU から読めるバッファに写す命令を入れる（recordDenoiseCapture）
+// 2. finishFrame: GPU が終わったら、別のスレッドで Open Image Denoise を動かす（startDenoiseJob）。描画は止めずに続ける
+// 3. 次の record: できあがっていれば GPU の画像に書き戻し（recordDenoiseUpload）、atrous の結果の代わりに使う
+// カメラが動いたら、できあがった結果も捨てる（oidnGeneration_）
+
+namespace {
+float halfToFloat(uint16_t h) {
+    uint32_t sign = (h >> 15) & 1u, exp = (h >> 10) & 31u, mant = h & 1023u;
+    float v;
+    if (exp == 0) v = std::ldexp(static_cast<float>(mant), -24);
+    else if (exp == 31) v = mant ? 0.0f : 65504.0f;
+    else v = std::ldexp(static_cast<float>(mant | 1024u), static_cast<int>(exp) - 25);
+    return sign ? -v : v;
+}
+}  // namespace
+
+void Renderer::releaseDenoise() {
+    if (oidnThread_.joinable()) oidnThread_.join();
+    oidnState_ = 0;
+    if (ctx_) {
+        ctx_->destroyBuffer(oidnIn_);
+        ctx_->destroyBuffer(oidnOut_);
+        ctx_->destroyImage(denoised_);
+    }
+    oidnW_ = oidnH_ = 0;
+    denoisedValid_ = denoisedUsed_ = false;
+    ++oidnGeneration_;
+}
+
+void Renderer::waitFinalDenoise() {
+    if (oidnThread_.joinable()) oidnThread_.join();
+}
+
+void Renderer::recordDenoiseUpload(VkCommandBuffer cmd) {
+    if (oidnState_ != 3) return;
+    if (oidnThread_.joinable()) oidnThread_.join();
+    oidnState_ = 0;
+    if (!oidnOk_ || oidnJobGeneration_ != oidnGeneration_ || !denoised_.image) return;
+    // 前のフレームで denoised_ を読み終えてから書き換える
+    VkMemoryBarrier before{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
+    before.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_SHADER_READ_BIT;
+    before.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                         0, 1, &before, 0, nullptr, 0, nullptr);
+    VkBufferImageCopy region{};
+    region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    region.imageExtent = {oidnW_, oidnH_, 1};
+    vkCmdCopyBufferToImage(cmd, oidnOut_.buffer, denoised_.image, VK_IMAGE_LAYOUT_GENERAL, 1, &region);
+    VkMemoryBarrier after{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
+    after.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    after.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+    vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 1, &after, 0, nullptr, 0, nullptr);
+    denoisedValid_ = true;
+}
+
+void Renderer::recordDenoiseCapture(VkCommandBuffer cmd, uint32_t cur) {
+    const uint32_t w = output_.width, h = output_.height;
+    const VkDeviceSize px = static_cast<VkDeviceSize>(w) * h;
+    if (!oidnIn_.buffer) {
+        // 初めて使うときに用意する（CPU 側のメモリ: 1 画素 56 バイト。GPU 側: 仕上げの結果 16 バイト）
+        oidnIn_ = ctx_->createBuffer(px * 40, VK_BUFFER_USAGE_TRANSFER_DST_BIT, ctx_->readbackMemoryFlags());
+        oidnOut_ = ctx_->createBuffer(px * 16, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+        denoised_ = ctx_->createImage(w, h, VK_FORMAT_R32G32B32A32_SFLOAT,
+                                      VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+        transitionImage(cmd, denoised_.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0,
+                        VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT | VK_ACCESS_TRANSFER_READ_BIT);
+        oidnW_ = w;
+        oidnH_ = h;
+    }
+    VkMemoryBarrier toCopy{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
+    toCopy.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    toCopy.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+    vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 1, &toCopy, 0, nullptr, 0,
+                         nullptr);
+    auto copy = [&](const Image& img, VkDeviceSize offset) {
+        VkBufferImageCopy region{};
+        region.bufferOffset = offset;
+        region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+        region.imageExtent = {w, h, 1};
+        vkCmdCopyImageToBuffer(cmd, img.image, VK_IMAGE_LAYOUT_GENERAL, oidnIn_.buffer, 1, &region);
+    };
+    copy(history_[cur], 0);           // rgba32f: 足し合わせた明るさ（面の色で割ったもの）
+    copy(albedoHist_[cur], px * 16);  // rgba32f: 面の色
+    copy(gnormal_[cur], px * 32);     // rgba16f: 面の向き
+    VkMemoryBarrier toHost{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
+    toHost.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    toHost.dstAccessMask = VK_ACCESS_HOST_READ_BIT;
+    vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_HOST_BIT, 0, 1, &toHost, 0, nullptr, 0, nullptr);
+    oidnState_ = 1;
+    oidnJobGeneration_ = oidnGeneration_;
+}
+
+void Renderer::startDenoiseJob() {
+    if (oidnState_ != 1) return;
+    oidnState_ = 2;
+    oidnOk_ = false;
+    const uint32_t w = oidnW_, h = oidnH_, frames = staticFrames_;
+    const float* in = static_cast<const float*>(oidnIn_.mapped);
+    float* out = static_cast<float*>(oidnOut_.mapped);
+    OidnDenoiser* oidn = oidn_;
+    oidnThread_ = std::thread([w, h, frames, in, out, oidn, this]() {
+        auto start = std::chrono::steady_clock::now();
+        const size_t px = static_cast<size_t>(w) * h;
+        const float* hist = in;
+        const float* alb = in + px * 4;
+        const uint16_t* nrm = reinterpret_cast<const uint16_t*>(in + px * 8);
+        // 結果は color に上書きする（CPU のメモリを節約。4K で約 100MB）
+        std::vector<float> color(px * 3), albedo(px * 3), normal(px * 3);
+        for (size_t i = 0; i < px; ++i)
+            for (size_t c = 0; c < 3; ++c) {
+                float a = std::min(std::max(alb[i * 4 + c], 0.0f), 1.0f);
+                float v = hist[i * 4 + c];
+                color[i * 3 + c] = std::isfinite(v) ? std::max(v, 0.0f) * a : 0.0f;
+                albedo[i * 3 + c] = a;
+                normal[i * 3 + c] = halfToFloat(nrm[i * 4 + c]);
+            }
+        bool ok = oidn->denoise(color.data(), albedo.data(), normal.data(), color.data(), static_cast<int>(w), static_cast<int>(h));
+        if (ok) {
+            // 仕上げ（composite）で面の色を掛けるので、ここでは面の色で割っておく
+            for (size_t i = 0; i < px; ++i) {
+                for (size_t c = 0; c < 3; ++c)
+                    out[i * 4 + c] = std::max(color[i * 3 + c], 0.0f) / std::max(albedo[i * 3 + c], 1e-4f);
+                out[i * 4 + 3] = 0.0f;
+            }
+        }
+        double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+        logInfo("Final denoise (Open Image Denoise) %ux%u after %u frames: %s in %.0f ms", w, h, frames, ok ? "done" : "FAILED", ms);
+        oidnOk_ = ok;
+        oidnState_ = 3;
+    });
+}
+
 void Renderer::destroy() {
     if (!ctx_) return;
     VkDevice dev = ctx_->device;
     vkDeviceWaitIdle(dev);
+    releaseDenoise();
     for (ComputePass* p : {&pathTrace_, &temporal_, &atrous_, &localDown_, &localBlur_, &composite_, &skyPass_, &skyCdfPass_, &overlayPass_})
         destroyPass(dev, *p);
     Image* all[] = {&noisy_, &gpos_[0], &gpos_[1], &gnormal_[0], &gnormal_[1], &galbedo_, &history_[0], &history_[1],

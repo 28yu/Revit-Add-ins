@@ -37,6 +37,8 @@
     <None Remove="Renderer\**" />
     <Compile Remove="Renderer\**" />
     <None Include="Renderer\prebuilt\win-x64\Tools28Render.exe" Link="Tools28Render.exe" CopyToOutputDirectory="PreserveNewest" />
+    <!-- 止まっている間の仕上げに使う Intel Open Image Denoise（CPU 版の DLL とライセンス）。exe の横の oidn フォルダに置く -->
+    <None Include="Renderer\prebuilt\win-x64\oidn\*.*" Link="oidn\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <!-- Revit API (NuGet パッケージ経由 - ローカル Revit 不要) -->

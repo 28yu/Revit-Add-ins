@@ -74,6 +74,12 @@ int runOffscreen(const Options& opt, Scene& scene) {
     renderer.setLocalToneMapping(opt.localToneMapping);
     renderer.setSkySampling(opt.skySampling);
     renderer.setSpatialDenoise(opt.spatialDenoise);
+    // 仕上げの Open Image Denoise（画像だけ作るときは、最後に 1 回だけ使う）
+    OidnDenoiser oidn;
+    if (opt.finalDenoise && opt.motionTest == 0 && opt.motionReference == 0 && oidn.load()) {
+        renderer.setFinalDenoiser(&oidn);
+        renderer.setAutoFinalDenoise(false);
+    }
     double initSeconds = secondsSince(initStart);
     // 3D ビューの「レンダリング設定」（照明・雲の量）
     renderer.setLighting(scene.revitLook.sun, scene.revitLook.artificial);
@@ -141,13 +147,27 @@ int runOffscreen(const Options& opt, Scene& scene) {
         vkCheck(vkQueueSubmit(ctx.queue, 1, &si, fence), "vkQueueSubmit");
         vkCheck(vkWaitForFences(ctx.device, 1, &fence, VK_TRUE, UINT64_MAX), "vkWaitForFences");
         vkResetFences(ctx.device, 1, &fence);
-        if (opt.autoExposure) exposure.update(renderer.finishFrame(), opt.exposureEv, 0.0f);
+        float key = renderer.finishFrame();
+        if (opt.autoExposure) exposure.update(key, opt.exposureEv, 0.0f);
         double seconds = secondsSince(t);
         if (opt.bands <= 0 && bands.update(seconds)) {
             renderer.setPathTraceBands(bands.bands);
             logInfo("Frame took %.0f ms: path trace in %u bands", seconds * 1000.0, bands.bands);
         }
         return seconds;
+    };
+    // 足し合わせた結果を Open Image Denoise で仕上げ、その絵をもう 1 フレーム描く（使えないときは何もしない）。かかった秒数を返す
+    auto finalDenoise = [&](ViewParams& v) {
+        if (!renderer.finalDenoiserAvailable()) return 0.0;
+        auto t = Clock::now();
+        renderer.requestFinalDenoise();
+        v.exposure = exposure.current;
+        renderOne(v);              // 写す
+        renderer.waitFinalDenoise();
+        v.exposure = exposure.current;
+        renderOne(v);              // 仕上げた結果で描く
+        if (!renderer.finalDenoiseShown()) logError("Final denoise was not applied");
+        return secondsSince(t);
     };
     struct FrameStats {
         double avg = 0, max = 0;
@@ -161,6 +181,7 @@ int runOffscreen(const Options& opt, Scene& scene) {
             view.exposure = exposure.current;
             still.add(renderOne(view), opt.benchFrames);
         }
+        double denoiseSeconds = finalDenoise(view);
         std::vector<uint8_t> rgba = readImageRgba(ctx, renderer.output(), opt.transparent);
         // 白とびの割合（RGB すべてが 250 以上の画素）と、平均の明るさ（0〜255）
         size_t blown = 0;
@@ -192,13 +213,14 @@ int runOffscreen(const Options& opt, Scene& scene) {
         logInfo("BENCH {\"drawn_triangles\":%zu,\"shapes\":%zu,\"placements\":%zu,\"triangles\":%zu,\"vertices\":%zu,\"textures\":%zu,\"scene_mb\":%.1f,\"save_s\":%.2f,"
                 "\"load_s\":%.2f,\"prepare_s\":%.2f,\"init_s\":%.2f,\"gpu_mb\":%.0f,\"gpu_peak_mb\":%.0f,"
                 "\"width\":%u,\"height\":%u,\"still_ms\":%.1f,\"still_max_ms\":%.1f,\"moving_ms\":%.1f,"
-                "\"moving_max_ms\":%.1f,\"bands\":%u,\"png_kb\":%.0f,\"blown_pct\":%.2f,\"mean_luma\":%.1f,\"hw_rt\":%d}",
+                "\"moving_max_ms\":%.1f,\"bands\":%u,\"png_kb\":%.0f,\"blown_pct\":%.2f,\"mean_luma\":%.1f,\"hw_rt\":%d,"
+                "\"denoise_ms\":%.0f}",
                 scene.instancedTriangleCount(), scene.meshes.size(), scene.instances.size(),
                 scene.triangleCount(), scene.vertices.size(), scene.textures.size(), sceneBytes / 1048576.0, saveSeconds,
                 opt.sceneLoadSeconds, prepareSeconds, initSeconds, ctx.allocatedDeviceBytes / 1048576.0,
                 ctx.peakDeviceBytes / 1048576.0, w, h, still.avg * 1000.0, still.max * 1000.0, moving.avg * 1000.0,
                 moving.max * 1000.0, renderer.pathTraceBands(), png.size() / 1024.0, pixels ? 100.0 * blown / pixels : 0.0,
-                pixels ? lumSum / pixels : 0.0, ctx.hardwareRt ? 1 : 0);
+                pixels ? lumSum / pixels : 0.0, ctx.hardwareRt ? 1 : 0, denoiseSeconds * 1000.0);
         vkDestroyFence(ctx.device, fence, nullptr);
         renderer.destroy();
         ctx.destroy();
@@ -218,6 +240,7 @@ int runOffscreen(const Options& opt, Scene& scene) {
         renderOne(view);
         if ((s + 1) % 16 == 0 || s + 1 == frames) logInfo("sample %d / %d", s + 1, frames);
     }
+    finalDenoise(view);
     double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
     logInfo("Rendered %d samples in %.1f s (exposure x%.2f)", frames, seconds, exposure.current);
     if (opt.motionTest > 0)

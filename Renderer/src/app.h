@@ -46,6 +46,7 @@ struct Options {
     float localToneMapping = 1.0f;  // ローカルトーンマッピングの強さ（0 = 使わない。--local-tonemap で変える。比較用）
     bool skySampling = true;       // 空と地面の光を直接狙う（--sky-sampling 0 で切る。比較用）
     bool spatialDenoise = true;    // 周りの画素と平均する（--no-spatial-denoise で切る。ノイズの量を測るとき用）
+    bool finalDenoise = true;      // 止まっている間・書き出しの仕上げに Open Image Denoise を使う（--final-denoise 0 で切る）
     bool bench = false;
     int benchFrames = 16;          // 止まっている間・動いている間それぞれ何フレーム測るか
     std::string saveScenePath;     // 指定があれば、読み込んだシーンを .t28s で保存する（ファイルの大きさの確認用）

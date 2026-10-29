@@ -363,6 +363,25 @@ Enscape 相当の「Revit だけで完結する」レンダリングを目指す
   - 本当に効くのは「跳ね返った光」の扱い（ReSTIR GI・パスガイディング）か、ノイズ除去の強化。まずは段階3-3（止まったら Open Image Denoise）で対処する
 - 確認用に `--no-spatial-denoise`（atrous を飛ばす。生のノイズを測る）を追加
 
+### 2026-10-29 追記: 段階3-3 止まったら Open Image Denoise で仕上げる
+- **流れ**（`Renderer` の recordDenoiseCapture → startDenoiseJob → recordDenoiseUpload）: 止まってから 12・48・192・768 フレーム目に、
+  `history`（足し合わせた明るさ。面の色で割ったもの）・`albedoHist`・`gnormal` を CPU から読めるバッファ（キャッシュの効く種類を優先）に写す。
+  GPU が終わったら別のスレッドで OIDN（`RT`・hdr・cleanAux・quality=high、CPU のコアを 1 つ空ける）。入力の色は「明るさ × 面の色」、
+  結果を面の色で割って `denoised_` に書き戻し、`atrous` の代わりに `filtered_[1]` へ写す（`composite`・ローカルトーンマッピングは変更なし）。
+  カメラが動いたら `oidnGeneration_` を進め、計算中の結果も捨てる
+- **書き出し**: 途中では仕上げず（`setAutoFinalDenoise(false)`）、足し合わせ終わったら 1 回だけ（頼む → 写して待つ → 仕上げた絵を描いて保存）。
+  そのぶん足し合わせる回数を半分にした（画像 512→256、360° 256→128。RT コアありの場合）。お知らせ「ノイズを取って仕上げ中…」（3 言語）
+- **効果**（`run.sh --quality`、8 フレーム、明るさ決め打ち、正解は 512 回）: RMSE 13.8 → **8.0**、まだら 7.5 → **4.0**。
+  段階3 の前（14.5 / 7.7）から比べて約半分。SVGF だけのときにあった暗めの偏りも無くなる。PNG も小さくなる（small 456 → 378KB）
+- 計算時間: 640×360 で約 0.2〜0.5 秒、1920×1080 で約 8 秒（この開発環境の CPU 3 スレッド。実機の 8〜16 コアならその数分の 1）
+- **配布**: 公式の Windows 版から CPU に要る DLL 4 つ（約 51MB。重みが入った `_core` が 50MB）とライセンスを `Renderer/prebuilt/win-x64/oidn/` に入れた。
+  csproj が出力の `oidn` フォルダへ、インストーラは 6 バージョンとも同じ元から取り込む（インストーラの中には 1 つだけ入る）。
+  QuickBuild は中身が同じなら配置しない。CI の成果物にも入れ、無ければ失敗させる
+- **つまずき**: `OpenImageDenoise.dll` を場所を指定して読んでも、OIDN が後から読む `OpenImageDenoise_device_cpu.dll` の依存 `tbb12.dll` は
+  oidn フォルダから探されず「unsupported device type: CPU」になった（Wine の +loaddll で発見）。`tbb12.dll` を先に場所を指定して読んで解決。
+  装置を作れなかった理由は `oidnGetDeviceError(nullptr, …)` で取れる
+- 動作確認: Linux（Linux 版 OIDN）で画像だけ作る・ウィンドウ（Xvfb、止まって 12 フレームで仕上げ、P で書き出し）、Wine で Windows 版（DLL あり・なし）
+
 ## v2.6 リリースとインストーラ化（2026-10-14）
 
 ### 配布形式の変更

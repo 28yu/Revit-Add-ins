@@ -143,6 +143,7 @@ static const Entry kStrings[] = {
     {"ExportingImage", "画像を書き出し中…", "Exporting image...", "正在导出图像…"},
     {"ExportingPanorama", "360°画像を書き出し中…", "Exporting 360° image...", "正在导出 360° 图像…"},
     {"ExportCancelHint", "Esc キーで中止", "Press Esc to cancel", "按 Esc 键取消"},
+    {"ExportFinishing", "ノイズを取って仕上げ中…", "Removing noise...", "正在去除噪点…"},
     {"Saved", "保存しました: ", "Saved: ", "已保存: "},
     {"SavedPanoramaNote", "ブラウザで開くと、ドラッグで見回せます", "Open it in a web browser and drag to look around",
      "在浏览器中打开后，拖动即可环视"},

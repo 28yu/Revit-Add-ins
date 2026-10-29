@@ -8,6 +8,9 @@ Revit の「リアルタイムレンダリング」ボタン（`Commands/Realtim
   自動で切り替える（同じ絵になるが遅いので、半分の大きさで描いて拡大する）
 - **ノイズ除去**: 前のフレームの結果を今のカメラ位置に合わせて重ね（再投影）、面の境目を守りながら周りの画素と平均する
   （SVGF 方式）。動いている間もざらつかず、止まると足し合わせが進んで正確な結果に近づく
+- **止まったら AI で仕上げ**: カメラが止まると、足し合わせた結果を Intel **Open Image Denoise**（CPU で動く AI のノイズ除去）に回し、
+  できたら差し替える（別のスレッドで計算するので画面は止まらない。止まってから 12・48・192・768 フレーム目に作り直す）。
+  画像・360° の書き出しも最後に 1 回仕上げる（そのぶん足し合わせる回数を半分にした）。DLL が無いとき（ビューアの exe）は今まで通り
 - **空・地面**: 雲のある青空と、地平線まで続くベージュの地面（モデルの一番下の高さ）。遠くは霞む（Enscape に近い見え方）
 - **照明器具**: ファミリの測光の設定（明るさ・色温度・配光・光源の形）から光源を作り、影も計算する（実際の明るさの単位なので、昼は控えめ・夜はよく見える）
 - **マテリアルの外観**（Revit の外観タブ）の色・イメージ（テクスチャ）・反射率・粗さ・透明度・レリーフ パターン（凹凸）・自己発光を使う。
@@ -64,6 +67,11 @@ Revit 2023 以降は、同じファミリの形（SymbolGeometryId）の 2 回�
 | `composite.comp` | 仕上げ: 面の色を掛け戻し、ローカルトーンマッピング、トーンマッピング |
 | `sky.comp` | 空と雲（体積の積雲・巻雲・うろこ雲）を起動時に 1 枚の画像に描く |
 | `sky_cdf.comp` | 空と地面の「明るさの地図」（方位 64 × 高さ 64）。拡散面で空・地面の光を直接狙う向きを選ぶのに使う |
+
+**止まっている間の仕上げ（`src/oidn.cpp` と `Renderer` の「仕上げ」）**: `temporal` の後に、足し合わせた明るさ（面の色で割ったもの）・面の色・面の向きを
+CPU から読めるバッファに写す → GPU が終わったら別のスレッドで Open Image Denoise（`RT` フィルタ、hdr・cleanAux・高品質）→ 次のフレームで
+GPU の画像に書き戻し、`atrous` の代わりに使う（面の色で割った値に戻して渡すので、`composite` 以降はそのまま）。カメラが動いたら結果は捨てる。
+DLL は exe の横の `oidn` フォルダから実行時に読む（`tbb12.dll` を先に場所を指定して読む。読まないと CPU 用の部品が見つからない）
 | `overlay.comp` | 操作の案内を画面に重ねる |
 
 **ローカルトーンマッピング**（屋根の下から外を見たときに外が白くとばないように）: 画面の平均と、明るい所（上位 5%）の明るさを毎フレーム測り、
@@ -117,8 +125,8 @@ Revit（LiveSync.cs）                                   Tools28Render.exe（win
 
 | ボタン | 保存するもの | 大きさ・回数 |
 |--|--|--|
-| 画像（札: PNG） | PNG（今の視点） | 画面と同じ縦横比で長い辺 1920〜3840 画素。RT コアあり 512 回・なし 128 回足し合わせ |
-| 360°（札: HTML） | HTML（画像入り。ブラウザで開くとドラッグで見回せる）と同じ名前の JPEG | 4096×2048（GPU のメモリ 5GB 以上・RT コアあり）または 2048×1024 |
+| 画像（札: PNG） | PNG（今の視点） | 画面と同じ縦横比で長い辺 1920〜3840 画素。RT コアあり 512 回・なし 128 回足し合わせ（Open Image Denoise で仕上げるときは半分） |
+| 360°（札: HTML） | HTML（画像入り。ブラウザで開くとドラッグで見回せる）と同じ名前の JPEG | 4096×2048（GPU のメモリ 5GB 以上・RT コアあり）または 2048×1024。256 回（RT コアなし 64 回。仕上げるときは半分） |
 | ビューア（札: EXE） | exe（この exe ＋ シーン） | 今の視点が最初の視点になる |
 
 - 画像・360°は、ウィンドウの描画を一時的に書き出す大きさに切り替えて足し合わせる（進み具合を表示。Esc で中止）。
@@ -158,7 +166,7 @@ cmake -S . -B build-linux -DT28_SYSTEM_GLFW=ON && cmake --build build-linux -j
 ```bash
 tools/bench/run.sh                 # small と large を測って表にする（結果は build-linux/bench/）
 tools/bench/run.sh huge            # いちばん大きいモデル
-tools/bench/run.sh --quality       # 画質: small を「512 回足し合わせた正解」と比べる（RMSE・まだら・白とび）
+tools/bench/run.sh --quality       # 画質: small を「512 回足し合わせた正解」と比べる（RMSE・まだら・白とび。明るさは決め打ち）
 FRAMES=16 SIZE=1280x720 tools/bench/run.sh small   # フレーム数・画像の大きさを変える
 ```
 
@@ -182,7 +190,8 @@ Tools28Render --scene model.t28s --output out.png       画像を作って終わ
         --log ファイル / --gpu 番号 / --bounces 回数 / --exposure EV / --no-auto-exposure
         --render-scale 倍率（小さく描いて拡大＝速い。既定は RT コアあり 1.0・なし 0.5）
         --software（RT コアがあっても予備の方式で描く） / --exit-after フレーム数（動作確認用）
-        --sky-sampling 0（空と地面の光を直接狙わない。比較用）/ --no-spatial-denoise（周りの画素と平均しない。生のノイズを測る）
+        --sky-sampling 0（空と地面の光を直接狙わない。比較用）/ --no-spatial-denoise（周りの画素と平均しない。生のノイズを測る）/
+        --final-denoise 0（Open Image Denoise を使わない。比較用。画像だけ作るときは最後に 1 回使う）
         --motion-test フレーム数 / --motion-reference フレーム数（動いている間の残像の確認。DEVLOG 参照）
         --bench-scene small|large|huge（測定用のモデル）/ --bench（時間・メモリ・大きさを測る）/ --bench-frames 回数 /
         --save-scene 保存先.t28s（シーンファイルを保存する）
@@ -202,3 +211,8 @@ Tools28Render --scene model.t28s --output out.png       画像を作って終わ
 | GLFW | ウィンドウ | zlib | ビルド時に git で取得（Linux はシステムのもの） |
 | stb_image_write | PNG 保存 | Public Domain / MIT | `third_party/stb` |
 | stb_truetype | 案内の文字を描く（フォントは Windows のものを使う） | Public Domain / MIT | `third_party/stb` |
+| Intel Open Image Denoise 2.3.3（CPU 版）＋ oneTBB | 止まっている間・書き出しの仕上げ（AI のノイズ除去） | Apache-2.0 | `prebuilt/win-x64/oidn`（公式のビルド済み DLL 4 つとライセンス。実行時に読む） |
+
+Open Image Denoise の DLL は公式の `oidn-2.3.3.x64.windows.zip` から `OpenImageDenoise.dll`・`OpenImageDenoise_core.dll`（学習済みの重みを含む。約 50MB）・
+`OpenImageDenoise_device_cpu.dll`・`tbb12.dll` だけを入れている（GPU 用の部品は入れない）。MSVC のランタイム（VC++ 2019 以降）が要るが、Revit と一緒に入っている。
+Linux で確かめるときは Linux 版の `lib` の中身を `build-linux/liboidn/` に置く（リポジトリには入れない）。Wine でも動く

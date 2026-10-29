@@ -358,11 +358,15 @@ int runWindow(const Options& opt, Scene& scene) {
 
     Bvh bvh;
     uint32_t glassStart = prepareScene(scene, bvh, opt.instancing);
+    // 止まっている間の仕上げ（Open Image Denoise。インストール先の oidn フォルダにあれば使う。ビューアの exe には無い）
+    OidnDenoiser oidn;
+    if (opt.finalDenoise) oidn.load();
     Renderer renderer;
     renderer.skyWidth_ = static_cast<uint32_t>(opt.skySize);
     renderer.init(ctx, scene, glassStart, bvh);
     renderer.setLocalToneMapping(opt.localToneMapping);
     renderer.setSkySampling(opt.skySampling);
+    renderer.setFinalDenoiser(&oidn);
 
     // RT コアの無い GPU では、半分の大きさで描いて拡大する（速さを保つため）
     float renderScale = opt.renderScale > 0 ? opt.renderScale : (ctx.hardwareRt ? 1.0f : 0.5f);
@@ -652,6 +656,7 @@ int runWindow(const Options& opt, Scene& scene) {
         uint32_t width = 0, height = 0;
         int samples = 0, done = 0, lastPercent = -1;
         bool transparent = false;  // 背景を透明にした PNG
+        bool finishing = false;    // 足し合わせ終わり、Open Image Denoise で仕上げている
     } job;
     VkPhysicalDeviceMemoryProperties memProps;
     vkGetPhysicalDeviceMemoryProperties(ctx.physical, &memProps);
@@ -709,14 +714,15 @@ int runWindow(const Options& opt, Scene& scene) {
             bool large = ctx.hardwareRt && gpuMemory >= (5ull << 30);
             job.width = large ? 4096 : 2048;
             job.height = job.width / 2;
-            job.samples = ctx.hardwareRt ? 256 : 64;
+            // 最後に Open Image Denoise で仕上げるときは、足し合わせる回数を半分にする（ノイズは仕上げで取れるので、書き出しが速くなる）
+            job.samples = (ctx.hardwareRt ? 256 : 64) / (renderer.finalDenoiserAvailable() ? 2 : 1);
         } else {
             // 画面と同じ縦横比で、長い辺が 1920 画素以上（最大 3840）
             uint32_t longSide = std::max(sc.extent.width, sc.extent.height);
             float k = std::clamp(1920.0f / longSide, 1.0f, 3840.0f / longSide);
             job.width = static_cast<uint32_t>(sc.extent.width * k);
             job.height = static_cast<uint32_t>(sc.extent.height * k);
-            job.samples = ctx.hardwareRt ? 512 : 128;
+            job.samples = (ctx.hardwareRt ? 512 : 128) / (renderer.finalDenoiserAvailable() ? 2 : 1);
         }
         if (opt.exportSamples > 0) job.samples = opt.exportSamples;
         // GPU のメモリに収まらない大きさなら、縦横比を保って小さくする（足りないまま書き出すと落ちる）
@@ -738,6 +744,8 @@ int runWindow(const Options& opt, Scene& scene) {
         logInfo("Export start: %s %ux%u, %d samples%s, %u bands", path.c_str(), job.width, job.height, job.samples,
                 job.transparent ? ", transparent background" : "", ptBands.bands);
         renderer.resize(job.width, job.height);
+        // 途中では仕上げない（最後に 1 回だけ。書き出す画像は最後の結果で仕上げる）
+        renderer.setAutoFinalDenoise(false);
         nv.exporting = true;
         nv.cancelExport = false;
         nv.hoverButton = -1;
@@ -758,6 +766,7 @@ int runWindow(const Options& opt, Scene& scene) {
             toast({tr("ExportCancelled")});
         }
         nv.exporting = false;
+        renderer.setAutoFinalDenoise(true);
         renderer.setTransparentOutput(false);
         ptBands = BandGovernor{};
         if (opt.bands > 0) ptBands.bands = static_cast<uint32_t>(opt.bands);
@@ -921,7 +930,9 @@ int runWindow(const Options& opt, Scene& scene) {
             nv.toolbarChanged = false;
         }
         // お知らせ: 書き出し中は進み具合、ボタンの上ではその説明、保存した後はしばらく結果
-        if (nv.exporting) {
+        if (nv.exporting && job.finishing) {
+            setStatus({tr("ExportFinishing")}, 1.0f);
+        } else if (nv.exporting) {
             int percent = job.samples > 0 ? job.done * 100 / job.samples : 0;
             if (percent != job.lastPercent) {
                 job.lastPercent = percent;
@@ -1099,8 +1110,21 @@ int runWindow(const Options& opt, Scene& scene) {
             renderer.finishFrame();
             updateBands(gpuTime);
             job.done += static_cast<int>(job.view.samplesPerFrame);
-            if (nv.cancelExport) finishExport(true);
-            else if (job.done >= job.samples) finishExport(false);
+            if (nv.cancelExport) {
+                renderer.waitFinalDenoise();
+                finishExport(true);
+            } else if (job.done >= job.samples) {
+                // 足し合わせ終わったら、Open Image Denoise で仕上げた絵を 1 枚描いてから保存する
+                //   1 枚目: 仕上げを頼む → 2 枚目: 結果を CPU に写して計算（終わるまで待つ）→ 3 枚目: 仕上げた絵を描く → 保存
+                if (renderer.finalDenoiseShown() || !renderer.finalDenoiserAvailable()) {
+                    finishExport(false);
+                } else if (!job.finishing) {
+                    job.finishing = true;
+                    renderer.requestFinalDenoise();
+                } else {
+                    renderer.waitFinalDenoise();
+                }
+            }
             continue;
         }
         // 動いている間はゆっくり、止まった直後に素早く合わせると目が疲れにくい

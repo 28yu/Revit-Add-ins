@@ -177,6 +177,16 @@ uint32_t VkContext::findMemoryType(uint32_t typeBits, VkMemoryPropertyFlags prop
     fatal("No suitable GPU memory type");
 }
 
+VkMemoryPropertyFlags VkContext::readbackMemoryFlags() const {
+    const VkMemoryPropertyFlags cached =
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
+    VkPhysicalDeviceMemoryProperties mem;
+    vkGetPhysicalDeviceMemoryProperties(physical, &mem);
+    for (uint32_t i = 0; i < mem.memoryTypeCount; ++i)
+        if ((mem.memoryTypes[i].propertyFlags & cached) == cached) return cached;
+    return VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+}
+
 Buffer VkContext::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags props) {
     Buffer b;
     b.size = size;

@@ -184,6 +184,24 @@ foreach ($file in $deployFiles) {
     }
 }
 
+# 描画プログラムが使う Open Image Denoise（oidn フォルダ）。大きい（約 50MB）ので、中身が同じなら配置しない
+$oidnSource = Join-Path $buildOutputDir "oidn"
+if (Test-Path $oidnSource) {
+    $oidnTarget = Join-Path $targetToolsDir "oidn"
+    foreach ($file in Get-ChildItem -Path $oidnSource -File) {
+        $dest = Join-Path $oidnTarget $file.Name
+        if ((Test-Path $dest) -and ((Get-Item $dest).Length -eq $file.Length) -and
+            ((Get-FileHash $dest).Hash -eq (Get-FileHash $file.FullName).Hash)) { continue }
+        $result = Copy-Tools28File -SourcePath $file.FullName -TargetDir $oidnTarget
+        if ($result -eq "Failed") {
+            $failed += "oidn\$($file.Name)"
+            Write-Host "✗ oidn\$($file.Name) の配置に失敗しました" -ForegroundColor Red
+        } else {
+            Write-Host "✓ oidn\$($file.Name) を配置しました" -ForegroundColor Green
+        }
+    }
+}
+
 # .addinファイルをAddinsルートにコピー（Revit はロックしないので通常コピーでよい）
 try {
     Copy-Item $sourceAddin (Join-Path $targetDir "Tools28.addin") -Force -ErrorAction Stop

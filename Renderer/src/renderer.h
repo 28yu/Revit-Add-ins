@@ -9,7 +9,14 @@
 //   5. 仕上げ（composite）: 面の色を掛け戻し、ローカルトーンマッピング（平均から大きく離れた明るさだけ縮める）と
 //      トーンマッピングをして画面に出す色にする
 // カメラが止まっている間は 2 で全フレームを均等に足し合わせるので、時間とともに正確な結果に近づく。
+// さらに止まっている間は、足し合わせた結果を CPU の Open Image Denoise（AI のノイズ除去）で仕上げ、3 の代わりに使う
+// （別のスレッドで計算し、できたら差し替える。止まってから 12・48・192・768 フレーム目に作り直す）。
+#include <atomic>
+#include <thread>
+#include <vector>
+
 #include "bvh.h"
+#include "oidn.h"
 #include "scene.h"
 #include "vk_context.h"
 
@@ -65,6 +72,18 @@ public:
     // 光の計算を横長の帯 n 本に分けて、帯ごとに GPU へ送る（1 回の処理を短くして、Windows の GPU リセットを防ぐ）。1 = 分けない
     void setPathTraceBands(uint32_t n) { ptBands_ = n < 1 ? 1 : n; }
     uint32_t pathTraceBands() const { return ptBands_; }
+    // 止まっている間の仕上げに使う Open Image Denoise（使えないときは nullptr のまま。init の後に設定する）
+    void setFinalDenoiser(OidnDenoiser* d) { oidn_ = d && d->available() ? d : nullptr; }
+    bool finalDenoiserAvailable() const { return oidn_ != nullptr; }
+    // 次のフレームで、足し合わせた結果を仕上げに回す（書き出しの最後に使う）
+    void requestFinalDenoise() { oidnForce_ = true; }
+    // 止まってから決まったフレームで自動で仕上げるか（書き出し中は切って、最後に requestFinalDenoise で 1 回だけ仕上げる）
+    void setAutoFinalDenoise(bool on) { autoFinalDenoise_ = on; }
+    // 直前に record したフレームが、仕上げの結果を使ったか
+    bool finalDenoiseShown() const { return denoisedUsed_; }
+    // 仕上げの計算が終わるまで待つ（書き出しのとき。待たない場合は計算中でも次のフレームに進んでよい）
+    void waitFinalDenoise();
+
     // 履歴を捨てて最初からやり直す
     void resetAccumulation() { resetHistory_ = true; }
     // カメラが止まってから描いたフレーム数
@@ -105,6 +124,11 @@ private:
     void writeOverlayDescriptors();
     void dispatch(VkCommandBuffer cmd, const ComputePass& pass, uint32_t set, const void* push, uint32_t pushSize,
                   uint32_t width, uint32_t height);
+    // 仕上げ（Open Image Denoise）: 結果を GPU に戻す / 足し合わせた結果を CPU に写す / 写した結果で計算を始める / 片付ける
+    void recordDenoiseUpload(VkCommandBuffer cmd);
+    void recordDenoiseCapture(VkCommandBuffer cmd, uint32_t cur);
+    void startDenoiseJob();
+    void releaseDenoise();
 
     struct AccelStruct {
         VkAccelerationStructureKHR handle = VK_NULL_HANDLE;
@@ -139,6 +163,20 @@ private:
     float localStrength_ = 1.0f;
     bool skySampling_ = true;
     bool spatialDenoise_ = true;
+
+    // 止まっている間の仕上げ（Open Image Denoise）
+    OidnDenoiser* oidn_ = nullptr;
+    Buffer oidnIn_;         // GPU → CPU: 足し合わせた明るさ（16 バイト）・面の色（16）・面の向き（8）
+    Buffer oidnOut_;        // CPU → GPU: 仕上げた明るさ（面の色で割ったもの。16 バイト）
+    Image denoised_;        // 仕上げた明るさ（GPU。止まっている間は atrous の結果の代わりに使う）
+    std::thread oidnThread_;
+    std::atomic<int> oidnState_{0};  // 0 = 空き, 1 = 写す命令を記録した, 2 = 計算中, 3 = 終わった
+    std::atomic<bool> oidnOk_{false};
+    uint32_t oidnGeneration_ = 0, oidnJobGeneration_ = 0;  // カメラが動くたびに増やす（古い結果を使わないため）
+    uint32_t oidnNextAt_ = 12;  // 止まってから何フレーム目に仕上げるか（終わるたびに 4 倍）
+    uint32_t oidnW_ = 0, oidnH_ = 0;
+    bool oidnForce_ = false, autoFinalDenoise_ = true;
+    bool denoisedValid_ = false, denoisedUsed_ = false;
     uint32_t ptBands_ = 1;
     float avgLog2_ = 0.0f;  // 前のフレームで測った画面の平均の明るさ（log2）
     bool hasAvgLog2_ = false;

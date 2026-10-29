@@ -65,6 +65,8 @@ public:
     VkDeviceSize deviceLocalBytes = 0;
     VkDeviceSize allocatedDeviceBytes = 0;
     VkDeviceSize peakDeviceBytes = 0;  // allocatedDeviceBytes の最大（加速構造を作る途中の一時領域も含む。性能測定用）
+    // GPU から CPU へ大きな画像を読み出すバッファ用。CPU が速く読める（キャッシュの効く）種類があればそれを使う
+    VkMemoryPropertyFlags readbackMemoryFlags() const;
 
 private:
     uint32_t findMemoryType(uint32_t typeBits, VkMemoryPropertyFlags props) const;

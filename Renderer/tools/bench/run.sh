@@ -3,7 +3,7 @@
 #
 # 使い方:
 #   tools/bench/run.sh [small|large|huge ...]      速さ・メモリ・ファイルの大きさを測る（既定: small large）
-#   tools/bench/run.sh --quality                    画質を測る（small を正解の画像と比べる）
+#   tools/bench/run.sh --quality                    画質を測る（small を正解の画像と比べる。明るさは決め打ち）
 # 環境変数: OUT（結果を置くフォルダ。既定は build-linux/bench）、FRAMES（測るフレーム数。既定 8）、
 #           SIZE（画像の大きさ。既定 640x360）、EXTRA（描画プログラムに足す引数）
 #
@@ -35,12 +35,14 @@ bench() {  # $1 = モデル, 残り = 足す引数
 }
 
 if [ "${1:-}" = "--quality" ]; then
-  # 正解: 512 回足し合わせた画像（一度作れば使い回す）
+  # 明るさは決め打ちにして比べる（自動露出・ローカルトーンマッピングは絵ごとに少し変わり、ノイズの比較を邪魔するため）
+  FIXED="--no-auto-exposure --exposure 2 --local-tonemap 0"
+  # 正解: 512 回足し合わせた画像（Open Image Denoise を使わない。一度作れば使い回す）
   if [ ! -f "$OUT/small_reference.png" ]; then
     "$BIN" --bench-scene small --output "$OUT/small_reference.png" --width "$W" --height "$H" --sky-size 1024 \
-      --samples 512 --log "$OUT/small_reference.log" $EXTRA >/dev/null 2>&1
+      --samples 512 --final-denoise 0 $FIXED --log "$OUT/small_reference.log" $EXTRA >/dev/null 2>&1
   fi
-  echo "frames=$FRAMES $(bench small)"
+  echo "frames=$FRAMES $(bench small $FIXED)"
   python3 tools/bench/compare.py "$OUT/small.png" "$OUT/small_reference.png"
   exit 0
 fi

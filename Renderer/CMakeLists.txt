@@ -82,6 +82,7 @@ add_executable(Tools28Render
   src/vk_context.cpp
   src/renderer.cpp
   src/offscreen.cpp
+  src/oidn.cpp
   src/window_app.cpp
   third_party/volk/volk.c
   ${T28_RESOURCES}

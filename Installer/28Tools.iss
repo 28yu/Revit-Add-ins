@@ -150,6 +150,13 @@ Source: "{#BinRoot}\Revit2023\Tools28Render.exe"; DestDir: "{#AddinsDir}\2023\28
 Source: "{#BinRoot}\Revit2024\Tools28Render.exe"; DestDir: "{#AddinsDir}\2024\28Tools"; Tasks: rvt2024; Flags: ignoreversion
 Source: "{#BinRoot}\Revit2025\Tools28Render.exe"; DestDir: "{#AddinsDir}\2025\28Tools"; Tasks: rvt2025; Flags: ignoreversion
 Source: "{#BinRoot}\Revit2026\Tools28Render.exe"; DestDir: "{#AddinsDir}\2026\28Tools"; Tasks: rvt2026; Flags: ignoreversion
+; 描画プログラムが仕上げに使う Intel Open Image Denoise（CPU 版。約 50MB。全バージョン共通なので、元は 1 か所から取り込み、インストーラには 1 つだけ入る）
+Source: "..\Renderer\prebuilt\win-x64\oidn\*"; DestDir: "{#AddinsDir}\2021\28Tools\oidn"; Tasks: rvt2021; Flags: ignoreversion
+Source: "..\Renderer\prebuilt\win-x64\oidn\*"; DestDir: "{#AddinsDir}\2022\28Tools\oidn"; Tasks: rvt2022; Flags: ignoreversion
+Source: "..\Renderer\prebuilt\win-x64\oidn\*"; DestDir: "{#AddinsDir}\2023\28Tools\oidn"; Tasks: rvt2023; Flags: ignoreversion
+Source: "..\Renderer\prebuilt\win-x64\oidn\*"; DestDir: "{#AddinsDir}\2024\28Tools\oidn"; Tasks: rvt2024; Flags: ignoreversion
+Source: "..\Renderer\prebuilt\win-x64\oidn\*"; DestDir: "{#AddinsDir}\2025\28Tools\oidn"; Tasks: rvt2025; Flags: ignoreversion
+Source: "..\Renderer\prebuilt\win-x64\oidn\*"; DestDir: "{#AddinsDir}\2026\28Tools\oidn"; Tasks: rvt2026; Flags: ignoreversion
 ; マニフェストは Addins 直下（<Assembly>28Tools\Tools28.dll</Assembly> で 28Tools フォルダを指す）
 Source: "{#AddinRoot}\2021\28Tools\Tools28.addin"; DestDir: "{#AddinsDir}\2021"; Tasks: rvt2021; Flags: ignoreversion
 Source: "{#AddinRoot}\2022\28Tools\Tools28.addin"; DestDir: "{#AddinsDir}\2022"; Tasks: rvt2022; Flags: ignoreversion
