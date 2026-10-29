@@ -8,7 +8,10 @@ namespace Tools28.Commands.RealtimeRender
 {
     /// <summary>
     /// 3D ビューに表示されている形状を三角形の集まりとして集める（Revit の CustomExporter から呼ばれる）。
-    /// ファミリ・リンクの位置（Transform）を積み重ねて、すべてプロジェクト座標（メートル）にそろえる。
+    /// ファミリ・リンクの位置（Transform）を積み重ねて、プロジェクト座標（メートル）にそろえる。
+    /// ファミリの置き場所（InstanceNode）の中の形は、ファミリから見た座標のまま集めて中身を比べ、
+    /// 同じ形がすでにあれば形は捨てて「置き場所（位置・向き）」だけを足す（同じ柱・車・照明を何度も持たない）。
+    /// それ以外（壁・床など）は 1 つの形にまとめ、そのままの位置に 1 回置く。
     /// </summary>
     internal class SceneExportContext : IExportContext
     {
@@ -27,6 +30,21 @@ namespace Tools28.Commands.RealtimeRender
         private ElementId _phaseMaterial = ElementId.InvalidElementId;
 
         public RenderScene Scene { get; } = new RenderScene();
+
+        /// <summary>集めている途中の形（置き場所 1 つ分、または置き場所の外の全部）。頂点番号はこの中での番号。</summary>
+        private class ShapeBuilder
+        {
+            public Transform World;         // 形の座標 → プロジェクト座標（フィート）。置き場所の外なら単位行列
+            public Transform WorldInverse;
+            public readonly List<RenderVertex> Vertices = new List<RenderVertex>();
+            public readonly List<int> Triangles = new List<int>();  // 頂点番号×3 とマテリアル番号
+        }
+        private readonly Stack<ShapeBuilder> _shapes = new Stack<ShapeBuilder>();
+        private readonly ShapeBuilder _loose = new ShapeBuilder { World = Transform.Identity, WorldInverse = Transform.Identity };
+        // 中身のハッシュ → 同じハッシュの形の番号（中身を比べて確かめる）
+        private readonly Dictionary<ulong, List<int>> _shapeByHash = new Dictionary<ulong, List<int>>();
+        /// <summary>置き場所のうち、すでにある形を使い回した数（ログ用）。</summary>
+        public int ReusedShapes { get; private set; }
         public int ElementCount { get; private set; }
         /// <summary>書き出した要素の ID（このモデルの物）。</summary>
         public HashSet<ElementId> ElementIds { get; } = new HashSet<ElementId>();
@@ -48,7 +66,11 @@ namespace Tools28.Commands.RealtimeRender
             return true;
         }
 
-        public void Finish() { }
+        public void Finish()
+        {
+            // 置き場所の外の形（壁・床など）は 1 つにまとめて、そのままの位置に置く
+            CommitShape(_loose);
+        }
 
         public bool IsCanceled() => false;
 
@@ -76,11 +98,105 @@ namespace Tools28.Commands.RealtimeRender
 
         public RenderNodeAction OnInstanceBegin(InstanceNode node)
         {
-            _transforms.Push(_transforms.Peek().Multiply(node.GetTransform()));
+            Transform world = _transforms.Peek().Multiply(node.GetTransform());
+            _transforms.Push(world);
+            _shapes.Push(new ShapeBuilder { World = world, WorldInverse = world.Inverse });
             return RenderNodeAction.Proceed;
         }
 
-        public void OnInstanceEnd(InstanceNode node) => _transforms.Pop();
+        public void OnInstanceEnd(InstanceNode node)
+        {
+            CommitShape(_shapes.Pop());
+            _transforms.Pop();
+        }
+
+        /// <summary>
+        /// 集めた形をシーンに入れる。同じ中身の形がすでにあれば、その形を使い回して置き場所だけを足す。
+        /// </summary>
+        private void CommitShape(ShapeBuilder b)
+        {
+            if (b.Triangles.Count == 0) return;
+            ulong hash = HashShape(b);
+            if (!_shapeByHash.TryGetValue(hash, out List<int> candidates))
+            {
+                candidates = new List<int>();
+                _shapeByHash[hash] = candidates;
+            }
+            int mesh = -1;
+            foreach (int c in candidates)
+                if (SameShape(c, b)) { mesh = c; break; }
+            if (mesh >= 0)
+            {
+                ReusedShapes++;
+            }
+            else
+            {
+                int firstTri = Scene.TriangleCount, baseIndex = Scene.Vertices.Count;
+                Scene.Vertices.AddRange(b.Vertices);
+                for (int i = 0; i < b.Triangles.Count; i += 4)
+                    Scene.AddTriangle(baseIndex + b.Triangles[i], baseIndex + b.Triangles[i + 1], baseIndex + b.Triangles[i + 2], b.Triangles[i + 3]);
+                mesh = Scene.Meshes.Count;
+                Scene.Meshes.Add(new RenderMesh { FirstTri = firstTri, TriCount = b.Triangles.Count / 4 });
+                candidates.Add(mesh);
+            }
+            Scene.Instances.Add(new RenderInstance { Mesh = mesh, M = ToMatrix(b.World) });
+        }
+
+        private static ulong HashShape(ShapeBuilder b)
+        {
+            // FNV-1a（64 ビット）。頂点の値とマテリアル番号をそのまま混ぜる
+            ulong h = 14695981039346656037UL;
+            void Mix(uint x)
+            {
+                for (int k = 0; k < 4; k++)
+                {
+                    h ^= (x >> (k * 8)) & 0xFF;
+                    h *= 1099511628211UL;
+                }
+            }
+            uint Bits(float f) => (uint)BitConverter.ToInt32(BitConverter.GetBytes(f), 0);
+            Mix((uint)b.Vertices.Count);
+            foreach (RenderVertex v in b.Vertices)
+            {
+                Mix(Bits(v.PX)); Mix(Bits(v.PY)); Mix(Bits(v.PZ));
+                Mix(Bits(v.NX)); Mix(Bits(v.NY)); Mix(Bits(v.NZ));
+                Mix(Bits(v.U)); Mix(Bits(v.V));
+            }
+            foreach (int i in b.Triangles) Mix((uint)i);
+            return h;
+        }
+
+        /// <summary>シーンの形 mesh と、集めた形 b の中身が同じか（頂点の値・並び・マテリアル）。</summary>
+        private bool SameShape(int mesh, ShapeBuilder b)
+        {
+            RenderMesh m = Scene.Meshes[mesh];
+            if (m.TriCount * 4 != b.Triangles.Count) return false;
+            int baseIndex = Scene.Triangles[m.FirstTri * 4];  // 形の頂点は続けて入れてあるので、最初の三角形の最初の頂点が先頭
+            for (int i = 0; i < b.Triangles.Count; i++)
+            {
+                int stored = Scene.Triangles[m.FirstTri * 4 + i];
+                if ((i % 4) == 3 ? stored != b.Triangles[i] : stored - baseIndex + b.Triangles[0] != b.Triangles[i]) return false;
+            }
+            int first = b.Triangles[0];
+            for (int i = 0; i < b.Vertices.Count; i++)
+            {
+                int si = baseIndex - first + i;
+                if (si < 0 || si >= Scene.Vertices.Count || !Scene.Vertices[si].Equals(b.Vertices[i])) return false;
+            }
+            return true;
+        }
+
+        /// <summary>Revit の Transform（フィート）を、メートルの 3 行 4 列（行ごと）にする。</summary>
+        private static float[] ToMatrix(Transform t)
+        {
+            XYZ x = t.BasisX, y = t.BasisY, z = t.BasisZ, o = t.Origin;
+            return new[]
+            {
+                (float)x.X, (float)y.X, (float)z.X, (float)(o.X * FeetToMeters),
+                (float)x.Y, (float)y.Y, (float)z.Y, (float)(o.Y * FeetToMeters),
+                (float)x.Z, (float)y.Z, (float)z.Z, (float)(o.Z * FeetToMeters),
+            };
+        }
 
         public RenderNodeAction OnLinkBegin(LinkNode node)
         {
@@ -324,36 +440,47 @@ namespace Tools28.Commands.RealtimeRender
 
         public void OnPolymesh(PolymeshTopology mesh)
         {
-            Transform t = _transforms.Peek();
+            // 置き場所の中なら、その置き場所から見た座標で集める（ふつうは置き場所の位置そのものなので、ほぼ単位行列）。
+            // 置き場所の外（壁・床・リンクの中の要素など）は、プロジェクト座標で集める
+            ShapeBuilder target = _shapes.Count > 0 ? _shapes.Peek() : _loose;
+            Transform t = _shapes.Count > 0 ? target.WorldInverse.Multiply(_transforms.Peek()) : _transforms.Peek();
             IList<XYZ> points = mesh.GetPoints();
             IList<XYZ> normals = mesh.GetNormals();
             IList<PolymeshFacet> facets = mesh.GetFacets();
             if (points.Count == 0 || facets.Count == 0) return;
-            // テクスチャのあるマテリアルだけ、面上の位置（UV）からテクスチャ画像上の位置を求める
-            // 画像を使うマテリアルだけ、面の上の位置（UV）を読む
+            // テクスチャのあるマテリアルだけ、面の上の位置（UV）を読む
             IList<UV> uvs = Scene.Materials[_currentMaterial].UsesUv ? mesh.GetUVs() : null;
             RenderVertex Vertex(int i, XYZ n) =>
                 MakeVertex(t, points[i], n, uvs != null && i < uvs.Count ? uvs[i] : null);
+            List<RenderVertex> verts = target.Vertices;
+            List<int> tris = target.Triangles;
+            void AddTriangle(int a, int b, int c)
+            {
+                tris.Add(a);
+                tris.Add(b);
+                tris.Add(c);
+                tris.Add(_currentMaterial);
+            }
 
             switch (mesh.DistributionOfNormals)
             {
                 case DistributionOfNormals.AtEachPoint:
                 {
-                    int baseIndex = Scene.Vertices.Count;
+                    int baseIndex = verts.Count;
                     for (int i = 0; i < points.Count; i++)
-                        Scene.Vertices.Add(Vertex(i, i < normals.Count ? normals[i] : null));
+                        verts.Add(Vertex(i, i < normals.Count ? normals[i] : null));
                     foreach (PolymeshFacet f in facets)
-                        Scene.AddTriangle(baseIndex + f.V1, baseIndex + f.V2, baseIndex + f.V3, _currentMaterial);
+                        AddTriangle(baseIndex + f.V1, baseIndex + f.V2, baseIndex + f.V3);
                     break;
                 }
                 case DistributionOfNormals.OnePerFace:
                 {
                     XYZ n = normals.Count > 0 ? normals[0] : null;
-                    int baseIndex = Scene.Vertices.Count;
+                    int baseIndex = verts.Count;
                     for (int i = 0; i < points.Count; i++)
-                        Scene.Vertices.Add(Vertex(i, n));
+                        verts.Add(Vertex(i, n));
                     foreach (PolymeshFacet f in facets)
-                        Scene.AddTriangle(baseIndex + f.V1, baseIndex + f.V2, baseIndex + f.V3, _currentMaterial);
+                        AddTriangle(baseIndex + f.V1, baseIndex + f.V2, baseIndex + f.V3);
                     break;
                 }
                 default: // OnEachFacet: 三角形ごとに向きが違うので、頂点を三角形ごとに分ける
@@ -362,11 +489,11 @@ namespace Tools28.Commands.RealtimeRender
                     {
                         PolymeshFacet f = facets[i];
                         XYZ n = i < normals.Count ? normals[i] : null;
-                        int baseIndex = Scene.Vertices.Count;
-                        Scene.Vertices.Add(Vertex(f.V1, n));
-                        Scene.Vertices.Add(Vertex(f.V2, n));
-                        Scene.Vertices.Add(Vertex(f.V3, n));
-                        Scene.AddTriangle(baseIndex, baseIndex + 1, baseIndex + 2, _currentMaterial);
+                        int baseIndex = verts.Count;
+                        verts.Add(Vertex(f.V1, n));
+                        verts.Add(Vertex(f.V2, n));
+                        verts.Add(Vertex(f.V3, n));
+                        AddTriangle(baseIndex, baseIndex + 1, baseIndex + 2);
                     }
                     break;
                 }

@@ -11,7 +11,8 @@ namespace Tools28.Commands.RealtimeRender
     {
         // 4: 太陽の後ろに 緯度・真北・日付を追加（描画プログラムで時間帯を変えるため）
         // 5: その後ろに 3D ビューのレンダリング設定（照明・背景・地面の色・雲の量）を追加
-        private const uint Version = 5;
+        // 6: 最後に 形と置き場所（同じファミリの同じ形は 1 回だけ持ち、位置・向きだけを何度も書く）
+        private const uint Version = 6;
 
         public static void Write(string path, RenderScene scene)
         {
@@ -95,6 +96,21 @@ namespace Tools28.Commands.RealtimeRender
                     w.Write(l.CosInner);
                     w.Write(l.CosOuter);
                 }
+
+                // 形と置き場所（形が 0 なら、全部の三角形がそのままの位置）
+                w.Write((uint)scene.Meshes.Count);
+                foreach (RenderMesh m in scene.Meshes)
+                {
+                    w.Write((uint)m.FirstTri);
+                    w.Write((uint)m.TriCount);
+                }
+                w.Write((uint)(scene.Meshes.Count > 0 ? scene.Instances.Count : 0));
+                if (scene.Meshes.Count > 0)
+                    foreach (RenderInstance inst in scene.Instances)
+                    {
+                        w.Write((uint)inst.Mesh);
+                        foreach (float v in inst.M) w.Write(v);
+                    }
             }
         }
     }

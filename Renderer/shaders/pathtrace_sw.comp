@@ -18,7 +18,8 @@ layout(set = 0, binding = 8, std430) readonly buffer BvhTris { uint bvhTris[]; }
 
 #include "common_head.glsl"
 
-const int STACK_SIZE = 48;
+const int STACK_SIZE = 32;       // 上の段（置き場所）
+const int MESH_STACK_SIZE = 48;  // 下の段（形の三角形。大きな形は深くなる）
 const float T_MIN = 0.0005;
 
 // 光線が箱に入る距離（入らなければ大きな値）
@@ -53,6 +54,8 @@ bool rayTriangle(vec3 o, vec3 d, uint tri, float tmax, out float t, out vec2 bar
     return t > T_MIN && t < tmax;
 }
 
+// 2 段の BVH（src/bvh.h）: 0 番が上の段（置き場所の箱。末端の bvhTris は置き場所の番号）、
+// 形ごとの下の段（形の座標の三角形の箱。末端の bvhTris は三角形の番号）は meshes[].bvhRoot から。
 // anyHit: 何かに当たった時点で終わる（影の判定用） / skipGlass: ガラスを無視する（影の判定用）
 // tmax: この距離より先は調べない
 Hit traverse(vec3 o, vec3 d, bool anyHit, bool skipGlass, float tmax) {
@@ -60,11 +63,11 @@ Hit traverse(vec3 o, vec3 d, bool anyHit, bool skipGlass, float tmax) {
     h.found = false;
     h.t = tmax;
     h.tri = 0u;
+    h.inst = 0u;
     h.bary = vec2(0.0);
     h.glass = false;
     vec3 safeD = mix(d, sign(d) * 1e-8 + vec3(1e-12), lessThan(abs(d), vec3(1e-8)));
     vec3 invD = 1.0 / safeD;
-    uint glassStart = uint(pc.misc.z);
 
     uint stack[STACK_SIZE];
     int sp = 0;
@@ -74,18 +77,51 @@ Hit traverse(vec3 o, vec3 d, bool anyHit, bool skipGlass, float tmax) {
         if (boxEntry(o, invD, n.bmin, n.bmax, h.t) >= 1e29) continue;
         if (n.count > 0u) {
             for (uint i = n.leftOrFirst; i < n.leftOrFirst + n.count; ++i) {
-                uint tri = bvhTris[i];
-                bool glass = tri >= glassStart;
-                if (skipGlass && glass) continue;
-                float t;
-                vec2 bary;
-                if (rayTriangle(o, d, tri, h.t, t, bary)) {
-                    h.found = true;
-                    h.t = t;
-                    h.tri = tri;
-                    h.bary = bary;
-                    h.glass = glass;
-                    if (anyHit) return h;
+                // 置き場所: 光線を形の座標に直して、その形の BVH をたどる（向きは正規化しないので、距離 t はそのまま使える）
+                uint inst = bvhTris[i];
+                Mesh mesh = meshes[instances[inst].meta.x];
+                vec3 lo = vec3(dot(instances[inst].worldToObject[0], vec4(o, 1.0)), dot(instances[inst].worldToObject[1], vec4(o, 1.0)),
+                               dot(instances[inst].worldToObject[2], vec4(o, 1.0)));
+                vec3 ld = vec3(dot(instances[inst].worldToObject[0].xyz, d), dot(instances[inst].worldToObject[1].xyz, d),
+                               dot(instances[inst].worldToObject[2].xyz, d));
+                vec3 lSafe = mix(ld, sign(ld) * 1e-8 + vec3(1e-12), lessThan(abs(ld), vec3(1e-8)));
+                vec3 lInv = 1.0 / lSafe;
+                uint glassFrom = mesh.firstTri + mesh.opaqueCount;
+                uint mstack[MESH_STACK_SIZE];
+                int msp = 0;
+                mstack[msp++] = mesh.bvhRoot;
+                while (msp > 0) {
+                    BvhNode m = nodes[mstack[--msp]];
+                    if (boxEntry(lo, lInv, m.bmin, m.bmax, h.t) >= 1e29) continue;
+                    if (m.count > 0u) {
+                        for (uint j = m.leftOrFirst; j < m.leftOrFirst + m.count; ++j) {
+                            uint tri = bvhTris[j];
+                            bool glass = tri >= glassFrom;
+                            if (skipGlass && glass) continue;
+                            float t;
+                            vec2 bary;
+                            if (rayTriangle(lo, ld, tri, h.t, t, bary)) {
+                                h.found = true;
+                                h.t = t;
+                                h.tri = tri;
+                                h.inst = inst;
+                                h.bary = bary;
+                                h.glass = glass;
+                                if (anyHit) return h;
+                            }
+                        }
+                    } else if (msp + 2 <= MESH_STACK_SIZE) {
+                        uint l = m.leftOrFirst, r = m.leftOrFirst + 1u;
+                        float dl = boxEntry(lo, lInv, nodes[l].bmin, nodes[l].bmax, h.t);
+                        float dr = boxEntry(lo, lInv, nodes[r].bmin, nodes[r].bmax, h.t);
+                        if (dl < dr) {
+                            if (dr < 1e29) mstack[msp++] = r;
+                            if (dl < 1e29) mstack[msp++] = l;
+                        } else {
+                            if (dl < 1e29) mstack[msp++] = l;
+                            if (dr < 1e29) mstack[msp++] = r;
+                        }
+                    }
                 }
             }
         } else if (sp + 2 <= STACK_SIZE) {

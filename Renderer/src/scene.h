@@ -79,10 +79,26 @@ struct RevitLook {
     bool operator!=(const RevitLook& o) const { return !(*this == o); }
 };
 
+// 形（メッシュ）: 三角形の並びのうち、連続した一続き。座標は「置き場所」から見た座標（インスタンスの座標系）
+struct MeshRange {
+    uint32_t firstTri = 0, triCount = 0;
+    uint32_t opaqueCount = 0;  // 不透明な三角形の数（sortGlassLast がメッシュの中で不透明→ガラスの順に並べる）
+};
+// 置き場所（インスタンス）: どの形を、どの位置・向きに置くか。
+// m は 3 行 4 列（行ごと）: 世界の座標 = m の左 3 列 × 形の座標 + m の右 1 列
+struct Instance {
+    uint32_t mesh = 0;
+    float m[12] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0};
+};
+
 struct Scene {
+    // 形のデータ。同じ形（同じファミリなど）は 1 回だけ持ち、instances で何度も置く（GPU のメモリ・ファイルの大きさを抑える）。
+    // meshes が空のときは「全部の三角形で 1 つの形を、そのままの位置に 1 回置く」とみなす（版 5 までのファイル）
     std::vector<Vertex> vertices;
     std::vector<uint32_t> indices;       // 3つで1つの三角形
     std::vector<uint32_t> triMaterials;  // 三角形ごとのマテリアル番号
+    std::vector<MeshRange> meshes;
+    std::vector<Instance> instances;
     std::vector<Material> materials;
     std::vector<Texture> textures;
     std::vector<Light> lights;
@@ -96,12 +112,23 @@ struct Scene {
     float dayOfYear = 80.0f;   // 1 月 1 日 = 1（既定は春分のころ）
     RevitLook revitLook;
 
-    // 不透明な三角形を前、ガラスの三角形を後ろに並べ替える。
-    // 戻り値: ガラスの最初の三角形番号（＝不透明な三角形の数）
+    // 形ごとに、不透明な三角形を前、ガラスの三角形を後ろに並べ替える（MeshRange::opaqueCount を決める）。
+    // 戻り値: 不透明な三角形の数（全部の形の合計。記録用）
     uint32_t sortGlassLast();
+    // meshes / instances が空なら「全部で 1 つの形・そのままの位置に 1 回」を入れる
+    void ensureInstances();
+    // useLimit 回以下しか置かれていない形を、置き場所の位置に動かして 1 つの形（そのままの位置に 1 回）にまとめる。
+    // 1 回しか使わない形（壁・床など）を 1 つずつ別に持つと、加速構造の数が増えて遅くなるため。
+    // useLimit を大きくすると全部まとめる（インスタンス化しない。比較用）
+    void mergeRarelyUsedMeshes(uint32_t useLimit = 1);
 
     size_t triangleCount() const { return indices.size() / 3; }
+    // 置き場所の分も数えた三角形の数（画面に描かれる数）
+    size_t instancedTriangleCount() const;
 };
+
+// 3 行 4 列の行列（Instance::m と同じ形）の逆行列。逆にできなければ false（out は単位行列）
+bool invertAffine(const float m[12], float out[12]);
 
 // Revit 側（Tools28）が書き出すシーンファイル（.t28s）を読む。
 // offset: ファイルの途中から読む（ビューアの exe に埋め込んだシーンを読むとき）

@@ -39,6 +39,7 @@ struct Options {
     int exitAfterFrames = 0;       // 動作確認用: このフレーム数を描いたら自動で閉じる（0 = 閉じない）
     // 性能測定（--bench）: 読み込み・準備の時間、GPU メモリ、止まっている間／動いている間の 1 フレームの時間、
     // シーンファイル・画像の大きさを測り、ログに「BENCH {...}」の 1 行（JSON）で出す。画像だけ作るモードで使う
+    bool instancing = true;        // 同じ形を 1 回だけ持つ（--no-instancing で切る。比較用）
     float localToneMapping = 1.0f;  // ローカルトーンマッピングの強さ（0 = 使わない。--local-tonemap で変える。比較用）
     bool bench = false;
     int benchFrames = 16;          // 止まっている間・動いている間それぞれ何フレーム測るか
@@ -118,11 +119,14 @@ struct AutoExposure {
     }
 };
 
-// 描画の準備: ガラスの三角形を後ろに並べ替え、BVH を作る。戻り値はガラスの最初の三角形番号
-inline uint32_t prepareScene(Scene& scene, Bvh& bvh) {
-    uint32_t glassStart = scene.sortGlassLast();
+// 描画の準備: 1 回しか使わない形を 1 つにまとめ、形ごとにガラスの三角形を後ろに並べ替え、BVH を作る。
+// instancing = false なら全部を 1 つの形にまとめる（同じ形を何度も持つ。比較・動作確認用）。戻り値は不透明な三角形の数
+inline uint32_t prepareScene(Scene& scene, Bvh& bvh, bool instancing = true) {
+    scene.ensureInstances();
+    scene.mergeRarelyUsedMeshes(instancing ? 1u : 0xFFFFFFFFu);
+    uint32_t opaque = scene.sortGlassLast();
     bvh.build(scene);
-    return glassStart;
+    return opaque;
 }
 
 // GPU の画像（RGBA8、GENERAL レイアウト）を CPU 側に写す。終わると GENERAL に戻す

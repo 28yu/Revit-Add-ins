@@ -39,6 +39,30 @@ struct Light {
 };
 layout(set = 0, binding = 12, std430) readonly buffer Lights { Light lights[]; };
 
+// 置き場所（インスタンス）と形（メッシュ）。頂点は形の座標で持ち、置き場所の行列で世界の座標に動かす
+struct Instance {
+    vec4 objectToWorld[3];  // 3 行 4 列（行ごと）
+    vec4 worldToObject[3];
+    vec4 normalMat[3];      // 向き（法線）を動かす 3 行 3 列
+    uvec4 meta;             // x = 形の番号
+};
+layout(set = 0, binding = 14, std430) readonly buffer Instances { Instance instances[]; };
+struct Mesh { uint firstTri; uint triCount; uint opaqueCount; uint bvhRoot; };
+layout(set = 0, binding = 15, std430) readonly buffer Meshes { Mesh meshes[]; };
+
+vec3 toWorldPoint(uint inst, vec3 p) {
+    return vec3(dot(instances[inst].objectToWorld[0], vec4(p, 1.0)), dot(instances[inst].objectToWorld[1], vec4(p, 1.0)),
+                dot(instances[inst].objectToWorld[2], vec4(p, 1.0)));
+}
+vec3 toWorldVector(uint inst, vec3 v) {
+    return vec3(dot(instances[inst].objectToWorld[0].xyz, v), dot(instances[inst].objectToWorld[1].xyz, v),
+                dot(instances[inst].objectToWorld[2].xyz, v));
+}
+vec3 toWorldNormal(uint inst, vec3 n) {
+    return vec3(dot(instances[inst].normalMat[0].xyz, n), dot(instances[inst].normalMat[1].xyz, n),
+                dot(instances[inst].normalMat[2].xyz, n));
+}
+
 layout(push_constant) uniform Params {
     vec4 camPos;      // xyz = 位置, w = 縦の画角の tan(半分)
     vec4 camForward;  // xyz = 前, w = パノラマなら 1
@@ -146,6 +170,7 @@ struct Hit {
     bool found;
     float t;
     uint tri;       // 全体での三角形番号
+    uint inst;      // 置き場所の番号
     vec2 bary;
     bool glass;
 };

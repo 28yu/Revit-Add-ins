@@ -23,11 +23,16 @@ Hit traceClosest(vec3 origin, vec3 dir) {
     h.found = rayQueryGetIntersectionTypeEXT(rq, true) == gl_RayQueryCommittedIntersectionTriangleEXT;
     if (h.found) {
         h.t = rayQueryGetIntersectionTEXT(rq, true);
-        uint instance = rayQueryGetIntersectionInstanceCustomIndexEXT(rq, true);
+        // 番号 = 置き場所の番号 × 2 + ガラスなら 1（renderer.cpp の buildAccelerationStructures）
+        uint code = uint(rayQueryGetIntersectionInstanceCustomIndexEXT(rq, true));
         uint prim = uint(rayQueryGetIntersectionPrimitiveIndexEXT(rq, true));
-        h.glass = instance == 1u;
-        h.tri = h.glass ? prim + uint(pc.misc.z) : prim;
+        h.inst = code >> 1;
+        h.glass = (code & 1u) != 0u;
+        Mesh m = meshes[instances[h.inst].meta.x];
+        h.tri = m.firstTri + (h.glass ? m.opaqueCount : 0u) + prim;
         h.bary = rayQueryGetIntersectionBarycentricsEXT(rq, true);
+    } else {
+        h.inst = 0u;
     }
     return h;
 }

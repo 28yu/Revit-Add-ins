@@ -119,6 +119,20 @@ struct GpuLight {
     float cone[4];           // x = cos（届く範囲）
 };
 
+// 置き場所（シェーダーの Instance と同じ並び。160 バイト）
+struct GpuInstance {
+    float objectToWorld[12];  // 3 行 4 列（行ごと）
+    float worldToObject[12];
+    float normal[12];         // 向き（法線）を動かす 3 行 3 列（各行の 4 つ目は未使用）
+    uint32_t mesh[4];         // x = 形の番号
+};
+
+// 形（シェーダーの Mesh と同じ並び）
+struct GpuMesh {
+    uint32_t firstTri, triCount, opaqueCount;  // 三角形の範囲。前から opaqueCount 個が不透明、残りがガラス
+    uint32_t bvhRoot;                          // 予備の方式で使う、この形の BVH の根
+};
+
 // テクスチャ 1 枚分の置き場所（シェーダーの TexInfo と同じ並び）
 struct GpuTexInfo {
     uint32_t offset;  // texels の何番目から始まるか（一番大きい段）
@@ -373,9 +387,10 @@ void Renderer::reloadScene(const Scene& scene, uint32_t glassStart, const Bvh& b
 
 void Renderer::destroyScene() {
     destroyAccel(tlas_);
-    destroyAccel(blasOpaque_);
-    destroyAccel(blasGlass_);
-    for (Buffer* b : {&vertices_, &indices_, &triMaterials_, &materials_, &texInfos_, &texels_, &lights_, &instances_, &bvhNodes_, &bvhTris_})
+    for (AccelStruct& b : blas_) destroyAccel(b);
+    blas_.clear();
+    for (Buffer* b : {&vertices_, &indices_, &triMaterials_, &materials_, &texInfos_, &texels_, &lights_, &instances_, &bvhNodes_,
+                      &bvhTris_, &sceneInstances_, &meshes_})
         ctx_->destroyBuffer(*b);
 }
 
@@ -385,9 +400,10 @@ void Renderer::uploadScene(const Scene& scene, uint32_t glassStart, const Bvh& b
     sunDir_ = scene.sunDir;
     sunIntensity_ = scene.sunIntensity;
     skyIntensity_ = scene.skyIntensity;
-    logInfo("Scene: %zu vertices, %zu triangles (%u opaque, %zu glass), %zu materials",
+    logInfo("Scene: %zu vertices, %zu triangles (%u opaque, %zu glass), %zu materials, %zu shapes, %zu placements "
+            "(%zu triangles drawn)",
             scene.vertices.size(), scene.triangleCount(), glassStart_, scene.triangleCount() - glassStart_,
-            scene.materials.size());
+            scene.materials.size(), scene.meshes.size(), scene.instances.size(), scene.instancedTriangleCount());
 
     // RT コアを使うときだけ、加速構造の材料として使う印を付ける（予備の方式ではその機能自体が無い）
     const VkBufferUsageFlags geomUsage =
@@ -399,13 +415,35 @@ void Renderer::uploadScene(const Scene& scene, uint32_t glassStart, const Bvh& b
     const VkDeviceSize storageLimit = ctx.properties.limits.maxStorageBufferRange;
     // 予備の方式（RT コアの無い GPU）では、自分でたどる BVH も 1 つの記憶領域に入れる
     const VkDeviceSize bvhBytes = hardwareRt_ ? 0 : bvh.nodes().size() * sizeof(BvhNode);
-    if (vertexBytes > storageLimit || indexBytes > storageLimit || bvhBytes > storageLimit)
+    const VkDeviceSize instanceBytes = scene.instances.size() * sizeof(GpuInstance);
+    if (vertexBytes > storageLimit || indexBytes > storageLimit || bvhBytes > storageLimit || instanceBytes > storageLimit)
         fatal("%s\n(vertices %.0f MB, indices %.0f MB, BVH %.0f MB, limit %.0f MB)", tr("ModelTooLarge"),
               vertexBytes / 1048576.0, indexBytes / 1048576.0, bvhBytes / 1048576.0, storageLimit / 1048576.0);
     vertices_ = ctx.createDeviceBuffer(scene.vertices.data(), scene.vertices.size() * sizeof(Vertex), geomUsage);
     indices_ = ctx.createDeviceBuffer(scene.indices.data(), scene.indices.size() * sizeof(uint32_t), geomUsage);
     triMaterials_ = ctx.createDeviceBuffer(scene.triMaterials.data(), scene.triMaterials.size() * sizeof(uint32_t),
                                            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+
+    // 置き場所: 形の座標 → 世界の座標、その逆、向き（法線）の動かし方（逆行列の転置）、形の番号
+    std::vector<GpuInstance> insts(scene.instances.size());
+    for (size_t i = 0; i < scene.instances.size(); ++i) {
+        const Instance& in = scene.instances[i];
+        GpuInstance& g = insts[i];
+        std::copy(in.m, in.m + 12, g.objectToWorld);
+        invertAffine(in.m, g.worldToObject);
+        for (int r = 0; r < 3; ++r) {
+            for (int c = 0; c < 3; ++c) g.normal[r * 4 + c] = g.worldToObject[c * 4 + r];
+            g.normal[r * 4 + 3] = 0.0f;
+        }
+        g.mesh[0] = in.mesh;
+    }
+    sceneInstances_ = ctx.createDeviceBuffer(insts.data(), insts.size() * sizeof(GpuInstance), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+    std::vector<GpuMesh> meshes(scene.meshes.size());
+    for (size_t i = 0; i < scene.meshes.size(); ++i) {
+        const MeshRange& m = scene.meshes[i];
+        meshes[i] = {m.firstTri, m.triCount, m.opaqueCount, i < bvh.meshRoots().size() ? bvh.meshRoots()[i] : 0u};
+    }
+    meshes_ = ctx.createDeviceBuffer(meshes.data(), meshes.size() * sizeof(GpuMesh), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
 
     std::vector<GpuMaterial> mats;
     for (const Material& m : scene.materials)
@@ -425,12 +463,8 @@ void Renderer::uploadScene(const Scene& scene, uint32_t glassStart, const Bvh& b
                           {l.direction.x, l.direction.y, l.direction.z, l.cosInner},
                           {l.cosOuter, 0, 0, 0}});
     lightCount_ = static_cast<uint32_t>(lights.size());
-    // 地面の高さ = モデルの一番下
-    groundZ_ = 0.0f;
-    if (!scene.vertices.empty()) {
-        groundZ_ = scene.vertices[0].pz;
-        for (const Vertex& v : scene.vertices) groundZ_ = std::min(groundZ_, v.pz);
-    }
+    // 地面の高さ = モデルの一番下（置き場所の位置まで含めた全体の箱の下の面）
+    groundZ_ = bvh.nodes().empty() ? 0.0f : bvh.boundsMin().z;
     if (lights.empty()) lights.push_back({});  // 空のバッファは作れないので 1 つ入れておく（数は 0 のまま）
     lights_ = ctx.createDeviceBuffer(lights.data(), lights.size() * sizeof(GpuLight), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
     logInfo("Lights: %u", lightCount_);
@@ -556,12 +590,15 @@ Renderer::AccelStruct Renderer::buildBlas(VkDeviceSize indexOffsetBytes, uint32_
         VkCommandBuffer copyCmd = ctx_->beginOneShot();
         vkCmdCopyAccelerationStructureKHR(copyCmd, &copy);
         ctx_->endOneShot(copyCmd);
-        logInfo("BLAS: %u triangles, %.1f MB -> %.1f MB (compacted)", triangleCount,
-                sizes.accelerationStructureSize / 1048576.0, compactSize / 1048576.0);
+        // 形がたくさんあるとログが長くなるので、大きいものだけ書く（合計は buildAccelerationStructures が書く）
+        if (triangleCount >= 100000)
+            logInfo("BLAS: %u triangles, %.1f MB -> %.1f MB (compacted)", triangleCount,
+                    sizes.accelerationStructureSize / 1048576.0, compactSize / 1048576.0);
         destroyAccel(as);
         as = compact;
     } else {
-        logInfo("BLAS: %u triangles, %.1f MB", triangleCount, sizes.accelerationStructureSize / 1048576.0);
+        if (triangleCount >= 100000)
+            logInfo("BLAS: %u triangles, %.1f MB", triangleCount, sizes.accelerationStructureSize / 1048576.0);
     }
 
     VkAccelerationStructureDeviceAddressInfoKHR ai{VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR};
@@ -633,16 +670,39 @@ void Renderer::buildAccelerationStructures(const Scene& scene) {
         return inst;
     };
 
-    // 不透明な物（インスタンス 0, マスク 0x01）とガラス（インスタンス 1, マスク 0x02）に分ける。
-    // 影の計算ではマスク 0x01 だけを見るので、ガラスは光を通す
-    if (glassStart_ > 0) {
-        blasOpaque_ = buildBlas(0, glassStart_, vertexCount);
-        instances.push_back(makeInstance(blasOpaque_.address, 0, 0x01));
+    // 形ごとに、不透明な部分とガラスの部分の加速構造を 1 つずつ作る（何度置いても 1 回だけ）。
+    // 置き場所ごとに TLAS のインスタンスを作る: 印（マスク）は不透明 0x01・ガラス 0x02（影の計算は 0x01 だけを見るので、ガラスは光を通す）。
+    // 番号（custom index）は「置き場所の番号 × 2 + ガラスなら 1」。シェーダーはこれで形と三角形を見つける
+    std::vector<int32_t> opaqueBlas(scene.meshes.size(), -1), glassBlas(scene.meshes.size(), -1);
+    for (size_t mi = 0; mi < scene.meshes.size(); ++mi) {
+        const MeshRange& m = scene.meshes[mi];
+        if (m.opaqueCount > 0) {
+            opaqueBlas[mi] = static_cast<int32_t>(blas_.size());
+            blas_.push_back(buildBlas(static_cast<VkDeviceSize>(m.firstTri) * 3 * sizeof(uint32_t), m.opaqueCount, vertexCount));
+        }
+        if (m.triCount > m.opaqueCount) {
+            glassBlas[mi] = static_cast<int32_t>(blas_.size());
+            blas_.push_back(buildBlas(static_cast<VkDeviceSize>(m.firstTri + m.opaqueCount) * 3 * sizeof(uint32_t),
+                                      m.triCount - m.opaqueCount, vertexCount));
+        }
     }
-    if (triCount > glassStart_) {
-        blasGlass_ = buildBlas(static_cast<VkDeviceSize>(glassStart_) * 3 * sizeof(uint32_t), triCount - glassStart_, vertexCount);
-        instances.push_back(makeInstance(blasGlass_.address, 1, 0x02));
+    if (scene.instances.size() >= (1u << 23)) fatal("%s\n(placements %zu)", tr("ModelTooLarge"), scene.instances.size());
+    for (size_t i = 0; i < scene.instances.size(); ++i) {
+        const Instance& in = scene.instances[i];
+        auto add = [&](int32_t b, uint32_t glass, uint32_t mask) {
+            if (b < 0) return;
+            VkAccelerationStructureInstanceKHR inst = makeInstance(blas_[b].address, static_cast<uint32_t>(i) * 2u + glass, mask);
+            for (int r = 0; r < 3; ++r)
+                for (int c = 0; c < 4; ++c) inst.transform.matrix[r][c] = in.m[r * 4 + c];
+            instances.push_back(inst);
+        };
+        add(opaqueBlas[in.mesh], 0u, 0x01);
+        add(glassBlas[in.mesh], 1u, 0x02);
     }
+    (void)triCount;
+    VkDeviceSize blasBytes = 0;
+    for (const AccelStruct& b : blas_) blasBytes += b.buffer.allocated;
+    logInfo("BLAS: %zu (%.1f MB), placements in TLAS: %zu", blas_.size(), blasBytes / 1048576.0, instances.size());
     buildTlas(instances);
     logInfo("Acceleration structures built");
 }
@@ -665,7 +725,7 @@ void Renderer::createPasses() {
     std::vector<BindingSpec> pt = {
         {0, hardwareRt_ ? VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR : BUF},
         {1, IMG}, {2, IMG}, {3, BUF}, {4, BUF}, {5, BUF}, {6, BUF}, {7, IMG}, {9, IMG}, {10, BUF}, {11, BUF}, {12, BUF},
-        {13, IMG},
+        {13, IMG}, {14, BUF}, {15, BUF},
     };
     if (!hardwareRt_) pt.push_back({8, BUF});
     pathTrace_ = hardwareRt_
@@ -698,6 +758,7 @@ void Renderer::writeDescriptors() {
             {1, noisy_.view}, {2, gpos_[cur].view}, {3, {}, vertices_.buffer}, {4, {}, indices_.buffer},
             {5, {}, triMaterials_.buffer}, {6, {}, materials_.buffer}, {7, gnormal_[cur].view}, {9, galbedo_.view},
             {10, {}, texInfos_.buffer}, {11, {}, texels_.buffer}, {12, {}, lights_.buffer}, {13, skyImage_.view},
+            {14, {}, sceneInstances_.buffer}, {15, {}, meshes_.buffer},
         };
         if (hardwareRt_) {
             Bind b{0};
@@ -879,7 +940,7 @@ void Renderer::record(VkCommandBuffer cmd, const ViewParams& view) {
     pt.sunDir[0] = sunDir_.x; pt.sunDir[1] = sunDir_.y; pt.sunDir[2] = sunDir_.z; pt.sunDir[3] = effectiveSun();
     pt.misc[0] = lightsOn_ ? static_cast<float>(lightCount_) : 0.0f;
     pt.misc[1] = effectiveSky();
-    pt.misc[2] = static_cast<float>(glassStart_);
+    pt.misc[2] = 0.0f;  // 未使用（ガラスは形ごとに分けた）
     // 1 画素が 1 m 先で何 m の幅になるか（テクスチャの縮小した段を選ぶのに使う）
     pt.misc[3] = view.panorama ? 2.0f * 3.14159265f / static_cast<float>(w) : 2.0f * tanHalf / static_cast<float>(h);
     pt.frame[0] = frameIndex_;

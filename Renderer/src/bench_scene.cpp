@@ -18,6 +18,7 @@ namespace {
 struct Mesh {
     std::vector<Vertex> vertices;
     std::vector<uint32_t> indices;
+    std::vector<int32_t> triMat;  // 三角形ごとのマテリアル（-1 または無し = 置くときのマテリアル）
 };
 
 void addQuad(Mesh& m, Vec3 a, Vec3 b, Vec3 c, Vec3 d, Vec3 n) {
@@ -67,17 +68,36 @@ Mesh ellipsoid(Vec3 r, int seg) {
     return m;
 }
 
-// 形を位置だけずらして（回転なし）シーンに足す。Revit の書き出しと同じく、置くたびに形を全部持つ
-void place(Scene& s, const Mesh& m, Vec3 at, uint32_t mat) {
+// 形（とマテリアル）をシーンに 1 回だけ入れ、形の番号を返す（同じ組み合わせは使い回す）
+struct ShapeCache {
+    std::vector<std::pair<std::pair<const Mesh*, uint32_t>, uint32_t>> known;
+};
+uint32_t shapeOf(Scene& s, ShapeCache& cache, const Mesh& m, uint32_t mat) {
+    for (const auto& k : cache.known)
+        if (k.first.first == &m && k.first.second == mat) return k.second;
+    MeshRange r;
+    r.firstTri = static_cast<uint32_t>(s.triMaterials.size());
+    r.triCount = static_cast<uint32_t>(m.indices.size() / 3);
     uint32_t base = static_cast<uint32_t>(s.vertices.size());
-    for (Vertex v : m.vertices) {
-        v.px += at.x;
-        v.py += at.y;
-        v.pz += at.z;
-        s.vertices.push_back(v);
-    }
+    s.vertices.insert(s.vertices.end(), m.vertices.begin(), m.vertices.end());
     for (uint32_t i : m.indices) s.indices.push_back(base + i);
-    for (size_t t = 0; t < m.indices.size() / 3; ++t) s.triMaterials.push_back(mat);
+    for (uint32_t t = 0; t < r.triCount; ++t)
+        s.triMaterials.push_back(t < m.triMat.size() && m.triMat[t] >= 0 ? static_cast<uint32_t>(m.triMat[t]) : mat);
+    s.meshes.push_back(r);
+    uint32_t id = static_cast<uint32_t>(s.meshes.size() - 1);
+    cache.known.push_back({{&m, mat}, id});
+    return id;
+}
+
+// 形を位置だけずらして（回転なし）置く。Revit のファミリと同じく、形は 1 回だけ持ち、置き場所を足す
+ShapeCache* gCache = nullptr;
+void place(Scene& s, const Mesh& m, Vec3 at, uint32_t mat) {
+    Instance in;
+    in.mesh = shapeOf(s, *gCache, m, mat);
+    in.m[3] = at.x;
+    in.m[7] = at.y;
+    in.m[11] = at.z;
+    s.instances.push_back(in);
 }
 
 uint32_t addMaterial(Scene& s, const char* name, float r, float g, float b, float rough, int32_t tex = -1,
@@ -132,6 +152,9 @@ bool makeBenchScene(const std::string& preset, Scene& s) {
         return false;
     }
     const float span = 8.0f, storey = 3.4f, slab = 0.25f;
+    ShapeCache cache;
+    gCache = &cache;
+    std::vector<Mesh> walls(static_cast<size_t>(floors));  // 階ごとの壁（形はそれぞれ別。1 回しか使わない形の例）
     const float width = nx * span, depth = ny * span;
 
     int32_t concreteTex = addNoiseTexture(s, texSize, 150, 12345u);
@@ -167,6 +190,15 @@ bool makeBenchScene(const std::string& preset, Scene& s) {
     addBox(lamp, {-0.6f, -0.08f, -0.06f}, {1.2f, 0.16f, 0.06f});
     addBox(slabBay, {0.0f, 0.0f, -slab}, {span, span, slab});
     Mesh car = ellipsoid({2.2f, 0.9f, 0.7f}, carSeg);
+    // 車の窓（ガラス）: 同じ形の中に不透明な部分とガラスが混ざる例
+    uint32_t mGlass = addMaterial(s, "ガラス", 0.8f, 0.9f, 0.95f, 0.05f);
+    s.materials[mGlass].opacity = 0.3f;
+    {
+        size_t before = car.indices.size() / 3;
+        addBox(car, {-0.9f, -0.75f, 0.35f}, {1.4f, 1.5f, 0.45f});
+        car.triMat.assign(before, -1);
+        car.triMat.resize(car.indices.size() / 3, static_cast<int32_t>(mGlass));
+    }
 
     int carIndex = 0;
     for (int f = 0; f < floors; ++f) {
@@ -192,9 +224,8 @@ bool makeBenchScene(const std::string& preset, Scene& s) {
                 if (j < ny) place(s, beamY, {i * span, j * span, z + storey}, mSteel);
             }
         // 奥の壁だけ（手前と左右は外に開いている）
-        Mesh wall;
-        addBox(wall, {0.0f, depth, z}, {width, 0.2f, storey});
-        place(s, wall, {0, 0, 0}, mWall);
+        addBox(walls[f], {0.0f, depth, z}, {width, 0.2f, storey});
+        place(s, walls[f], {0, 0, 0}, mWall);
     }
 
     // 天井の照明（数を抑える: 4 スパンに 1 つ）
@@ -216,6 +247,7 @@ bool makeBenchScene(const std::string& preset, Scene& s) {
     s.camera.up = {0, 0, 1};
     s.camera.fovY = 55.0f;
     s.sunDir = {0.4f, -0.7f, 0.6f};
+    gCache = nullptr;
     return true;
 }
 

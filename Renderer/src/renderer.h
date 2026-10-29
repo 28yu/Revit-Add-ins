@@ -27,7 +27,7 @@ struct ViewParams {
 
 class Renderer {
 public:
-    // scene は sortGlassLast() 済み（glassStart = ガラスの最初の三角形）、bvh はその並びで作ったもの。
+    // scene は prepareScene 済み（形と置き場所・形ごとにガラスが後ろ）、bvh はその並びで作ったもの。glassStart は記録用（不透明な三角形の数）。
     // RT コアが無い GPU では bvh を GPU に送って、予備の方式で描く
     // 空と雲の画像の横の画素数（init の前に設定する。縦はその 1/4）
     uint32_t skyWidth_ = 4096;
@@ -108,6 +108,7 @@ private:
     VkContext* ctx_ = nullptr;
     bool hardwareRt_ = false;
     Buffer vertices_, indices_, triMaterials_, materials_, exposure_, instances_;
+    Buffer sceneInstances_, meshes_;  // 置き場所（位置・向き・形の番号）と形（三角形の範囲・BVH の根）
     Buffer texInfos_, texels_;  // テクスチャ（Revit の外観の「イメージ」「レリーフ パターン」）
     Buffer lights_;             // 照明器具の光源
     uint32_t lightCount_ = 0;
@@ -115,7 +116,8 @@ private:
     float cloudAmount_ = 0.5f;
     float groundZ_ = 0.0f;      // 地面の高さ（モデルの一番下）
     Buffer bvhNodes_, bvhTris_;  // 予備の方式（RT コア無し）で使う
-    AccelStruct blasOpaque_, blasGlass_, tlas_;
+    std::vector<AccelStruct> blas_;  // 何度も使う形ごとに、不透明な部分とガラスの部分
+    AccelStruct tlas_;
     uint32_t glassStart_ = 0;
     float skyIntensity_ = 1.0f;
     Vec3 sunDir_;

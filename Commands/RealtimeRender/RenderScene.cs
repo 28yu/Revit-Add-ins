@@ -14,6 +14,13 @@ namespace Tools28.Commands.RealtimeRender
         public List<RenderTexture> Textures { get; } = new List<RenderTexture>();
         /// <summary>照明器具の光源。</summary>
         public List<RenderLight> Lights { get; } = new List<RenderLight>();
+        /// <summary>
+        /// 形（三角形の並びのうち連続した一続き）。同じファミリの同じ形は 1 回だけ持ち、Instances で何度も置く
+        /// （GPU のメモリ・ファイルの大きさを抑えるため）。頂点は形ごとの座標（ファミリから見た座標。メートル）。
+        /// </summary>
+        public List<RenderMesh> Meshes { get; } = new List<RenderMesh>();
+        /// <summary>置き場所: どの形を、どの位置・向きに置くか。</summary>
+        public List<RenderInstance> Instances { get; } = new List<RenderInstance>();
 
         public RenderCamera Camera { get; set; } = new RenderCamera();
         /// <summary>太陽のある方向（単位ベクトル）。</summary>
@@ -34,7 +41,20 @@ namespace Tools28.Commands.RealtimeRender
         public uint GroundColor { get; set; }            // 0xFFBBGGRR（グラデーションの地面の色。0 なら指定なし）
         public float CloudAmount { get; set; } = 0.5f;   // 0 = 雲なし 〜 1 = 曇り
 
+        /// <summary>持っている三角形の数（同じ形は 1 回だけ数える）。</summary>
         public int TriangleCount => Triangles.Count / 4;
+
+        /// <summary>置き場所の分も数えた三角形の数（画面に描かれる数）。</summary>
+        public long DrawnTriangleCount
+        {
+            get
+            {
+                if (Meshes.Count == 0) return TriangleCount;
+                long n = 0;
+                foreach (RenderInstance inst in Instances) n += Meshes[inst.Mesh].TriCount;
+                return n;
+            }
+        }
 
         public void AddTriangle(int a, int b, int c, int material)
         {
@@ -44,28 +64,82 @@ namespace Tools28.Commands.RealtimeRender
             Triangles.Add(material);
         }
 
-        /// <summary>全頂点を囲む箱（メートル）。頂点がなければ null。</summary>
+        /// <summary>モデル全体を囲む箱（メートル。置き場所の位置まで含める）。頂点がなければ null。</summary>
         public (float[] min, float[] max)? Bounds()
         {
             if (Vertices.Count == 0) return null;
             var min = new[] { float.MaxValue, float.MaxValue, float.MaxValue };
             var max = new[] { float.MinValue, float.MinValue, float.MinValue };
-            foreach (var v in Vertices)
+            void Grow(float x, float y, float z)
             {
-                min[0] = Math.Min(min[0], v.PX); max[0] = Math.Max(max[0], v.PX);
-                min[1] = Math.Min(min[1], v.PY); max[1] = Math.Max(max[1], v.PY);
-                min[2] = Math.Min(min[2], v.PZ); max[2] = Math.Max(max[2], v.PZ);
+                min[0] = Math.Min(min[0], x); max[0] = Math.Max(max[0], x);
+                min[1] = Math.Min(min[1], y); max[1] = Math.Max(max[1], y);
+                min[2] = Math.Min(min[2], z); max[2] = Math.Max(max[2], z);
             }
-            return (min, max);
+            if (Meshes.Count == 0)
+            {
+                foreach (var v in Vertices) Grow(v.PX, v.PY, v.PZ);
+                return (min, max);
+            }
+            // 形ごとの箱（形の座標）を、置き場所ごとに 8 つの角を動かして囲む
+            var meshMin = new float[Meshes.Count][];
+            var meshMax = new float[Meshes.Count][];
+            for (int mi = 0; mi < Meshes.Count; mi++)
+            {
+                var lo = new[] { float.MaxValue, float.MaxValue, float.MaxValue };
+                var hi = new[] { float.MinValue, float.MinValue, float.MinValue };
+                RenderMesh m = Meshes[mi];
+                for (int t = m.FirstTri; t < m.FirstTri + m.TriCount; t++)
+                    for (int k = 0; k < 3; k++)
+                    {
+                        RenderVertex v = Vertices[Triangles[t * 4 + k]];
+                        lo[0] = Math.Min(lo[0], v.PX); hi[0] = Math.Max(hi[0], v.PX);
+                        lo[1] = Math.Min(lo[1], v.PY); hi[1] = Math.Max(hi[1], v.PY);
+                        lo[2] = Math.Min(lo[2], v.PZ); hi[2] = Math.Max(hi[2], v.PZ);
+                    }
+                meshMin[mi] = lo;
+                meshMax[mi] = hi;
+            }
+            foreach (RenderInstance inst in Instances)
+            {
+                float[] lo = meshMin[inst.Mesh], hi = meshMax[inst.Mesh], m = inst.M;
+                if (lo[0] > hi[0]) continue;
+                for (int c = 0; c < 8; c++)
+                {
+                    float x = (c & 1) != 0 ? hi[0] : lo[0], y = (c & 2) != 0 ? hi[1] : lo[1], z = (c & 4) != 0 ? hi[2] : lo[2];
+                    Grow(m[0] * x + m[1] * y + m[2] * z + m[3], m[4] * x + m[5] * y + m[6] * z + m[7],
+                         m[8] * x + m[9] * y + m[10] * z + m[11]);
+                }
+            }
+            return min[0] <= max[0] ? (min, max) : ((float[], float[])?)null;
         }
     }
 
-    internal struct RenderVertex
+    /// <summary>形: 三角形の並びのうち、FirstTri から TriCount 個。</summary>
+    internal struct RenderMesh
+    {
+        public int FirstTri, TriCount;
+    }
+
+    /// <summary>置き場所: 形の番号と、3 行 4 列の行列（行ごと。世界の座標 = 左 3 列 × 形の座標 + 右 1 列。メートル）。</summary>
+    internal struct RenderInstance
+    {
+        public int Mesh;
+        public float[] M;
+    }
+
+    internal struct RenderVertex : IEquatable<RenderVertex>
     {
         public float PX, PY, PZ;
         public float NX, NY, NZ;
         /// <summary>面の上の位置（メートル）。画像上の位置へは、マテリアルの貼り方（Xform）で直す。</summary>
         public float U, V;
+
+        // 同じ形かを比べるのに使う（既定の比べ方は遅いので、値を直接比べる）
+        public bool Equals(RenderVertex o) =>
+            PX == o.PX && PY == o.PY && PZ == o.PZ && NX == o.NX && NY == o.NY && NZ == o.NZ && U == o.U && V == o.V;
+        public override bool Equals(object obj) => obj is RenderVertex o && Equals(o);
+        public override int GetHashCode() => PX.GetHashCode() ^ (PY.GetHashCode() * 31) ^ (PZ.GetHashCode() * 17);
     }
 
     internal class RenderMaterial

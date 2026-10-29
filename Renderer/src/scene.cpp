@@ -27,7 +27,11 @@ namespace t28 {
 //                               向きx,y,z, cos（落ち始め）, cos（届く範囲）
 // 4: 太陽の後ろに 緯度・真北・日付（年の何日目）を追加。
 // 5: その後ろに 3D ビューのレンダリング設定（照明・背景・地面の色・雲の量）を追加。3・4 も読める（足りない分は既定値）
-static const uint32_t kVersion = 5;
+// 6: 最後（光源の後ろ）に 形と置き場所（インスタンス）を追加。同じ形は 1 回だけ持ち、位置・向きだけを何度も書く
+//   uint32   形の数       → 各: uint32 最初の三角形番号, 三角形の数（三角形の並びの中の連続した一続き）
+//   uint32   置き場所の数 → 各: uint32 形の番号, float 3 行 4 列（行ごと。世界の座標 = 左 3 列 × 形の座標 + 右 1 列）
+//   形の数が 0 なら、版 5 までと同じ（全部の三角形がそのままの位置）。頂点はそれぞれの形の座標で書く
+static const uint32_t kVersion = 6;
 
 namespace {
 class Reader {
@@ -171,6 +175,22 @@ bool loadScene(const std::string& path, Scene& scene, std::string& error, long o
         l.cosInner = v[11];
         l.cosOuter = v[12];
     }
+    if (version >= 6) {
+        uint32_t meshCount = 0, instanceCount = 0;
+        if (!r.read(meshCount) || meshCount > triCount) return fail("bad mesh count");
+        scene.meshes.resize(meshCount);
+        for (MeshRange& m : scene.meshes) {
+            if (!r.read(m.firstTri) || !r.read(m.triCount)) return fail("truncated meshes");
+            if (m.firstTri > triCount || m.triCount > triCount - m.firstTri) return fail("mesh out of range");
+        }
+        if (!r.read(instanceCount) || instanceCount > 50000000u) return fail("bad instance count");
+        scene.instances.resize(instanceCount);
+        for (Instance& in : scene.instances) {
+            if (!r.read(in.mesh) || !r.readFloats(in.m, 12)) return fail("truncated instances");
+            if (in.mesh >= meshCount) return fail("instance mesh out of range");
+        }
+        if (meshCount > 0 && instanceCount == 0) return fail("no instances");
+    }
     fclose(f);
     if (triCount == 0) {
         error = "the model has no triangles";
@@ -232,27 +252,160 @@ void saveScene(const Scene& scene, std::vector<uint8_t>& out) {
         for (float v : {l.position.x, l.position.y, l.position.z, l.radius, l.intensity.x, l.intensity.y, l.intensity.z,
                         static_cast<float>(l.type), l.direction.x, l.direction.y, l.direction.z, l.cosInner, l.cosOuter})
             put(out, v);
+    put(out, static_cast<uint32_t>(scene.meshes.size()));
+    for (const MeshRange& m : scene.meshes) {
+        put(out, m.firstTri);
+        put(out, m.triCount);
+    }
+    put(out, static_cast<uint32_t>(scene.meshes.empty() ? 0 : scene.instances.size()));
+    if (!scene.meshes.empty())
+        for (const Instance& in : scene.instances) {
+            put(out, in.mesh);
+            for (float v : in.m) put(out, v);
+        }
+}
+
+void Scene::ensureInstances() {
+    if (!meshes.empty() && !instances.empty()) return;
+    meshes.assign(1, MeshRange{0, static_cast<uint32_t>(triangleCount()), static_cast<uint32_t>(triangleCount())});
+    instances.assign(1, Instance{});
+}
+
+size_t Scene::instancedTriangleCount() const {
+    if (meshes.empty()) return triangleCount();
+    size_t n = 0;
+    for (const Instance& in : instances) n += meshes[in.mesh].triCount;
+    return n;
+}
+
+namespace {
+bool isIdentity(const float m[12]) {
+    static const float id[12] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0};
+    for (int i = 0; i < 12; ++i)
+        if (std::fabs(m[i] - id[i]) > 1e-7f) return false;
+    return true;
+}
+}  // namespace
+
+void Scene::mergeRarelyUsedMeshes(uint32_t useLimit) {
+    ensureInstances();
+    std::vector<uint32_t> uses(meshes.size(), 0);
+    for (const Instance& in : instances) uses[in.mesh]++;
+    bool needed = false;
+    for (const Instance& in : instances)
+        if (uses[in.mesh] <= useLimit) needed = true;
+    // すでに「まとめた形 1 つ（そのままの位置に 1 回）＋何度も使う形」になっていれば何もしない
+    size_t rare = 0;
+    for (const Instance& in : instances)
+        if (uses[in.mesh] <= useLimit) ++rare;
+    if (!needed || (rare == 1 && isIdentity(instances[0].m) && uses[instances[0].mesh] <= useLimit)) return;
+
+    std::vector<Vertex> newV;
+    std::vector<uint32_t> newI, newM;
+    newV.reserve(vertices.size());
+    newI.reserve(indices.size());
+    newM.reserve(triMaterials.size());
+    std::vector<uint32_t> remap(vertices.size(), 0), stamp(vertices.size(), 0);
+    uint32_t pass = 0;
+    // 形の三角形を足す。m があれば位置と向きを置き場所に合わせて動かす
+    auto append = [&](const MeshRange& mr, const float* m) {
+        ++pass;
+        float nm[9] = {1, 0, 0, 0, 1, 0, 0, 0, 1};  // 向き（法線）を動かす行列 = 左 3 列の逆行列の転置
+        if (m) {
+            float a = m[0], b = m[1], c = m[2], d = m[4], e = m[5], f = m[6], g = m[8], h = m[9], k = m[10];
+            float det = a * (e * k - f * h) - b * (d * k - f * g) + c * (d * h - e * g);
+            float inv = std::fabs(det) > 1e-20f ? 1.0f / det : 0.0f;
+            float cof[9] = {e * k - f * h, -(d * k - f * g), d * h - e * g,
+                            -(b * k - c * h), a * k - c * g, -(a * h - b * g),
+                            b * f - c * e, -(a * f - c * d), a * e - b * d};
+            for (int i = 0; i < 9; ++i) nm[i] = cof[i] * inv;
+        }
+        for (uint32_t t = mr.firstTri; t < mr.firstTri + mr.triCount; ++t) {
+            for (int k = 0; k < 3; ++k) {
+                uint32_t vi = indices[t * 3 + k];
+                if (stamp[vi] != pass) {
+                    stamp[vi] = pass;
+                    remap[vi] = static_cast<uint32_t>(newV.size());
+                    Vertex v = vertices[vi];
+                    if (m) {
+                        float px = v.px, py = v.py, pz = v.pz, nx = v.nx, ny = v.ny, nz = v.nz;
+                        v.px = m[0] * px + m[1] * py + m[2] * pz + m[3];
+                        v.py = m[4] * px + m[5] * py + m[6] * pz + m[7];
+                        v.pz = m[8] * px + m[9] * py + m[10] * pz + m[11];
+                        float tx = nm[0] * nx + nm[1] * ny + nm[2] * nz;
+                        float ty = nm[3] * nx + nm[4] * ny + nm[5] * nz;
+                        float tz = nm[6] * nx + nm[7] * ny + nm[8] * nz;
+                        float len = std::sqrt(tx * tx + ty * ty + tz * tz);
+                        if (len > 1e-12f) { v.nx = tx / len; v.ny = ty / len; v.nz = tz / len; }
+                    }
+                    newV.push_back(v);
+                }
+                newI.push_back(remap[vi]);
+            }
+            newM.push_back(triMaterials[t]);
+        }
+    };
+    std::vector<MeshRange> newMeshes;
+    std::vector<Instance> newInstances;
+    // 1) まれにしか使わない形は、置き場所の位置に動かして 1 つにまとめる（そのままの位置に 1 回置く）
+    MeshRange merged;
+    for (const Instance& in : instances)
+        if (uses[in.mesh] <= useLimit) append(meshes[in.mesh], isIdentity(in.m) ? nullptr : in.m);
+    merged.triCount = static_cast<uint32_t>(newM.size());
+    if (merged.triCount > 0) {
+        newMeshes.push_back(merged);
+        newInstances.push_back(Instance{});
+    }
+    // 2) 何度も使う形は 1 回だけ持つ
+    std::vector<uint32_t> newIndexOf(meshes.size(), UINT32_MAX);
+    for (size_t mi = 0; mi < meshes.size(); ++mi) {
+        if (uses[mi] <= useLimit) continue;
+        MeshRange r;
+        r.firstTri = static_cast<uint32_t>(newM.size());
+        append(meshes[mi], nullptr);
+        r.triCount = static_cast<uint32_t>(newM.size()) - r.firstTri;
+        newIndexOf[mi] = static_cast<uint32_t>(newMeshes.size());
+        newMeshes.push_back(r);
+    }
+    for (const Instance& in : instances)
+        if (uses[in.mesh] > useLimit) {
+            Instance n = in;
+            n.mesh = newIndexOf[in.mesh];
+            newInstances.push_back(n);
+        }
+    vertices.swap(newV);
+    indices.swap(newI);
+    triMaterials.swap(newM);
+    meshes.swap(newMeshes);
+    instances.swap(newInstances);
 }
 
 uint32_t Scene::sortGlassLast() {
-    const size_t n = triangleCount();
-    std::vector<uint32_t> order(n);
-    std::iota(order.begin(), order.end(), 0u);
+    ensureInstances();
     auto isGlass = [&](uint32_t t) { return materials[triMaterials[t]].opacity < 0.99f; };
-    std::stable_partition(order.begin(), order.end(), [&](uint32_t t) { return !isGlass(t); });
-
     std::vector<uint32_t> newIndices(indices.size());
-    std::vector<uint32_t> newMats(n);
-    uint32_t glassStart = static_cast<uint32_t>(n);
-    for (size_t i = 0; i < n; ++i) {
-        uint32_t t = order[i];
-        for (int k = 0; k < 3; ++k) newIndices[i * 3 + k] = indices[t * 3 + k];
-        newMats[i] = triMaterials[t];
-        if (isGlass(t) && glassStart == n) glassStart = static_cast<uint32_t>(i);
+    std::vector<uint32_t> newMats(triMaterials.size());
+    // 形に入っていない三角形は、そのままの位置に残す
+    for (size_t t = 0; t < triMaterials.size(); ++t) {
+        for (int k = 0; k < 3; ++k) newIndices[t * 3 + k] = indices[t * 3 + k];
+        newMats[t] = triMaterials[t];
+    }
+    uint32_t opaqueTotal = 0;
+    for (MeshRange& m : meshes) {
+        std::vector<uint32_t> order(m.triCount);
+        std::iota(order.begin(), order.end(), m.firstTri);
+        auto mid = std::stable_partition(order.begin(), order.end(), [&](uint32_t t) { return !isGlass(t); });
+        m.opaqueCount = static_cast<uint32_t>(mid - order.begin());
+        opaqueTotal += m.opaqueCount;
+        for (uint32_t i = 0; i < m.triCount; ++i) {
+            uint32_t src = order[i], dst = m.firstTri + i;
+            for (int k = 0; k < 3; ++k) newIndices[dst * 3 + k] = indices[src * 3 + k];
+            newMats[dst] = triMaterials[src];
+        }
     }
     indices.swap(newIndices);
     triMaterials.swap(newMats);
-    return glassStart;
+    return opaqueTotal;
 }
 
 // --- 動作確認用の部屋 --------------------------------------------------------

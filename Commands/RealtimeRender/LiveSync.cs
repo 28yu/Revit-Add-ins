@@ -226,7 +226,7 @@ namespace Tools28.Commands.RealtimeRender
                     return;
                 }
                 s.ExportedIds = exportedIds;
-                DiagLog.Cmd("RealtimeRender", $"ライブ同期: モデルを更新 ({scene.TriangleCount} 三角形)");
+                DiagLog.Cmd("RealtimeRender", $"ライブ同期: モデルを更新 ({scene.TriangleCount} 三角形・描く数 {scene.DrawnTriangleCount}・形 {scene.Meshes.Count}・置き場所 {scene.Instances.Count})");
             }
             catch (Exception ex)
             {

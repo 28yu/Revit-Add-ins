@@ -356,7 +356,7 @@ int runWindow(const Options& opt, Scene& scene) {
     }, opt.gpu, !opt.forceSoftware);
 
     Bvh bvh;
-    uint32_t glassStart = prepareScene(scene, bvh);
+    uint32_t glassStart = prepareScene(scene, bvh, opt.instancing);
     Renderer renderer;
     renderer.skyWidth_ = static_cast<uint32_t>(opt.skySize);
     renderer.init(ctx, scene, glassStart, bvh);
@@ -823,7 +823,7 @@ int runWindow(const Options& opt, Scene& scene) {
                 // Revit が書いている途中で読めなかったときは、次の機会にもう一度読む
                 if (loadScene(opt.scenePath, next, error)) {
                     Bvh nextBvh;
-                    uint32_t nextGlass = prepareScene(next, nextBvh);
+                    uint32_t nextGlass = prepareScene(next, nextBvh, opt.instancing);
                     renderer.reloadScene(next, nextGlass, nextBvh);
                     scene.sunDir = next.sunDir;  // 時間帯を Revit のままにしているときは新しい太陽を使う
                     scene.latitude = next.latitude;

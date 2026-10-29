@@ -38,7 +38,12 @@ Revit（Tools28.dll）                       Tools28Render.exe
                                                export.cpp      書き出し（保存先の画面・PNG・360°の HTML・ビューアの exe）
 ```
 
-シーンファイル（`.t28s`）の形式は `src/scene.cpp` の先頭に書いてあります。
+シーンファイル（`.t28s`）の形式は `src/scene.cpp` の先頭に書いてあります（今は版 6）。
+
+**同じ形は 1 回だけ持つ（インスタンス化）**: Revit 側（`SceneExportContext`）が、ファミリの置き場所ごとに形を集めて中身を比べ、
+同じ形なら「置き場所（3 行 4 列の行列）」だけを書く。描画側は形ごとに加速構造（BLAS）を 1 つ作り、置き場所の数だけ TLAS に並べる
+（予備の方式は 2 段の BVH: 上の段が置き場所、下の段が形）。1 回しか使わない形（壁・床など）は `Scene::mergeRarelyUsedMeshes` が
+1 つにまとめる（加速構造の数を増やさないため）。`--no-instancing` で全部まとめて描ける（比較用）。
 **形式を変えるときは `Commands/RealtimeRender/SceneWriter.cs` も同時に直すこと。**
 
 ## シェーダー

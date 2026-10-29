@@ -4,7 +4,8 @@
 void surfaceAt(Hit h, vec3 rayDir, out vec3 pos, out vec3 normal, out vec3 geomNormal, out vec2 uv, out float uvPerMeter) {
     uint i0 = indices[h.tri * 3u], i1 = indices[h.tri * 3u + 1u], i2 = indices[h.tri * 3u + 2u];
     vec4 v0 = vertices[i0].position, v1 = vertices[i1].position, v2 = vertices[i2].position;
-    vec3 p0 = v0.xyz, p1 = v1.xyz, p2 = v2.xyz;
+    // 頂点は形の座標なので、置き場所の位置・向きに動かす
+    vec3 p0 = toWorldPoint(h.inst, v0.xyz), p1 = toWorldPoint(h.inst, v1.xyz), p2 = toWorldPoint(h.inst, v2.xyz);
     vec2 t0 = vec2(v0.w, vertices[i0].normal.w), t1 = vec2(v1.w, vertices[i1].normal.w), t2 = vec2(v2.w, vertices[i2].normal.w);
     float b0 = 1.0 - h.bary.x - h.bary.y;
     pos = p0 * b0 + p1 * h.bary.x + p2 * h.bary.y;
@@ -14,7 +15,7 @@ void surfaceAt(Hit h, vec3 rayDir, out vec3 pos, out vec3 normal, out vec3 geomN
     float uvArea = abs(e1.x * e2.y - e1.y * e2.x);
     uvPerMeter = sqrt(uvArea / max(length(cr), 1e-12));
     geomNormal = normalize(cr);
-    vec3 n = vertices[i0].normal.xyz * b0 + vertices[i1].normal.xyz * h.bary.x + vertices[i2].normal.xyz * h.bary.y;
+    vec3 n = toWorldNormal(h.inst, vertices[i0].normal.xyz * b0 + vertices[i1].normal.xyz * h.bary.x + vertices[i2].normal.xyz * h.bary.y);
     normal = dot(n, n) > 1e-8 ? normalize(n) : geomNormal;
     // 裏から当たったときは表向きにそろえる（Revit の形は裏表が混ざっていることがある）
     if (dot(geomNormal, rayDir) > 0.0) geomNormal = -geomNormal;
@@ -27,7 +28,7 @@ void basis(vec3 n, out vec3 t, out vec3 b);  // 下で定義
 void tangentFrame(Hit h, vec3 n, out vec3 tu, out vec3 tv) {
     uint i0 = indices[h.tri * 3u], i1 = indices[h.tri * 3u + 1u], i2 = indices[h.tri * 3u + 2u];
     vec4 v0 = vertices[i0].position, v1 = vertices[i1].position, v2 = vertices[i2].position;
-    vec3 dp1 = v1.xyz - v0.xyz, dp2 = v2.xyz - v0.xyz;
+    vec3 dp1 = toWorldVector(h.inst, v1.xyz - v0.xyz), dp2 = toWorldVector(h.inst, v2.xyz - v0.xyz);
     vec2 d1 = vec2(v1.w, vertices[i1].normal.w) - vec2(v0.w, vertices[i0].normal.w);
     vec2 d2 = vec2(v2.w, vertices[i2].normal.w) - vec2(v0.w, vertices[i0].normal.w);
     float det = d1.x * d2.y - d1.y * d2.x;

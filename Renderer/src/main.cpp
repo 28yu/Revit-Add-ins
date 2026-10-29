@@ -12,6 +12,7 @@
 // 性能測定: --bench-scene small|large|huge（測定用の立体駐車場）/ --bench（画像だけ作るときに時間・メモリ・大きさを測る）/
 //         --bench-frames 回数 / --save-scene 保存先.t28s
 // ローカルトーンマッピングの強さ: --local-tonemap 0〜1（0 = 使わない。比較用）/ カメラ: --camera x,y,z,前x,前y,前z
+// 同じ形を何度も持つ（インスタンス化しない。比較用）: --no-instancing
 #include <algorithm>
 #include <chrono>
 #include <cstdio>
@@ -60,6 +61,7 @@ static int run(int argc, char** argv) {
         else if (a == "--test-scene") testScene = true;
         else if (a == "--bench-scene") benchScene = next();
         else if (a == "--bench") opt.bench = true;
+        else if (a == "--no-instancing") opt.instancing = false;
         else if (a == "--local-tonemap") opt.localToneMapping = static_cast<float>(std::atof(next()));
         else if (a == "--camera") {
             // 確認用: カメラの位置と向き「x,y,z,前x,前y,前z」（メートル）
@@ -126,8 +128,9 @@ static int run(int argc, char** argv) {
     auto loadStart = std::chrono::steady_clock::now();
     if (!benchScene.empty()) {
         if (!makeBenchScene(benchScene, scene)) fatal("unknown bench scene: %s (small / large / huge)", benchScene.c_str());
-        logInfo("Bench scene %s: %zu triangles, %zu vertices, %zu textures", benchScene.c_str(), scene.triangleCount(),
-                scene.vertices.size(), scene.textures.size());
+        logInfo("Bench scene %s: %zu triangles stored (%zu drawn), %zu vertices, %zu shapes, %zu placements, %zu textures",
+                benchScene.c_str(), scene.triangleCount(), scene.instancedTriangleCount(), scene.vertices.size(),
+                scene.meshes.size(), scene.instances.size(), scene.textures.size());
     } else if (embedded) {
         std::string error;
         if (!loadScene(embeddedExe, scene, error, embeddedOffset)) fatal("%s\n%s", tr("SceneLoadFailed"), error.c_str());

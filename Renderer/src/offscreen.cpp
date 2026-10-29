@@ -64,7 +64,7 @@ int runOffscreen(const Options& opt, Scene& scene) {
     }
     auto prepStart = Clock::now();
     Bvh bvh;
-    uint32_t glassStart = prepareScene(scene, bvh);
+    uint32_t glassStart = prepareScene(scene, bvh, opt.instancing);
     double prepareSeconds = secondsSince(prepStart);
     auto initStart = Clock::now();
     Renderer renderer;
@@ -177,10 +177,11 @@ int runOffscreen(const Options& opt, Scene& scene) {
             v.exposure = exposure.current;
             moving.add(renderOne(v), opt.benchFrames);
         }
-        logInfo("BENCH {\"triangles\":%zu,\"vertices\":%zu,\"textures\":%zu,\"scene_mb\":%.1f,\"save_s\":%.2f,"
+        logInfo("BENCH {\"drawn_triangles\":%zu,\"shapes\":%zu,\"placements\":%zu,\"triangles\":%zu,\"vertices\":%zu,\"textures\":%zu,\"scene_mb\":%.1f,\"save_s\":%.2f,"
                 "\"load_s\":%.2f,\"prepare_s\":%.2f,\"init_s\":%.2f,\"gpu_mb\":%.0f,\"gpu_peak_mb\":%.0f,"
                 "\"width\":%u,\"height\":%u,\"still_ms\":%.1f,\"still_max_ms\":%.1f,\"moving_ms\":%.1f,"
                 "\"moving_max_ms\":%.1f,\"png_kb\":%.0f,\"blown_pct\":%.2f,\"mean_luma\":%.1f,\"hw_rt\":%d}",
+                scene.instancedTriangleCount(), scene.meshes.size(), scene.instances.size(),
                 scene.triangleCount(), scene.vertices.size(), scene.textures.size(), sceneBytes / 1048576.0, saveSeconds,
                 opt.sceneLoadSeconds, prepareSeconds, initSeconds, ctx.allocatedDeviceBytes / 1048576.0,
                 ctx.peakDeviceBytes / 1048576.0, w, h, still.avg * 1000.0, still.max * 1000.0, moving.avg * 1000.0,

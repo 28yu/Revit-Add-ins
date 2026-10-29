@@ -105,7 +105,7 @@ namespace Tools28.Commands.RealtimeRender
                 elementIds.UnionWith(context.ElementIds);
             }
             DiagLog.Cmd("RealtimeRender",
-                $"書き出し: 要素 {context.ElementCount} / 三角形 {scene.TriangleCount} / マテリアル {scene.Materials.Count} / テクスチャ {scene.Textures.Count} / {watch.ElapsedMilliseconds} ms");
+                $"書き出し: 要素 {context.ElementCount} / 三角形 {scene.TriangleCount}（描く数 {scene.DrawnTriangleCount}）/ 形 {scene.Meshes.Count} / 置き場所 {scene.Instances.Count}（使い回し {context.ReusedShapes}）/ マテリアル {scene.Materials.Count} / テクスチャ {scene.Textures.Count} / {watch.ElapsedMilliseconds} ms");
             foreach (string missing in context.MissingTextures)
                 DiagLog.Cmd("RealtimeRender", $"テクスチャ画像が見つかりません: {missing}");
             if (scene.TriangleCount > 0)
