@@ -68,13 +68,14 @@ jobs:
           TAG="v$VERSION"
           ASSET="28Tools_Setup_v$VERSION.exe"
 
-          find_release() {  # $1=repo  → 該当タグのリリース JSON（下書きを優先）
+          find_release() {  # $1=repo  → 該当タグのリリース JSON（下書きを優先）。
+            # 名札（タグ）が外れて untagged-… になったものも、リリース名で見つける（下で付け直す）
             gh api "repos/$1/releases?per_page=30" \
-              --jq "[.[] | select(.tag_name == \"$TAG\")] | sort_by(.draft) | reverse | .[0] // empty"
+              --jq "[.[] | select(.tag_name == \"$TAG\" or (.name == \"28 Tools $TAG\" and (.tag_name | startswith(\"untagged-\"))))] | sort_by(.draft) | reverse | .[0] // empty"
           }
 
           # 1) 両リポジトリの状態を先に調べる（ここでは何も変更しない）
-          declare -A IDS
+          declare -A IDS FIXTAG
           for REPO in "$ADDIN_REPO" "$SITE_REPO"; do
             if [ "$REPO" = "$SITE_REPO" ]; then export GH_TOKEN="$SITE_TOKEN"; else export GH_TOKEN="$ADDIN_TOKEN"; fi
             if [ -z "$GH_TOKEN" ]; then echo "::error::$REPO 用のトークンがありません"; exit 1; fi
@@ -86,6 +87,8 @@ jobs:
             fi
             if [ "$DRAFT" = "true" ]; then
               IDS[$REPO]="$ID"; echo "$REPO: 下書き（id=$ID）→ 公開します"
+            elif [ "$(jq -r .tag_name <<<"$REL")" != "$TAG" ]; then
+              FIXTAG[$REPO]="$ID"; echo "$REPO: 公開済みだが名札（タグ）が外れている（id=$ID）→ $TAG を付け直します"
             else
               echo "$REPO: すでに公開済み → スキップ"
             fi
@@ -101,15 +104,36 @@ jobs:
             if [ -f "$NOTES" ]; then
               gh api "repos/$REPO/releases/$ID" --jq '.body // ""' > body.md
               python3 scripts/insert-release-notes.py body.md "$NOTES"
-              gh api -X PATCH "repos/$REPO/releases/$ID" -F body=@body.md --jq '"本文を更新しました: \(.html_url)"'
+              # ⚠ tag_name も必ず一緒に送る（送らないと下書きの名札が外れ、untagged-… になる。2026-10-29 に v2.8 で発生）
+              gh api -X PATCH "repos/$REPO/releases/$ID" -f tag_name="$TAG" -F body=@body.md --jq '"本文を更新しました: \(.html_url)"'
             fi
-            gh api -X PATCH "repos/$REPO/releases/$ID" -F draft=false -f make_latest=true \
+            gh api -X PATCH "repos/$REPO/releases/$ID" -f tag_name="$TAG" -F draft=false -f make_latest=true \
               --jq '"公開しました: \(.html_url)"'
           done
 
-          # 3) サイトのボタンが読む releases/latest が新バージョンを指しているか確認
+          # 2b) 名札が外れた公開済みのリリースに付け直す（本文も最新の説明にする）
+          for REPO in "$ADDIN_REPO" "$SITE_REPO"; do
+            ID="${FIXTAG[$REPO]:-}"
+            [ -z "$ID" ] && continue
+            if [ "$REPO" = "$SITE_REPO" ]; then export GH_TOKEN="$SITE_TOKEN"; else export GH_TOKEN="$ADDIN_TOKEN"; fi
+            if [ -f "$NOTES" ]; then
+              gh api "repos/$REPO/releases/$ID" --jq '.body // ""' > body.md
+              python3 scripts/insert-release-notes.py body.md "$NOTES"
+              gh api -X PATCH "repos/$REPO/releases/$ID" -f tag_name="$TAG" -F body=@body.md -f make_latest=true \
+                --jq '"名札を付け直しました: \(.tag_name) \(.html_url)"'
+            else
+              gh api -X PATCH "repos/$REPO/releases/$ID" -f tag_name="$TAG" -f make_latest=true \
+                --jq '"名札を付け直しました: \(.tag_name) \(.html_url)"'
+            fi
+          done
+
+          # 3) サイトのボタンが読む releases/latest が新バージョンを指しているか確認（反映が遅れることがあるので数回見る）
           export GH_TOKEN="$SITE_TOKEN"
-          LATEST=$(gh api "repos/$SITE_REPO/releases/latest" --jq .tag_name)
+          for i in 1 2 3 4 5 6; do
+            LATEST=$(gh api "repos/$SITE_REPO/releases/latest" --jq .tag_name)
+            [ "$LATEST" = "$TAG" ] && break
+            sleep 5
+          done
           echo "$SITE_REPO の releases/latest: $LATEST"
           [ "$LATEST" = "$TAG" ] || { echo "::error::releases/latest が $TAG ではありません（$LATEST）"; exit 1; }
 
