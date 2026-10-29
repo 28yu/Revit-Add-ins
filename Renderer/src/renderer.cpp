@@ -26,6 +26,12 @@ static const uint32_t kAtrousSpv[] =       // ノイズ除去 その2（周り�
 static const uint32_t kCompositeSpv[] =    // 仕上げ（色を掛け戻す・トーンマッピング）
 #include "composite.spv.inc"
     ;
+static const uint32_t kLocalDownSpv[] =    // ローカルトーンマッピング: 大まかな明るさを 8×8 画素ごとにまとめる（自動露出の集計も）
+#include "localexp_down.spv.inc"
+    ;
+static const uint32_t kLocalBlurSpv[] =    // ローカルトーンマッピング: 大まかな明るさを、明るさの境目を守りながらぼかす
+#include "localexp_blur.spv.inc"
+    ;
 static const uint32_t kOverlaySpv[] =      // 操作の案内を重ねる
 #include "overlay.spv.inc"
     ;
@@ -67,6 +73,18 @@ struct CompositePush {
     float exposure;
     uint32_t background;
     uint32_t transparent;
+    float pivot;     // 画面の平均の明るさ（log2）。ローカルトーンマッピングはここを中心に縮める
+    float strength;  // ローカルトーンマッピングの強さ（0 = 使わない）
+    float brightIn;  // 明るい所（上位 5%）が平均から何段上か
+    float brightOut; // それを何段上に収めるか
+};
+
+struct LocalDownPush {
+    uint32_t background;
+};
+
+struct LocalBlurPush {
+    int32_t dir[2];
 };
 
 struct SkyPush {
@@ -82,6 +100,7 @@ struct OverlayPush {
 struct ExposureData {
     int32_t logLumSum;
     int32_t logLumCount;
+    int32_t histogram[64];  // 8×8 画素ごとの明るさの度数分布（-16〜+16 段、0.5 段刻み）
 };
 
 struct GpuMaterial {
@@ -661,7 +680,11 @@ void Renderer::createPasses() {
     for (uint32_t i = 0; i < 5; ++i) atrous.push_back({i, IMG});
     atrous_ = createPass(dev, atrous, 4, sizeof(AtrousPush), kAtrousSpv, sizeof(kAtrousSpv), "atrous");
 
-    composite_ = createPass(dev, {{0, IMG}, {1, IMG}, {2, IMG}, {3, IMG}, {4, BUF}}, 2, sizeof(CompositePush),
+    localDown_ = createPass(dev, {{0, IMG}, {1, IMG}, {2, IMG}, {3, BUF}}, 2, sizeof(LocalDownPush), kLocalDownSpv,
+                            sizeof(kLocalDownSpv), "local exposure (down)");
+    localBlur_ = createPass(dev, {{0, IMG}, {1, IMG}}, 2, sizeof(LocalBlurPush), kLocalBlurSpv, sizeof(kLocalBlurSpv),
+                            "local exposure (blur)");
+    composite_ = createPass(dev, {{0, IMG}, {1, IMG}, {2, IMG}, {3, IMG}, {4, IMG}}, 2, sizeof(CompositePush),
                             kCompositeSpv, sizeof(kCompositeSpv), "composite");
     skyPass_ = createPass(dev, {{0, IMG}}, 1, sizeof(SkyPush), kSkySpv, sizeof(kSkySpv), "sky");
     overlayPass_ = createPass(dev, {{0, IMG}, {1, IMG}}, kOverlaySlots, sizeof(OverlayPush), kOverlaySpv, sizeof(kOverlaySpv), "overlay");
@@ -699,9 +722,15 @@ void Renderer::writeDescriptors() {
             });
         }
         // 平均を奇数回くり返すと、結果は filtered_[1] に入る
+        writeSet(dev, localDown_.sets[cur], {
+            {0, filtered_[kAtrousIterations % 2].view}, {1, albedoHist_[cur].view}, {2, local_[0].view},
+            {3, {}, exposure_.buffer},
+        });
+        // ぼかし: 横は local_[0] → local_[1]、縦は local_[1] → local_[0]
+        writeSet(dev, localBlur_.sets[cur], {{0, local_[cur].view}, {1, local_[1 - cur].view}});
         writeSet(dev, composite_.sets[cur], {
             {0, filtered_[kAtrousIterations % 2].view}, {1, history_[cur].view}, {2, albedoHist_[cur].view},
-            {3, output_.view}, {4, {}, exposure_.buffer},
+            {3, output_.view}, {4, local_[0].view},
         });
     }
 }
@@ -795,9 +824,12 @@ void Renderer::setTransparentOutput(bool transparent) {
 void Renderer::resize(uint32_t width, uint32_t height) {
     vkDeviceWaitIdle(ctx_->device);
     Image* all[] = {&noisy_, &gpos_[0], &gpos_[1], &gnormal_[0], &gnormal_[1], &galbedo_, &history_[0], &history_[1],
-                    &moments_[0], &moments_[1], &filtered_[0], &filtered_[1], &albedoHist_[0], &albedoHist_[1], &output_};
+                    &moments_[0], &moments_[1], &filtered_[0], &filtered_[1], &albedoHist_[0], &albedoHist_[1], &output_,
+                    &local_[0], &local_[1]};
     for (Image* img : all) ctx_->destroyImage(*img);
     const VkImageUsageFlags storage = VK_IMAGE_USAGE_STORAGE_BIT;
+    for (Image* img : {&local_[0], &local_[1]})
+        *img = ctx_->createImage((width + 7) / 8, (height + 7) / 8, VK_FORMAT_R32G32B32A32_SFLOAT, storage);
     for (Image* img : {&noisy_, &gpos_[0], &gpos_[1], &gnormal_[0], &gnormal_[1], &history_[0], &history_[1],
                        &moments_[0], &moments_[1], &filtered_[0], &filtered_[1], &albedoHist_[0], &albedoHist_[1]})
         *img = ctx_->createImage(width, height, VK_FORMAT_R32G32B32A32_SFLOAT, storage);
@@ -819,7 +851,8 @@ void Renderer::dispatch(VkCommandBuffer cmd, const ComputePass& pass, uint32_t s
 void Renderer::record(VkCommandBuffer cmd, const ViewParams& view) {
     if (imagesFresh_) {
         Image* all[] = {&noisy_, &gpos_[0], &gpos_[1], &gnormal_[0], &gnormal_[1], &galbedo_, &history_[0],
-                        &history_[1], &moments_[0], &moments_[1], &filtered_[0], &filtered_[1], &albedoHist_[0], &albedoHist_[1], &output_};
+                        &history_[1], &moments_[0], &moments_[1], &filtered_[0], &filtered_[1], &albedoHist_[0], &albedoHist_[1], &output_,
+                        &local_[0], &local_[1]};
         for (Image* img : all)
             transitionImage(cmd, img->image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL,
                             VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
@@ -882,8 +915,25 @@ void Renderer::record(VkCommandBuffer cmd, const ViewParams& view) {
         computeBarrier(cmd);
     }
 
-    // 4. 仕上げ
-    CompositePush cp{view.exposure, lookBackground_, transparentOutput_ ? 1u : 0u};
+    // 4. 大まかな明るさ（ローカルトーンマッピング用。自動露出の集計も）
+    LocalDownPush ldp{lookBackground_};
+    dispatch(cmd, localDown_, cur, &ldp, sizeof(ldp), w, h);
+    computeBarrier(cmd);
+    const uint32_t sw = local_[0].width, sh = local_[0].height;
+    LocalBlurPush lbx{{1, 0}}, lby{{0, 1}};
+    dispatch(cmd, localBlur_, 0, &lbx, sizeof(lbx), sw, sh);
+    computeBarrier(cmd);
+    dispatch(cmd, localBlur_, 1, &lby, sizeof(lby), sw, sh);
+    computeBarrier(cmd);
+
+    // 5. 仕上げ。縮める中心は前のフレームで測った画面の平均（まだ無ければ露出から逆算）
+    float pivot = hasAvgLog2_ ? avgLog2_ : std::log2(0.32f / std::max(view.exposure, 1e-6f));
+    // 明るい所の収め先: 平均との差が小さい画面（普通の屋外など）はそのまま。差が大きい画面（屋根の下から外を見る）ほど強く縮め、
+    // kBrightTarget 段 + 超えた分の 1 割に収める（外が真っ白にならず、明るい外として見える）
+    const float kBrightTarget = 1.6f;
+    float brightIn = hasAvgLog2_ ? std::max(brightLog2_ - avgLog2_, 0.0f) : 0.0f;
+    float brightOut = std::min(brightIn, kBrightTarget + 0.1f * std::max(brightIn - kBrightTarget, 0.0f));
+    CompositePush cp{view.exposure, lookBackground_, transparentOutput_ ? 1u : 0u, pivot, localStrength_, brightIn, brightOut};
     dispatch(cmd, composite_, cur, &cp, sizeof(cp), w, h);
 
     // 自動露出の集計を CPU から読めるようにする
@@ -904,6 +954,30 @@ float Renderer::finishFrame() {
     const auto* data = static_cast<const ExposureData*>(exposure_.mapped);
     if (data->logLumCount <= 0) return -1.0f;
     float avgLog2 = static_cast<float>(data->logLumSum) / 64.0f / static_cast<float>(data->logLumCount);
+    // 明るい所: 度数分布の上位 5% の明るさ（区分の中で数に比例して補間し、段差が出ないようにする）
+    int64_t total = 0;
+    for (int i = 0; i < 64; ++i) total += data->histogram[i];
+    float bright = avgLog2;
+    int64_t above = 0;
+    const double want = total * 0.05;
+    for (int i = 63; i >= 0; --i) {
+        int64_t n = data->histogram[i];
+        if (n > 0 && above + n >= want) {
+            float inBin = static_cast<float>((want - above) / static_cast<double>(n));  // 区分の上の端から何割下か
+            bright = (i + 1 - inBin) * 0.5f - 16.0f;
+            break;
+        }
+        above += n;
+    }
+    // 歩き回っている間に外の明るさがちらつかないよう、前のフレームの値となめらかにつなぐ
+    if (!hasAvgLog2_) {
+        avgLog2_ = avgLog2;
+        brightLog2_ = bright;
+    } else {
+        avgLog2_ += (avgLog2 - avgLog2_) * 0.2f;
+        brightLog2_ += (bright - brightLog2_) * 0.2f;
+    }
+    hasAvgLog2_ = true;
     return std::exp2(avgLog2);
 }
 
@@ -911,9 +985,11 @@ void Renderer::destroy() {
     if (!ctx_) return;
     VkDevice dev = ctx_->device;
     vkDeviceWaitIdle(dev);
-    for (ComputePass* p : {&pathTrace_, &temporal_, &atrous_, &composite_, &skyPass_, &overlayPass_}) destroyPass(dev, *p);
+    for (ComputePass* p : {&pathTrace_, &temporal_, &atrous_, &localDown_, &localBlur_, &composite_, &skyPass_, &overlayPass_})
+        destroyPass(dev, *p);
     Image* all[] = {&noisy_, &gpos_[0], &gpos_[1], &gnormal_[0], &gnormal_[1], &galbedo_, &history_[0], &history_[1],
-                    &moments_[0], &moments_[1], &filtered_[0], &filtered_[1], &albedoHist_[0], &albedoHist_[1], &output_, &skyImage_, &overlay_[0], &overlay_[1], &overlay_[2]};
+                    &moments_[0], &moments_[1], &filtered_[0], &filtered_[1], &albedoHist_[0], &albedoHist_[1], &output_,
+                    &local_[0], &local_[1], &skyImage_, &overlay_[0], &overlay_[1], &overlay_[2], &overlay_[3]};
     for (Image* img : all) ctx_->destroyImage(*img);
     destroyScene();
     ctx_->destroyBuffer(exposure_);

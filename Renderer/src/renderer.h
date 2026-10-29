@@ -5,7 +5,9 @@
 //   1. パストレース（pathtrace_hw / pathtrace_sw）: 1 画素 1 本の光の通り道を計算（ざらついた明るさ＋面の情報）
 //   2. ノイズ除去 その1（temporal）: 前のフレームまでの結果を今のカメラ位置に合わせて重ねる
 //   3. ノイズ除去 その2（atrous ×5）: 面の境目を守りながら周りの画素と平均する
-//   4. 仕上げ（composite）: 面の色を掛け戻し、トーンマッピングして画面に出す色にする（自動露出の集計も）
+//   4. 大まかな明るさ（localexp_down → localexp_blur）: 8×8 画素ごとの明るさを、境目を守りながらぼかす（自動露出の集計も）
+//   5. 仕上げ（composite）: 面の色を掛け戻し、ローカルトーンマッピング（平均から大きく離れた明るさだけ縮める）と
+//      トーンマッピングをして画面に出す色にする
 // カメラが止まっている間は 2 で全フレームを均等に足し合わせるので、時間とともに正確な結果に近づく。
 #include "bvh.h"
 #include "scene.h"
@@ -49,6 +51,8 @@ public:
     // 太陽を消したときは、直射を 0 に、空の明るさを夜に近い暗さにする
     float effectiveSun() const { return sunOn_ ? sunIntensity_ : 0.0f; }
     float effectiveSky() const { return sunOn_ ? skyIntensity_ : skyIntensity_ * 0.04f; }
+    // ローカルトーンマッピングの強さ（0 = 使わない、1 = 標準）。屋根の下から外を見たときに外が白くとばないようにする
+    void setLocalToneMapping(float strength) { localStrength_ = strength; }
     // 背景（空・雲、地面を消したときはその分も）を透明にして描く（PNG の書き出し用）
     void setTransparentOutput(bool transparent);
     // 履歴を捨てて最初からやり直す
@@ -119,6 +123,11 @@ private:
 
     // 描画とノイズ除去の画像。[2] は「今回」と「前回」を交互に使う
     Image noisy_, gpos_[2], gnormal_[2], galbedo_, history_[2], moments_[2], filtered_[2], albedoHist_[2], output_;
+    Image local_[2];  // 大まかな明るさ（縦横 1/8。ぼかしの行き来に 2 枚）
+    float localStrength_ = 1.0f;
+    float avgLog2_ = 0.0f;  // 前のフレームで測った画面の平均の明るさ（log2）
+    bool hasAvgLog2_ = false;
+    float brightLog2_ = 0.0f;  // 前のフレームで測った明るい所（上位 5%）の明るさ（log2）
     bool imagesFresh_ = false;  // 作り直した直後（レイアウトの切り替えが必要）
     bool resetHistory_ = true;
     uint32_t lookBackground_ = 0, lookMono_ = 0, lookFlags_ = 0, lookGround_ = 0;
@@ -128,7 +137,7 @@ private:
     uint32_t staticFrames_ = 0;
     uint32_t frameIndex_ = 0;
 
-    ComputePass pathTrace_, temporal_, atrous_, composite_, skyPass_, overlayPass_;
+    ComputePass pathTrace_, temporal_, atrous_, localDown_, localBlur_, composite_, skyPass_, overlayPass_;
     Image skyImage_;  // 空と雲（起動時・太陽が変わったときに描く）
     Vec3 skySun_;
 

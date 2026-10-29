@@ -1,0 +1,47 @@
+#version 450
+// ローカルトーンマッピング その1: 画面の「大まかな明るさ」を 8×8 画素ごとに 1 つの値にまとめる（明るさの対数）。
+// 自動露出の集計もここで行う（8×8 画素の平均をとってから対数にする。ざらつきの黒い点に引きずられないように）。
+// 1 つの作業グループ（8×8 画素）が、小さい画像の 1 画素を書く
+layout(local_size_x = 8, local_size_y = 8) in;
+
+layout(set = 0, binding = 0, rgba32f) uniform readonly image2D uFiltered;  // ならした明るさ（色で割ったもの）
+layout(set = 0, binding = 1, rgba32f) uniform readonly image2D uAlbedo;    // 面の色（a = 物が見えている割合）
+layout(set = 0, binding = 2, rgba32f) uniform writeonly image2D uSmall;    // x = 明るさの対数（log2）, y = 1 なら値あり
+// 自動露出・ローカルトーンマッピングの集計: 対数の合計と、明るさの度数分布（-16〜+16 段を 0.5 段刻みの 64 区分）
+layout(set = 0, binding = 3, std430) buffer Exposure { int logLumSum; int logLumCount; int histogram[64]; };
+
+layout(push_constant) uniform Params {
+    uint background;  // 背景色（RGBA8。a が 0 以外なら、背景色の所は数えない）
+} pc;
+
+shared float sharedLum[64];
+
+void main() {
+    ivec2 size = imageSize(uFiltered);
+    ivec2 p = ivec2(gl_GlobalInvocationID.xy);
+    float lum = -1.0;
+    if (p.x < size.x && p.y < size.y) {
+        vec4 albedoCov = imageLoad(uAlbedo, p);
+        vec3 color = imageLoad(uFiltered, p).rgb * albedoCov.rgb;
+        float coverage = (pc.background >> 24u) != 0u ? clamp(albedoCov.a, 0.0, 1.0) : 1.0;
+        // 背景色の所は数えない（暗い背景で物が白とびしないように）
+        if (coverage > 0.5) lum = dot(color, vec3(0.2126, 0.7152, 0.0722));
+    }
+    sharedLum[gl_LocalInvocationIndex] = lum;
+    barrier();
+    if (gl_LocalInvocationIndex == 0u) {
+        float sum = 0.0;
+        int n = 0;
+        for (int i = 0; i < 64; ++i) {
+            if (sharedLum[i] >= 0.0) { sum += sharedLum[i]; n++; }
+        }
+        float logLum = log2(max(n > 0 ? sum / float(n) : 0.0, 1e-5));
+        imageStore(uSmall, ivec2(gl_WorkGroupID.xy), vec4(clamp(logLum, -16.0, 16.0), n > 0 ? 1.0 : 0.0, 0.0, 0.0));
+        if (n > 0) {
+            int q = int(clamp(logLum, -16.0, 16.0) * 64.0);  // 1/64 段刻み
+            atomicAdd(logLumSum, q);
+            atomicAdd(logLumCount, 1);
+            atomicAdd(histogram[clamp(int((logLum + 16.0) * 2.0), 0, 63)], 1);
+        }
+    }
+}

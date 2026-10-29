@@ -11,8 +11,10 @@
 //         --software（RT コアを使わない予備の方式で描く。動作確認用）
 // 性能測定: --bench-scene small|large|huge（測定用の立体駐車場）/ --bench（画像だけ作るときに時間・メモリ・大きさを測る）/
 //         --bench-frames 回数 / --save-scene 保存先.t28s
+// ローカルトーンマッピングの強さ: --local-tonemap 0〜1（0 = 使わない。比較用）/ カメラ: --camera x,y,z,前x,前y,前z
 #include <algorithm>
 #include <chrono>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <string>
@@ -48,6 +50,8 @@ static int run(int argc, char** argv) {
     Options opt;
     bool testScene = false;
     std::string benchScene;  // 性能測定用のモデル（small / large / huge）
+    bool cameraOverride = false;
+    float cameraValues[6] = {};
     const char* lang = nullptr;
     for (int i = 1; i < argc; ++i) {
         std::string a = argv[i];
@@ -56,6 +60,15 @@ static int run(int argc, char** argv) {
         else if (a == "--test-scene") testScene = true;
         else if (a == "--bench-scene") benchScene = next();
         else if (a == "--bench") opt.bench = true;
+        else if (a == "--local-tonemap") opt.localToneMapping = static_cast<float>(std::atof(next()));
+        else if (a == "--camera") {
+            // 確認用: カメラの位置と向き「x,y,z,前x,前y,前z」（メートル）
+            float c[6] = {0, 0, 0, 0, 1, 0};
+            if (std::sscanf(next(), "%f,%f,%f,%f,%f,%f", &c[0], &c[1], &c[2], &c[3], &c[4], &c[5]) == 6) {
+                cameraOverride = true;
+                std::copy(c, c + 6, cameraValues);
+            }
+        }
         else if (a == "--bench-frames") opt.benchFrames = std::max(1, std::atoi(next()));
         else if (a == "--save-scene") opt.saveScenePath = next();
         else if (a == "--output") opt.outputPath = next();
@@ -125,6 +138,11 @@ static int run(int argc, char** argv) {
         scene = makeTestScene();
     }
     opt.sceneLoadSeconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - loadStart).count();
+    if (cameraOverride) {
+        scene.camera.eye = {cameraValues[0], cameraValues[1], cameraValues[2]};
+        scene.camera.forward = {cameraValues[3], cameraValues[4], cameraValues[5]};
+        scene.camera.up = {0, 0, 1};
+    }
     // 確認用: レンダリング設定の照明・雲の量を置き換える
     if (!opt.lighting.empty()) {
         scene.revitLook.sun = opt.lighting != "artificial";

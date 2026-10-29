@@ -70,6 +70,7 @@ int runOffscreen(const Options& opt, Scene& scene) {
     Renderer renderer;
     renderer.skyWidth_ = static_cast<uint32_t>(opt.skySize);
     renderer.init(ctx, scene, glassStart, bvh);
+    renderer.setLocalToneMapping(opt.localToneMapping);
     double initSeconds = secondsSince(initStart);
     // 3D ビューの「レンダリング設定」（照明・雲の量）
     renderer.setLighting(scene.revitLook.sun, scene.revitLook.artificial);

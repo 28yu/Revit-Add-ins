@@ -1,0 +1,34 @@
+#version 450
+// ローカルトーンマッピング その2: 「大まかな明るさ」の小さい画像を、明るさの境目を守りながらぼかす（縦・横に 1 回ずつ）。
+// 明るさが大きく違う所（屋根の下の暗い所と外の明るい所）は混ぜないので、境目の周りに光のにじみ（ハロー）が出にくい
+layout(local_size_x = 8, local_size_y = 8) in;
+
+layout(set = 0, binding = 0, rgba32f) uniform readonly image2D uIn;
+layout(set = 0, binding = 1, rgba32f) uniform writeonly image2D uOut;
+
+layout(push_constant) uniform Params {
+    ivec2 dir;  // (1, 0) = 横、(0, 1) = 縦
+} pc;
+
+const int RADIUS = 8;            // 小さい画像の画素（元の画像で 64 画素）
+const float SIGMA_SPACE = 4.0;   // 距離の重み
+const float SIGMA_RANGE = 1.0;   // 明るさの差の重み（段。1 段 = 2 倍）
+
+void main() {
+    ivec2 size = imageSize(uIn);
+    ivec2 p = ivec2(gl_GlobalInvocationID.xy);
+    if (p.x >= size.x || p.y >= size.y) return;
+    vec4 c = imageLoad(uIn, p);
+    float sum = 0.0, wSum = 0.0;
+    for (int i = -RADIUS; i <= RADIUS; ++i) {
+        ivec2 q = clamp(p + pc.dir * i, ivec2(0), size - 1);
+        vec4 s = imageLoad(uIn, q);
+        if (s.y <= 0.0) continue;  // 値の無い所（背景色だけの所）
+        float d = s.x - c.x;
+        float w = exp(-float(i * i) / (2.0 * SIGMA_SPACE * SIGMA_SPACE));
+        if (c.y > 0.0) w *= exp(-d * d / (2.0 * SIGMA_RANGE * SIGMA_RANGE));
+        sum += s.x * w;
+        wSum += w;
+    }
+    imageStore(uOut, p, wSum > 0.0 ? vec4(sum / wSum, 1.0, 0.0, 0.0) : c);
+}
