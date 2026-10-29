@@ -1,5 +1,6 @@
 #include "export.h"
 
+#include <cctype>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -7,6 +8,7 @@
 
 #include "i18n.h"
 #include "log.h"
+#include "scene_pack.h"
 
 #include <stb_image_write.h>
 
@@ -135,6 +137,9 @@ canvas:active { cursor: grabbing; }
 #title { top: 12px; font-size: 14px; }
 #hint { bottom: 12px; font-size: 13px; }
 #error { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; color: #eee; padding: 24px; text-align: center; }
+#save { position: fixed; right: 12px; bottom: 12px; font-size: 13px; color: #eee; background: rgba(0, 0, 0, .55); padding: 6px 10px;
+        border-radius: 6px; text-decoration: none; }
+#save:hover { background: rgba(0, 0, 0, .75); }
 </style>
 </head>
 <body>
@@ -142,6 +147,7 @@ canvas:active { cursor: grabbing; }
 <div id="title" class="tag">{{TITLE}}</div>
 <div id="hint" class="tag">{{HINT}}</div>
 <div id="error">{{NOWEBGL}}</div>
+<a id="save" download="{{FILENAME}}">{{SAVE}}</a>
 <script>
 (function () {
   var canvas = document.getElementById("view");
@@ -184,6 +190,7 @@ canvas:active { cursor: grabbing; }
     draw();
   };
   img.src = "data:image/jpeg;base64,{{IMAGE}}";
+  document.getElementById("save").href = img.src;  // 他の 360°ビューアや SNS で使えるよう、中の JPEG を保存できる
   function draw() {
     var dpr = window.devicePixelRatio || 1;
     var w = Math.round(canvas.clientWidth * dpr), h = Math.round(canvas.clientHeight * dpr);
@@ -230,7 +237,7 @@ std::string fileNameOf(const std::string& path) {
     return p == std::string::npos ? path : path.substr(p + 1);
 }
 
-std::string defaultExportName(const std::string& viewName, ExportKind kind) {
+std::string defaultExportName(const std::string& viewName, ExportKind kind, bool png) {
     std::string base;
     for (unsigned char c : viewName) {
         if (c < 0x20 || strchr("\\/:*?\"<>|", c)) base += '_';
@@ -247,7 +254,7 @@ std::string defaultExportName(const std::string& viewName, ExportKind kind) {
     char stamp[16];
     std::time_t now = std::time(nullptr);
     std::strftime(stamp, sizeof(stamp), "%y%m%d_", std::localtime(&now));
-    const char* ext = kind == ExportKind::Image ? ".png" : kind == ExportKind::Panorama ? ".html" : ".exe";
+    const char* ext = kind == ExportKind::Image ? (png ? ".png" : ".jpg") : kind == ExportKind::Panorama ? ".html" : ".exe";
     return stamp + base + ext;
 }
 
@@ -255,7 +262,15 @@ std::string chooseSavePath(void* ownerWindow, ExportKind kind, const std::string
 #ifdef _WIN32
     std::wstring filter, ext;
     switch (kind) {
-        case ExportKind::Image: filter = widen(tr("FilterPng")) + std::wstring(L"\0*.png\0", 7); ext = L"png"; break;
+        case ExportKind::Image: {
+            // 既定の名前の拡張子のほうを先に出す（選んだ種類の拡張子が付く）
+            std::wstring jpg = widen(tr("FilterJpeg")) + std::wstring(L"\0*.jpg;*.jpeg\0", 14);
+            std::wstring png = widen(tr("FilterPng")) + std::wstring(L"\0*.png\0", 7);
+            bool pngFirst = defaultName.size() >= 4 && defaultName.compare(defaultName.size() - 4, 4, ".png") == 0;
+            filter = pngFirst ? png + jpg : jpg + png;
+            ext = pngFirst ? L"png" : L"jpg";
+            break;
+        }
         case ExportKind::Panorama: filter = widen(tr("FilterHtml")) + std::wstring(L"\0*.html\0", 8); ext = L"html"; break;
         case ExportKind::Viewer: filter = widen(tr("FilterExe")) + std::wstring(L"\0*.exe\0", 7); ext = L"exe"; break;
     }
@@ -309,6 +324,19 @@ bool writePng(const std::string& path, const std::vector<uint8_t>& rgba, uint32_
                           static_cast<int>(width) * 4) != 0;
 }
 
+bool writeImage(const std::string& path, const std::vector<uint8_t>& rgba, uint32_t width, uint32_t height) {
+    std::string lower = path;
+    for (char& ch : lower) ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+    if (lower.size() >= 4 && lower.compare(lower.size() - 4, 4, ".png") == 0) return writePng(path, rgba, width, height);
+    std::vector<uint8_t> jpeg;
+    auto sink = [](void* ctx, void* data, int size) {
+        auto* out = static_cast<std::vector<uint8_t>*>(ctx);
+        out->insert(out->end(), static_cast<uint8_t*>(data), static_cast<uint8_t*>(data) + size);
+    };
+    if (!stbi_write_jpg_to_func(sink, &jpeg, static_cast<int>(width), static_cast<int>(height), 4, rgba.data(), 92)) return false;
+    return writeAll(path, {&jpeg});
+}
+
 bool writePanoramaHtml(const std::string& htmlPath, const std::vector<uint8_t>& rgba, uint32_t width, uint32_t height,
                        const std::string& title) {
     std::vector<uint8_t> jpeg;
@@ -318,14 +346,11 @@ bool writePanoramaHtml(const std::string& htmlPath, const std::vector<uint8_t>& 
     };
     if (!stbi_write_jpg_to_func(sink, &jpeg, static_cast<int>(width), static_cast<int>(height), 4, rgba.data(), 92))
         return false;
-
-    // 同じ名前の .jpg（他の 360°ビューアや SNS でも使えるように）
-    std::string jpgPath = htmlPath;
-    size_t dot = jpgPath.find_last_of('.');
-    size_t slash = jpgPath.find_last_of("/\\");
-    if (dot != std::string::npos && (slash == std::string::npos || dot > slash)) jpgPath.resize(dot);
-    jpgPath += ".jpg";
-    if (!writeAll(jpgPath, {&jpeg})) logError("Failed to write %s", jpgPath.c_str());
+    // 「画像を保存」で取り出すときのファイル名（HTML と同じ名前の .jpg）
+    std::string jpgName = fileNameOf(htmlPath);
+    size_t dot = jpgName.find_last_of('.');
+    if (dot != std::string::npos) jpgName.resize(dot);
+    jpgName += ".jpg";
 
     const char* lang = currentLanguage() == Lang::US ? "en" : currentLanguage() == Lang::CN ? "zh" : "ja";
     std::string html = kPanoramaHtml;
@@ -333,12 +358,14 @@ bool writePanoramaHtml(const std::string& htmlPath, const std::vector<uint8_t>& 
     html = replaceAll(html, "{{TITLE}}", htmlEscape(title.empty() ? tr("WindowTitle") : title));
     html = replaceAll(html, "{{HINT}}", htmlEscape(tr("PanoramaHint")));
     html = replaceAll(html, "{{NOWEBGL}}", htmlEscape(tr("PanoramaNoWebGL")));
+    html = replaceAll(html, "{{SAVE}}", htmlEscape(tr("PanoramaSaveImage")));
+    html = replaceAll(html, "{{FILENAME}}", htmlEscape(jpgName));
     html = replaceAll(html, "{{IMAGE}}", base64(jpeg));
     std::vector<uint8_t> bytes(html.begin(), html.end());
     return writeAll(htmlPath, {&bytes});
 }
 
-bool writeViewerExe(const std::string& path, const Scene& scene, const std::string& title, std::string& error) {
+bool writeViewerExe(const std::string& path, const Scene& scene, const Camera& camera, const std::string& title, std::string& error) {
     std::string self = selfExePath();
     std::vector<uint8_t> exe;
     if (self.empty() || !readAll(self, exe)) {
@@ -353,7 +380,7 @@ bool writeViewerExe(const std::string& path, const Scene& scene, const std::stri
     uint32_t titleLen = static_cast<uint32_t>(title.size());
     payload.insert(payload.end(), reinterpret_cast<uint8_t*>(&titleLen), reinterpret_cast<uint8_t*>(&titleLen) + 4);
     payload.insert(payload.end(), title.begin(), title.end());
-    saveScene(scene, payload);
+    packScene(scene, camera, payload);
 
     std::vector<uint8_t> trailer(16);
     uint64_t offset = exe.size();
@@ -388,6 +415,31 @@ bool findEmbeddedScene(std::string& exePath, long& sceneOffset, std::string& tit
     }
     fclose(f);
     return found;
+}
+
+bool loadEmbeddedScene(const std::string& exePath, long sceneOffset, Scene& scene, std::string& error) {
+    FILE* f = openFile(exePath, "rb");
+    if (!f) {
+        error = "cannot open " + exePath;
+        return false;
+    }
+    char magic[4] = {};
+    bool packed = fseek(f, sceneOffset, SEEK_SET) == 0 && fread(magic, 1, 4, f) == 4 && memcmp(magic, "T28P", 4) == 0;
+    if (!packed) {
+        fclose(f);
+        return loadScene(exePath, scene, error, sceneOffset);  // 以前の形式（.t28s そのまま）
+    }
+    // 詰めたシーン: 最後の 16 バイト（付け足した位置の印）の手前までを読んで戻す
+    fseek(f, 0, SEEK_END);
+    long end = ftell(f) - 16;
+    std::vector<uint8_t> data(end > sceneOffset ? static_cast<size_t>(end - sceneOffset) : 0);
+    bool ok = !data.empty() && fseek(f, sceneOffset, SEEK_SET) == 0 && fread(data.data(), 1, data.size(), f) == data.size();
+    fclose(f);
+    if (!ok) {
+        error = "cannot read the embedded scene";
+        return false;
+    }
+    return unpackScene(data.data(), data.size(), scene, error);
 }
 
 const char* systemLanguage() {

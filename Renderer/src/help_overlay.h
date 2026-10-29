@@ -30,7 +30,8 @@ struct ToolbarImage {
 enum ToolbarButton { kButtonImage = 0, kButtonPanorama = 1, kButtonViewer = 2, kButtonSync = 3, kButtonCount = 4 };
 // hover: カーソルが乗っているボタン（-1 = 無し）。sync: 同期のボタン（-1 = 出さない、0 = 止めている、1 = 同期中）
 // width: この幅より狭ければボタンを広げてこの幅にする（0 = 中身に合わせる。下の「表示」の設定と幅をそろえるため）
-ToolbarImage buildToolbarImage(float scale, int hover, int sync, int width = 0);
+// imagePng: 画像の書き出しが PNG（背景を透明にするとき）。それ以外は JPG の札を出す
+ToolbarImage buildToolbarImage(float scale, int hover, int sync, int width = 0, bool imagePng = false);
 
 // ツールバーの下の「表示」の設定。上から
 //   空・雲を表示（＋背景色）／地面・地平線を表示（＋地面の色）／太陽の光／照明器具／単色で表示（＋色）／

@@ -78,6 +78,7 @@ add_executable(Tools28Render
   src/log.cpp
   src/i18n.cpp
   src/scene.cpp
+  src/scene_pack.cpp
   src/bench_scene.cpp
   src/vk_context.cpp
   src/renderer.cpp
@@ -85,11 +86,16 @@ add_executable(Tools28Render
   src/oidn.cpp
   src/window_app.cpp
   third_party/volk/volk.c
+  third_party/miniz/miniz.c
+  third_party/miniz/miniz_tdef.c
+  third_party/miniz/miniz_tinfl.c
   ${T28_RESOURCES}
   ${SHADER_DEPS})
 
 target_include_directories(Tools28Render PRIVATE
-  src third_party/volk third_party/stb ${SHADER_INCLUDE_DIR})
+  src third_party/volk third_party/stb third_party/miniz ${SHADER_INCLUDE_DIR})
+# miniz（ビューアの exe に入れるシーンの圧縮）は deflate だけ使う
+target_compile_definitions(Tools28Render PRIVATE MINIZ_NO_ARCHIVE_APIS MINIZ_NO_STDIO MINIZ_NO_TIME)
 target_link_libraries(Tools28Render PRIVATE Vulkan::Headers glfw)
 
 if(WIN32)

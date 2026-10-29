@@ -50,6 +50,7 @@ struct Options {
     int sparse = -1;               // 動いている間は 4 画素に 1 つだけ光を追う（-1 = 自動: GPU が速くないとき、0 = 使わない、1 = いつも）
     bool bench = false;
     int benchFrames = 16;          // 止まっている間・動いている間それぞれ何フレーム測るか
+    std::string exportViewerPath;  // 指定があれば、ビューアの exe を書き出して終わる（動作確認用）
     std::string saveScenePath;     // 指定があれば、読み込んだシーンを .t28s で保存する（ファイルの大きさの確認用）
     double sceneLoadSeconds = 0;   // シーンの読み込み（または作成）にかかった時間（性能測定用。main が入れる）
 };

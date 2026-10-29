@@ -10,7 +10,7 @@
 // その他: --log ファイル / --gpu 番号 / --bounces 回数 / --exposure EV / --no-auto-exposure / --render-scale 倍率
 //         --software（RT コアを使わない予備の方式で描く。動作確認用）
 // 性能測定: --bench-scene small|large|huge（測定用の立体駐車場）/ --bench（画像だけ作るときに時間・メモリ・大きさを測る）/
-//         --bench-frames 回数 / --save-scene 保存先.t28s
+//         --bench-frames 回数 / --save-scene 保存先.t28s（.t28p なら詰めたシーン）/ --export-viewer 保存先.exe（ビューアを書き出して終わる）
 // ローカルトーンマッピングの強さ: --local-tonemap 0〜1（0 = 使わない。比較用）/ カメラ: --camera x,y,z,前x,前y,前z
 // 同じ形を何度も持つ（インスタンス化しない。比較用）: --no-instancing / 光の計算を帯に分ける数: --bands 数 / GPU のメモリをこの量とみなす: --gpu-memory-mb MB（動作確認用）
 #include <algorithm>
@@ -25,6 +25,7 @@
 #include "export.h"
 #include "log.h"
 #include "i18n.h"
+#include "scene_pack.h"
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -68,6 +69,7 @@ static int run(int argc, char** argv) {
         else if (a == "--sky-sampling") opt.skySampling = std::atoi(next()) != 0;
         else if (a == "--no-spatial-denoise") opt.spatialDenoise = false;
         else if (a == "--final-denoise") opt.finalDenoise = std::atoi(next()) != 0;
+        else if (a == "--export-viewer") opt.exportViewerPath = next();
         else if (a == "--sparse") opt.sparse = std::atoi(next());
         else if (a == "--camera") {
             // 確認用: カメラの位置と向き「x,y,z,前x,前y,前z」（メートル）
@@ -139,10 +141,27 @@ static int run(int argc, char** argv) {
                 scene.meshes.size(), scene.instances.size(), scene.textures.size());
     } else if (embedded) {
         std::string error;
-        if (!loadScene(embeddedExe, scene, error, embeddedOffset)) fatal("%s\n%s", tr("SceneLoadFailed"), error.c_str());
+        if (!loadEmbeddedScene(embeddedExe, embeddedOffset, scene, error)) fatal("%s\n%s", tr("SceneLoadFailed"), error.c_str());
     } else if (!opt.scenePath.empty() && !testScene) {
         std::string error;
-        if (!loadScene(opt.scenePath, scene, error)) fatal("%s\n%s", tr("SceneLoadFailed"), error.c_str());
+        // .t28p は詰めたシーン（ビューアの exe に入れる形式。動作確認用に --save-scene で書ける）
+        const std::string& sp = opt.scenePath;
+        bool ok;
+        if (sp.size() > 5 && sp.compare(sp.size() - 5, 5, ".t28p") == 0) {
+            std::vector<uint8_t> data;
+            FILE* f = openFile(sp, "rb");
+            if (f) {
+                fseek(f, 0, SEEK_END);
+                data.resize(static_cast<size_t>(std::max(0L, ftell(f))));
+                fseek(f, 0, SEEK_SET);
+                if (fread(data.data(), 1, data.size(), f) != data.size()) data.clear();
+                fclose(f);
+            }
+            ok = unpackScene(data.data(), data.size(), scene, error);
+        } else {
+            ok = loadScene(sp, scene, error);
+        }
+        if (!ok) fatal("%s\n%s", tr("SceneLoadFailed"), error.c_str());
     } else {
         scene = makeTestScene();
     }
@@ -163,6 +182,17 @@ static int run(int argc, char** argv) {
     if (opt.samples < 1) opt.samples = 1;
     if (opt.renderScale != 0.0f && (opt.renderScale < 0.25f || opt.renderScale > 2.0f)) opt.renderScale = 0.0f;
 
+    if (!opt.exportViewerPath.empty()) {
+        // 動作確認用: ビューアの exe を書き出して終わる（ウィンドウの「ビューア」ボタンと同じ。準備も同じにする）
+        Bvh bvh;
+        prepareScene(scene, bvh, opt.instancing);
+        std::string error;
+        auto t = std::chrono::steady_clock::now();
+        bool ok = writeViewerExe(opt.exportViewerPath, scene, scene.camera, opt.title, error);
+        logInfo("Viewer export %s in %.1f s: %s %s", ok ? "done" : "FAILED",
+                std::chrono::duration<double>(std::chrono::steady_clock::now() - t).count(), opt.exportViewerPath.c_str(), error.c_str());
+        return ok ? 0 : 1;
+    }
     return opt.outputPath.empty() ? runWindow(opt, scene) : runOffscreen(opt, scene);
 }
 

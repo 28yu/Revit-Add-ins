@@ -49,8 +49,8 @@ fi
 
 presets=("$@")
 [ ${#presets[@]} -eq 0 ] && presets=(small large)
-printf '| モデル | 三角形 | シーン(MB) | 準備(s) | GPU最大(MB) | 止まっている(ms) | 動いている(ms) | 最大(ms) | PNG(KB) | 白とび(%%) |\n'
-printf '|--|--|--|--|--|--|--|--|--|--|\n'
+printf '| モデル | 三角形 | シーン(MB) | ビューア(MB) | 準備(s) | GPU最大(MB) | 止まっている(ms) | 動いている(ms) | 最大(ms) | PNG(KB) | 白とび(%%) |\n'
+printf '|--|--|--|--|--|--|--|--|--|--|--|\n'
 for p in "${presets[@]}"; do
   j=$(bench "$p")
   echo "$j" > "$OUT/$p.json"
@@ -59,7 +59,7 @@ import json, sys
 p, j = sys.argv[1], json.loads(sys.argv[2])
 if "error" in j:
     print(f"| {p} | 失敗（ログを確認） |"); sys.exit()
-print(f"| {p} | {j['triangles']:,} | {j['scene_mb']} | {j['prepare_s'] + j['init_s']:.1f} | {j['gpu_peak_mb']:.0f} | "
+print(f"| {p} | {j['triangles']:,} | {j['scene_mb']} | {j.get('viewer_mb', '-')} | {j['prepare_s'] + j['init_s']:.1f} | {j['gpu_peak_mb']:.0f} | "
       f"{j['still_ms']:.0f} | {j['moving_ms']:.0f} | {max(j['still_max_ms'], j['moving_max_ms']):.0f} | {j['png_kb']:.0f} | {j['blown_pct']} |")
 PY
 done

@@ -502,11 +502,11 @@ void syncIcon(Canvas& c, float cx, float cy, float s, const Color& col) {
 
 }  // namespace
 
-ToolbarImage buildToolbarImage(float s, int hover, int sync, int minWidth) {
+ToolbarImage buildToolbarImage(float s, int hover, int sync, int minWidth, bool imagePng) {
     std::vector<const char*> labels = {"ExportImage", "ExportPanorama", "ExportViewer"};
     if (sync >= 0) labels.push_back(sync > 0 ? "SyncOn" : "SyncOff");
     // 書き出しのボタンには、保存されるファイルの種類を小さな札で出す（どれが exe・html か分かるように）
-    const char* kinds[] = {"PNG", "HTML", "EXE", nullptr};
+    const char* kinds[] = {imagePng ? "PNG" : "JPG", "HTML", "EXE", nullptr};
     const int count = static_cast<int>(labels.size());
     const float pad = 6 * s, iconH = 24 * s, labelPx = 11 * s, labelH = 14 * s, gap = 2 * s;
     const float badgePx = 10 * s, badgeH = 15 * s;

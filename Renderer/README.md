@@ -21,8 +21,8 @@ Revit の「リアルタイムレンダリング」ボタン（`Commands/Realtim
 - 速い GPU では 1 フレームで複数回（1〜4 回、約 30 fps を目安に自動調整）計算して、動いている間の画質を上げる
 - **ライブ同期**: Revit でモデルを変更すると、自動で描画ウィンドウに反映される（右上の「同期中」ボタンで止める / 再開）。
   視点は連動しない（描画ウィンドウと Revit のビューは別々に動かす）
-- **書き出し**（ウィンドウ右上のボタン）: 画像（PNG）／360°画像（ブラウザで見回せる HTML ＋ JPEG）／
-  ビューア（シーンを中に入れた exe。Revit の無い PC でもダブルクリックで歩き回れる）
+- **書き出し**（ウィンドウ右上のボタン）: 画像（JPEG。背景を透明にするときは PNG）／360°画像（ブラウザで見回せる HTML 1 つ）／
+  ビューア（シーンを詰めて中に入れた exe。Revit の無い PC でもダブルクリックで歩き回れる）
 - 描画は Revit とは別のプログラムで行うので、ここで問題が起きても Revit は止まらない
 
 ## 仕組み
@@ -129,13 +129,16 @@ Revit（LiveSync.cs）                                   Tools28Render.exe（win
 
 | ボタン | 保存するもの | 大きさ・回数 |
 |--|--|--|
-| 画像（札: PNG） | PNG（今の視点） | 画面と同じ縦横比で長い辺 1920〜3840 画素。RT コアあり 512 回・なし 128 回足し合わせ（Open Image Denoise で仕上げるときは半分） |
-| 360°（札: HTML） | HTML（画像入り。ブラウザで開くとドラッグで見回せる）と同じ名前の JPEG | 4096×2048（GPU のメモリ 5GB 以上・RT コアあり）または 2048×1024。256 回（RT コアなし 64 回。仕上げるときは半分） |
+| 画像（札: JPG。透明にするときは PNG） | JPEG（品質 92。保存先で .png を選べば PNG）。背景を透明にするときは PNG | 画面と同じ縦横比で長い辺 1920〜3840 画素。RT コアあり 512 回・なし 128 回足し合わせ（Open Image Denoise で仕上げるときは半分） |
+| 360°（札: HTML） | HTML 1 つ（画像入り。ブラウザで開くとドラッグで見回せる。右下の「画像を保存」で JPEG を取り出せる） | 4096×2048（GPU のメモリ 5GB 以上・RT コアあり）または 2048×1024。256 回（RT コアなし 64 回。仕上げるときは半分） |
 | ビューア（札: EXE） | exe（この exe ＋ シーン） | 今の視点が最初の視点になる |
 
 - 画像・360°は、ウィンドウの描画を一時的に書き出す大きさに切り替えて足し合わせる（進み具合を表示。Esc で中止）。
   明るさは書き出しを始めたときのまま
 - ビューアの exe の形式は `src/export.h` の先頭に書いてある（exe の後ろにシーンを付け足し、最後の 16 バイトで位置を示す）。
+  シーンは「詰めたシーン」（`src/scene_pack.cpp`）: 頂点・三角形を前との差にしてバイトごとに並べ替え、deflate（miniz）で圧縮、色の画像は JPEG。
+  .t28s の 1/10 ほどになる（位置・三角形は元どおり、面の向きは GPU と同じ 16 ビット精度）。詰めるのは別のスレッド（その間もウィンドウは動く）。
+  以前の形式（.t28s をそのまま付け足したもの）も読める。
   起動時に `--scene` が無ければ自分の exe を調べる。言語は Windows の表示言語に合わせる
 - ビューアは署名の無い exe なので、受け取った PC で Windows の警告が出ることがある（「詳細情報」→「実行」）
 
@@ -196,7 +199,9 @@ Tools28Render --scene model.t28s --output out.png       画像を作って終わ
         --software（RT コアがあっても予備の方式で描く） / --exit-after フレーム数（動作確認用）
         --sky-sampling 0（空と地面の光を直接狙わない。比較用）/ --no-spatial-denoise（周りの画素と平均しない。生のノイズを測る）/
         --final-denoise 0（Open Image Denoise を使わない。比較用。画像だけ作るときは最後に 1 回使う）/
-        --sparse 0|1（動いている間に 4 画素に 1 つだけ光を追う。既定は自動。性能測定の「動いている間」は使う）
+        --sparse 0|1（動いている間に 4 画素に 1 つだけ光を追う。既定は自動。性能測定の「動いている間」は使う）/
+        --export-viewer 保存先.exe（ビューアを書き出して終わる）/ --output の拡張子が .jpg なら JPEG、.html なら 360°の HTML /
+        --save-scene・--scene に .t28p を使うと「詰めたシーン」
         --motion-test フレーム数 / --motion-reference フレーム数（動いている間の残像の確認。DEVLOG 参照）
         --bench-scene small|large|huge（測定用のモデル）/ --bench（時間・メモリ・大きさを測る）/ --bench-frames 回数 /
         --save-scene 保存先.t28s（シーンファイルを保存する）
@@ -216,6 +221,8 @@ Tools28Render --scene model.t28s --output out.png       画像を作って終わ
 | GLFW | ウィンドウ | zlib | ビルド時に git で取得（Linux はシステムのもの） |
 | stb_image_write | PNG 保存 | Public Domain / MIT | `third_party/stb` |
 | stb_truetype | 案内の文字を描く（フォントは Windows のものを使う） | Public Domain / MIT | `third_party/stb` |
+| miniz 3.0.2 | ビューアの exe に入れるシーンの圧縮（deflate） | MIT | `third_party/miniz`（deflate・inflate の部分だけ組み込む） |
+| stb_image | ビューアの JPEG のテクスチャを読む | Public Domain / MIT | `third_party/stb` |
 | Intel Open Image Denoise 2.3.3（CPU 版）＋ oneTBB | 止まっている間・書き出しの仕上げ（AI のノイズ除去） | Apache-2.0 | `prebuilt/win-x64/oidn`（公式のビルド済み DLL 4 つとライセンス。実行時に読む） |
 
 Open Image Denoise の DLL は公式の `oidn-2.3.3.x64.windows.zip` から `OpenImageDenoise.dll`・`OpenImageDenoise_core.dll`（学習済みの重みを含む。約 50MB）・

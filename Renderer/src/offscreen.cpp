@@ -6,6 +6,8 @@
 
 #include "app.h"
 #include "log.h"
+#include "scene_pack.h"
+#include "export.h"
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #define STBIW_WINDOWS_UTF8
@@ -45,13 +47,22 @@ int runOffscreen(const Options& opt, Scene& scene) {
     ctx.init({}, nullptr, opt.gpu, !opt.forceSoftware);
     if (opt.gpuMemoryMb > 0) ctx.deviceLocalBytes = static_cast<VkDeviceSize>(opt.gpuMemoryMb) << 20;  // 動作確認用
     // 性能測定: シーンファイルの大きさ（ビューアの exe に入る量）と、保存にかかる時間
-    size_t sceneBytes = 0;
-    double saveSeconds = 0;
+    size_t sceneBytes = 0, viewerBytes = 0;
+    double saveSeconds = 0, packSeconds = 0;
     if (opt.bench || !opt.saveScenePath.empty()) {
+        // ビューアの exe に入る「詰めたシーン」の大きさと、詰めるのにかかる時間
+        auto tp = Clock::now();
+        std::vector<uint8_t> packed;
+        packScene(scene, scene.camera, packed);
+        viewerBytes = packed.size();
+        packSeconds = secondsSince(tp);
         auto t = Clock::now();
         std::vector<uint8_t> bytes;
         saveScene(scene, bytes);
         sceneBytes = bytes.size();
+        // 保存先が .t28p なら詰めたシーンを保存する（読み込みの確認用。--scene で開ける）
+        const std::string& sp = opt.saveScenePath;
+        if (sp.size() > 5 && sp.compare(sp.size() - 5, 5, ".t28p") == 0) bytes.swap(packed);
         if (!opt.saveScenePath.empty()) {
             FILE* f = openFile(opt.saveScenePath, "wb");
             if (f) {
@@ -211,13 +222,13 @@ int runOffscreen(const Options& opt, Scene& scene) {
             v.exposure = exposure.current;
             moving.add(renderOne(v), opt.benchFrames);
         }
-        logInfo("BENCH {\"drawn_triangles\":%zu,\"shapes\":%zu,\"placements\":%zu,\"triangles\":%zu,\"vertices\":%zu,\"textures\":%zu,\"scene_mb\":%.1f,\"save_s\":%.2f,"
+        logInfo("BENCH {\"drawn_triangles\":%zu,\"shapes\":%zu,\"placements\":%zu,\"triangles\":%zu,\"vertices\":%zu,\"textures\":%zu,\"scene_mb\":%.1f,\"viewer_mb\":%.1f,\"pack_s\":%.2f,\"save_s\":%.2f,"
                 "\"load_s\":%.2f,\"prepare_s\":%.2f,\"init_s\":%.2f,\"gpu_mb\":%.0f,\"gpu_peak_mb\":%.0f,"
                 "\"width\":%u,\"height\":%u,\"still_ms\":%.1f,\"still_max_ms\":%.1f,\"moving_ms\":%.1f,"
                 "\"moving_max_ms\":%.1f,\"bands\":%u,\"png_kb\":%.0f,\"blown_pct\":%.2f,\"mean_luma\":%.1f,\"hw_rt\":%d,"
                 "\"denoise_ms\":%.0f}",
                 scene.instancedTriangleCount(), scene.meshes.size(), scene.instances.size(),
-                scene.triangleCount(), scene.vertices.size(), scene.textures.size(), sceneBytes / 1048576.0, saveSeconds,
+                scene.triangleCount(), scene.vertices.size(), scene.textures.size(), sceneBytes / 1048576.0, viewerBytes / 1048576.0, packSeconds, saveSeconds,
                 opt.sceneLoadSeconds, prepareSeconds, initSeconds, ctx.allocatedDeviceBytes / 1048576.0,
                 ctx.peakDeviceBytes / 1048576.0, w, h, still.avg * 1000.0, still.max * 1000.0, moving.avg * 1000.0,
                 moving.max * 1000.0, renderer.pathTraceBands(), png.size() / 1024.0, pixels ? 100.0 * blown / pixels : 0.0,
@@ -247,10 +258,14 @@ int runOffscreen(const Options& opt, Scene& scene) {
     if (opt.motionTest > 0)
         logInfo("Final camera: eye %.4f %.4f %.4f yaw %.5f pitch %.5f", cam.eye.x, cam.eye.y, cam.eye.z, cam.yaw, cam.pitch);
 
-    // GPU の画像を CPU 側に写して PNG に保存する
+    // GPU の画像を CPU 側に写して保存する（.html なら 360°の HTML、.jpg なら JPEG、それ以外は PNG。書き出しの確認用）
     std::vector<uint8_t> rgba = readImageRgba(ctx, renderer.output(), opt.transparent);
-    int ok = stbi_write_png(opt.outputPath.c_str(), static_cast<int>(w), static_cast<int>(h), 4, rgba.data(),
-                            static_cast<int>(w) * 4);
+    const std::string& op = opt.outputPath;
+    auto endsWith = [&](const char* ext) { size_t n = strlen(ext); return op.size() >= n && op.compare(op.size() - n, n, ext) == 0; };
+    int ok = endsWith(".html") ? writePanoramaHtml(op, rgba, w, h, opt.title)
+           : endsWith(".jpg")  ? writeImage(op, rgba, w, h)
+                               : stbi_write_png(op.c_str(), static_cast<int>(w), static_cast<int>(h), 4, rgba.data(),
+                                                static_cast<int>(w) * 4);
     vkDestroyFence(ctx.device, fence, nullptr);
     renderer.destroy();
     ctx.destroy();

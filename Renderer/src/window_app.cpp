@@ -8,6 +8,8 @@
 #include <fstream>
 #include <limits>
 #include <string>
+#include <thread>
+#include <atomic>
 #include <vector>
 
 #include "app.h"
@@ -619,9 +621,9 @@ int runWindow(const Options& opt, Scene& scene) {
         // 書き出しのボタンと「表示」の設定は、広いほうに幅をそろえる
         int tbHover = hover < kLookIdBase ? hover : -1, lookHover = hover >= kLookIdBase ? hover - kLookIdBase : -1;
         int sync = liveSync ? (syncOn ? 1 : 0) : -1;
-        int w = static_cast<int>(std::max(buildToolbarImage(contentScale, -1, sync).image.width,
+        int w = static_cast<int>(std::max(buildToolbarImage(contentScale, -1, sync, 0, look.transparentPng).image.width,
                                           buildLookPanelImage(contentScale, -1, look).image.width));
-        toolbar = buildToolbarImage(contentScale, tbHover, sync, w);
+        toolbar = buildToolbarImage(contentScale, tbHover, sync, w, look.transparentPng);
         renderer.setOverlay(kToolbarSlot, toolbar.image.rgba, toolbar.image.width, toolbar.image.height);
         lookPanel = buildLookPanelImage(contentScale, lookHover, look, w);
         renderer.setOverlay(kLookSlot, lookPanel.image.rgba, lookPanel.image.width, lookPanel.image.height);
@@ -669,29 +671,36 @@ int runWindow(const Options& opt, Scene& scene) {
     nativeWindow = glfwGetWin32Window(window);
 #endif
     const char* tipKeys[kButtonCount] = {"TipImage", "TipPanorama", "TipViewer", "TipSync"};
+    // ビューアの書き出しは、シーンを詰める（圧縮する）のに時間がかかるので別のスレッドで行う（その間ウィンドウは動かせる）。
+    // 書き出し中はライブ同期でシーンを入れ替えない（別のスレッドが読んでいるため）
+    std::thread viewerThread;
+    std::atomic<int> viewerState{0};  // 0 = していない, 1 = 書き出し中, 2 = 終わった
+    bool viewerOk = false;
+    std::string viewerPath, viewerError;
 
     auto startExport = [&](int button) {
         ExportKind kind = button == kButtonImage ? ExportKind::Image
                         : button == kButtonPanorama ? ExportKind::Panorama : ExportKind::Viewer;
-        std::string path = chooseSavePath(nativeWindow, kind, defaultExportName(opt.viewName, kind));
+        if (viewerState != 0) return;  // ビューアの書き出しが終わるまで待つ
+        // 画像は JPEG（背景を透明にするときだけ PNG）
+        std::string path = chooseSavePath(nativeWindow, kind, defaultExportName(opt.viewName, kind, look.transparentPng));
         if (path.empty()) return;
         if (kind == ExportKind::Viewer) {
-            // 今の視点を最初の視点にして、シーンを exe に付け足す
-            Camera saved = scene.camera;
-            scene.camera.eye = cam.eye;
-            scene.camera.forward = cam.forward();
-            scene.camera.up = cam.up();
-            scene.camera.fovY = cam.fovY;
-            std::string error;
-            bool ok = writeViewerExe(path, scene, opt.title, error);
-            scene.camera = saved;
-            if (ok) {
-                logInfo("Viewer exported: %s", path.c_str());
-                toast({std::string(tr("Saved")) + fileNameOf(path), tr("SavedViewerNote")});
-            } else {
-                logError("Viewer export failed: %s", error.c_str());
-                toast({std::string(tr("ExportFailed")) + fileNameOf(path)});
-            }
+            // 今の視点を最初の視点にして、シーンを詰めて exe に付け足す
+            Camera start = scene.camera;
+            start.eye = cam.eye;
+            start.forward = cam.forward();
+            start.up = cam.up();
+            start.fovY = cam.fovY;
+            viewerPath = path;
+            viewerState = 1;
+            logInfo("Viewer export start: %s", path.c_str());
+            viewerThread = std::thread([&, start, path]() {
+                auto t = std::chrono::steady_clock::now();
+                viewerOk = writeViewerExe(path, scene, start, opt.title, viewerError);
+                logInfo("Viewer export took %.1f s", std::chrono::duration<double>(std::chrono::steady_clock::now() - t).count());
+                viewerState = 2;
+            });
             return;
         }
         job = ExportJob{};
@@ -754,7 +763,7 @@ int runWindow(const Options& opt, Scene& scene) {
     auto finishExport = [&](bool cancelled) {
         if (!cancelled) {
             std::vector<uint8_t> rgba = readImageRgba(ctx, renderer.output(), job.transparent);
-            bool ok = job.kind == ExportKind::Image ? writePng(job.path, rgba, job.width, job.height)
+            bool ok = job.kind == ExportKind::Image ? writeImage(job.path, rgba, job.width, job.height)
                                                     : writePanoramaHtml(job.path, rgba, job.width, job.height, opt.title);
             logInfo("Export %s: %s", ok ? "done" : "FAILED", job.path.c_str());
             if (!ok) toast({std::string(tr("ExportFailed")) + fileNameOf(job.path)});
@@ -874,7 +883,18 @@ int runWindow(const Options& opt, Scene& scene) {
 
         // Revit からの変更を受け取る（書き出し中・同期を止めている間は受け取らない）
         syncTimer += dt;
-        if (liveSync && syncOn && !nv.exporting && syncTimer >= 0.15) {
+        if (viewerState == 2) {
+            viewerThread.join();
+            viewerState = 0;
+            if (viewerOk) {
+                logInfo("Viewer exported: %s", viewerPath.c_str());
+                toast({std::string(tr("Saved")) + fileNameOf(viewerPath), tr("SavedViewerNote")});
+            } else {
+                logError("Viewer export failed: %s", viewerError.c_str());
+                toast({std::string(tr("ExportFailed")) + fileNameOf(viewerPath)});
+            }
+        }
+        if (liveSync && syncOn && !nv.exporting && viewerState == 0 && syncTimer >= 0.15) {
             syncTimer = 0;
             long long st = stampOf(opt.scenePath);
             if (st != sceneStamp && st != kNoFile) {
@@ -930,7 +950,9 @@ int runWindow(const Options& opt, Scene& scene) {
             nv.toolbarChanged = false;
         }
         // お知らせ: 書き出し中は進み具合、ボタンの上ではその説明、保存した後はしばらく結果
-        if (nv.exporting && job.finishing) {
+        if (viewerState == 1) {
+            setStatus({tr("ExportingViewer")}, -1);
+        } else if (nv.exporting && job.finishing) {
             setStatus({tr("ExportFinishing")}, 1.0f);
         } else if (nv.exporting) {
             int percent = job.samples > 0 ? job.done * 100 / job.samples : 0;
@@ -1160,6 +1182,7 @@ int runWindow(const Options& opt, Scene& scene) {
         }
     }
 
+    if (viewerThread.joinable()) viewerThread.join();
     vkDeviceWaitIdle(ctx.device);
     vkDestroyFence(ctx.device, fence, nullptr);
     vkDestroySemaphore(ctx.device, imageReady, nullptr);
