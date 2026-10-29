@@ -239,6 +239,9 @@ jobs:
             $SINCE_ARG \
             --features Docs/features.json \
             > release-body.md
+          # 改善・修正の説明（Docs/ReleaseNotes/v<バージョン>.md）があれば差し込む
+          python3 scripts/insert-release-notes.py release-body.md \
+            "Docs/ReleaseNotes/v${{ needs.version.outputs.version }}.md"
           cat release-body.md
 
       # 配布物はインストーラ exe 1 本だけ（バージョン別 ZIP は廃止）

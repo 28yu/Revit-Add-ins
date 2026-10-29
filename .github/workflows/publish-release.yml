@@ -10,6 +10,9 @@ run-name: "リリースの公開 ${{ github.ref_name }}"
 #       運営者の指示で 2026-10 に導入）
 #   - Actions → 「リリースの公開」→ Run workflow（version に 2.7 などを入力）
 #
+# 本文: Docs/ReleaseNotes/v<バージョン>.md（改善・修正の説明）があれば、公開の直前に両リポジトリの本文へ差し込む
+#   （最新の内容で置き換える。運営者が GitHub の画面で本文を編集する必要はない）
+#
 # 安全装置:
 #   - 両リポジトリに v<バージョン> の下書きがあり、インストーラ 28Tools_Setup_v<バージョン>.exe が
 #     添付されていることを先に両方確認してから公開する（片方だけ公開される事態を避ける）
@@ -32,6 +35,9 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: バージョンを決める
         id: v
         env:
@@ -85,11 +91,18 @@ jobs:
             fi
           done
 
-          # 2) 公開する（下書きを draft=false にし、最新リリースとして扱う）
+          # 2) 公開する（下書きを draft=false にし、最新リリースとして扱う）。
+          #    その前に、改善・修正の説明（Docs/ReleaseNotes/v<バージョン>.md）を本文に差し込む
+          NOTES="Docs/ReleaseNotes/v$VERSION.md"
           for REPO in "$ADDIN_REPO" "$SITE_REPO"; do
             ID="${IDS[$REPO]:-}"
             [ -z "$ID" ] && continue
             if [ "$REPO" = "$SITE_REPO" ]; then export GH_TOKEN="$SITE_TOKEN"; else export GH_TOKEN="$ADDIN_TOKEN"; fi
+            if [ -f "$NOTES" ]; then
+              gh api "repos/$REPO/releases/$ID" --jq '.body // ""' > body.md
+              python3 scripts/insert-release-notes.py body.md "$NOTES"
+              gh api -X PATCH "repos/$REPO/releases/$ID" -F body=@body.md --jq '"本文を更新しました: \(.html_url)"'
+            fi
             gh api -X PATCH "repos/$REPO/releases/$ID" -F draft=false -f make_latest=true \
               --jq '"公開しました: \(.html_url)"'
           done

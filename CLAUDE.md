@@ -378,8 +378,10 @@ _buttonTipKeys["FeatureName"] = "Ribbon.FeatureName.Button.Tip";
   `git push origin origin/main:refs/heads/publish/v<VERSION>` を実行する。ワークフローが両リポジトリの下書きと
   exe の有無を確認してから両方を公開し、合図のブランチを削除する（Claude はリリース編集 API が 403 のため代行させる）。
   手動なら Actions →「リリースの公開」→ Run workflow。公開後はサイト側の待機ブランチを `claude/*` へ push する
-- **パッチ版（例: 2.7.1）も同じ手順**で出せる（`release/v2.7.1` → `publish/v2.7.1`）。ただしリリース本文は `features.json` の新機能しか載らないため、
-  修正内容を載せたい場合は運営者が GitHub の画面で本文を書き足す（`Docs/DEVLOG.md#v2.7.1 / v2.7.2 のパッチリリース（2026-10-16）`）
+- **改善・修正の説明は `Docs/ReleaseNotes/v<VERSION>.md` に書く**（2026-10-29〜）。下書きを作るときと公開するときに
+  `scripts/insert-release-notes.py` が本文の「… 対応」の行の下へ自動で差し込む（公開時は最新の内容で置き換える）。
+  **運営者が GitHub の画面で本文を編集する必要はない**。自動生成の本文は `features.json` の新機能しか載せないので、改善・修正は必ずここに書く
+- **パッチ版（例: 2.7.1）も同じ手順**で出せる（`release/v2.7.1` → `publish/v2.7.1`）。修正内容は上の `Docs/ReleaseNotes/v2.7.1.md` に書く
 - タグ push (`v*`) でも同様
 - GitHub → Actions → "Build and Release" → Run workflow で手動実行可能
 
