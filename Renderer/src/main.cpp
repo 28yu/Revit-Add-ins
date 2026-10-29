@@ -12,7 +12,7 @@
 // 性能測定: --bench-scene small|large|huge（測定用の立体駐車場）/ --bench（画像だけ作るときに時間・メモリ・大きさを測る）/
 //         --bench-frames 回数 / --save-scene 保存先.t28s
 // ローカルトーンマッピングの強さ: --local-tonemap 0〜1（0 = 使わない。比較用）/ カメラ: --camera x,y,z,前x,前y,前z
-// 同じ形を何度も持つ（インスタンス化しない。比較用）: --no-instancing
+// 同じ形を何度も持つ（インスタンス化しない。比較用）: --no-instancing / 光の計算を帯に分ける数: --bands 数 / GPU のメモリをこの量とみなす: --gpu-memory-mb MB（動作確認用）
 #include <algorithm>
 #include <chrono>
 #include <cstdio>
@@ -62,6 +62,8 @@ static int run(int argc, char** argv) {
         else if (a == "--bench-scene") benchScene = next();
         else if (a == "--bench") opt.bench = true;
         else if (a == "--no-instancing") opt.instancing = false;
+        else if (a == "--bands") opt.bands = std::max(1, std::atoi(next()));
+        else if (a == "--gpu-memory-mb") opt.gpuMemoryMb = std::max(0, std::atoi(next()));
         else if (a == "--local-tonemap") opt.localToneMapping = static_cast<float>(std::atof(next()));
         else if (a == "--camera") {
             // 確認用: カメラの位置と向き「x,y,z,前x,前y,前z」（メートル）

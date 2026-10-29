@@ -140,6 +140,41 @@ struct GpuTexInfo {
     uint32_t levels;  // 縮小した段の数（ミップマップ。遠くの模様がちらつかないよう、離れたら小さい段を使う）
 };
 
+// GPU に送る頂点（24 バイト。shaders/common_head.glsl の vertexPos / vertexNormal / vertexUv と同じ並び）
+struct GpuVertex {
+    float px, py, pz;
+    uint32_t normal;  // 面の向きを八面体に写して 2 つの 16 ビットに詰めたもの（0x8000 = 向き無し）
+    float u, v;
+};
+static_assert(sizeof(GpuVertex) == 24, "GpuVertex must be 24 bytes");
+
+uint32_t packNormal(float x, float y, float z) {
+    float len = std::fabs(x) + std::fabs(y) + std::fabs(z);
+    if (len < 1e-12f) return 0x8000u;
+    x /= len;
+    y /= len;
+    if (z < 0.0f) {
+        float ox = (1.0f - std::fabs(y)) * (x >= 0.0f ? 1.0f : -1.0f);
+        float oy = (1.0f - std::fabs(x)) * (y >= 0.0f ? 1.0f : -1.0f);
+        x = ox;
+        y = oy;
+    }
+    auto q = [](float f) {
+        int v = static_cast<int>(std::lround(std::max(-1.0f, std::min(1.0f, f)) * 32767.0f));
+        return static_cast<uint32_t>(static_cast<uint16_t>(static_cast<int16_t>(v)));
+    };
+    return q(x) | (q(y) << 16);
+}
+
+std::vector<GpuVertex> packVertices(const std::vector<Vertex>& vertices) {
+    std::vector<GpuVertex> out(vertices.size());
+    for (size_t i = 0; i < vertices.size(); ++i) {
+        const Vertex& v = vertices[i];
+        out[i] = {v.px, v.py, v.pz, packNormal(v.nx, v.ny, v.nz), v.u, v.v};
+    }
+    return out;
+}
+
 float srgbToLinear(uint8_t c) {
     float s = c / 255.0f;
     return s <= 0.04045f ? s / 12.92f : std::pow((s + 0.055f) / 1.055f, 2.4f);
@@ -410,7 +445,7 @@ void Renderer::uploadScene(const Scene& scene, uint32_t glassStart, const Bvh& b
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
         (hardwareRt_ ? VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR : 0);
     // 形状のデータが 1 つの記憶領域の上限を超えると、GPU が範囲外を読んで落ちる。分かる言葉で止める
-    const VkDeviceSize vertexBytes = scene.vertices.size() * sizeof(Vertex);
+    const VkDeviceSize vertexBytes = scene.vertices.size() * sizeof(GpuVertex);
     const VkDeviceSize indexBytes = scene.indices.size() * sizeof(uint32_t);
     const VkDeviceSize storageLimit = ctx.properties.limits.maxStorageBufferRange;
     // 予備の方式（RT コアの無い GPU）では、自分でたどる BVH も 1 つの記憶領域に入れる
@@ -419,7 +454,10 @@ void Renderer::uploadScene(const Scene& scene, uint32_t glassStart, const Bvh& b
     if (vertexBytes > storageLimit || indexBytes > storageLimit || bvhBytes > storageLimit || instanceBytes > storageLimit)
         fatal("%s\n(vertices %.0f MB, indices %.0f MB, BVH %.0f MB, limit %.0f MB)", tr("ModelTooLarge"),
               vertexBytes / 1048576.0, indexBytes / 1048576.0, bvhBytes / 1048576.0, storageLimit / 1048576.0);
-    vertices_ = ctx.createDeviceBuffer(scene.vertices.data(), scene.vertices.size() * sizeof(Vertex), geomUsage);
+    {
+        std::vector<GpuVertex> packed = packVertices(scene.vertices);
+        vertices_ = ctx.createDeviceBuffer(packed.data(), packed.size() * sizeof(GpuVertex), geomUsage);
+    }
     indices_ = ctx.createDeviceBuffer(scene.indices.data(), scene.indices.size() * sizeof(uint32_t), geomUsage);
     triMaterials_ = ctx.createDeviceBuffer(scene.triMaterials.data(), scene.triMaterials.size() * sizeof(uint32_t),
                                            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
@@ -471,7 +509,13 @@ void Renderer::uploadScene(const Scene& scene, uint32_t glassStart, const Bvh& b
 
     // 1 つの記憶領域の上限（GPU ごとに違う）と GPU のメモリの 1/4 に収まるまで、テクスチャを縮める
     const VkDeviceSize maxRange = ctx.properties.limits.maxStorageBufferRange;
-    const VkDeviceSize texBudget = std::min<VkDeviceSize>(maxRange, ctx.deviceLocalBytes > 0 ? ctx.deviceLocalBytes / 4 : maxRange);
+    // 形がすでに使っている分も考えて、GPU のメモリの 6 割を超えないようにする（加速構造と描画用の画像の分を残す）
+    VkDeviceSize texBudget = std::min<VkDeviceSize>(maxRange, ctx.deviceLocalBytes > 0 ? ctx.deviceLocalBytes / 4 : maxRange);
+    if (ctx.deviceLocalBytes > 0) {
+        const VkDeviceSize cap = ctx.deviceLocalBytes * 6 / 10;
+        const VkDeviceSize left = cap > ctx.allocatedDeviceBytes ? cap - ctx.allocatedDeviceBytes : 0;
+        texBudget = std::min(texBudget, std::max<VkDeviceSize>(left, 32ull << 20));
+    }
     std::vector<GpuTexInfo> texInfos;
     std::vector<uint32_t> texels;
     for (uint32_t maxSize = 16384;; maxSize /= 2) {
@@ -507,7 +551,7 @@ Renderer::AccelStruct Renderer::buildBlas(VkDeviceSize indexOffsetBytes, uint32_
     tri.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR;
     tri.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
     tri.vertexData.deviceAddress = vertices_.address;
-    tri.vertexStride = sizeof(Vertex);
+    tri.vertexStride = sizeof(GpuVertex);
     tri.maxVertex = vertexCount - 1;
     tri.indexType = VK_INDEX_TYPE_UINT32;
     tri.indexData.deviceAddress = indices_.address + indexOffsetBytes;
@@ -891,14 +935,25 @@ void Renderer::resize(uint32_t width, uint32_t height) {
     const VkImageUsageFlags storage = VK_IMAGE_USAGE_STORAGE_BIT;
     for (Image* img : {&local_[0], &local_[1]})
         *img = ctx_->createImage((width + 7) / 8, (height + 7) / 8, VK_FORMAT_R32G32B32A32_SFLOAT, storage);
-    for (Image* img : {&noisy_, &gpos_[0], &gpos_[1], &gnormal_[0], &gnormal_[1], &history_[0], &history_[1],
+    for (Image* img : {&gpos_[0], &gpos_[1], &history_[0], &history_[1],
                        &moments_[0], &moments_[1], &filtered_[0], &filtered_[1], &albedoHist_[0], &albedoHist_[1]})
         *img = ctx_->createImage(width, height, VK_FORMAT_R32G32B32A32_SFLOAT, storage);
+    // 精度の要らないもの（今回の明るさ・面の向き）は半分の大きさの数（16 ビット）で持ち、GPU のメモリを節約する。
+    // ノイズ除去の途中の値（ばらつき）は大きな値になるので 32 ビットのまま
+    for (Image* img : {&noisy_, &gnormal_[0], &gnormal_[1]})
+        *img = ctx_->createImage(width, height, VK_FORMAT_R16G16B16A16_SFLOAT, storage);
     galbedo_ = ctx_->createImage(width, height, VK_FORMAT_R8G8B8A8_UNORM, storage);
     output_ = ctx_->createImage(width, height, VK_FORMAT_R8G8B8A8_UNORM, storage | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
     imagesFresh_ = true;
     resetHistory_ = true;
     writeDescriptors();
+}
+
+VkDeviceSize Renderer::imageBytes(uint32_t width, uint32_t height) {
+    // resize と同じ並び: 32 ビット×4 が 10 枚、16 ビット×4 が 3 枚、8 ビット×4 が 2 枚、縦横 1/8 の 32 ビット×4 が 2 枚
+    const VkDeviceSize px = static_cast<VkDeviceSize>(width) * height;
+    const VkDeviceSize small = static_cast<VkDeviceSize>((width + 7) / 8) * ((height + 7) / 8);
+    return px * (10 * 16 + 3 * 8 + 2 * 4) + small * 2 * 16;
 }
 
 void Renderer::dispatch(VkCommandBuffer cmd, const ComputePass& pass, uint32_t set, const void* push, uint32_t pushSize,
@@ -910,14 +965,19 @@ void Renderer::dispatch(VkCommandBuffer cmd, const ComputePass& pass, uint32_t s
 }
 
 void Renderer::record(VkCommandBuffer cmd, const ViewParams& view) {
+    // 帯に分けて描くときは、帯ごとに先に GPU へ送って終わるのを待つ（cmd より前に実行される）ので、
+    // 作り直した画像の準備もそれより前に済ませる
+    const uint32_t bands = std::max(1u, std::min(ptBands_, (output_.height + 7) / 8));
     if (imagesFresh_) {
+        VkCommandBuffer prep = bands > 1 ? ctx_->beginOneShot() : cmd;
         Image* all[] = {&noisy_, &gpos_[0], &gpos_[1], &gnormal_[0], &gnormal_[1], &galbedo_, &history_[0],
                         &history_[1], &moments_[0], &moments_[1], &filtered_[0], &filtered_[1], &albedoHist_[0], &albedoHist_[1], &output_,
                         &local_[0], &local_[1]};
         for (Image* img : all)
-            transitionImage(cmd, img->image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL,
+            transitionImage(prep, img->image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL,
                             VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
                             VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+        if (bands > 1) ctx_->endOneShot(prep);
         imagesFresh_ = false;
     }
     memset(exposure_.mapped, 0, sizeof(ExposureData));
@@ -946,13 +1006,35 @@ void Renderer::record(VkCommandBuffer cmd, const ViewParams& view) {
     pt.frame[0] = frameIndex_;
     pt.frame[1] = staticFrames_;
     pt.frame[2] = view.maxBounces;
-    pt.frame[3] = view.samplesPerFrame;
+    pt.frame[3] = std::min(view.samplesPerFrame, 255u);
     // 透明にするときは、空が見える所を「背景」として印を付ける（色は使わない）
     pt.look[0] = transparentOutput_ ? (lookBackground_ | 0xFF000000u) : lookBackground_;
     pt.look[1] = lookMono_;
     pt.look[2] = lookFlags_;
     pt.look[3] = lookGround_;
-    dispatch(cmd, pathTrace_, cur, &pt, sizeof(pt), w, h);
+    if (bands <= 1) {
+        dispatch(cmd, pathTrace_, cur, &pt, sizeof(pt), w, h);
+    } else {
+        // 重い 1 枚を横長の帯に分け、帯ごとに GPU へ送って終わるのを待つ（1 回の処理が長いと Windows が GPU を
+        // リセットして落ちるため。約 2 秒）。最後の帯だけ cmd に入れ、続く処理と一緒に送る
+        const uint32_t rowsPerBand = ((h + bands - 1) / bands + 7) / 8 * 8;
+        uint32_t y = 0;
+        while (y < h) {
+            const uint32_t rows = std::min(rowsPerBand, h - y);
+            PathTracePush band = pt;
+            band.frame[3] = pt.frame[3] | (y << 8);
+            if (y + rows < h) {
+                VkCommandBuffer one = ctx_->beginOneShot();
+                computeBarrier(one);
+                dispatch(one, pathTrace_, cur, &band, sizeof(band), w, rows);
+                ctx_->endOneShot(one);
+            } else {
+                computeBarrier(cmd);  // 先に送った帯の書き込みを、この後の処理から見えるようにする
+                dispatch(cmd, pathTrace_, cur, &band, sizeof(band), w, rows);
+            }
+            y += rows;
+        }
+    }
     computeBarrier(cmd);
 
     // 2. 前のフレームを重ねる（前のカメラの位置で、今の位置を写し直す）

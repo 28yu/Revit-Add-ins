@@ -12,6 +12,10 @@ namespace Tools28.Commands.RealtimeRender
     /// ファミリの置き場所（InstanceNode）の中の形は、ファミリから見た座標のまま集めて中身を比べ、
     /// 同じ形がすでにあれば形は捨てて「置き場所（位置・向き）」だけを足す（同じ柱・車・照明を何度も持たない）。
     /// それ以外（壁・床など）は 1 つの形にまとめ、そのままの位置に 1 回置く。
+    /// Revit 2023 以降は、ファミリの形の番号（SymbolGeometryId）が同じ置き場所の 2 回目からは中身を読まない
+    /// （1 回目に覚えた「形と位置」を並べるだけ。書き出しが速くなる）。見た目が変わりうる条件（フェーズの上書き・
+    /// ビューのフィルタ・要素ごとの上書き）も見分けの目印に含め、光源を含むファミリは毎回読む。
+    /// 念のため 16 回に 1 回は実際に読んで比べ、違っていたらそのファミリは以後も毎回読む。
     /// </summary>
     internal class SceneExportContext : IExportContext
     {
@@ -38,7 +42,36 @@ namespace Tools28.Commands.RealtimeRender
             public Transform WorldInverse;
             public readonly List<RenderVertex> Vertices = new List<RenderVertex>();
             public readonly List<int> Triangles = new List<int>();  // 頂点番号×3 とマテリアル番号
+            // 2 回目から読まないための記録（Revit 2023 以降）
+            public string TemplateKey;              // 見分けの目印（null = 記録しない）
+            public List<TemplateEntry> Recording;   // この置き場所の中で置いた形と、この置き場所から見た位置
+            public ShapeTemplate Skipped;           // 読まずに済ませた（覚えた形を並べる）
+            public ShapeTemplate Verify;            // 抜き取り確認（読んだ結果を覚えた形と比べる）
+            public bool HasLight;                   // 中に光源がある（覚えない。光源は置き場所ごとに読む必要がある）
         }
+        private struct TemplateEntry
+        {
+            public int Mesh;
+            public Transform Relative;  // 置き場所の座標 → 形の座標の位置（フィート）
+        }
+        private class ShapeTemplate
+        {
+            public List<TemplateEntry> Entries;
+            public int Uses;
+            public bool Unsafe;  // 抜き取り確認で違っていた（以後は毎回読む）
+        }
+        private const int VerifyEvery = 16;
+        private readonly Dictionary<string, ShapeTemplate> _templates = new Dictionary<string, ShapeTemplate>();
+        /// <summary>中身を読まずに済ませた置き場所の数（ログ用）。</summary>
+        public int SkippedInstances { get; private set; }
+        /// <summary>抜き取り確認で違っていたファミリの数（ログ用）。</summary>
+        public int VerifyMismatches { get; private set; }
+
+        // 見た目が変わりうる条件（ビューのフィルタ・要素ごとの上書き）
+        private readonly View _view;
+        private readonly List<(ElementId id, ICollection<ElementId> categories, ElementFilter filter, ICollection<ElementId> selection)> _viewFilters =
+            new List<(ElementId, ICollection<ElementId>, ElementFilter, ICollection<ElementId>)>();
+        private string _elementSignature = "";
         private readonly Stack<ShapeBuilder> _shapes = new Stack<ShapeBuilder>();
         private readonly ShapeBuilder _loose = new ShapeBuilder { World = Transform.Identity, WorldInverse = Transform.Identity };
         // 中身のハッシュ → 同じハッシュの形の番号（中身を比べて確かめる）
@@ -51,12 +84,30 @@ namespace Tools28.Commands.RealtimeRender
         /// <summary>見つからなかったテクスチャ画像（ログ用）。</summary>
         public IReadOnlyList<string> MissingTextures => _textures.Missing;
 
-        public SceneExportContext(Document doc, PhaseOverrides phase = null)
+        public SceneExportContext(Document doc, PhaseOverrides phase = null, View view = null)
         {
             _phase = phase;
+            _view = view;
             _documents.Push(doc);
             _transforms.Push(Transform.Identity);
             _textures = new TextureLoader(doc.PathName, doc.Application.VersionNumber);
+            if (view != null)
+            {
+                try
+                {
+                    foreach (ElementId fid in view.GetFilters())
+                    {
+                        if (doc.GetElement(fid) is ParameterFilterElement pf)
+                            _viewFilters.Add((fid, pf.GetCategories(), pf.GetElementFilter(), null));
+                        else if (doc.GetElement(fid) is SelectionFilterElement sf)
+                            _viewFilters.Add((fid, null, null, sf.GetElementIds()));
+                    }
+                }
+                catch (Exception ex)
+                {
+                    DiagLog.Cmd("RealtimeRender", $"ビューのフィルタを読めませんでした ({ex.Message})");
+                }
+            }
         }
 
         public bool Start()
@@ -87,6 +138,7 @@ namespace Tools28.Commands.RealtimeRender
         {
             _currentElement = elementId;
             _phaseMaterial = PhaseMaterialOf(elementId);
+            _elementSignature = OverrideSignatureOf(elementId);
             // 書き出した要素（このモデルの物だけ。リンクの中の要素はリンク自体で見る）。ライブ同期で、削除された要素が
             // 描いていた物かどうかを調べるのに使う
             if (_documents.Count == 1) ElementIds.Add(elementId);
@@ -100,14 +152,133 @@ namespace Tools28.Commands.RealtimeRender
         {
             Transform world = _transforms.Peek().Multiply(node.GetTransform());
             _transforms.Push(world);
-            _shapes.Push(new ShapeBuilder { World = world, WorldInverse = world.Inverse });
+            var b = new ShapeBuilder { World = world, WorldInverse = world.Inverse };
+            string key = TemplateKeyOf(node);
+            if (key != null)
+            {
+                if (_templates.TryGetValue(key, out ShapeTemplate tpl) && !tpl.Unsafe)
+                {
+                    tpl.Uses++;
+                    if (tpl.Uses % VerifyEvery != 0)
+                    {
+                        // 同じ形を前に読んでいる: 中身は読まない（OnInstanceEnd で覚えた形を並べる）
+                        b.Skipped = tpl;
+                        _shapes.Push(b);
+                        SkippedInstances++;
+                        return RenderNodeAction.Skip;
+                    }
+                    b.Verify = tpl;  // 抜き取り確認: 読んで、覚えた形と比べる
+                }
+                b.TemplateKey = key;
+                b.Recording = new List<TemplateEntry>();
+            }
+            _shapes.Push(b);
             return RenderNodeAction.Proceed;
         }
 
+        // Skip を返したときも呼ばれる（RenderNodeAction.Skip の説明より）
         public void OnInstanceEnd(InstanceNode node)
         {
-            CommitShape(_shapes.Pop());
+            ShapeBuilder b = _shapes.Peek();
+            if (b.Skipped != null)
+            {
+                foreach (TemplateEntry e in b.Skipped.Entries) AddPlacement(e.Mesh, b.World.Multiply(e.Relative));
+            }
+            else
+            {
+                CommitShape(b);
+            }
+            _shapes.Pop();
             _transforms.Pop();
+            if (b.Skipped != null || b.Recording == null || b.HasLight) return;
+            if (b.Verify != null)
+            {
+                if (!SameEntries(b.Verify.Entries, b.Recording))
+                {
+                    b.Verify.Unsafe = true;
+                    VerifyMismatches++;
+                    DiagLog.Cmd("RealtimeRender", $"同じ形のはずのファミリで中身が違いました（以後は毎回読みます）: {b.TemplateKey}");
+                }
+            }
+            else if (!_templates.ContainsKey(b.TemplateKey))
+            {
+                _templates[b.TemplateKey] = new ShapeTemplate { Entries = b.Recording };
+            }
+        }
+
+        /// <summary>置き場所を足し、記録中の外側の置き場所（覚えようとしているファミリ）にも、そこから見た位置で覚えさせる。</summary>
+        private void AddPlacement(int mesh, Transform world)
+        {
+            Scene.Instances.Add(new RenderInstance { Mesh = mesh, M = ToMatrix(world) });
+            foreach (ShapeBuilder f in _shapes)
+                if (f.Recording != null)
+                    f.Recording.Add(new TemplateEntry { Mesh = mesh, Relative = f.WorldInverse.Multiply(world) });
+        }
+
+        private static bool SameEntries(List<TemplateEntry> a, List<TemplateEntry> b)
+        {
+            if (a.Count != b.Count) return false;
+            for (int i = 0; i < a.Count; i++)
+            {
+                if (a[i].Mesh != b[i].Mesh) return false;
+                Transform x = a[i].Relative, y = b[i].Relative;
+                if (!x.Origin.IsAlmostEqualTo(y.Origin) || !x.BasisX.IsAlmostEqualTo(y.BasisX) ||
+                    !x.BasisY.IsAlmostEqualTo(y.BasisY) || !x.BasisZ.IsAlmostEqualTo(y.BasisZ))
+                    return false;
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// 2 回目から読まないための見分けの目印。ファミリの形の番号（Revit 2023 以降）に、文書・フェーズの上書き・
+        /// ビューのフィルタと要素ごとの上書きを足したもの。使えなければ null（毎回読む）。
+        /// </summary>
+        private string TemplateKeyOf(InstanceNode node)
+        {
+#if REVIT2021 || REVIT2022
+            return null;
+#else
+            try
+            {
+                SymbolGeometryId sid = node.GetSymbolGeometryId();
+                string id = sid?.AsUniqueIdentifier();
+                if (string.IsNullOrEmpty(id)) return null;
+                return $"{_documents.Peek().PathName}|{id}|{_phaseMaterial}|{_elementSignature}";
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+#endif
+        }
+
+        /// <summary>要素の見た目を変えうるビューの設定（当てはまるフィルタ・要素ごとの上書き）を文字にしたもの。</summary>
+        private string OverrideSignatureOf(ElementId elementId)
+        {
+            if (_view == null || _documents.Count != 1) return "";
+            try
+            {
+                Element e = _documents.Peek().GetElement(elementId);
+                if (e == null) return "";
+                var sb = new System.Text.StringBuilder();
+                OverrideGraphicSettings o = _view.GetElementOverrides(elementId);
+                Color c = o.SurfaceForegroundPatternColor;
+                if (c != null && c.IsValid) sb.Append($"c{c.Red},{c.Green},{c.Blue}");
+                sb.Append('t').Append(o.Transparency).Append(o.Halftone ? "h" : "");
+                ElementId cat = e.Category?.Id;
+                foreach (var f in _viewFilters)
+                {
+                    bool passes = f.selection != null
+                        ? f.selection.Contains(elementId)
+                        : cat != null && f.categories.Contains(cat) && (f.filter == null || f.filter.PassesFilter(e));
+                    if (passes) sb.Append('|').Append(f.id);
+                }
+                return sb.ToString();
+            }
+            catch (Exception)
+            {
+                return "?" + elementId;  // 調べられなければ、その要素だけの目印にする（使い回さない）
+            }
         }
 
         /// <summary>
@@ -139,7 +310,7 @@ namespace Tools28.Commands.RealtimeRender
                 Scene.Meshes.Add(new RenderMesh { FirstTri = firstTri, TriCount = b.Triangles.Count / 4 });
                 candidates.Add(mesh);
             }
-            Scene.Instances.Add(new RenderInstance { Mesh = mesh, M = ToMatrix(b.World) });
+            AddPlacement(mesh, b.World);
         }
 
         private static ulong HashShape(ShapeBuilder b)
@@ -222,6 +393,7 @@ namespace Tools28.Commands.RealtimeRender
         /// </summary>
         public void OnLight(LightNode node)
         {
+            foreach (ShapeBuilder f in _shapes) f.HasLight = true;
             try
             {
                 Document doc = _documents.Peek();

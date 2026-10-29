@@ -33,9 +33,9 @@ float boxEntry(vec3 o, vec3 invD, vec3 bmin, vec3 bmax, float tmax) {
 
 // 光線と三角形の交差（Möller–Trumbore）。bary はハード版と同じく (頂点1の重み, 頂点2の重み)
 bool rayTriangle(vec3 o, vec3 d, uint tri, float tmax, out float t, out vec2 bary) {
-    vec3 a = vertices[indices[tri * 3u]].position.xyz;
-    vec3 b = vertices[indices[tri * 3u + 1u]].position.xyz;
-    vec3 c = vertices[indices[tri * 3u + 2u]].position.xyz;
+    vec3 a = vertexPos(indices[tri * 3u]);
+    vec3 b = vertexPos(indices[tri * 3u + 1u]);
+    vec3 c = vertexPos(indices[tri * 3u + 2u]);
     vec3 e1 = b - a, e2 = c - a;
     vec3 p = cross(d, e2);
     float det = dot(e1, p);

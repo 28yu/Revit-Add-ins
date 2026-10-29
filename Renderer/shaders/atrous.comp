@@ -7,7 +7,7 @@ layout(local_size_x = 8, local_size_y = 8) in;
 layout(set = 0, binding = 0, rgba32f) uniform readonly image2D uIn;       // rgb = 明るさ, a = ばらつき
 layout(set = 0, binding = 1, rgba32f) uniform writeonly image2D uOut;
 layout(set = 0, binding = 2, rgba32f) uniform readonly image2D uGPos;
-layout(set = 0, binding = 3, rgba32f) uniform readonly image2D uGNormal;
+layout(set = 0, binding = 3, rgba16f) uniform readonly image2D uGNormal;
 layout(set = 0, binding = 4, rgba32f) uniform readonly image2D uHistory;  // a = 重ねた回数
 
 layout(push_constant) uniform Params {

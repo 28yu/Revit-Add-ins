@@ -1,5 +1,6 @@
 #pragma once
 // 起動時の設定と、カメラ・自動露出の共通処理。
+#include <algorithm>
 #include <cmath>
 #include <string>
 #include <vector>
@@ -39,6 +40,8 @@ struct Options {
     int exitAfterFrames = 0;       // 動作確認用: このフレーム数を描いたら自動で閉じる（0 = 閉じない）
     // 性能測定（--bench）: 読み込み・準備の時間、GPU メモリ、止まっている間／動いている間の 1 フレームの時間、
     // シーンファイル・画像の大きさを測り、ログに「BENCH {...}」の 1 行（JSON）で出す。画像だけ作るモードで使う
+    int gpuMemoryMb = 0;           // 動作確認用: GPU のメモリをこの量（MB）とみなす（少ない GPU での動きを確かめる）
+    int bands = 0;                 // 光の計算を帯に分ける数（0 = 自動。--bands で決め打ち。動作確認用）
     bool instancing = true;        // 同じ形を 1 回だけ持つ（--no-instancing で切る。比較用）
     float localToneMapping = 1.0f;  // ローカルトーンマッピングの強さ（0 = 使わない。--local-tonemap で変える。比較用）
     bool bench = false;
@@ -116,6 +119,38 @@ struct AutoExposure {
             // 明るさの比で滑らかに近づける（急に明るさが変わると見づらいため）
             current = std::exp2(std::log2(current) * smooth + std::log2(target) * (1.0f - smooth));
         }
+    }
+};
+
+// 光の計算を横長の帯に分ける数を決める。帯 1 本の計算を kMaxBandSeconds 以下に保つ
+// （Windows は GPU の 1 回の処理が約 2 秒を超えるとリセットし、描画プログラムが落ちるため）
+struct BandGovernor {
+    static constexpr double kMaxBandSeconds = 0.3;
+    uint32_t bands = 1;
+    int fastFrames = 0;
+    // 画像の大きさから、最初の分け方を決める（4K なら 4 本。測る前の 1 枚目で落ちないように）
+    static uint32_t initialFor(uint32_t width, uint32_t height) {
+        double pixels = static_cast<double>(width) * height;
+        return static_cast<uint32_t>(std::fmin(16.0, std::fmax(1.0, std::ceil(pixels / 2.1e6))));
+    }
+    // 1 枚にかかった時間（全部の帯の合計）から分け方を直す。変えたら true
+    bool update(double frameSeconds) {
+        double perBand = frameSeconds / bands;
+        if (perBand > kMaxBandSeconds && bands < 64) {
+            bands = std::min(64u, bands * 2);
+            fastFrames = 0;
+            return true;
+        }
+        if (perBand < kMaxBandSeconds * 0.2 && bands > 1) {
+            if (++fastFrames >= 10) {
+                bands /= 2;
+                fastFrames = 0;
+                return true;
+            }
+        } else {
+            fastFrames = 0;
+        }
+        return false;
     }
 };
 

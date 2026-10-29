@@ -2,13 +2,25 @@
 // pathtrace_hw.comp / pathtrace_sw.comp から取り込まれる。
 // 出力（ノイズ除去 denoise の材料）。色は「最初に当たった面の色」で割った明るさにしておき、
 // ノイズ除去のあとで色を掛け戻す（模様や色の境目をぼかさないため）
-layout(set = 0, binding = 1, rgba32f) uniform writeonly image2D uNoisy;   // rgb = 今回の明るさ（色で割ったもの）
+layout(set = 0, binding = 1, rgba16f) uniform writeonly image2D uNoisy;   // rgb = 今回の明るさ（色で割ったもの）
 layout(set = 0, binding = 2, rgba32f) uniform writeonly image2D uGPos;    // xyz = 最初に当たった位置, w = 距離（空なら -1）
-layout(set = 0, binding = 7, rgba32f) uniform writeonly image2D uGNormal; // xyz = 面の向き
+layout(set = 0, binding = 7, rgba16f) uniform writeonly image2D uGNormal; // xyz = 面の向き
 layout(set = 0, binding = 9, rgba8) uniform writeonly image2D uGAlbedo;   // rgb = 最初に当たった面の色
 
-struct Vertex { vec4 position; vec4 normal; };  // position.w = 面の上の位置 u, normal.w = v（メートル）
-layout(set = 0, binding = 3, std430) readonly buffer Vertices { Vertex vertices[]; };
+// 頂点は 1 つ 6 個の値（24 バイト）: 位置 x, y, z / 面の向き（2 つの 16 ビットに詰めたもの）/ 面の上の位置 u, v（メートル）
+// （GPU のメモリを節約するため。src/renderer.cpp の packVertices と同じ並び）
+layout(set = 0, binding = 3, std430) readonly buffer Vertices { float vdata[]; };
+vec3 vertexPos(uint i) { uint b = i * 6u; return vec3(vdata[b], vdata[b + 1u], vdata[b + 2u]); }
+vec2 vertexUv(uint i) { uint b = i * 6u; return vec2(vdata[b + 4u], vdata[b + 5u]); }
+// 面の向き: 八面体に写して 2 つの 16 ビットに詰めたもの（x の下位 16 ビットが 0x8000 なら「向き無し」= 0 を返す）
+vec3 vertexNormal(uint i) {
+    uint packed = floatBitsToUint(vdata[i * 6u + 3u]);
+    if ((packed & 0xFFFFu) == 0x8000u) return vec3(0.0);
+    vec2 e = vec2(float(int(packed << 16) >> 16), float(int(packed) >> 16)) / 32767.0;
+    vec3 n = vec3(e, 1.0 - abs(e.x) - abs(e.y));
+    if (n.z < 0.0) n.xy = (1.0 - abs(n.yx)) * vec2(n.x >= 0.0 ? 1.0 : -1.0, n.y >= 0.0 ? 1.0 : -1.0);
+    return normalize(n);
+}
 layout(set = 0, binding = 4, std430) readonly buffer Indices { uint indices[]; };
 // 三角形ごとのマテリアル番号。ガラスの三角形はガラス用の並びに入っている
 layout(set = 0, binding = 5, std430) readonly buffer TriMaterials { uint triMaterials[]; };
@@ -70,7 +82,7 @@ layout(push_constant) uniform Params {
     vec4 camUp;       // xyz = 上, w = 地面の高さ（モデルの一番下）
     vec4 sunDir;      // xyz = 太陽のある方向, w = 太陽の明るさ
     vec4 misc;        // x = 照明器具の光源の数, y = 空の明るさ, z = ガラス三角形の開始位置（三角形番号）, w = 1 画素の幅（1 m 先で何 m か）
-    uvec4 frame;      // x = フレーム番号, y = 止まってからのフレーム数, z = 最大反射回数, w = 1 フレームで計算する回数
+    uvec4 frame;      // x = フレーム番号, y = 止まってからのフレーム数, z = 最大反射回数, w = 1 フレームで計算する回数（下位 8 ビット）＋描き始める行（上位 24 ビット）
     uvec4 look;       // x = 背景色（RGBA8。a が 0 以外なら空・雲を出さずにこの色）, y = 単色（RGBA8。a が 0 以外なら全部この色）,
                       // z = 1 なら地面（と地平線）をまっすぐには見せない, w = 地面の色（RGBA8。a が 0 なら既定の色）
 } pc;

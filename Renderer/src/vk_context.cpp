@@ -295,7 +295,8 @@ void VkContext::endOneShot(VkCommandBuffer cmd) {
     si.commandBufferCount = 1;
     si.pCommandBuffers = &cmd;
     vkCheck(vkQueueSubmit(queue, 1, &si, VK_NULL_HANDLE), "vkQueueSubmit (one-shot)");
-    vkQueueWaitIdle(queue);
+    // GPU がリセットされたとき（VK_ERROR_DEVICE_LOST）は、ここで分かる言葉で知らせて終わる
+    vkCheck(vkQueueWaitIdle(queue), "vkQueueWaitIdle (one-shot)");
     vkFreeCommandBuffers(device, commandPool, 1, &cmd);
 }
 

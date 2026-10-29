@@ -354,6 +354,7 @@ int runWindow(const Options& opt, Scene& scene) {
         vkCheck(glfwCreateWindowSurface(inst, window, nullptr, &surface), "glfwCreateWindowSurface");
         return surface;
     }, opt.gpu, !opt.forceSoftware);
+    if (opt.gpuMemoryMb > 0) ctx.deviceLocalBytes = static_cast<VkDeviceSize>(opt.gpuMemoryMb) << 20;  // 動作確認用
 
     Bvh bvh;
     uint32_t glassStart = prepareScene(scene, bvh, opt.instancing);
@@ -370,6 +371,18 @@ int runWindow(const Options& opt, Scene& scene) {
     if (opt.renderScale <= 0) renderScale = std::min(renderScale, 0.5f);
     logInfo("Render scale %.2f (max %.2f)", renderScale, maxRenderScale);
 
+    // GPU のメモリに収まる描画の大きさか（足りなければ縮める倍率を返す。1 = そのまま）。
+    // 描画用の画像は大きさに比例して増える（1920×1080 で約 400 MB、4K で約 1.6 GB）ので、メモリの少ない GPU で落ちないようにする
+    auto memoryFit = [&](uint32_t w, uint32_t h) {
+        if (ctx.deviceLocalBytes == 0) return 1.0f;
+        const VkDeviceSize others = ctx.allocatedDeviceBytes > renderer.imageBytesNow() ? ctx.allocatedDeviceBytes - renderer.imageBytesNow() : 0;
+        const VkDeviceSize cap = ctx.deviceLocalBytes * 85 / 100;
+        const VkDeviceSize budget = cap > others ? cap - others : 0;
+        const VkDeviceSize need = Renderer::imageBytes(w, h);
+        if (need <= budget) return 1.0f;
+        return static_cast<float>(std::sqrt(static_cast<double>(budget) / static_cast<double>(need))) * 0.95f;
+    };
+
     Swapchain sc;
     Image display;  // 画面と同じ大きさの画像（描画結果を拡大して写し、案内を重ねてから画面に出す）
     VkImageLayout displayLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -379,6 +392,12 @@ int runWindow(const Options& opt, Scene& scene) {
         createSwapchain(ctx, window, sc);
         rs = {std::max(16u, static_cast<uint32_t>(sc.extent.width * renderScale)),
               std::max(16u, static_cast<uint32_t>(sc.extent.height * renderScale))};
+        if (float fit = memoryFit(rs.width, rs.height); fit < 1.0f) {
+            renderScale = std::max(0.1f, renderScale * fit);
+            rs = {std::max(16u, static_cast<uint32_t>(sc.extent.width * renderScale)),
+                  std::max(16u, static_cast<uint32_t>(sc.extent.height * renderScale))};
+            logInfo("Render scale lowered to %.2f to fit GPU memory", renderScale);
+        }
         renderer.resize(rs.width, rs.height);
         ctx.destroyImage(display);
         display = ctx.createImage(sc.extent.width, sc.extent.height, VK_FORMAT_R8G8B8A8_UNORM,
@@ -403,6 +422,17 @@ int runWindow(const Options& opt, Scene& scene) {
         rs = {std::max(16u, static_cast<uint32_t>(sc.extent.width * renderScale)),
               std::max(16u, static_cast<uint32_t>(sc.extent.height * renderScale))};
         renderer.resize(rs.width, rs.height);
+    };
+    // 重い 1 枚は光の計算を横長の帯に分けて GPU に送る（帯 1 本を短く保ち、Windows の GPU リセットを防ぐ）
+    BandGovernor ptBands;
+    if (opt.bands > 0) {
+        ptBands.bands = static_cast<uint32_t>(opt.bands);
+        renderer.setPathTraceBands(ptBands.bands);
+    }
+    auto updateBands = [&](double gpuTime) {
+        if (opt.bands > 0 || !ptBands.update(gpuTime)) return;
+        renderer.setPathTraceBands(ptBands.bands);
+        logInfo("Frame took %.0f ms: path trace in %u bands", gpuTime * 1000.0, ptBands.bands);
     };
     auto adaptQuality = [&](double gpuTime, float dt) {
         auto lower = [&](float factor) {
@@ -439,8 +469,12 @@ int runWindow(const Options& opt, Scene& scene) {
                 ++activeBounces;
                 logInfo("Restored bounces %u", activeBounces);
             } else if (renderScale < maxRenderScale - 1e-3f) {
-                applyScale(std::min(maxRenderScale, renderScale / 0.75f));
-                logInfo("Restored render scale %.2f", renderScale);
+                float next = std::min(maxRenderScale, renderScale / 0.75f);
+                // 戻した大きさが GPU のメモリに収まるときだけ戻す
+                if (memoryFit(static_cast<uint32_t>(sc.extent.width * next), static_cast<uint32_t>(sc.extent.height * next)) >= 1.0f) {
+                    applyScale(next);
+                    logInfo("Restored render scale %.2f", renderScale);
+                }
             }
         }
     };
@@ -684,11 +718,24 @@ int runWindow(const Options& opt, Scene& scene) {
             job.samples = ctx.hardwareRt ? 512 : 128;
         }
         if (opt.exportSamples > 0) job.samples = opt.exportSamples;
+        // GPU のメモリに収まらない大きさなら、縦横比を保って小さくする（足りないまま書き出すと落ちる）
+        if (float fit = memoryFit(job.width, job.height); fit < 1.0f) {
+            uint32_t ow = job.width, oh = job.height;
+            job.width = std::max(256u, static_cast<uint32_t>(job.width * fit) / 2 * 2);
+            job.height = kind == ExportKind::Panorama ? job.width / 2 : std::max(144u, static_cast<uint32_t>(job.height * fit));
+            logInfo("Export size reduced to fit GPU memory: %ux%u -> %ux%u (GPU memory %.0f MB of %.0f MB)", ow, oh, job.width,
+                    job.height, ctx.allocatedDeviceBytes / 1048576.0, ctx.deviceLocalBytes / 1048576.0);
+            toast({tr("ExportReduced"), std::to_string(job.width) + " x " + std::to_string(job.height)});
+        }
         // PNG の書き出しで「背景を透明に」なら、空（と消した地面）の所を透明にして描く
         job.transparent = kind == ExportKind::Image && look.transparentPng;
         renderer.setTransparentOutput(job.transparent);
-        logInfo("Export start: %s %ux%u, %d samples%s", path.c_str(), job.width, job.height, job.samples,
-                job.transparent ? ", transparent background" : "");
+        // 書き出す大きさから、光の計算を帯に分ける数を決めておく（4K なら 4 本。かかった時間でさらに直す）
+        ptBands = BandGovernor{};
+        ptBands.bands = opt.bands > 0 ? static_cast<uint32_t>(opt.bands) : BandGovernor::initialFor(job.width, job.height);
+        renderer.setPathTraceBands(ptBands.bands);
+        logInfo("Export start: %s %ux%u, %d samples%s, %u bands", path.c_str(), job.width, job.height, job.samples,
+                job.transparent ? ", transparent background" : "", ptBands.bands);
         renderer.resize(job.width, job.height);
         nv.exporting = true;
         nv.cancelExport = false;
@@ -711,6 +758,9 @@ int runWindow(const Options& opt, Scene& scene) {
         }
         nv.exporting = false;
         renderer.setTransparentOutput(false);
+        ptBands = BandGovernor{};
+        if (opt.bands > 0) ptBands.bands = static_cast<uint32_t>(opt.bands);
+        renderer.setPathTraceBands(ptBands.bands);
         nv.cancelExport = false;
         renderer.resize(rs.width, rs.height);
         nv.toolbarChanged = true;
@@ -1046,6 +1096,7 @@ int runWindow(const Options& opt, Scene& scene) {
         if (nv.exporting) {
             // 書き出し中は明るさを変えない（書き出しを始めたときの明るさのまま）
             renderer.finishFrame();
+            updateBands(gpuTime);
             job.done += static_cast<int>(job.view.samplesPerFrame);
             if (nv.cancelExport) finishExport(true);
             else if (job.done >= job.samples) finishExport(false);
@@ -1054,6 +1105,7 @@ int runWindow(const Options& opt, Scene& scene) {
         // 動いている間はゆっくり、止まった直後に素早く合わせると目が疲れにくい
         exposure.update(renderer.finishFrame(), nv.evOffset, 0.9f);
         adaptQuality(gpuTime, dt);
+        updateBands(gpuTime);
 
         if (opt.exitAfterFrames > 0 && static_cast<int>(renderer.accumulatedSamples()) >= opt.exitAfterFrames) {
             logInfo("Exit after %d frames (exposure x%.2f)", opt.exitAfterFrames, exposure.current);

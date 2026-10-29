@@ -55,6 +55,12 @@ public:
     void setLocalToneMapping(float strength) { localStrength_ = strength; }
     // 背景（空・雲、地面を消したときはその分も）を透明にして描く（PNG の書き出し用）
     void setTransparentOutput(bool transparent);
+    // 描く大きさ width × height のときに、描画とノイズ除去の画像が使う GPU メモリ（バイト）。書き出しの前の見積もりに使う
+    static VkDeviceSize imageBytes(uint32_t width, uint32_t height);
+    VkDeviceSize imageBytesNow() const { return output_.width ? imageBytes(output_.width, output_.height) : 0; }
+    // 光の計算を横長の帯 n 本に分けて、帯ごとに GPU へ送る（1 回の処理を短くして、Windows の GPU リセットを防ぐ）。1 = 分けない
+    void setPathTraceBands(uint32_t n) { ptBands_ = n < 1 ? 1 : n; }
+    uint32_t pathTraceBands() const { return ptBands_; }
     // 履歴を捨てて最初からやり直す
     void resetAccumulation() { resetHistory_ = true; }
     // カメラが止まってから描いたフレーム数
@@ -127,6 +133,7 @@ private:
     Image noisy_, gpos_[2], gnormal_[2], galbedo_, history_[2], moments_[2], filtered_[2], albedoHist_[2], output_;
     Image local_[2];  // 大まかな明るさ（縦横 1/8。ぼかしの行き来に 2 枚）
     float localStrength_ = 1.0f;
+    uint32_t ptBands_ = 1;
     float avgLog2_ = 0.0f;  // 前のフレームで測った画面の平均の明るさ（log2）
     bool hasAvgLog2_ = false;
     float brightLog2_ = 0.0f;  // 前のフレームで測った明るい所（上位 5%）の明るさ（log2）

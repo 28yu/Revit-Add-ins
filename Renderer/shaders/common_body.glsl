@@ -3,10 +3,9 @@
 // uv = テクスチャ上の位置（1 = 画像 1 枚分）, uvPerMeter = 1 m で何枚分進むか（遠くで縮小した段を選ぶのに使う）
 void surfaceAt(Hit h, vec3 rayDir, out vec3 pos, out vec3 normal, out vec3 geomNormal, out vec2 uv, out float uvPerMeter) {
     uint i0 = indices[h.tri * 3u], i1 = indices[h.tri * 3u + 1u], i2 = indices[h.tri * 3u + 2u];
-    vec4 v0 = vertices[i0].position, v1 = vertices[i1].position, v2 = vertices[i2].position;
     // 頂点は形の座標なので、置き場所の位置・向きに動かす
-    vec3 p0 = toWorldPoint(h.inst, v0.xyz), p1 = toWorldPoint(h.inst, v1.xyz), p2 = toWorldPoint(h.inst, v2.xyz);
-    vec2 t0 = vec2(v0.w, vertices[i0].normal.w), t1 = vec2(v1.w, vertices[i1].normal.w), t2 = vec2(v2.w, vertices[i2].normal.w);
+    vec3 p0 = toWorldPoint(h.inst, vertexPos(i0)), p1 = toWorldPoint(h.inst, vertexPos(i1)), p2 = toWorldPoint(h.inst, vertexPos(i2));
+    vec2 t0 = vertexUv(i0), t1 = vertexUv(i1), t2 = vertexUv(i2);
     float b0 = 1.0 - h.bary.x - h.bary.y;
     pos = p0 * b0 + p1 * h.bary.x + p2 * h.bary.y;
     uv = t0 * b0 + t1 * h.bary.x + t2 * h.bary.y;
@@ -15,7 +14,7 @@ void surfaceAt(Hit h, vec3 rayDir, out vec3 pos, out vec3 normal, out vec3 geomN
     float uvArea = abs(e1.x * e2.y - e1.y * e2.x);
     uvPerMeter = sqrt(uvArea / max(length(cr), 1e-12));
     geomNormal = normalize(cr);
-    vec3 n = toWorldNormal(h.inst, vertices[i0].normal.xyz * b0 + vertices[i1].normal.xyz * h.bary.x + vertices[i2].normal.xyz * h.bary.y);
+    vec3 n = toWorldNormal(h.inst, vertexNormal(i0) * b0 + vertexNormal(i1) * h.bary.x + vertexNormal(i2) * h.bary.y);
     normal = dot(n, n) > 1e-8 ? normalize(n) : geomNormal;
     // 裏から当たったときは表向きにそろえる（Revit の形は裏表が混ざっていることがある）
     if (dot(geomNormal, rayDir) > 0.0) geomNormal = -geomNormal;
@@ -27,10 +26,10 @@ void basis(vec3 n, out vec3 t, out vec3 b);  // 下で定義
 // 三角形の上で、面の上の位置 u, v が増える向き（凹凸の計算に使う）。求められなければ面の向きから適当に決める
 void tangentFrame(Hit h, vec3 n, out vec3 tu, out vec3 tv) {
     uint i0 = indices[h.tri * 3u], i1 = indices[h.tri * 3u + 1u], i2 = indices[h.tri * 3u + 2u];
-    vec4 v0 = vertices[i0].position, v1 = vertices[i1].position, v2 = vertices[i2].position;
-    vec3 dp1 = toWorldVector(h.inst, v1.xyz - v0.xyz), dp2 = toWorldVector(h.inst, v2.xyz - v0.xyz);
-    vec2 d1 = vec2(v1.w, vertices[i1].normal.w) - vec2(v0.w, vertices[i0].normal.w);
-    vec2 d2 = vec2(v2.w, vertices[i2].normal.w) - vec2(v0.w, vertices[i0].normal.w);
+    vec3 q0 = vertexPos(i0);
+    vec3 dp1 = toWorldVector(h.inst, vertexPos(i1) - q0), dp2 = toWorldVector(h.inst, vertexPos(i2) - q0);
+    vec2 d1 = vertexUv(i1) - vertexUv(i0);
+    vec2 d2 = vertexUv(i2) - vertexUv(i0);
     float det = d1.x * d2.y - d1.y * d2.x;
     if (abs(det) < 1e-12) {
         basis(n, tu, tv);
@@ -437,12 +436,13 @@ vec3 cameraRay(vec2 uv) {
 
 void main() {
     ivec2 size = imageSize(uNoisy);
-    ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
+    // frame.w: 下位 8 ビット = 1 フレームで計算する回数、上位 24 ビット = 描き始める行（重い 1 枚を横長の帯に分けて描くとき）
+    ivec2 pixel = ivec2(gl_GlobalInvocationID.xy) + ivec2(0, int(pc.frame.w >> 8u));
     if (pixel.x >= size.x || pixel.y >= size.y) return;
     rngState = pcg(uint(pixel.x) + uint(pixel.y) * 9781u + pc.frame.x * 6271u * 26699u);
 
     // 1 フレームで何回か計算して平均する（速い GPU では回数を増やし、動いている間の画質を上げる）
-    uint spp = max(pc.frame.w, 1u);
+    uint spp = max(pc.frame.w & 0xFFu, 1u);
     vec3 demod = vec3(0.0);   // 色で割った明るさ（1 回ずつ、その回の面の色で割ってから平均する）
     vec3 albedo = vec3(0.0);  // 面の色の平均
     float background = 0.0;   // 背景色が見えている割合（輪郭をなめらかにするため割合で持つ）

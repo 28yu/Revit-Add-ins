@@ -5,11 +5,11 @@
 // カメラが止まっている間は、全フレームを均等に足し合わせる（＝ノイズの無い正確な結果に近づいていく）。
 layout(local_size_x = 8, local_size_y = 8) in;
 
-layout(set = 0, binding = 0, rgba32f) uniform readonly image2D uNoisy;       // 今回の明るさ（色で割ったもの）
+layout(set = 0, binding = 0, rgba16f) uniform readonly image2D uNoisy;       // 今回の明るさ（色で割ったもの）
 layout(set = 0, binding = 1, rgba32f) uniform readonly image2D uGPos;        // 今回: 位置・距離
-layout(set = 0, binding = 2, rgba32f) uniform readonly image2D uGNormal;     // 今回: 面の向き
+layout(set = 0, binding = 2, rgba16f) uniform readonly image2D uGNormal;     // 今回: 面の向き
 layout(set = 0, binding = 3, rgba32f) uniform readonly image2D uPrevGPos;    // 前回: 位置・距離
-layout(set = 0, binding = 4, rgba32f) uniform readonly image2D uPrevGNormal; // 前回: 面の向き
+layout(set = 0, binding = 4, rgba16f) uniform readonly image2D uPrevGNormal; // 前回: 面の向き
 layout(set = 0, binding = 5, rgba32f) uniform readonly image2D uPrevHistory; // 前回の履歴: rgb = 平均, a = 重ねた回数
 layout(set = 0, binding = 6, rgba32f) uniform readonly image2D uPrevMoments; // 前回: x = 明るさの平均, y = 明るさの2乗の平均
 layout(set = 0, binding = 7, rgba32f) uniform writeonly image2D uHistory;

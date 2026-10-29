@@ -43,6 +43,7 @@ int runOffscreen(const Options& opt, Scene& scene) {
     auto secondsSince = [](Clock::time_point t) { return std::chrono::duration<double>(Clock::now() - t).count(); };
     VkContext ctx;
     ctx.init({}, nullptr, opt.gpu, !opt.forceSoftware);
+    if (opt.gpuMemoryMb > 0) ctx.deviceLocalBytes = static_cast<VkDeviceSize>(opt.gpuMemoryMb) << 20;  // 動作確認用
     // 性能測定: シーンファイルの大きさ（ビューアの exe に入る量）と、保存にかかる時間
     size_t sceneBytes = 0;
     double saveSeconds = 0;
@@ -120,6 +121,10 @@ int runOffscreen(const Options& opt, Scene& scene) {
         v.maxBounces = opt.bounces;
         view = v;
     }
+    // 重い 1 枚は横長の帯に分けて描く（最初は画像の大きさから決め、かかった時間で直す。--bands で決め打ちもできる）
+    BandGovernor bands;
+    bands.bands = opt.bands > 0 ? static_cast<uint32_t>(opt.bands) : BandGovernor::initialFor(w, h);
+    renderer.setPathTraceBands(bands.bands);
     // 1 フレームを描いて終わるまで待つ（かかった秒数を返す）
     auto renderOne = [&](const ViewParams& v) {
         auto t = Clock::now();
@@ -135,7 +140,12 @@ int runOffscreen(const Options& opt, Scene& scene) {
         vkCheck(vkWaitForFences(ctx.device, 1, &fence, VK_TRUE, UINT64_MAX), "vkWaitForFences");
         vkResetFences(ctx.device, 1, &fence);
         if (opt.autoExposure) exposure.update(renderer.finishFrame(), opt.exposureEv, 0.0f);
-        return secondsSince(t);
+        double seconds = secondsSince(t);
+        if (opt.bands <= 0 && bands.update(seconds)) {
+            renderer.setPathTraceBands(bands.bands);
+            logInfo("Frame took %.0f ms: path trace in %u bands", seconds * 1000.0, bands.bands);
+        }
+        return seconds;
     };
     struct FrameStats {
         double avg = 0, max = 0;
@@ -180,12 +190,12 @@ int runOffscreen(const Options& opt, Scene& scene) {
         logInfo("BENCH {\"drawn_triangles\":%zu,\"shapes\":%zu,\"placements\":%zu,\"triangles\":%zu,\"vertices\":%zu,\"textures\":%zu,\"scene_mb\":%.1f,\"save_s\":%.2f,"
                 "\"load_s\":%.2f,\"prepare_s\":%.2f,\"init_s\":%.2f,\"gpu_mb\":%.0f,\"gpu_peak_mb\":%.0f,"
                 "\"width\":%u,\"height\":%u,\"still_ms\":%.1f,\"still_max_ms\":%.1f,\"moving_ms\":%.1f,"
-                "\"moving_max_ms\":%.1f,\"png_kb\":%.0f,\"blown_pct\":%.2f,\"mean_luma\":%.1f,\"hw_rt\":%d}",
+                "\"moving_max_ms\":%.1f,\"bands\":%u,\"png_kb\":%.0f,\"blown_pct\":%.2f,\"mean_luma\":%.1f,\"hw_rt\":%d}",
                 scene.instancedTriangleCount(), scene.meshes.size(), scene.instances.size(),
                 scene.triangleCount(), scene.vertices.size(), scene.textures.size(), sceneBytes / 1048576.0, saveSeconds,
                 opt.sceneLoadSeconds, prepareSeconds, initSeconds, ctx.allocatedDeviceBytes / 1048576.0,
                 ctx.peakDeviceBytes / 1048576.0, w, h, still.avg * 1000.0, still.max * 1000.0, moving.avg * 1000.0,
-                moving.max * 1000.0, png.size() / 1024.0, pixels ? 100.0 * blown / pixels : 0.0,
+                moving.max * 1000.0, renderer.pathTraceBands(), png.size() / 1024.0, pixels ? 100.0 * blown / pixels : 0.0,
                 pixels ? lumSum / pixels : 0.0, ctx.hardwareRt ? 1 : 0);
         vkDestroyFence(ctx.device, fence, nullptr);
         renderer.destroy();

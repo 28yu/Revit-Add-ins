@@ -90,6 +90,10 @@ static const Entry kStrings[] = {
      "Narrow the 3D view with a section box or hide some categories, then try again.",
      "模型过大，此 GPU 无法处理。\n"
      "请用剖面框缩小 3D 视图的显示范围或减少显示的类别后重试。"},
+    {"ExportReduced",
+     "GPU のメモリが足りないため、書き出す大きさを下げました",
+     "Not enough GPU memory, so the export size was reduced",
+     "GPU 内存不足，已降低导出尺寸"},
     {"QualityLowered",
      "モデルが大きいため、解像度を下げて描いています",
      "The model is large, so it is drawn at a lower resolution",
