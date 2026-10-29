@@ -17,5 +17,15 @@ namespace Tools28
             return id.IntegerValue;
 #endif
         }
+
+        /// <summary>要素 ID の値（Revit 2024 以降は 64 ビット。描画プログラムへ要素を伝えるときに使う）。</summary>
+        public static long LongValue(this ElementId id)
+        {
+#if REVIT2021 || REVIT2022 || REVIT2023
+            return id.IntegerValue;
+#else
+            return id.Value;
+#endif
+        }
     }
 }

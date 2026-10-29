@@ -89,12 +89,14 @@ namespace Tools28.Commands.RealtimeRender
         /// 3D ビューに表示されている形状・マテリアルを集め、カメラと太陽の向きを決める（ライブ同期でも使う）。
         /// </summary>
         /// <param name="elementIds">指定すると、書き出した要素の ID を入れる（ライブ同期用）</param>
-        internal static RenderScene ExportScene(Document doc, View3D view, HashSet<ElementId> elementIds = null)
+        /// <param name="only">指定すると、この要素だけを書き出す（ライブ同期で変わった要素だけを送るとき）</param>
+        internal static RenderScene ExportScene(Document doc, View3D view, HashSet<ElementId> elementIds = null,
+                                                ICollection<ElementId> only = null)
         {
             var watch = Stopwatch.StartNew();
             // フェーズの「上書き」表示のマテリアル（選んだ内容を使う。ライブ同期では画面を出さない）
             PhaseOverrides phase = PhaseMaterials.Resolve(doc, view, null, false, false, out _);
-            var context = new SceneExportContext(doc, phase, view);
+            var context = new SceneExportContext(doc, phase, view, only);
             var exporter = new CustomExporter(doc, context) { IncludeGeometricObjects = false };
             exporter.Export(view);
 
@@ -105,7 +107,7 @@ namespace Tools28.Commands.RealtimeRender
                 elementIds.UnionWith(context.ElementIds);
             }
             DiagLog.Cmd("RealtimeRender",
-                $"書き出し: 要素 {context.ElementCount} / 三角形 {scene.TriangleCount}（描く数 {scene.DrawnTriangleCount}）/ 形 {scene.Meshes.Count} / 置き場所 {scene.Instances.Count}（使い回し {context.ReusedShapes}・読み飛ばし {context.SkippedInstances}・確認で不一致 {context.VerifyMismatches}）/ マテリアル {scene.Materials.Count} / テクスチャ {scene.Textures.Count} / {watch.ElapsedMilliseconds} ms");
+                $"書き出し{(only != null ? $"（変わった要素 {only.Count} 個だけ）" : "")}: 要素 {context.ElementCount} / 三角形 {scene.TriangleCount}（描く数 {scene.DrawnTriangleCount}）/ 形 {scene.Meshes.Count} / 置き場所 {scene.Instances.Count}（使い回し {context.ReusedShapes}・読み飛ばし {context.SkippedInstances}・確認で不一致 {context.VerifyMismatches}）/ マテリアル {scene.Materials.Count} / テクスチャ {scene.Textures.Count} / {watch.ElapsedMilliseconds} ms");
             foreach (string missing in context.MissingTextures)
                 DiagLog.Cmd("RealtimeRender", $"テクスチャ画像が見つかりません: {missing}");
             if (scene.TriangleCount > 0)

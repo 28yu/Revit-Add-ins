@@ -55,6 +55,7 @@ struct Light {
     LightType type = LightType::Omni;
     Vec3 direction{0, 0, -1};  // 半球・スポットの向き
     float cosInner = 1.0f, cosOuter = 0.0f;  // スポット: 明るさが落ち始める角度・届く角度（cos）
+    int64_t element = -1;      // この光源を持つ Revit の要素の ID（ライブ同期の差分で入れ替える。-1 = 不明）
 };
 
 struct Camera {
@@ -89,6 +90,7 @@ struct MeshRange {
 struct Instance {
     uint32_t mesh = 0;
     float m[12] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0};
+    int64_t element = -1;  // この置き場所を描いている Revit の要素の ID（ライブ同期の差分で入れ替える。-1 = 不明）
 };
 
 struct Scene {
@@ -111,6 +113,7 @@ struct Scene {
     float trueNorth = 0.0f;    // 真北の向き（ラジアン。Revit のプロジェクトの位置の角度）
     float dayOfYear = 80.0f;   // 1 月 1 日 = 1（既定は春分のころ）
     RevitLook revitLook;
+    uint32_t syncSeq = 0;      // ライブ同期の通し番号（このシーンがどこまでの変更を含むか。版 7 から）
 
     // 形ごとに、不透明な三角形を前、ガラスの三角形を後ろに並べ替える（MeshRange::opaqueCount を決める）。
     // 戻り値: 不透明な三角形の数（全部の形の合計。記録用）
@@ -132,7 +135,13 @@ bool invertAffine(const float m[12], float out[12]);
 
 // Revit 側（Tools28）が書き出すシーンファイル（.t28s）を読む。
 // offset: ファイルの途中から読む（ビューアの exe に埋め込んだシーンを読むとき）
-bool loadScene(const std::string& path, Scene& scene, std::string& error, long offset = 0);
+// allowEmpty: 三角形が無くてもよい（ライブ同期の差分で、消すだけのとき）
+bool loadScene(const std::string& path, Scene& scene, std::string& error, long offset = 0, bool allowEmpty = false);
+// ライブ同期の差分（Revit 側 SceneWriter.WriteDelta）を読む。removed = 消す要素の ID、seq = 通し番号
+bool loadSceneDelta(const std::string& path, Scene& delta, std::vector<int64_t>& removed, uint32_t& seq, std::string& error);
+// 差分を足す: removed の要素の置き場所・光源を消してから、delta の形・置き場所・光源・マテリアル・テクスチャを足す。
+// 使われなくなった形が多くなったら詰め直す。scene は prepareScene する前のもの（要素 ID が残っているもの）であること
+void applySceneDelta(Scene& scene, const Scene& delta, const std::vector<int64_t>& removed);
 // シーンを同じ形式で書き出す（ビューアの exe に埋め込むときに使う）
 void saveScene(const Scene& scene, std::vector<uint8_t>& out);
 // 時刻（時）の太陽の向き。敷地の緯度・真北・日付から求める（時刻は太陽の動きに合わせた時刻で、正午に真南）

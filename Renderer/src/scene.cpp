@@ -31,7 +31,9 @@ namespace t28 {
 //   uint32   形の数       → 各: uint32 最初の三角形番号, 三角形の数（三角形の並びの中の連続した一続き）
 //   uint32   置き場所の数 → 各: uint32 形の番号, float 3 行 4 列（行ごと。世界の座標 = 左 3 列 × 形の座標 + 右 1 列）
 //   形の数が 0 なら、版 5 までと同じ（全部の三角形がそのままの位置）。頂点はそれぞれの形の座標で書く
-static const uint32_t kVersion = 6;
+// 7: 最後に 置き場所ごとの要素 ID（int64。形の数が 0 なら無し）、光源ごとの要素 ID（int64）、ライブ同期の通し番号（uint32）
+//   ライブ同期の差分（.d＋通し番号 8 桁）: "T28D" | uint32 版（1）| uint32 通し番号 | uint32 消す要素の数 | int64 要素 ID… | このシーンの形式
+static const uint32_t kVersion = 7;
 
 namespace {
 class Reader {
@@ -47,7 +49,7 @@ private:
 };
 }  // namespace
 
-bool loadScene(const std::string& path, Scene& scene, std::string& error, long offset) {
+bool loadScene(const std::string& path, Scene& scene, std::string& error, long offset, bool allowEmpty) {
     FILE* f = openFile(path, "rb");
     if (!f) {
         error = "cannot open file: " + path;
@@ -191,8 +193,15 @@ bool loadScene(const std::string& path, Scene& scene, std::string& error, long o
         }
         if (meshCount > 0 && instanceCount == 0) return fail("no instances");
     }
+    if (version >= 7) {
+        for (Instance& in : scene.instances)
+            if (!r.read(in.element)) return fail("truncated instance elements");
+        for (Light& l : scene.lights)
+            if (!r.read(l.element)) return fail("truncated light elements");
+        if (!r.read(scene.syncSeq)) return fail("truncated sync number");
+    }
     fclose(f);
-    if (triCount == 0) {
+    if (triCount == 0 && !allowEmpty) {
         error = "the model has no triangles";
         return false;
     }
@@ -263,6 +272,153 @@ void saveScene(const Scene& scene, std::vector<uint8_t>& out) {
             put(out, in.mesh);
             for (float v : in.m) put(out, v);
         }
+    if (!scene.meshes.empty())
+        for (const Instance& in : scene.instances) put(out, in.element);
+    for (const Light& l : scene.lights) put(out, l.element);
+    put(out, scene.syncSeq);
+}
+
+bool loadSceneDelta(const std::string& path, Scene& delta, std::vector<int64_t>& removed, uint32_t& seq, std::string& error) {
+    FILE* f = openFile(path, "rb");
+    if (!f) {
+        error = "cannot open file: " + path;
+        return false;
+    }
+    char magic[4];
+    uint32_t version = 0, count = 0;
+    bool ok = fread(magic, 1, 4, f) == 4 && memcmp(magic, "T28D", 4) == 0 && fread(&version, 4, 1, f) == 1 && version == 1 &&
+              fread(&seq, 4, 1, f) == 1 && fread(&count, 4, 1, f) == 1 && count <= 50000000u;
+    if (ok) {
+        removed.resize(count);
+        ok = count == 0 || fread(removed.data(), sizeof(int64_t), count, f) == count;
+    }
+    long offset = ok ? ftell(f) : 0;
+    fclose(f);
+    if (!ok) {
+        error = "not a delta file";
+        return false;
+    }
+    return loadScene(path, delta, error, offset, true);
+}
+
+namespace {
+bool sameMaterial(const Material& a, const Material& b) {
+    auto sameMap = [](const TextureMap& x, const TextureMap& y) {
+        return x.texture == y.texture && std::equal(x.xform, x.xform + 6, y.xform);
+    };
+    return a.r == b.r && a.g == b.g && a.b == b.b && a.opacity == b.opacity && a.roughness == b.roughness &&
+           a.metallic == b.metallic && a.emissive == b.emissive && a.f0 == b.f0 && sameMap(a.color, b.color) &&
+           sameMap(a.bump, b.bump) && a.bumpType == b.bumpType && a.bumpDepth == b.bumpDepth && a.name == b.name;
+}
+uint64_t textureHash(const Texture& t) {
+    uint64_t h = 1469598103934665603ull ^ (static_cast<uint64_t>(t.width) << 32 | t.height) ^ (t.linear ? 1 : 0);
+    for (uint8_t b : t.rgba) h = (h ^ b) * 1099511628211ull;
+    return h;
+}
+
+// 使われていない形（置き場所が 1 つも無い形）の三角形・頂点を取り除いて詰め直す
+void compactScene(Scene& s) {
+    std::vector<uint8_t> used(s.meshes.size(), 0);
+    for (const Instance& in : s.instances) used[in.mesh] = 1;
+    std::vector<uint32_t> meshMap(s.meshes.size(), UINT32_MAX), vertexMap(s.vertices.size(), UINT32_MAX);
+    std::vector<Vertex> vertices;
+    std::vector<uint32_t> indices, triMaterials;
+    std::vector<MeshRange> meshes;
+    for (size_t mi = 0; mi < s.meshes.size(); ++mi) {
+        if (!used[mi]) continue;
+        const MeshRange& m = s.meshes[mi];
+        MeshRange nm = m;
+        nm.firstTri = static_cast<uint32_t>(triMaterials.size());
+        for (uint32_t t = m.firstTri; t < m.firstTri + m.triCount; ++t) {
+            for (int k = 0; k < 3; ++k) {
+                uint32_t v = s.indices[t * 3 + k];
+                if (vertexMap[v] == UINT32_MAX) {
+                    vertexMap[v] = static_cast<uint32_t>(vertices.size());
+                    vertices.push_back(s.vertices[v]);
+                }
+                indices.push_back(vertexMap[v]);
+            }
+            triMaterials.push_back(s.triMaterials[t]);
+        }
+        meshMap[mi] = static_cast<uint32_t>(meshes.size());
+        meshes.push_back(nm);
+    }
+    for (Instance& in : s.instances) in.mesh = meshMap[in.mesh];
+    s.vertices.swap(vertices);
+    s.indices.swap(indices);
+    s.triMaterials.swap(triMaterials);
+    s.meshes.swap(meshes);
+}
+}  // namespace
+
+void applySceneDelta(Scene& scene, const Scene& delta, const std::vector<int64_t>& removed) {
+    scene.ensureInstances();
+    // 1. 消す（変わった要素・消えた要素の置き場所と光源）
+    if (!removed.empty()) {
+        std::vector<int64_t> sorted(removed);
+        std::sort(sorted.begin(), sorted.end());
+        auto gone = [&](int64_t e) { return e >= 0 && std::binary_search(sorted.begin(), sorted.end(), e); };
+        scene.instances.erase(std::remove_if(scene.instances.begin(), scene.instances.end(),
+                                             [&](const Instance& in) { return gone(in.element); }),
+                              scene.instances.end());
+        scene.lights.erase(std::remove_if(scene.lights.begin(), scene.lights.end(), [&](const Light& l) { return gone(l.element); }),
+                           scene.lights.end());
+    }
+    // 2. テクスチャ・マテリアル（同じものがあれば使い回す）
+    std::vector<int32_t> texMap(delta.textures.size(), -1);
+    if (!delta.textures.empty()) {
+        std::vector<uint64_t> have(scene.textures.size());
+        for (size_t i = 0; i < scene.textures.size(); ++i) have[i] = textureHash(scene.textures[i]);
+        for (size_t i = 0; i < delta.textures.size(); ++i) {
+            const Texture& t = delta.textures[i];
+            uint64_t h = textureHash(t);
+            for (size_t j = 0; j < have.size() && texMap[i] < 0; ++j)
+                if (have[j] == h && scene.textures[j].width == t.width && scene.textures[j].height == t.height &&
+                    scene.textures[j].rgba == t.rgba)
+                    texMap[i] = static_cast<int32_t>(j);
+            if (texMap[i] < 0) {
+                texMap[i] = static_cast<int32_t>(scene.textures.size());
+                scene.textures.push_back(t);
+                have.push_back(h);
+            }
+        }
+    }
+    std::vector<uint32_t> matMap(delta.materials.size(), 0);
+    for (size_t i = 0; i < delta.materials.size(); ++i) {
+        Material m = delta.materials[i];
+        if (m.color.texture >= 0) m.color.texture = texMap[m.color.texture];
+        if (m.bump.texture >= 0) m.bump.texture = texMap[m.bump.texture];
+        size_t j = 0;
+        while (j < scene.materials.size() && !sameMaterial(scene.materials[j], m)) ++j;
+        if (j == scene.materials.size()) scene.materials.push_back(m);
+        matMap[i] = static_cast<uint32_t>(j);
+    }
+    // 3. 形と置き場所・光源を足す
+    if (delta.triangleCount() > 0) {
+        Scene d = delta;
+        d.ensureInstances();
+        const uint32_t vBase = static_cast<uint32_t>(scene.vertices.size()), tBase = static_cast<uint32_t>(scene.triangleCount()),
+                       mBase = static_cast<uint32_t>(scene.meshes.size());
+        scene.vertices.insert(scene.vertices.end(), d.vertices.begin(), d.vertices.end());
+        for (uint32_t i : d.indices) scene.indices.push_back(i + vBase);
+        for (uint32_t m : d.triMaterials) scene.triMaterials.push_back(matMap[m]);
+        for (MeshRange m : d.meshes) {
+            m.firstTri += tBase;
+            scene.meshes.push_back(m);
+        }
+        for (Instance in : d.instances) {
+            in.mesh += mBase;
+            scene.instances.push_back(in);
+        }
+    }
+    scene.lights.insert(scene.lights.end(), delta.lights.begin(), delta.lights.end());
+    // 4. 使われていない形が多くなったら詰め直す（何度も同期するうちにメモリが増え続けないように）
+    std::vector<uint8_t> used(scene.meshes.size(), 0);
+    for (const Instance& in : scene.instances) used[in.mesh] = 1;
+    size_t unusedTris = 0;
+    for (size_t i = 0; i < scene.meshes.size(); ++i)
+        if (!used[i]) unusedTris += scene.meshes[i].triCount;
+    if (unusedTris > 0 && unusedTris * 4 > scene.triangleCount()) compactScene(scene);
 }
 
 void Scene::ensureInstances() {

@@ -40,6 +40,8 @@ namespace Tools28.Commands.RealtimeRender
         public uint BackgroundColor { get; set; } = 0xFFFFFF;  // 0xBBGGRR
         public uint GroundColor { get; set; }            // 0xFFBBGGRR（グラデーションの地面の色。0 なら指定なし）
         public float CloudAmount { get; set; } = 0.5f;   // 0 = 雲なし 〜 1 = 曇り
+        /// <summary>ライブ同期の通し番号（描画プログラムが、どこまでの変更を受け取ったかを知るため。最初の書き出しは 0）。</summary>
+        public uint SyncSeq { get; set; }
 
         /// <summary>持っている三角形の数（同じ形は 1 回だけ数える）。</summary>
         public int TriangleCount => Triangles.Count / 4;
@@ -126,6 +128,11 @@ namespace Tools28.Commands.RealtimeRender
     {
         public int Mesh;
         public float[] M;
+        /// <summary>
+        /// この置き場所を描いている Revit の要素の ID（このモデルの要素。リンクの中の物はリンクの要素）。
+        /// ライブ同期で、変わった要素の分だけを入れ替えるのに使う
+        /// </summary>
+        public long Element;
     }
 
     internal struct RenderVertex : IEquatable<RenderVertex>
@@ -178,6 +185,8 @@ namespace Tools28.Commands.RealtimeRender
         public int Type;  // 0 = 全方向, 1 = 半球, 2 = スポット
         public float[] Direction = { 0, 0, -1 };
         public float CosInner = 1f, CosOuter;
+        /// <summary>この光源を持つ Revit の要素の ID（RenderInstance.Element と同じ）。</summary>
+        public long Element = -1;
     }
 
     internal class RenderCamera

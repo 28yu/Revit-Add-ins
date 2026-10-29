@@ -336,6 +336,27 @@ struct Navigator {
 
 Navigator* nav(GLFWwindow* w) { return static_cast<Navigator*>(glfwGetWindowUserPointer(w)); }
 
+// ライブ同期の差分のファイル名（シーンファイル＋.d＋通し番号 8 桁。Revit 側 LiveSync.UpdateDelta と同じ）
+std::string deltaPath(const std::string& scenePath, uint32_t seq) {
+    char buf[16];
+    snprintf(buf, sizeof(buf), ".d%08u", seq);
+    return scenePath + buf;
+}
+
+// 全体を読み直したとき、それより前の差分（もう含まれている）を消す
+void removeOldDeltas(const std::string& scenePath, uint32_t upTo) {
+    namespace fs = std::filesystem;
+    std::error_code ec;
+    fs::path p = fs::u8path(scenePath);
+    const std::string prefix = p.filename().u8string() + ".d";
+    for (const auto& entry : fs::directory_iterator(p.parent_path(), ec)) {
+        std::string name = entry.path().filename().u8string();
+        if (name.size() != prefix.size() + 8 || name.compare(0, prefix.size(), prefix) != 0) continue;
+        uint32_t seq = static_cast<uint32_t>(std::strtoul(name.c_str() + prefix.size(), nullptr, 10));
+        if (seq <= upTo) fs::remove(entry.path(), ec);
+    }
+}
+
 }  // namespace
 
 int runWindow(const Options& opt, Scene& scene) {
@@ -359,6 +380,11 @@ int runWindow(const Options& opt, Scene& scene) {
     if (opt.gpuMemoryMb > 0) ctx.deviceLocalBytes = static_cast<VkDeviceSize>(opt.gpuMemoryMb) << 20;  // 動作確認用
 
     Bvh bvh;
+    // ライブ同期の差分を足すための元のシーン（prepareScene の前のもの。置き場所に要素の ID が付いている）。
+    // 描くのは、これを写して prepareScene したもの（scene）
+    Scene master;
+    if (opt.liveSync && !opt.scenePath.empty()) master = scene;
+    uint32_t syncSeq = scene.syncSeq;  // 受け取った変更の通し番号（全体の書き出し・差分ごとに 1 ずつ増える）
     uint32_t glassStart = prepareScene(scene, bvh, opt.instancing);
     // 止まっている間の仕上げ（Open Image Denoise。インストール先の oidn フォルダにあれば使う。ビューアの exe には無い）
     OidnDenoiser oidn;
@@ -902,6 +928,9 @@ int runWindow(const Options& opt, Scene& scene) {
                 std::string error;
                 // Revit が書いている途中で読めなかったときは、次の機会にもう一度読む
                 if (loadScene(opt.scenePath, next, error)) {
+                    master = next;
+                    syncSeq = next.syncSeq;
+                    removeOldDeltas(opt.scenePath, syncSeq);
                     Bvh nextBvh;
                     uint32_t nextGlass = prepareScene(next, nextBvh, opt.instancing);
                     renderer.reloadScene(next, nextGlass, nextBvh);
@@ -921,10 +950,47 @@ int runWindow(const Options& opt, Scene& scene) {
                     scene = std::move(next);
                     bvh = std::move(nextBvh);
                     sceneStamp = st;
-                    logInfo("Live sync: scene reloaded (%zu triangles)", scene.triangleCount());
+                    logInfo("Live sync: scene reloaded #%u (%zu triangles)", syncSeq, scene.triangleCount());
                     toast({tr("SyncUpdated")}, 2.5);
                 } else {
                     logInfo("Live sync: could not read the scene yet (%s)", error.c_str());
+                }
+            }
+            // 差分（変わった要素だけ）: 通し番号の順に足して、描き直す
+            auto deltaStart = std::chrono::steady_clock::now();
+            int deltas = 0;
+            while (true) {
+                const std::string path = deltaPath(opt.scenePath, syncSeq + 1);
+                if (stampOf(path) == kNoFile) break;
+                Scene delta;
+                std::vector<int64_t> removed;
+                uint32_t seq = 0;
+                std::string error;
+                if (!loadSceneDelta(path, delta, removed, seq, error) || seq != syncSeq + 1) {
+                    logError("Live sync: could not read %s (%s)", path.c_str(), error.c_str());
+                    break;
+                }
+                applySceneDelta(master, delta, removed);
+                syncSeq = seq;
+                std::error_code ec;
+                fs::remove(fs::u8path(path), ec);
+                logInfo("Live sync: delta #%u (%zu removed, %zu triangles added)", seq, removed.size(), delta.triangleCount());
+                ++deltas;
+            }
+            if (deltas > 0) {
+                if (master.instances.empty() || master.triangleCount() == 0) {
+                    logInfo("Live sync: nothing left to draw");
+                } else {
+                    Scene next = master;
+                    Bvh nextBvh;
+                    uint32_t nextGlass = prepareScene(next, nextBvh, opt.instancing);
+                    renderer.reloadScene(next, nextGlass, nextBvh);
+                    scene = std::move(next);
+                    bvh = std::move(nextBvh);
+                    logInfo("Live sync: %d delta(s) applied in %.0f ms (%zu triangles stored)", deltas,
+                            std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - deltaStart).count(),
+                            scene.triangleCount());
+                    toast({tr("SyncUpdated")}, 2.5);
                 }
             }
         }

@@ -16,6 +16,8 @@ namespace Tools28.Commands.RealtimeRender
     /// （1 回目に覚えた「形と位置」を並べるだけ。書き出しが速くなる）。見た目が変わりうる条件（フェーズの上書き・
     /// ビューのフィルタ・要素ごとの上書き）も見分けの目印に含め、光源を含むファミリは毎回読む。
     /// 念のため 16 回に 1 回は実際に読んで比べ、違っていたらそのファミリは以後も毎回読む。
+    /// 置き場所と光源には、それを描いている要素の ID を付ける（壁・床なども要素ごとに 1 つの形にする）。
+    /// ライブ同期で変わった要素だけを書き出すときは、only に入っていない要素を読まない（Revit が三角形にする前に飛ばすので速い）。
     /// </summary>
     internal class SceneExportContext : IExportContext
     {
@@ -73,7 +75,13 @@ namespace Tools28.Commands.RealtimeRender
             new List<(ElementId, ICollection<ElementId>, ElementFilter, ICollection<ElementId>)>();
         private string _elementSignature = "";
         private readonly Stack<ShapeBuilder> _shapes = new Stack<ShapeBuilder>();
-        private readonly ShapeBuilder _loose = new ShapeBuilder { World = Transform.Identity, WorldInverse = Transform.Identity };
+        // 置き場所の外の形（壁・床など）。要素ごとに 1 つの形にする（ライブ同期で、要素ごとに入れ替えられるように）
+        private ShapeBuilder _loose = NewLoose();
+        private static ShapeBuilder NewLoose() => new ShapeBuilder { World = Transform.Identity, WorldInverse = Transform.Identity };
+        // 今の要素（このモデルの要素。リンクの中を読んでいる間はリンクの要素）の ID
+        private long _currentTop = -1;
+        // 書き出す要素（null = 全部）
+        private readonly ICollection<ElementId> _only;
         // 中身のハッシュ → 同じハッシュの形の番号（中身を比べて確かめる）
         private readonly Dictionary<ulong, List<int>> _shapeByHash = new Dictionary<ulong, List<int>>();
         /// <summary>置き場所のうち、すでにある形を使い回した数（ログ用）。</summary>
@@ -84,10 +92,11 @@ namespace Tools28.Commands.RealtimeRender
         /// <summary>見つからなかったテクスチャ画像（ログ用）。</summary>
         public IReadOnlyList<string> MissingTextures => _textures.Missing;
 
-        public SceneExportContext(Document doc, PhaseOverrides phase = null, View view = null)
+        public SceneExportContext(Document doc, PhaseOverrides phase = null, View view = null, ICollection<ElementId> only = null)
         {
             _phase = phase;
             _view = view;
+            _only = only;
             _documents.Push(doc);
             _transforms.Push(Transform.Identity);
             _textures = new TextureLoader(doc.PathName, doc.Application.VersionNumber);
@@ -119,7 +128,7 @@ namespace Tools28.Commands.RealtimeRender
 
         public void Finish()
         {
-            // 置き場所の外の形（壁・床など）は 1 つにまとめて、そのままの位置に置く
+            // 念のため（ふつうは要素の終わりで入れてある）
             CommitShape(_loose);
         }
 
@@ -136,6 +145,14 @@ namespace Tools28.Commands.RealtimeRender
 
         public RenderNodeAction OnElementBegin(ElementId elementId)
         {
+            if (_documents.Count == 1)
+            {
+                // 変わった要素だけを書き出すときは、それ以外を読まない
+                if (_only != null && !_only.Contains(elementId)) return RenderNodeAction.Skip;
+                CommitShape(_loose);  // 念のため（前の要素の形が残っていれば、その要素の形として入れる）
+                _currentTop = elementId.LongValue();
+                _loose = NewLoose();
+            }
             _currentElement = elementId;
             _phaseMaterial = PhaseMaterialOf(elementId);
             _elementSignature = OverrideSignatureOf(elementId);
@@ -146,7 +163,15 @@ namespace Tools28.Commands.RealtimeRender
             return RenderNodeAction.Proceed;
         }
 
-        public void OnElementEnd(ElementId elementId) { }
+        public void OnElementEnd(ElementId elementId)
+        {
+            // このモデルの要素が終わったら、置き場所の外の形をその要素の形として入れる（リンクの中の要素は、リンクの要素の終わりでまとめて）
+            if (_documents.Count == 1 && _currentTop == elementId.LongValue())
+            {
+                CommitShape(_loose);
+                _loose = NewLoose();
+            }
+        }
 
         public RenderNodeAction OnInstanceBegin(InstanceNode node)
         {
@@ -209,7 +234,7 @@ namespace Tools28.Commands.RealtimeRender
         /// <summary>置き場所を足し、記録中の外側の置き場所（覚えようとしているファミリ）にも、そこから見た位置で覚えさせる。</summary>
         private void AddPlacement(int mesh, Transform world)
         {
-            Scene.Instances.Add(new RenderInstance { Mesh = mesh, M = ToMatrix(world) });
+            Scene.Instances.Add(new RenderInstance { Mesh = mesh, M = ToMatrix(world), Element = _currentTop });
             foreach (ShapeBuilder f in _shapes)
                 if (f.Recording != null)
                     f.Recording.Add(new TemplateEntry { Mesh = mesh, Relative = f.WorldInverse.Multiply(world) });
@@ -398,7 +423,11 @@ namespace Tools28.Commands.RealtimeRender
             {
                 Document doc = _documents.Peek();
                 RenderLight light = LightReader.Read(doc, _currentElement, _transforms.Peek().Multiply(node.GetTransform()));
-                if (light != null) Scene.Lights.Add(light);
+                if (light != null)
+                {
+                    light.Element = _currentTop;
+                    Scene.Lights.Add(light);
+                }
             }
             catch (Exception ex)
             {
