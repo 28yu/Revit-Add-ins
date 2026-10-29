@@ -15,7 +15,7 @@
 > （ビュー系4本は短くした版 a11a041、一般モデル化・梁レベル色分けは v2.7.2 のタグ）。新しい内容はこのフォルダにある。
 > 梁レベル色分けの「その階の梁だけ・水平/斜め」（2026-10-27）は `Features/BeamLevelColor.md` に統合済み。
 | `release-notes.md` | リリース本文に貼る「改善・修正」の文章（自動生成の本文には載らないため） |
-| `site-news-v28.patch` | サイト（28tools-download）のトップの新着に v2.8 を足す差分（`index.html` と `js/main.js`） |
+| `site-v28.patch` | サイト（28tools-download）の差分一式（2026-10-29 作成）: 新着 v2.8、ビュー4機能の名前（〜合わせ）・アイコン・説明、サイトの CLAUDE.md の現在のバージョン |
 
 ## 今回のリリースに入る変更（v2.7.2 → 現在の main）
 
@@ -57,7 +57,7 @@
 5. **公開の後に**マニュアルとサイトを更新する（先にやると、マニュアル・新着だけ新版でダウンロードは旧版になる）
    - アドイン側: `Features/*.md` の8本を `Docs/Features/` に上書きコピーして `claude/*` に push
      → `notify-site.yml` がサイトのマニュアルを作り直す（数分）。このフォルダ（`Docs/ReleasePrep/v2.8/`）はその commit で削除してよい
-   - サイト側（28tools-download）: `git apply <このフォルダ>/site-news-v28.patch` → 日付（`2026/10`）を公開した月に直す →
+   - サイト側（28tools-download）: `git apply --binary <このフォルダ>/site-v28.patch` → 日付（`2026/10`）を公開した月に直す →
      `claude/*` に push（自動で PR 作成・マージ → 本番）。サイトの `CLAUDE.md` の「現在のバージョン」も v2.8 に直す
      （機能数は 24 のまま。`addins.html` の機能カード・機能数の変更は不要）
 6. **Notion**: リリースDB（907878c5-…）に `対象=アドイン (Revit-Add-ins)` で v2.8 を記録、決定事項ログに追記、

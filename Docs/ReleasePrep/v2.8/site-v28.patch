@@ -1,0 +1,1236 @@
+From cdc32f819c95ca3898e06f065e912ed6e1bdd9df Mon Sep 17 00:00:00 2001
+From: x <x>
+Date: Thu, 29 Oct 2026 06:14:39 +0000
+Subject: [PATCH] tmp
+
+---
+ CLAUDE.md                               |  14 +-
+ about.html                              |   8 +-
+ addins.html                             |  32 ++---
+ images/revit-icons/sectionbox_match.png | Bin 0 -> 9277 bytes
+ images/revit-icons/view_match.png       | Bin 0 -> 9055 bytes
+ images/revit-icons/viewport_match.png   | Bin 0 -> 4658 bytes
+ index.html                              |  15 +-
+ js/main.js                              | 183 ++++++++++++------------
+ manual/cropbox-copy.html                |  10 +-
+ manual/sectionbox-copy.html             |  12 +-
+ manual/view-copy.html                   |  12 +-
+ manual/viewport-position.html           |  12 +-
+ sitemap.xml                             |   8 +-
+ 13 files changed, 165 insertions(+), 141 deletions(-)
+ create mode 100644 images/revit-icons/sectionbox_match.png
+ create mode 100644 images/revit-icons/view_match.png
+ create mode 100644 images/revit-icons/viewport_match.png
+
+diff --git a/CLAUDE.md b/CLAUDE.md
+index 49a0059..bc6f482 100644
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -391,7 +391,7 @@ PRが作成されると、Netlifyが自動でプレビュー環境を構築し
+ 
+ **対応バージョン**: Revit 2021, 2022, 2023, 2024, 2025, 2026（全バージョン利用可能）
+ 
+-**現在のバージョン**: v2.7.2（2026/10/16〜。配布物は全バージョン共通のインストーラー `28Tools_Setup_v2.7.2.exe` 1 本）
++**現在のバージョン**: v2.8（2026/10〜。配布物は全バージョン共通のインストーラー `28Tools_Setup_v2.8.exe` 1 本）
+ 
+ **配布形式（v2.6〜）**: Inno Setup で作った**署名なし**のインストーラー 1 本で
+ Revit 2021〜2026 をまとめて扱う（アドイン開発リポジトリの `Installer/28Tools.iss`）。
+@@ -1891,3 +1891,15 @@ X API は新規登録だと従量課金（無料枠なし）のため、**無料
+ - 最初に出る「週に何回投稿するか」は Buffer のおすすめ表示用。予約は Notion の日時で送るので動作に影響しない
+ - Notion の旧「インテグレーション」は「コネクション（新規コネクト）」に名前が変わった。ページへの接続許可は「…」→「詳細」→「接続」
+ 
++
++
++---
++
++## 2026/10 セッション — Revit アドイン v2.8 公開
++
++| 対応 | 内容 |
++|--|--|
++| 機能名の変更 | ビューの4機能を「〜合わせ」に（ビューポート位置合わせ・トリミング領域合わせ・視点合わせ・切断ボックス合わせ）。`addins.html` のカード、`js/main.js` の翻訳、`manual/` の4ページの題名、`about.html`・`index.html`・`addins.html` の説明文を変更。URL（`manual/view-copy.html` など）は変えていない（検索・リンク切れを避けるため） |
++| アイコン | `images/revit-icons/viewport_match.png` / `view_match.png` / `sectionbox_match.png` を追加（アドイン側 `Resources/Icons/` と同じもの）。トリミング領域は `cropbox_copy.png` のまま |
++| トップ | 新着に `index-news-v28` |
++| 機能数 | 24 のまま（新機能なし） |
+diff --git a/about.html b/about.html
+index 1503d89..0560c51 100644
+--- a/about.html
++++ b/about.html
+@@ -123,10 +123,10 @@
+                 <ul style="margin-top: 16px;">
+                     <li data-lang-key="about-tool1"><strong>符号ON/OFF</strong> - 通り芯・レベルの符号表示を一括切替</li>
+                     <li data-lang-key="about-tool2"><strong>シート一括作成</strong> - 図枠を指定して複数シートをまとめて作成</li>
+-                    <li data-lang-key="about-tool3"><strong>3D視点コピペ</strong> - 3Dビューの視点を他のビューに反映</li>
+-                    <li data-lang-key="about-tool4"><strong>切断ボックスコピペ</strong> - 3Dビューの切断ボックス範囲を反映</li>
+-                    <li data-lang-key="about-tool5"><strong>ビューポート位置コピペ</strong> - シート上のビューポート位置を反映</li>
+-                    <li data-lang-key="about-tool6"><strong>トリミング領域コピペ</strong> - ビューのトリミング領域を反映</li>
++                    <li data-lang-key="about-tool3"><strong>視点合わせ</strong> - 3Dビューの視点を他のビューに反映</li>
++                    <li data-lang-key="about-tool4"><strong>切断ボックス合わせ</strong> - 3Dビューの切断ボックス範囲を反映</li>
++                    <li data-lang-key="about-tool5"><strong>ビューポート位置合わせ</strong> - シート上のビューポート位置を反映</li>
++                    <li data-lang-key="about-tool6"><strong>トリミング領域合わせ</strong> - ビューのトリミング領域を反映</li>
+                     <li data-lang-key="about-tool7"><strong>部屋タグ自動配置</strong> - ビューポートの部屋情報からタグを一括自動配置</li>
+                     <li data-lang-key="about-tool8"><strong>梁下端色分け</strong> - 梁の下端レベルを自動計算しパステルカラーで色分け</li>
+                     <li data-lang-key="about-tool9"><strong>梁天端色分け</strong> - 梁の天端レベルをパステルカラーで色分け表示</li>
+diff --git a/addins.html b/addins.html
+index c14958e..cc4849a 100644
+--- a/addins.html
++++ b/addins.html
+@@ -20,14 +20,14 @@
+         "price": "0",
+         "priceCurrency": "JPY"
+       },
+-      "description": "Revit 2021-2026対応の無料アドイン。符号ON/OFF、シート一括作成、3D視点コピペ、部屋タグ自動配置、梁色分け、Excel連携、リアルタイムレンダリングなど24の機能を提供。"
++      "description": "Revit 2021-2026対応の無料アドイン。符号ON/OFF、シート一括作成、視点合わせ、部屋タグ自動配置、梁色分け、Excel連携、リアルタイムレンダリングなど24の機能を提供。"
+     }
+     </script>
+-    <meta name="description" content="Revit 2021-2026対応の無料アドイン。符号ON/OFF、シート一括作成、3D視点コピペ、部屋タグ自動配置、梁色分け、Excel連携、塗潰し領域分割・統合、リアルタイムレンダリングなど24の機能を提供。">
++    <meta name="description" content="Revit 2021-2026対応の無料アドイン。符号ON/OFF、シート一括作成、視点合わせ、部屋タグ自動配置、梁色分け、Excel連携、塗潰し領域分割・統合、リアルタイムレンダリングなど24の機能を提供。">
+ 
+     <!-- OGP (Open Graph Protocol) -->
+     <meta property="og:title" content="28 Tools - Revit アドイン配布センター">
+-    <meta property="og:description" content="Revit 2021-2026対応の無料アドイン。符号ON/OFF、シート一括作成、3D視点コピペ、部屋タグ自動配置、梁色分け、Excel連携、塗潰し領域分割・統合、リアルタイムレンダリングなど24の機能を提供。">
++    <meta property="og:description" content="Revit 2021-2026対応の無料アドイン。符号ON/OFF、シート一括作成、視点合わせ、部屋タグ自動配置、梁色分け、Excel連携、塗潰し領域分割・統合、リアルタイムレンダリングなど24の機能を提供。">
+     <meta property="og:type" content="website">
+     <meta property="og:url" content="https://28tools.com/addins.html">
+     <meta property="og:image" content="https://28tools.com/images/ogp-image.png">
+@@ -37,7 +37,7 @@
+     <!-- Twitter Card -->
+     <meta name="twitter:card" content="summary_large_image">
+     <meta name="twitter:title" content="28 Tools - Revit アドイン配布センター">
+-    <meta name="twitter:description" content="Revit 2021-2026対応の無料アドイン。符号ON/OFF、シート一括作成、3D視点コピペ、部屋タグ自動配置、梁色分け、Excel連携、塗潰し領域分割・統合、リアルタイムレンダリングなど24の機能を提供。">
++    <meta name="twitter:description" content="Revit 2021-2026対応の無料アドイン。符号ON/OFF、シート一括作成、視点合わせ、部屋タグ自動配置、梁色分け、Excel連携、塗潰し領域分割・統合、リアルタイムレンダリングなど24の機能を提供。">
+     <meta name="twitter:image" content="https://28tools.com/images/ogp-image.png">
+ 
+     <!-- Google tag (gtag.js) -->
+@@ -104,39 +104,39 @@
+                         <p class="feature-description" data-lang-key="feature-sheet-desc">図枠を指定して複数シートをまとめて作成</p>
+                     </a>
+ 
+-                    <!-- ビューポート位置コピペ -->
++                    <!-- ビューポート位置合わせ -->
+                     <a href="manual/viewport-position.html" class="feature-card">
+                         <div class="feature-icon">
+-                            <img src="images/revit-icons/viewport_copy.png" alt="Viewport Position Icon">
++                            <img src="images/revit-icons/viewport_match.png" alt="Viewport Position Icon">
+                         </div>
+-                        <h3 class="feature-title" data-lang-key="feature-viewport-title">ビューポート位置コピペ</h3>
+-                        <p class="feature-description" data-lang-key="feature-viewport-desc">シート上のビューポート位置をコピー&ペースト</p>
++                        <h3 class="feature-title" data-lang-key="feature-viewport-title">ビューポート位置合わせ</h3>
++                        <p class="feature-description" data-lang-key="feature-viewport-desc">シート上のビューポート位置を他のシートにそろえる</p>
+                     </a>
+ 
+-                    <!-- トリミング領域コピペ -->
++                    <!-- トリミング領域合わせ -->
+                     <a href="manual/cropbox-copy.html" class="feature-card">
+                         <div class="feature-icon">
+                             <img src="images/revit-icons/cropbox_copy.png" alt="Crop Box Icon">
+                         </div>
+-                        <h3 class="feature-title" data-lang-key="feature-crop-title">トリミング領域コピペ</h3>
++                        <h3 class="feature-title" data-lang-key="feature-crop-title">トリミング領域合わせ</h3>
+                         <p class="feature-description" data-lang-key="feature-crop-desc">ビューのトリミング領域をコピー&ペースト</p>
+                     </a>
+ 
+-                    <!-- 3D視点コピペ -->
++                    <!-- 視点合わせ -->
+                     <a href="manual/view-copy.html" class="feature-card">
+                         <div class="feature-icon">
+-                            <img src="images/revit-icons/view_copy.png" alt="3D View Copy Icon">
++                            <img src="images/revit-icons/view_match.png" alt="3D View Copy Icon">
+                         </div>
+-                        <h3 class="feature-title" data-lang-key="feature-view-title">3D視点コピペ</h3>
++                        <h3 class="feature-title" data-lang-key="feature-view-title">視点合わせ</h3>
+                         <p class="feature-description" data-lang-key="feature-view-desc">3Dビューの視点を他のビューにコピー&ペースト</p>
+                     </a>
+ 
+-                    <!-- 切断ボックスコピペ -->
++                    <!-- 切断ボックス合わせ -->
+                     <a href="manual/sectionbox-copy.html" class="feature-card">
+                         <div class="feature-icon">
+-                            <img src="images/revit-icons/sectionbox_copy.png" alt="Section Box Icon">
++                            <img src="images/revit-icons/sectionbox_match.png" alt="Section Box Icon">
+                         </div>
+-                        <h3 class="feature-title" data-lang-key="feature-section-title">切断ボックスコピペ</h3>
++                        <h3 class="feature-title" data-lang-key="feature-section-title">切断ボックス合わせ</h3>
+                         <p class="feature-description" data-lang-key="feature-section-desc">3Dビューの切断ボックス範囲をコピー&ペースト</p>
+                     </a>
+ 
+diff --git a/images/revit-icons/sectionbox_match.png b/images/revit-icons/sectionbox_match.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..6145d847c3affde1c366f0dde9b887fe629271c7
+GIT binary patch
+literal 9277
+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
+z6~hLs@A^bg++1wznez*;(%0A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
+
+literal 0
+HcmV?d00001
+
+diff --git a/images/revit-icons/view_match.png b/images/revit-icons/view_match.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..6f325f4a4f25f84433164c6ac69bc118e7d11a23
+GIT binary patch
+literal 9055
+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
+Rm74$n002ovPDHLkV1jMGooWC8
+
+literal 0
+HcmV?d00001
+
+diff --git a/images/revit-icons/viewport_match.png b/images/revit-icons/viewport_match.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..cd5f59e825476754bc75cf7fa3057301015fc39a
+GIT binary patch
+literal 4658
+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
+
+literal 0
+HcmV?d00001
+
+diff --git a/index.html b/index.html
+index e2e959b..815d6f9 100644
+--- a/index.html
++++ b/index.html
+@@ -6,7 +6,7 @@
+     <title>28 Tools - Revit作図サポートツール</title>
+     <link rel="icon" type="image/png" href="images/site-icons/favicon-28.png">
+     <link rel="canonical" href="https://28tools.com/">
+-    <meta name="description" content="Revit作業を効率化する無料アドインツール。通り芯符号切替、シート一括作成、3D視点コピペ、リアルタイムレンダリングなど24の便利機能を提供。">
++    <meta name="description" content="Revit作業を効率化する無料アドインツール。通り芯符号切替、シート一括作成、視点合わせ、リアルタイムレンダリングなど24の便利機能を提供。">
+ 
+     <!-- 構造化データ -->
+     <script type="application/ld+json">
+@@ -15,7 +15,7 @@
+       "@type": "WebSite",
+       "name": "28 Tools",
+       "url": "https://28tools.com/",
+-      "description": "Revit作業を効率化する無料アドインツール。通り芯符号切替、シート一括作成、3D視点コピペなど便利機能を提供。",
++      "description": "Revit作業を効率化する無料アドインツール。通り芯符号切替、シート一括作成、視点合わせなど便利機能を提供。",
+       "publisher": {
+         "@type": "Organization",
+         "name": "28 Tools",
+@@ -30,7 +30,7 @@
+ 
+     <!-- OGP (Open Graph Protocol) -->
+     <meta property="og:title" content="28 Tools - Revit作図サポートセンター">
+-    <meta property="og:description" content="Revit作業を効率化する無料アドインツール。通り芯符号切替、シート一括作成、3D視点コピペ、リアルタイムレンダリングなど24の便利機能を提供。">
++    <meta property="og:description" content="Revit作業を効率化する無料アドインツール。通り芯符号切替、シート一括作成、視点合わせ、リアルタイムレンダリングなど24の便利機能を提供。">
+     <meta property="og:type" content="website">
+     <meta property="og:url" content="https://28tools.com/">
+     <meta property="og:image" content="https://28tools.com/images/ogp-image.png">
+@@ -40,7 +40,7 @@
+     <!-- Twitter Card -->
+     <meta name="twitter:card" content="summary_large_image">
+     <meta name="twitter:title" content="28 Tools - Revit作図サポートセンター">
+-    <meta name="twitter:description" content="Revit作業を効率化する無料アドインツール。通り芯符号切替、シート一括作成、3D視点コピペ、リアルタイムレンダリングなど24の便利機能を提供。">
++    <meta name="twitter:description" content="Revit作業を効率化する無料アドインツール。通り芯符号切替、シート一括作成、視点合わせ、リアルタイムレンダリングなど24の便利機能を提供。">
+     <meta name="twitter:image" content="https://28tools.com/images/ogp-image.png">
+ 
+     <!-- Google tag (gtag.js) -->
+@@ -214,6 +214,13 @@
+                 <h2 class="news-title" data-lang-key="index-news-title">新着・おすすめ</h2>
+             </div>
+             <ul class="news-list">
++                <li class="news-item">
++                    <span class="news-date">2026/10</span>
++                    <span class="news-tag addon">Addon</span>
++                    <div class="news-content">
++                        <a href="addins.html" data-lang-key="index-news-v28">28 Tools v2.8 リリース — ビューの「〜合わせ」を1ボタンに（AutoCAD の MA と同じ操作）、梁レベル色分けで梁タグ表記に対応、リアルタイムレンダリングに表示の設定を追加</a>
++                    </div>
++                </li>
+                 <li class="news-item">
+                     <span class="news-date">2026/10</span>
+                     <span class="news-tag addon">Addon</span>
+diff --git a/js/main.js b/js/main.js
+index 7d09c9c..44c753d 100644
+--- a/js/main.js
++++ b/js/main.js
+@@ -553,44 +553,44 @@ function initTranslations() {
+             zh: '使用指定的标题栏一次创建多个图纸'
+         },
+         'feature-view-title': {
+-            ja: '3D視点コピペ',
+-            en: '3D View Copy & Paste',
+-            zh: '3D视点复制粘贴'
++            ja: '視点合わせ',
++            en: 'Match View',
++            zh: '匹配视角'
+         },
+         'feature-view-desc': {
+             ja: '3Dビューの視点を他のビューに反映',
+-            en: 'Copy and paste 3D view orientation',
+-            zh: '将3D视图的视点复制并粘贴'
++            en: 'Match the 3D view orientation to other views',
++            zh: '将3D视图的视点匹配到其他视图'
+         },
+         'feature-section-title': {
+-            ja: '切断ボックスコピペ',
+-            en: 'Section Box Copy & Paste',
+-            zh: '剖切框复制粘贴'
++            ja: '切断ボックス合わせ',
++            en: 'Match Section Box',
++            zh: '匹配剖面框'
+         },
+         'feature-section-desc': {
+             ja: '3Dビューの切断ボックス範囲を反映',
+-            en: 'Copy and paste section box range',
+-            zh: '复制并粘贴剖切框范围'
++            en: 'Match the section box range to other 3D views',
++            zh: '将剖切框范围匹配到其他3D视图'
+         },
+         'feature-viewport-title': {
+-            ja: 'ビューポート位置コピペ',
+-            en: 'Viewport Position Copy & Paste',
+-            zh: '视口位置复制粘贴'
++            ja: 'ビューポート位置合わせ',
++            en: 'Align Viewports',
++            zh: '对齐视口'
+         },
+         'feature-viewport-desc': {
+             ja: 'シート上のビューポート位置を反映',
+-            en: 'Copy and paste viewport positions',
+-            zh: '复制并粘贴视口位置'
++            en: 'Align viewport positions across sheets',
++            zh: '在图纸之间对齐视口位置'
+         },
+         'feature-crop-title': {
+-            ja: 'トリミング領域コピペ',
+-            en: 'Crop Region Copy & Paste',
+-            zh: '裁剪区域复制粘贴'
++            ja: 'トリミング領域合わせ',
++            en: 'Match Crop Region',
++            zh: '匹配裁剪区域'
+         },
+         'feature-crop-desc': {
+             ja: 'ビューのトリミング領域を反映',
+-            en: 'Copy and paste crop regions',
+-            zh: '复制并粘贴裁剪区域'
++            en: 'Match crop regions to other views',
++            zh: '将裁剪区域匹配到其他视图'
+         },
+         'feature-room-tag-title': {
+             ja: '部屋タグ自動配置',
+@@ -883,6 +883,11 @@ function initTranslations() {
+             en: 'News & Featured',
+             zh: '最新动态'
+         },
++        'index-news-v28': {
++            ja: '28 Tools v2.8 リリース — ビューの「〜合わせ」を1ボタンに（AutoCAD の MA と同じ操作）、梁レベル色分けで梁タグ表記に対応、リアルタイムレンダリングに表示の設定を追加',
++            en: '28 Tools v2.8 Released — View "Match" tools are now one button (like AutoCAD\'s MA); Beam Level Color Code supports beam tags; Real-time Rendering adds display settings',
++            zh: '28 Tools v2.8 发布 — 视图“匹配”工具合并为一个按钮（与 AutoCAD 的 MA 操作相同），梁标高颜色区分支持梁标记，实时渲染新增显示设置'
++        },
+         'index-news-v27': {
+             ja: '28 Tools v2.7.2 リリース — 新機能「リアルタイムレンダリング」を追加（全24機能）',
+             en: '28 Tools v2.7.2 Released — New Real-time Rendering feature (24 features in total)',
+@@ -1419,7 +1424,7 @@ translations.gridBubble = {
+     },
+     'manual-grid-bubble-related-viewport': {
+         ja: 'ビューポート位置 コピー＆ペースト — シート上のビューポート位置を他のシートに合わせる',
+-        en: 'Viewport Position Copy & Paste — Match viewport positions across sheets',
++        en: 'Align Viewports — Match viewport positions across sheets',
+         zh: '视口位置 复制＆粘贴 — 将图纸上的视口位置与其他图纸对齐'
+     }
+ };
+@@ -1580,24 +1585,24 @@ translations.sheetCreation = {
+     },
+     'manual-sheet-creation-related-viewport': {
+         ja: 'ビューポート位置 コピー＆ペースト — 作成したシートのビューポート位置を他のシートに合わせる',
+-        en: 'Viewport Position Copy & Paste — Match viewport positions of created sheets to other sheets',
++        en: 'Align Viewports — Match viewport positions of created sheets to other sheets',
+         zh: '视口位置 复制＆粘贴 — 将创建图纸的视口位置与其他图纸对齐'
+     }
+ };
+ 
+     // ========================================
+-    // view-copy.html (3D視点コピペ)
++    // view-copy.html (視点合わせ)
+     // ========================================
+ translations.viewCopy = {
+     'manual-view-copy-title': {
+-        ja: '3D視点コピペ',
+-        en: '3D View Point Copy & Paste',
+-        zh: '三维视点复制粘贴'
++        ja: '視点合わせ',
++        en: 'Match View',
++        zh: '匹配视角'
+     },
+     'manual-view-copy-subtitle': {
+-        ja: '3Dビューの視点を他のビューにコピー＆ペースト',
+-        en: 'Copy and paste the camera viewpoint between 3D views',
+-        zh: '将三维视图的视点复制粘贴到其他视图'
++        ja: '3Dビューの視点を別の3Dビューに合わせる',
++        en: 'Match the camera viewpoint of other 3D views',
++        zh: '将其他三维视图的视点匹配为相同'
+     },
+     'manual-view-copy-overview': {
+         ja: '3Dビューのカメラ位置・向きをコピーして、別の3Dビューに貼り付ける機能です。複数の3Dビューで視点を揃えたい場合に便利です。',
+@@ -1690,35 +1695,35 @@ translations.viewCopy = {
+         zh: '请确认粘贴目标是否为活动的<strong>三维视图</strong>'
+     },
+     'manual-view-copy-related-sectionbox': {
+-        ja: '切断ボックス コピー＆ペースト — 3Dビューのセクションボックス範囲をコピー',
+-        en: 'Section Box Copy & Paste — Copy the section box range of a 3D view',
++        ja: '切断ボックス合わせ — 3Dビューのセクションボックス範囲をコピー',
++        en: 'Match Section Box — Copy the section box range of a 3D view',
+         zh: '切断框 复制＆粘贴 — 复制三维视图的切断框范围'
+     },
+     'manual-view-copy-related-cropbox': {
+-        ja: 'トリミング領域 コピー＆ペースト — 平面図・断面図などのトリミング領域をコピー',
+-        en: 'Crop Region Copy & Paste — Copy the crop region of floor plans, sections, etc.',
++        ja: 'トリミング領域合わせ — 平面図・断面図などのトリミング領域をコピー',
++        en: 'Match Crop Region — Copy the crop region of floor plans, sections, etc.',
+         zh: '裁剪区域 复制＆粘贴 — 复制平面图、剖面图等的裁剪区域'
+     },
+     'manual-view-copy-related-viewport': {
+         ja: 'ビューポート位置 コピー＆ペースト — シート上のビューポート位置をコピー',
+-        en: 'Viewport Position Copy & Paste — Copy the viewport position on a sheet',
++        en: 'Align Viewports — Copy the viewport position on a sheet',
+         zh: '视口位置 复制＆粘贴 — 复制图纸上的视口位置'
+     }
+ };
+ 
+     // ========================================
+-    // sectionbox-copy.html (切断ボックスコピペ)
++    // sectionbox-copy.html (切断ボックス合わせ)
+     // ========================================
+ translations.sectionboxCopy = {
+     'manual-sectionbox-copy-title': {
+-        ja: '切断ボックスコピペ',
+-        en: 'Section Box Copy & Paste',
+-        zh: '切断框复制粘贴'
++        ja: '切断ボックス合わせ',
++        en: 'Match Section Box',
++        zh: '匹配剖面框'
+     },
+     'manual-sectionbox-copy-subtitle': {
+-        ja: '3Dビューの切断ボックス範囲をコピー＆ペースト',
+-        en: 'Copy and paste the section box range between 3D views',
+-        zh: '在三维视图之间复制粘贴切断框范围'
++        ja: '3Dビューの切断ボックス範囲を別の3Dビューに合わせる',
++        en: 'Match the section box range of other 3D views',
++        zh: '在三维视图之间匹配剖面框范围'
+     },
+     'manual-sectionbox-copy-overview': {
+         ja: '3Dビューのセクションボックス（切断ボックス）の範囲をコピーして、別の3Dビューに貼り付ける機能です。同じ切り取り範囲を複数の3Dビューで共有したい場合に便利です。',
+@@ -1826,35 +1831,35 @@ translations.sectionboxCopy = {
+         zh: '请关闭"剖面框"复选框以确认和调整范围'
+     },
+     'manual-sectionbox-copy-related-viewcopy': {
+-        ja: '3Dビュー視点 コピー＆ペースト — 3Dビューのカメラ位置・向きをコピー',
+-        en: '3D View Point Copy & Paste — Copy the camera position and orientation of a 3D view',
++        ja: '視点合わせ — 3Dビューのカメラ位置・向きをコピー',
++        en: 'Match View — Copy the camera position and orientation of a 3D view',
+         zh: '三维视点 复制＆粘贴 — 复制三维视图的相机位置和方向'
+     },
+     'manual-sectionbox-copy-related-cropbox': {
+-        ja: 'トリミング領域 コピー＆ペースト — 平面図・断面図などのトリミング領域をコピー',
+-        en: 'Crop Region Copy & Paste — Copy the crop region of floor plans, sections, etc.',
++        ja: 'トリミング領域合わせ — 平面図・断面図などのトリミング領域をコピー',
++        en: 'Match Crop Region — Copy the crop region of floor plans, sections, etc.',
+         zh: '裁剪区域 复制＆粘贴 — 复制平面图、剖面图等的裁剪区域'
+     },
+     'manual-sectionbox-copy-related-viewport': {
+         ja: 'ビューポート位置 コピー＆ペースト — シート上のビューポート位置をコピー',
+-        en: 'Viewport Position Copy & Paste — Copy the viewport position on a sheet',
++        en: 'Align Viewports — Copy the viewport position on a sheet',
+         zh: '视口位置 复制＆粘贴 — 复制图纸上的视口位置'
+     }
+ };
+ 
+     // ========================================
+-    // viewport-position.html (ビューポート位置コピペ)
++    // viewport-position.html (ビューポート位置合わせ)
+     // ========================================
+ translations.viewportPosition = {
+     'manual-viewport-position-title': {
+-        ja: 'ビューポート位置コピペ',
+-        en: 'Viewport Position Copy & Paste',
+-        zh: '视口位置复制粘贴'
++        ja: 'ビューポート位置合わせ',
++        en: 'Align Viewports',
++        zh: '对齐视口'
+     },
+     'manual-viewport-pos-subtitle': {
+-        ja: 'シート上のビューポート位置をコピー＆ペースト',
+-        en: 'Copy & paste viewport positions on sheets',
+-        zh: '复制并粘贴图纸上的视口位置'
++        ja: 'シート上のビューポート位置を他のシートにそろえる',
++        en: 'Align viewport positions across sheets',
++        zh: '在图纸之间对齐视口位置'
+     },
+     'manual-viewport-pos-overview': {
+         ja: 'シート上のビューポート位置をコピーして、他のシートの同名ビューポートに自動的に貼り付ける機能です。複数のシートで同じビュー（例: 各階の平面図）を同じ位置に揃えたいときに便利です。',
+@@ -2012,9 +2017,9 @@ translations.viewportPosition = {
+         zh: '相关功能'
+     },
+     'manual-viewport-pos-related1': {
+-        ja: '3Dビュー視点 コピー＆ペースト',
+-        en: '3D View Camera Copy & Paste',
+-        zh: '3D视图视角复制粘贴'
++        ja: '視点合わせ',
++        en: 'Match View',
++        zh: '匹配视角'
+     },
+     'manual-viewport-pos-related1-desc': {
+         ja: '3Dビューのカメラ位置・向きをコピー',
+@@ -2022,9 +2027,9 @@ translations.viewportPosition = {
+         zh: '复制3D视图的摄像机位置和方向'
+     },
+     'manual-viewport-pos-related2': {
+-        ja: '切断ボックス コピー＆ペースト',
+-        en: 'Section Box Copy & Paste',
+-        zh: '剖面框复制粘贴'
++        ja: '切断ボックス合わせ',
++        en: 'Match Section Box',
++        zh: '匹配剖面框'
+     },
+     'manual-viewport-pos-related2-desc': {
+         ja: '3Dビューのセクションボックス範囲をコピー',
+@@ -2032,9 +2037,9 @@ translations.viewportPosition = {
+         zh: '复制3D视图的剖面框范围'
+     },
+     'manual-viewport-pos-related3': {
+-        ja: 'トリミング領域 コピー＆ペースト',
+-        en: 'Crop Region Copy & Paste',
+-        zh: '裁剪区域复制粘贴'
++        ja: 'トリミング領域合わせ',
++        en: 'Match Crop Region',
++        zh: '匹配裁剪区域'
+     },
+     'manual-viewport-pos-related3-desc': {
+         ja: 'ビューのトリミング領域をコピー',
+@@ -2099,18 +2104,18 @@ translations.viewportPosition = {
+ };
+ 
+     // ========================================
+-    // cropbox-copy.html (トリミング領域コピペ)
++    // cropbox-copy.html (トリミング領域合わせ)
+     // ========================================
+ translations.cropboxCopy = {
+     'manual-cropbox-copy-title': {
+-        ja: 'トリミング領域コピペ',
+-        en: 'Crop Region Copy & Paste',
+-        zh: '裁剪区域复制粘贴'
++        ja: 'トリミング領域合わせ',
++        en: 'Match Crop Region',
++        zh: '匹配裁剪区域'
+     },
+     'manual-cropbox-copy-subtitle': {
+-        ja: 'ビューのトリミング領域をコピー＆ペースト',
+-        en: 'Copy & paste view crop regions',
+-        zh: '复制并粘贴视图的裁剪区域'
++        ja: 'ビューのトリミング領域を別のビューに合わせる',
++        en: 'Match crop regions of other views',
++        zh: '匹配其他视图的裁剪区域'
+     },
+     'section-overview': {
+         ja: '機能概要',
+@@ -2253,9 +2258,9 @@ translations.cropboxCopy = {
+         zh: '相关功能'
+     },
+     'manual-cropbox-copy-related1': {
+-        ja: '3Dビュー視点 コピー＆ペースト',
+-        en: '3D View Camera Copy & Paste',
+-        zh: '3D视图视角复制粘贴'
++        ja: '視点合わせ',
++        en: 'Match View',
++        zh: '匹配视角'
+     },
+     'manual-cropbox-copy-related1-desc': {
+         ja: '3Dビューのカメラ位置・向きをコピー',
+@@ -2263,9 +2268,9 @@ translations.cropboxCopy = {
+         zh: '复制3D视图的摄像机位置和方向'
+     },
+     'manual-cropbox-copy-related2': {
+-        ja: '切断ボックス コピー＆ペースト',
+-        en: 'Section Box Copy & Paste',
+-        zh: '剖面框复制粘贴'
++        ja: '切断ボックス合わせ',
++        en: 'Match Section Box',
++        zh: '匹配剖面框'
+     },
+     'manual-cropbox-copy-related2-desc': {
+         ja: '3Dビューのセクションボックス範囲をコピー',
+@@ -2274,8 +2279,8 @@ translations.cropboxCopy = {
+     },
+     'manual-cropbox-copy-related3': {
+         ja: 'ビューポート位置 コピー＆ペースト',
+-        en: 'Viewport Position Copy & Paste',
+-        zh: '视口位置复制粘贴'
++        en: 'Align Viewports',
++        zh: '对齐视口'
+     },
+     'manual-cropbox-copy-related3-desc': {
+         ja: 'シート上のビューポート位置をコピー',
+@@ -6802,24 +6807,24 @@ translations.filledRegion = {
+             zh: '批量创建图纸 - 使用指定的标题栏一次创建多个图纸'
+         },
+         'about-tool3': {
+-            ja: '3D視点コピペ - 3Dビューの視点を他のビューに反映',
+-            en: '3D View Copy & Paste - Copy and paste 3D view orientation to other views',
+-            zh: '3D视点复制粘贴 - 将3D视图视角复制并粘贴到其他视图'
++            ja: '視点合わせ - 3Dビューの視点を他のビューに反映',
++            en: 'Match View - Copy and paste 3D view orientation to other views',
++            zh: '匹配视角 - 将3D视图视角复制并粘贴到其他视图'
+         },
+         'about-tool4': {
+-            ja: '切断ボックスコピペ - 3Dビューの切断ボックス範囲を反映',
+-            en: 'Section Box Copy & Paste - Copy and paste 3D view section box range',
+-            zh: '剖切框复制粘贴 - 复制并粘贴剖切框范围'
++            ja: '切断ボックス合わせ - 3Dビューの切断ボックス範囲を反映',
++            en: 'Match Section Box - Copy and paste 3D view section box range',
++            zh: '匹配剖面框 - 复制并粘贴剖切框范围'
+         },
+         'about-tool5': {
+-            ja: 'ビューポート位置コピペ - シート上のビューポート位置を反映',
+-            en: 'Viewport Position Copy & Paste - Copy and paste viewport positions on sheets',
+-            zh: '视口位置复制粘贴 - 复制并粘贴视口位置'
++            ja: 'ビューポート位置合わせ - シート上のビューポート位置を反映',
++            en: 'Align Viewports - Copy and paste viewport positions on sheets',
++            zh: '对齐视口 - 复制并粘贴视口位置'
+         },
+         'about-tool6': {
+-            ja: 'トリミング領域コピペ - ビューのトリミング領域を反映',
+-            en: 'Crop Region Copy & Paste - Copy and paste view crop regions',
+-            zh: '裁剪区域复制粘贴 - 复制并粘贴裁剪区域'
++            ja: 'トリミング領域合わせ - ビューのトリミング領域を反映',
++            en: 'Match Crop Region - Copy and paste view crop regions',
++            zh: '匹配裁剪区域 - 复制并粘贴裁剪区域'
+         },
+         'about-tool7': {
+             ja: '部屋タグ自動配置 - ビューポートの部屋情報からタグを一括自動配置',
+diff --git a/manual/cropbox-copy.html b/manual/cropbox-copy.html
+index d548822..90e4f1d 100644
+--- a/manual/cropbox-copy.html
++++ b/manual/cropbox-copy.html
+@@ -3,11 +3,11 @@
+ <head>
+     <meta charset="UTF-8">
+     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+-    <title>トリミング領域コピペ - 28 Tools マニュアル</title>
++    <title>トリミング領域合わせ - 28 Tools マニュアル</title>
+     <link rel="icon" type="image/png" href="../images/site-icons/favicon-28.png">
+     <link rel="canonical" href="https://28tools.com/manual/cropbox-copy.html">
+     <meta name="description" content="Revitのビュー間でトリミング領域の範囲と形状をコピー＆ペースト。同じ表示範囲を別のビューに適用できる無料アドインの使い方マニュアル。">
+-    <meta property="og:title" content="トリミング領域コピペ - 28 Tools マニュアル">
++    <meta property="og:title" content="トリミング領域合わせ - 28 Tools マニュアル">
+     <meta property="og:description" content="Revitのビュー間でトリミング領域の範囲と形状をコピー＆ペースト。同じ表示範囲を別のビューに適用できる無料アドインの使い方マニュアル。">
+     <meta property="og:type" content="article">
+     <meta property="og:url" content="https://28tools.com/manual/cropbox-copy.html">
+@@ -52,7 +52,7 @@
+             <span class="separator">›</span>
+             <a href="../addins.html" data-lang-key="breadcrumb-addins">アドイン</a>
+             <span class="separator">›</span>
+-            <span data-lang-key="manual-cropbox-copy-title">トリミング領域コピペ</span>
++            <span data-lang-key="manual-cropbox-copy-title">トリミング領域合わせ</span>
+         </nav>
+ 
+         <!-- 機能タイトル -->
+@@ -60,8 +60,8 @@
+             <div class="icon-wrapper">
+                 <img src="../images/revit-icons/cropbox_copy.png" alt="Crop Box Icon" class="feature-icon">
+             </div>
+-            <h1 class="manual-title" data-lang-key="manual-cropbox-copy-title">トリミング領域コピペ</h1>
+-            <p class="manual-subtitle" data-lang-key="manual-cropbox-copy-subtitle">ビューのトリミング領域をコピー＆ペースト</p>
++            <h1 class="manual-title" data-lang-key="manual-cropbox-copy-title">トリミング領域合わせ</h1>
++            <p class="manual-subtitle" data-lang-key="manual-cropbox-copy-subtitle">ビューのトリミング領域を別のビューに合わせる</p>
+         </div>
+ 
+         <!-- 機能概要 -->
+diff --git a/manual/sectionbox-copy.html b/manual/sectionbox-copy.html
+index 3a42ffb..7f0dd49 100644
+--- a/manual/sectionbox-copy.html
++++ b/manual/sectionbox-copy.html
+@@ -3,11 +3,11 @@
+ <head>
+     <meta charset="UTF-8">
+     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+-    <title>切断ボックスコピペ - 28 Tools マニュアル</title>
++    <title>切断ボックス合わせ - 28 Tools マニュアル</title>
+     <link rel="icon" type="image/png" href="../images/site-icons/favicon-28.png">
+     <link rel="canonical" href="https://28tools.com/manual/sectionbox-copy.html">
+     <meta name="description" content="Revitの3Dビュー間で切断ボックスの範囲をコピー＆ペースト。同じ表示範囲を複数の3Dビューで統一できる無料アドインの使い方マニュアル。">
+-    <meta property="og:title" content="切断ボックスコピペ - 28 Tools マニュアル">
++    <meta property="og:title" content="切断ボックス合わせ - 28 Tools マニュアル">
+     <meta property="og:description" content="Revitの3Dビュー間で切断ボックスの範囲をコピー＆ペースト。同じ表示範囲を複数の3Dビューで統一できる無料アドインの使い方マニュアル。">
+     <meta property="og:type" content="article">
+     <meta property="og:url" content="https://28tools.com/manual/sectionbox-copy.html">
+@@ -52,16 +52,16 @@
+             <span class="separator">›</span>
+             <a href="../addins.html" data-lang-key="breadcrumb-addins">アドイン</a>
+             <span class="separator">›</span>
+-            <span data-lang-key="manual-sectionbox-copy-title">切断ボックスコピペ</span>
++            <span data-lang-key="manual-sectionbox-copy-title">切断ボックス合わせ</span>
+         </nav>
+ 
+         <!-- 機能タイトル -->
+         <div class="manual-header">
+             <div class="icon-wrapper">
+-                <img src="../images/revit-icons/sectionbox_copy.png" alt="Section Box Icon" class="feature-icon">
++                <img src="../images/revit-icons/sectionbox_match.png" alt="Section Box Icon" class="feature-icon">
+             </div>
+-            <h1 class="manual-title" data-lang-key="manual-sectionbox-copy-title">切断ボックスコピペ</h1>
+-            <p class="manual-subtitle" data-lang-key="manual-sectionbox-copy-subtitle">3Dビューの切断ボックス範囲をコピー＆ペースト</p>
++            <h1 class="manual-title" data-lang-key="manual-sectionbox-copy-title">切断ボックス合わせ</h1>
++            <p class="manual-subtitle" data-lang-key="manual-sectionbox-copy-subtitle">3Dビューの切断ボックス範囲を別の3Dビューに合わせる</p>
+         </div>
+ 
+         <!-- 機能概要 -->
+diff --git a/manual/view-copy.html b/manual/view-copy.html
+index 7a53f08..24dc716 100644
+--- a/manual/view-copy.html
++++ b/manual/view-copy.html
+@@ -3,11 +3,11 @@
+ <head>
+     <meta charset="UTF-8">
+     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+-    <title>3D視点コピペ - 28 Tools マニュアル</title>
++    <title>視点合わせ - 28 Tools マニュアル</title>
+     <link rel="icon" type="image/png" href="../images/site-icons/favicon-28.png">
+     <link rel="canonical" href="https://28tools.com/manual/view-copy.html">
+     <meta name="description" content="Revitの3Dビュー間でカメラ位置・向き・ズームをコピー＆ペースト。同じ視点を別の3Dビューに簡単に適用できる無料アドインの使い方マニュアル。">
+-    <meta property="og:title" content="3D視点コピペ - 28 Tools マニュアル">
++    <meta property="og:title" content="視点合わせ - 28 Tools マニュアル">
+     <meta property="og:description" content="Revitの3Dビュー間でカメラ位置・向き・ズームをコピー＆ペースト。同じ視点を別の3Dビューに簡単に適用できる無料アドインの使い方マニュアル。">
+     <meta property="og:type" content="article">
+     <meta property="og:url" content="https://28tools.com/manual/view-copy.html">
+@@ -52,16 +52,16 @@
+             <span class="separator">›</span>
+             <a href="../addins.html" data-lang-key="breadcrumb-addins">アドイン</a>
+             <span class="separator">›</span>
+-            <span data-lang-key="manual-view-copy-title">3D視点コピペ</span>
++            <span data-lang-key="manual-view-copy-title">視点合わせ</span>
+         </nav>
+ 
+         <!-- 機能タイトル -->
+         <div class="manual-header">
+             <div class="icon-wrapper">
+-                <img src="../images/revit-icons/view_copy.png" alt="View Copy Icon" class="feature-icon">
++                <img src="../images/revit-icons/view_match.png" alt="View Copy Icon" class="feature-icon">
+             </div>
+-            <h1 class="manual-title" data-lang-key="manual-view-copy-title">3D視点コピペ</h1>
+-            <p class="manual-subtitle" data-lang-key="manual-view-copy-subtitle">3Dビューの視点を他のビューにコピー＆ペースト</p>
++            <h1 class="manual-title" data-lang-key="manual-view-copy-title">視点合わせ</h1>
++            <p class="manual-subtitle" data-lang-key="manual-view-copy-subtitle">3Dビューの視点を別の3Dビューに合わせる</p>
+         </div>
+ 
+         <!-- 機能概要 -->
+diff --git a/manual/viewport-position.html b/manual/viewport-position.html
+index 238c045..23e1702 100644
+--- a/manual/viewport-position.html
++++ b/manual/viewport-position.html
+@@ -3,11 +3,11 @@
+ <head>
+     <meta charset="UTF-8">
+     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+-    <title>ビューポート位置コピペ - 28 Tools マニュアル</title>
++    <title>ビューポート位置合わせ - 28 Tools マニュアル</title>
+     <link rel="icon" type="image/png" href="../images/site-icons/favicon-28.png">
+     <link rel="canonical" href="https://28tools.com/manual/viewport-position.html">
+     <meta name="description" content="Revitのシート上のビューポート位置座標をコピー＆ペースト。複数シートでビューの配置位置を統一できる無料アドインの使い方マニュアル。">
+-    <meta property="og:title" content="ビューポート位置コピペ - 28 Tools マニュアル">
++    <meta property="og:title" content="ビューポート位置合わせ - 28 Tools マニュアル">
+     <meta property="og:description" content="Revitのシート上のビューポート位置座標をコピー＆ペースト。複数シートでビューの配置位置を統一できる無料アドインの使い方マニュアル。">
+     <meta property="og:type" content="article">
+     <meta property="og:url" content="https://28tools.com/manual/viewport-position.html">
+@@ -52,16 +52,16 @@
+             <span class="separator">›</span>
+             <a href="../addins.html" data-lang-key="breadcrumb-addins">アドイン</a>
+             <span class="separator">›</span>
+-            <span data-lang-key="manual-viewport-position-title">ビューポート位置コピペ</span>
++            <span data-lang-key="manual-viewport-position-title">ビューポート位置合わせ</span>
+         </nav>
+ 
+         <!-- 機能タイトル -->
+         <div class="manual-header">
+             <div class="icon-wrapper">
+-                <img src="../images/revit-icons/viewport_copy.png" alt="Viewport Position Icon" class="feature-icon">
++                <img src="../images/revit-icons/viewport_match.png" alt="Viewport Position Icon" class="feature-icon">
+             </div>
+-            <h1 class="manual-title" data-lang-key="manual-viewport-position-title">ビューポート位置コピペ</h1>
+-            <p class="manual-subtitle" data-lang-key="manual-viewport-pos-subtitle">シート上のビューポート位置をコピー＆ペースト</p>
++            <h1 class="manual-title" data-lang-key="manual-viewport-position-title">ビューポート位置合わせ</h1>
++            <p class="manual-subtitle" data-lang-key="manual-viewport-pos-subtitle">シート上のビューポート位置を他のシートにそろえる</p>
+         </div>
+ 
+         <!-- 機能概要 -->
+diff --git a/sitemap.xml b/sitemap.xml
+index 46f5c90..6396a71 100644
+--- a/sitemap.xml
++++ b/sitemap.xml
+@@ -64,7 +64,7 @@
+     <priority>0.8</priority>
+   </url>
+ 
+-  <!-- マニュアル - 3D視点コピペ -->
++  <!-- マニュアル - 視点合わせ -->
+   <url>
+     <loc>https://28tools.com/manual/view-copy.html</loc>
+     <lastmod>2026-04-10</lastmod>
+@@ -72,7 +72,7 @@
+     <priority>0.8</priority>
+   </url>
+ 
+-  <!-- マニュアル - 切断ボックスコピペ -->
++  <!-- マニュアル - 切断ボックス合わせ -->
+   <url>
+     <loc>https://28tools.com/manual/sectionbox-copy.html</loc>
+     <lastmod>2026-04-10</lastmod>
+@@ -80,7 +80,7 @@
+     <priority>0.8</priority>
+   </url>
+ 
+-  <!-- マニュアル - ビューポート位置コピペ -->
++  <!-- マニュアル - ビューポート位置合わせ -->
+   <url>
+     <loc>https://28tools.com/manual/viewport-position.html</loc>
+     <lastmod>2026-04-10</lastmod>
+@@ -88,7 +88,7 @@
+     <priority>0.8</priority>
+   </url>
+ 
+-  <!-- マニュアル - トリミング領域コピペ -->
++  <!-- マニュアル - トリミング領域合わせ -->
+   <url>
+     <loc>https://28tools.com/manual/cropbox-copy.html</loc>
+     <lastmod>2026-04-10</lastmod>
+-- 
+2.43.0
+
