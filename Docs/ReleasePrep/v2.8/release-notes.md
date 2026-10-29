@@ -8,7 +8,21 @@
 
 ### 改善
 
+**ビューの「〜合わせ」（ビューポート位置・視点・切断ボックス・トリミング領域）**
+- コピー／ペーストの2つのボタンを、1つのボタンにまとめました（AutoCAD の MA と同じ操作: 元を選ぶ → 合わせたい先を選ぶ）
+- ボタン名を「ビューポート位置合わせ」「視点合わせ」「切断ボックス合わせ」「トリミング領域合わせ」に変更しました
+- コピー中はカーソルの横に印が出ます。Esc で取りやめます
+- 視点合わせは Ctrl+Z で元に戻せます
+- ビューポート位置合わせは、枠の中心ではなく図の位置でそろえます（Revit 2023 以降）
+
+**一般モデル化**
+- 材質を「元の材質のまま」にできるようにしました（既定）
+- 切断ボックスの外側を切り取ります
+- 作ったのに見えないときは、理由を結果に表示します。作ったものは選択状態になります
+- ファミリで作るとき「書き出して配置／書き出すだけ／配置するだけ」を選べます
+
 **梁レベル色分け（天端／下端）**
+- その階の梁だけを色分けします（参照レベルで判定）。「すべて／水平の梁だけ／斜めの梁だけ」を選べます
 - レベルの表記を自由に入力できるようにしました（既定はビューのレベル名）
 - 同じレベル差は、どの階でも同じ色になります（一度決まった色は変わりません）
 - 凡例を階ごとに、凡例ビューとして作成します。実行後は作成した凡例を開きます
@@ -29,7 +43,21 @@
 ## English (optional)
 
 ### Improvements
+**View "Match" tools (Viewport Position, View, Section Box, Crop Region)**
+- Copy and Paste are now a single button (works like AutoCAD's MA: pick the source, then the targets)
+- Renamed to Align Viewports / Match View / Match Section Box / Match Crop Region
+- A marker next to the cursor shows what is being copied; press Esc to cancel
+- Match View can be undone with Ctrl+Z
+- Align Viewports aligns by the drawing position instead of the frame center (Revit 2023 and later)
+
+**Generic Model Merge**
+- New default material option: keep the original materials
+- Geometry outside the section box is trimmed
+- If the result is not visible, the reason is shown; created elements are selected
+- When creating a family: export and place / export only / place only
+
 **Beam Level Color Code (Top/Bottom)**
+- Only beams on that level are colored (by reference level); choose all / horizontal only / sloped only
 - The level text can now be entered freely (defaults to the view's level name)
 - The same level difference now gets the same color on every floor
 - Legends are created per floor as legend views and opened after the run
