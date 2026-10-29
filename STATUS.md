@@ -1,9 +1,31 @@
-## 最新: 2026-10-29（v2.8 公開・レンダリング改善の段階0〜1）
-- **v2.8 を公開**（両リポジトリ。タグ v2.8 = 90d9688）。サイトの機能名・アイコン（〜合わせ）と新着を更新、マニュアル8本を反映
-  - リリース本文の「改善・修正」は `Docs/ReleaseNotes/v<VERSION>.md` に書けば、下書き作成時と公開時に自動で差し込まれる（運営者の作業なし）
-  - ⚠ 公開時の本文更新で**タグが外れて untagged-… になった**（tag_name を送らずに PATCH したため）→ 公開ワークフローで付け直して解決・再発防止済み
-- レンダリングの改善計画（段階0〜5、`TASKS.md`）: 段階0（測る仕組み `Renderer/tools/bench/`）・段階1（白とび対策＝ローカルトーンマッピング）完了。段階1は実機確認待ち
-- 次: 段階2（大きなモデルで落ちない・軽い。インスタンス化から）
+## 最新セッション: 2026-10-29（v2.8 公開・レンダリング改善 段階0〜2）
+長いセッションのため新しいセッションで続ける。詳細は `TASKS.md` の「リアルタイムレンダリングの改善計画」と `Docs/DEVLOG.md`（RealtimeRender の 2026-10-29 追記 4 つ）。
+
+### 実施したこと
+| 項目 | 内容 | 実機 |
+|--|--|--|
+| v2.8 公開 | 両リポジトリ公開（タグ v2.8 = 90d9688）。サイトの機能名・アイコン（〜合わせ）・新着を更新、マニュアル8本を反映 | 公開済み |
+| リリース本文 | `Docs/ReleaseNotes/v<VERSION>.md` に書けば下書き作成時・公開時に自動で差し込む（運営者の作業なし）。⚠ 本文更新の PATCH で tag_name を送らないとタグが外れる → 修正済み | — |
+| 段階0 測る仕組み | 測定用の立体駐車場 `--bench-scene small/large/huge`、`--bench`、`Renderer/tools/bench/run.sh`（`--quality` で画質） | — |
+| 段階1 白とび対策 | ローカルトーンマッピング（`localexp_down/blur.comp` → `composite.comp`）。屋根の下の白とび 11.9%→0.6%、屋外の絵は不変 | **未確認** |
+| 段階2-1 インスタンス化 | 同じ形は1回だけ持つ（シーンファイル版 6。Revit 側 `SceneExportContext` が中身を比べて置き場所だけ足す）。GPU メモリ 大 506→97MB・特大 1816→102MB | **未確認** |
+| 段階2-1b | Revit 2023〜: SymbolGeometryId が同じ置き場所は2回目から読まない（フィルタ・フェーズ・要素の上書きも目印、光源入りは毎回読む、16回に1回は読んで比べる） | **未確認** |
+| 段階2-2〜2-4 | 頂点 24 バイト、光の計算を帯に分けて送る（帯1本 0.3 秒以下・自動 1〜64 本）、GPU メモリの見積もりで描く／書き出す大きさを自動で縮める | **未確認** |
+| その他 | サイトに一時保存フォルダ `temp/`（サイトに出ない・GitHub 上は公開）。運営者の私用ツール keeper（`temp/keeper/`、C# 18KB）を作り直した | — |
+
+### 次のセッションでやること
+1. 運営者の実機確認の結果を聞く（段階1・2。確認点は `TASKS.md`）。不具合があれば `render.log` の該当部分をチャットで受け取って直す
+2. **段階3 ウィンドウの画質**: 空の光を直接狙う（屋根の下のまだらの主因。今は跳ね返りが偶然空に抜けたときだけ数えている）→
+   動いている間は小さく描いて復元 → 止まったら Open Image Denoise（CPU・別スレッド）で仕上げ（インストーラが数十MB増えるのは運営者了承済み。ビューア exe には入れない）
+3. 段階4 書き出し（画像の既定 JPEG・360° の重複削除・ビューア exe とテクスチャの圧縮）、段階5 ライブ同期の差分化
+- 運営者の要望の優先順: **大きなモデルでも落ちない・軽い（最優先）** ＞ ウィンドウも書き出しも高画質 ＞ 書き出すファイルを小さく。時間がかかってもよい
+
+### 開発環境のメモ（このコンテナで用意したもの。新しいコンテナでは入れ直し）
+- `apt-get install -y dotnet-sdk-8.0 cmake glslc libglfw3-dev mesa-vulkan-drivers libvulkan-dev xvfb mingw-w64 xdotool`（先に `apt-get update`）
+- Linux 版: `cd Renderer && cmake -S . -B build-linux -DT28_SYSTEM_GLFW=ON -DCMAKE_BUILD_TYPE=Release && cmake --build build-linux -j8`
+- Windows 版 exe: `Renderer/build-windows.sh`（**C++ を変えたら必ず作り直して `prebuilt/win-x64/Tools28Render.exe` もコミット**）
+- lavapipe を使う: `VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json`。確認用オプション `--camera` `--local-tonemap` `--no-instancing` `--bands` `--gpu-memory-mb`
+- 画質の正解画像 `build-linux/bench/small_reference.png` は仕上げを変えたら消して作り直す
 
 ## 最新: 2026-10-29（未リリースのマニュアルを v2.7.2 の内容に戻した）
 - 運営者の判断（B 案）: v2.8 の公開まで、サイトのマニュアルは公開中の v2.7.2 の操作に合わせる
