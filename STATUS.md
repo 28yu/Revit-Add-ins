@@ -1,3 +1,10 @@
+## 最新: 2026-10-29（未リリースのマニュアルを v2.7.2 の内容に戻した）
+- 運営者の判断（B 案）: v2.8 の公開まで、サイトのマニュアルは公開中の v2.7.2 の操作に合わせる
+- `Docs/Features/` の6本（ViewportPosition・ViewCopy3D・SectionBoxCopy・CropBoxCopy・GenericModelMerge・BeamLevelColor）を戻し、
+  新しい内容は `Docs/ReleasePrep/v2.8/Features/` に移した（v2.8 公開後にコピーで戻す。手順は同フォルダの README）
+- ビュー系4本は v2.7.2 のタグではなく、その直後に短くした版（a11a041。AdSense 対策・v2.7.2 の操作の説明）に戻した
+- サイト（28tools-download）に一時保存フォルダ `temp/` を作った（サイトには出ない。GitHub 上では公開）
+
 ## 最終セッション: 2026-10-22〜10-27（一般モデル化・「〜合わせ」1ボタン化・梁レベル色分け）
 長いセッションのため新しいセッションで続ける。詳細な判断は `Docs/DEVLOG.md` の各節（2026-10-23〜27 の追記）。
 

@@ -8,6 +8,12 @@
 | `Features/BeamLevelColor.md` | 梁レベル色分けのマニュアル（表記する文字・梁タグ・ブレース・階ごとの凡例・色は各階共通） |
 | `Features/RealtimeRender.md` | リアルタイムレンダリングのマニュアル（表示の設定・レンダリング設定・フェーズ・大きなモデル） |
 | `Features/FireProtection.md` | 耐火被覆色分けのマニュアル（上書き時に凡例ビューが残る、の1行だけ） |
+| `Features/ViewportPosition.md` `ViewCopy3D.md` `SectionBoxCopy.md` `CropBoxCopy.md` | 「〜合わせ」1ボタン化（2026-10-26〜27）後のマニュアル。2026-10-29 に `Docs/Features/` から移した |
+| `Features/GenericModelMerge.md` | 一般モデル化の改善（2026-10-23）後のマニュアル。同上 |
+
+> ⚠ 2026-10-29: 未リリースの操作がサイトに出ていたため、`Docs/Features/` の6本を公開中の v2.7.2 の内容に戻した
+> （ビュー系4本は短くした版 a11a041、一般モデル化・梁レベル色分けは v2.7.2 のタグ）。新しい内容はこのフォルダにある。
+> 梁レベル色分けの「その階の梁だけ・水平/斜め」（2026-10-27）は `Features/BeamLevelColor.md` に統合済み。
 | `release-notes.md` | リリース本文に貼る「改善・修正」の文章（自動生成の本文には載らないため） |
 | `site-news-v28.patch` | サイト（28tools-download）のトップの新着に v2.8 を足す差分（`index.html` と `js/main.js`） |
 
@@ -49,7 +55,7 @@
 4. 運営者が「公開して」と言ったら: `git push origin origin/main:refs/heads/publish/v2.8`
    → `publish-release.yml` が両リポジトリを公開する。サイトのダウンロードボタンはこの時点で新版になる
 5. **公開の後に**マニュアルとサイトを更新する（先にやると、マニュアル・新着だけ新版でダウンロードは旧版になる）
-   - アドイン側: `Features/*.md` の3本を `Docs/Features/` に上書きコピーして `claude/*` に push
+   - アドイン側: `Features/*.md` の8本を `Docs/Features/` に上書きコピーして `claude/*` に push
      → `notify-site.yml` がサイトのマニュアルを作り直す（数分）。このフォルダ（`Docs/ReleasePrep/v2.8/`）はその commit で削除してよい
    - サイト側（28tools-download）: `git apply <このフォルダ>/site-news-v28.patch` → 日付（`2026/10`）を公開した月に直す →
      `claude/*` に push（自動で PR 作成・マージ → 本番）。サイトの `CLAUDE.md` の「現在のバージョン」も v2.8 に直す
