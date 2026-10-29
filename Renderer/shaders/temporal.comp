@@ -26,7 +26,8 @@ layout(push_constant) uniform Params {
     vec4 prevForward;  // xyz = 前回の前方向, w = 1 なら履歴を捨ててやり直す
     vec4 prevRight;    // xyz = 前回の右方向, w = 縦横比
     vec4 prevUp;       // xyz = 前回の上方向, w = 縦の画角の tan(半分)
-    vec4 params;       // x = 動いている間の最小の混ぜ具合, y = 重ねる回数の上限
+    vec4 params;       // x = 動いている間の最小の混ぜ具合, y = 重ねる回数の上限,
+                       // z = ばらつきの倍率（4 画素に 1 つだけ光を追ったフレームは、補った画素が似た値になってばらつきを小さく見積もるので 4）
 } pc;
 
 float luminance(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
@@ -149,7 +150,7 @@ void main() {
         sampleVariance = max(sampleVariance, max(0.0, s2 / cnt - m * m));
     }
     // 重ねた回数が少ないうちはノイズの見積もり自体が不確かなので、多めに見積もって強めにならす
-    float variance = sampleVariance / len * max(1.0, 16.0 / len);
+    float variance = sampleVariance / len * max(1.0, 16.0 / len) * max(pc.params.z, 1.0);
     // 鏡・金属の映り込みはノイズが少ない（つるつるなほど）ので、平均しすぎて映り込みがぼけないようにする
     variance *= 1.0 - 0.9 * mirror;
 

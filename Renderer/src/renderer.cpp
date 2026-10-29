@@ -41,6 +41,9 @@ static const uint32_t kSkySpv[] =          // 空と雲の画像を前もって�
 static const uint32_t kSkyCdfSpv[] =       // 空の明るさの地図（空の光を直接狙うため）
 #include "sky_cdf.spv.inc"
     ;
+static const uint32_t kSparseFillSpv[] =   // 動いている間、光を追わなかった画素の明るさを周りから補う
+#include "sparse_fill.spv.inc"
+    ;
 
 namespace {
 
@@ -808,6 +811,7 @@ void Renderer::createPasses() {
                             kCompositeSpv, sizeof(kCompositeSpv), "composite");
     skyPass_ = createPass(dev, {{0, IMG}}, 1, sizeof(SkyPush), kSkySpv, sizeof(kSkySpv), "sky");
     skyCdfPass_ = createPass(dev, {{0, IMG}, {1, BUF}}, 1, 4, kSkyCdfSpv, sizeof(kSkyCdfSpv), "sky distribution");
+    sparseFill_ = createPass(dev, {{0, IMG}, {1, IMG}, {2, IMG}}, 2, 4, kSparseFillSpv, sizeof(kSparseFillSpv), "sparse fill");
     overlayPass_ = createPass(dev, {{0, IMG}, {1, IMG}}, kOverlaySlots, sizeof(OverlayPush), kOverlaySpv, sizeof(kOverlaySpv), "overlay");
 }
 
@@ -831,6 +835,7 @@ void Renderer::writeDescriptors() {
         }
         writeSet(dev, pathTrace_.sets[cur], pt);
 
+        writeSet(dev, sparseFill_.sets[cur], {{0, noisy_.view}, {1, gpos_[cur].view}, {2, gnormal_[cur].view}});
         writeSet(dev, temporal_.sets[cur], {
             {0, noisy_.view}, {1, gpos_[cur].view}, {2, gnormal_[cur].view}, {3, gpos_[prev].view},
             {4, gnormal_[prev].view}, {5, history_[prev].view}, {6, moments_[prev].view}, {7, history_[cur].view},
@@ -1038,30 +1043,49 @@ void Renderer::record(VkCommandBuffer cmd, const ViewParams& view) {
     pt.look[1] = lookMono_;
     pt.look[2] = lookFlags_;
     pt.look[3] = lookGround_;
-    if (bands <= 1) {
-        dispatch(cmd, pathTrace_, cur, &pt, sizeof(pt), w, h);
+    // 動いている間は 2×2 画素ごとに 1 つだけ光を追い（描き方 1）、残りは最初に見えている面だけ調べて（描き方 2）、
+    // 明るさを周りから補う（sparse_fill）。光の計算がおよそ 1/4 になる。止まったら全部の画素で追う
+    lastSparse_ = sparse_ && moved && !view.panorama && w >= 16 && h >= 16;
+    const uint32_t mode = lastSparse_ ? 1u : 0u;
+    const uint32_t gridW = lastSparse_ ? (w + 1) / 2 : w, gridH = lastSparse_ ? (h + 1) / 2 : h;
+    if (lastSparse_) {
+        // 描き方 2 は軽いので 1 回で送る（描き方 1 と書く画素が重ならないので、間の待ち合わせは要らない）
+        PathTracePush primaryOnly = pt;
+        primaryOnly.frame[3] = pt.frame[3] | (2u << 8);
+        dispatch(cmd, pathTrace_, cur, &primaryOnly, sizeof(primaryOnly), w, h);
+    }
+    const uint32_t ptBandsNow = std::max(1u, std::min(bands, (gridH + 7) / 8));
+    if (ptBandsNow <= 1) {
+        PathTracePush full = pt;
+        full.frame[3] = pt.frame[3] | (mode << 8);
+        dispatch(cmd, pathTrace_, cur, &full, sizeof(full), gridW, gridH);
     } else {
         // 重い 1 枚を横長の帯に分け、帯ごとに GPU へ送って終わるのを待つ（1 回の処理が長いと Windows が GPU を
         // リセットして落ちるため。約 2 秒）。最後の帯だけ cmd に入れ、続く処理と一緒に送る
-        const uint32_t rowsPerBand = ((h + bands - 1) / bands + 7) / 8 * 8;
+        const uint32_t rowsPerBand = ((gridH + ptBandsNow - 1) / ptBandsNow + 7) / 8 * 8;
         uint32_t y = 0;
-        while (y < h) {
-            const uint32_t rows = std::min(rowsPerBand, h - y);
+        while (y < gridH) {
+            const uint32_t rows = std::min(rowsPerBand, gridH - y);
             PathTracePush band = pt;
-            band.frame[3] = pt.frame[3] | (y << 8);
-            if (y + rows < h) {
+            band.frame[3] = pt.frame[3] | (mode << 8) | (y << 10);
+            if (y + rows < gridH) {
                 VkCommandBuffer one = ctx_->beginOneShot();
                 computeBarrier(one);
-                dispatch(one, pathTrace_, cur, &band, sizeof(band), w, rows);
+                dispatch(one, pathTrace_, cur, &band, sizeof(band), gridW, rows);
                 ctx_->endOneShot(one);
             } else {
                 computeBarrier(cmd);  // 先に送った帯の書き込みを、この後の処理から見えるようにする
-                dispatch(cmd, pathTrace_, cur, &band, sizeof(band), w, rows);
+                dispatch(cmd, pathTrace_, cur, &band, sizeof(band), gridW, rows);
             }
             y += rows;
         }
     }
     computeBarrier(cmd);
+    if (lastSparse_) {
+        uint32_t unused = 0;
+        dispatch(cmd, sparseFill_, cur, &unused, sizeof(unused), w, h);
+        computeBarrier(cmd);
+    }
 
     // 2. 前のフレームを重ねる（前のカメラの位置で、今の位置を写し直す）
     const ViewParams& prev = hasLastView_ ? lastView_ : view;
@@ -1074,6 +1098,7 @@ void Renderer::record(VkCommandBuffer cmd, const ViewParams& view) {
     tp.prevUp[3] = std::tan(prev.fovY * 0.5f * 3.14159265f / 180.0f);
     tp.params[0] = kMovingHistoryAlpha;
     tp.params[1] = kMaxHistory;
+    tp.params[2] = lastSparse_ ? 4.0f : 1.0f;
     dispatch(cmd, temporal_, cur, &tp, sizeof(tp), w, h);
     computeBarrier(cmd);
 
@@ -1317,7 +1342,7 @@ void Renderer::destroy() {
     VkDevice dev = ctx_->device;
     vkDeviceWaitIdle(dev);
     releaseDenoise();
-    for (ComputePass* p : {&pathTrace_, &temporal_, &atrous_, &localDown_, &localBlur_, &composite_, &skyPass_, &skyCdfPass_, &overlayPass_})
+    for (ComputePass* p : {&pathTrace_, &temporal_, &atrous_, &localDown_, &localBlur_, &composite_, &skyPass_, &skyCdfPass_, &sparseFill_, &overlayPass_})
         destroyPass(dev, *p);
     Image* all[] = {&noisy_, &gpos_[0], &gpos_[1], &gnormal_[0], &gnormal_[1], &galbedo_, &history_[0], &history_[1],
                     &moments_[0], &moments_[1], &filtered_[0], &filtered_[1], &albedoHist_[0], &albedoHist_[1], &output_,

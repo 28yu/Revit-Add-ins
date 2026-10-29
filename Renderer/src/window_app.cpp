@@ -973,6 +973,8 @@ int runWindow(const Options& opt, Scene& scene) {
         if (acq == VK_ERROR_OUT_OF_DATE_KHR) { needResize = true; continue; }
         if (acq != VK_SUCCESS && acq != VK_SUBOPTIMAL_KHR) vkCheck(acq, "vkAcquireNextImageKHR");
 
+        // 動いている間は 4 画素に 1 つだけ光を追う（速い GPU で 1 フレームに 2 回以上計算できているときは使わない）
+        renderer.setSparseWhileMoving(opt.sparse == 1 || (opt.sparse < 0 && samplesPerFrame == 1));
         ViewParams view = cam.view();
         view.maxBounces = activeBounces;
         view.samplesPerFrame = samplesPerFrame;
@@ -1137,7 +1139,9 @@ int runWindow(const Options& opt, Scene& scene) {
             glfwSetWindowShouldClose(window, GLFW_TRUE);
         }
 
-        frameTimeAvg = frameTimeAvg * 0.9 + dt * 0.1;
+        // 4 画素に 1 つだけ光を追ったフレームは軽いので、全部の画素で追ったときの時間に直して数える
+        // （そうしないと「軽い → 回数を増やす → 4 画素に 1 つをやめる → 重い → 回数を減らす」をくり返す）
+        frameTimeAvg = frameTimeAvg * 0.9 + dt * (renderer.lastFrameSparse() ? 2.5 : 1.0) * 0.1;
         sppTimer += dt;
         if (sppTimer >= 0.5) {
             sppTimer = 0;

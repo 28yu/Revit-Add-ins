@@ -1,0 +1,44 @@
+#version 450
+// 動いている間の「小さく描いて復元」: 2×2 画素ごとに 1 つだけ光を追ったフレームで、追わなかった画素の明るさを周りから補う。
+//
+// 明るさは「面の色で割ったもの」なので、なめらかに変わる。周り 3×3 の光を追った画素のうち、同じ面の上（位置・向きが近い）の
+// ものだけを混ぜる。面の色（模様）と位置・向きは全部の画素で求めてあるので、テクスチャや物の輪郭はぼけない。
+// 同じ面の画素が見つからないとき（細い物の輪郭など）は、距離だけで混ぜる（次のフレームの時間方向の平均でならされる）
+layout(local_size_x = 8, local_size_y = 8) in;
+
+// rgb = 明るさ（色で割ったもの）, a = 1 なら求まっている・0 なら未定。補った画素は 0.5 にする（同じ処理の中で補った値を使わないため）
+layout(set = 0, binding = 0, rgba16f) uniform image2D uNoisy;
+layout(set = 0, binding = 1, rgba32f) uniform readonly image2D uGPos;     // xyz = 位置, w = 距離（空なら負）
+layout(set = 0, binding = 2, rgba16f) uniform readonly image2D uGNormal;  // xyz = 面の向き
+
+void main() {
+    ivec2 size = imageSize(uNoisy);
+    ivec2 p = ivec2(gl_GlobalInvocationID.xy);
+    if (p.x >= size.x || p.y >= size.y) return;
+    if (imageLoad(uNoisy, p).a > 0.25) return;  // 光を追った画素、または空・地面がまっすぐ見えている画素
+
+    vec4 gp = imageLoad(uGPos, p);
+    vec3 n = imageLoad(uGNormal, p).xyz;
+    float planeTol = 0.02 * max(gp.w, 0.0) + 0.01;
+    vec3 sum = vec3(0.0), sumAny = vec3(0.0);
+    float wSum = 0.0, wAny = 0.0;
+    for (int dy = -1; dy <= 1; ++dy) {
+        for (int dx = -1; dx <= 1; ++dx) {
+            ivec2 q = p + ivec2(dx, dy);
+            if (q.x < 0 || q.y < 0 || q.x >= size.x || q.y >= size.y) continue;
+            vec4 cq = imageLoad(uNoisy, q);
+            if (cq.a < 0.75) continue;  // 光を追っていない画素（ここで補ったものも含む）は使わない
+            vec4 gq = imageLoad(uGPos, q);
+            vec3 nq = imageLoad(uGNormal, q).xyz;
+            float near = (dx == 0 || dy == 0) ? 1.0 : 0.7;  // 斜めは少し軽く
+            float w = near * exp(-abs(dot(n, gq.xyz - gp.xyz)) / planeTol) * pow(max(dot(n, nq), 0.0), 16.0);
+            if (gq.w < 0.0) w = 0.0;  // 空の明るさは物の面に混ぜない
+            sum += cq.rgb * w;
+            wSum += w;
+            sumAny += cq.rgb * near;
+            wAny += near;
+        }
+    }
+    vec3 c = wSum > 1e-3 ? sum / wSum : (wAny > 0.0 ? sumAny / wAny : vec3(0.0));
+    imageStore(uNoisy, p, vec4(c, 0.5));
+}

@@ -74,6 +74,7 @@ int runOffscreen(const Options& opt, Scene& scene) {
     renderer.setLocalToneMapping(opt.localToneMapping);
     renderer.setSkySampling(opt.skySampling);
     renderer.setSpatialDenoise(opt.spatialDenoise);
+    renderer.setSparseWhileMoving(opt.sparse != 0);  // 性能測定の「動いている間」も、ウィンドウと同じく 4 画素に 1 つ
     // 仕上げの Open Image Denoise（画像だけ作るときは、最後に 1 回だけ使う）
     OidnDenoiser oidn;
     if (opt.finalDenoise && opt.motionTest == 0 && opt.motionReference == 0 && oidn.load()) {

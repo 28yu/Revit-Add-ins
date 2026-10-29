@@ -68,6 +68,7 @@ static int run(int argc, char** argv) {
         else if (a == "--sky-sampling") opt.skySampling = std::atoi(next()) != 0;
         else if (a == "--no-spatial-denoise") opt.spatialDenoise = false;
         else if (a == "--final-denoise") opt.finalDenoise = std::atoi(next()) != 0;
+        else if (a == "--sparse") opt.sparse = std::atoi(next());
         else if (a == "--camera") {
             // 確認用: カメラの位置と向き「x,y,z,前x,前y,前z」（メートル）
             float c[6] = {0, 0, 0, 0, 1, 0};

@@ -190,6 +190,11 @@ float envMisWeight(float diffusePdf, uvec2 envRows, vec3 dir) {
     return diffusePdf * diffusePdf / (diffusePdf * diffusePdf + pl * pl);
 }
 
+// 動いている間に 4 画素に 1 つだけ光を追うとき、残りの画素は「最初に見えている面」だけ調べる（gPrimaryOnly）。
+// そのとき、面に当たって途中でやめたら gIncomplete = true（空・地面・背景色がまっすぐ見えているときは、明るさまで求まるので false）
+bool gPrimaryOnly = false;
+bool gIncomplete = false;
+
 // --- 1本の光の通り道を追う -----------------------------------------------
 // 最初に当たった面の情報（ノイズ除去で使う）
 struct Primary {
@@ -300,6 +305,10 @@ vec3 radiance(vec3 origin, vec3 dir, out Primary primary) {
                     primary.albedo = a;
                 }
             }
+        }
+        if (gPrimaryOnly && primary.hit) {
+            gIncomplete = true;
+            return result;
         }
         float roughness = mono ? 0.6 : clamp(m.params.x, 0.02, 1.0);
         float metallic = mono ? 0.0 : m.params.y;
@@ -475,13 +484,23 @@ vec3 cameraRay(vec2 uv) {
 
 void main() {
     ivec2 size = imageSize(uNoisy);
-    // frame.w: 下位 8 ビット = 1 フレームで計算する回数、上位 24 ビット = 描き始める行（重い 1 枚を横長の帯に分けて描くとき）
-    ivec2 pixel = ivec2(gl_GlobalInvocationID.xy) + ivec2(0, int(pc.frame.w >> 8u));
+    // frame.w: 下位 8 ビット = 1 フレームで計算する回数、次の 2 ビット = 描き方、上位 22 ビット = 描き始める行（重い 1 枚を帯に分けるとき）
+    //   描き方 0 = 全部の画素で光を追う
+    //   描き方 1 = 2×2 画素ごとに 1 つだけ光を追う（動いている間。どの画素かはフレームごとに変える。行は 2×2 のまとまりの単位）
+    //   描き方 2 = 描き方 1 で追わなかった画素の「最初に見えている面」だけ調べる（残りの明るさは sparse_fill.comp で周りから補う）
+    uint mode = (pc.frame.w >> 8u) & 3u;
+    ivec2 gid = ivec2(gl_GlobalInvocationID.xy) + ivec2(0, int(pc.frame.w >> 10u));
+    // 2×2 のどの画素で光を追うか（4 フレームで一回り。斜めに飛ばして、続けて同じ並びにならないようにする）
+    const ivec2 ORDER[4] = ivec2[](ivec2(0, 0), ivec2(1, 1), ivec2(1, 0), ivec2(0, 1));
+    ivec2 traced = ORDER[pc.frame.x & 3u];
+    ivec2 pixel = mode == 1u ? gid * 2 + traced : gid;
     if (pixel.x >= size.x || pixel.y >= size.y) return;
+    if (mode == 2u && (pixel & 1) == traced) return;  // 光を追う画素は描き方 1 で描く
     rngState = pcg(uint(pixel.x) + uint(pixel.y) * 9781u + pc.frame.x * 6271u * 26699u);
+    gPrimaryOnly = mode == 2u;
 
     // 1 フレームで何回か計算して平均する（速い GPU では回数を増やし、動いている間の画質を上げる）
-    uint spp = max(pc.frame.w & 0xFFu, 1u);
+    uint spp = gPrimaryOnly ? 1u : max(pc.frame.w & 0xFFu, 1u);
     vec3 demod = vec3(0.0);   // 色で割った明るさ（1 回ずつ、その回の面の色で割ってから平均する）
     vec3 albedo = vec3(0.0);  // 面の色の平均
     float background = 0.0;   // 背景色が見えている割合（輪郭をなめらかにするため割合で持つ）
@@ -503,7 +522,8 @@ void main() {
     albedo /= float(spp);
     background /= float(spp);
 
-    imageStore(uNoisy, pixel, vec4(demod, 1.0));
+    // a = 1 なら明るさが求まっている。0 なら sparse_fill.comp が周りの画素から補う
+    imageStore(uNoisy, pixel, vec4(gIncomplete ? vec3(0.0) : demod, gIncomplete ? 0.0 : 1.0));
     // 位置・向きは画素の中心で求める（輪郭で毎フレーム手前・奥が入れ替わらないように）
     vec3 gpos, gnormal;
     float gdist, gmirror;

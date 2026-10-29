@@ -62,6 +62,9 @@ public:
     void setLocalToneMapping(float strength) { localStrength_ = strength; }
     // 空と地面の光を直接狙う（屋根の下のまだらを減らす。false は比較用）
     void setSkySampling(bool on) { if (on != skySampling_) { skySampling_ = on; resetHistory_ = true; } }
+    // 動いている間は 2×2 画素ごとに 1 つだけ光を追い、残りは周りから補う（光の計算がおよそ 1/4 になる。止まったら全部の画素）
+    void setSparseWhileMoving(bool on) { sparse_ = on; }
+    bool lastFrameSparse() const { return lastSparse_; }
     // 周りの画素と平均する処理（atrous）を使うか（false はノイズの量を測るとき用）
     void setSpatialDenoise(bool on) { spatialDenoise_ = on; }
     // 背景（空・雲、地面を消したときはその分も）を透明にして描く（PNG の書き出し用）
@@ -163,6 +166,7 @@ private:
     float localStrength_ = 1.0f;
     bool skySampling_ = true;
     bool spatialDenoise_ = true;
+    bool sparse_ = false, lastSparse_ = false;
 
     // 止まっている間の仕上げ（Open Image Denoise）
     OidnDenoiser* oidn_ = nullptr;
@@ -190,7 +194,7 @@ private:
     uint32_t staticFrames_ = 0;
     uint32_t frameIndex_ = 0;
 
-    ComputePass pathTrace_, temporal_, atrous_, localDown_, localBlur_, composite_, skyPass_, skyCdfPass_, overlayPass_;
+    ComputePass pathTrace_, temporal_, atrous_, localDown_, localBlur_, composite_, skyPass_, skyCdfPass_, sparseFill_, overlayPass_;
     Image skyImage_;  // 空と雲（起動時・太陽が変わったときに描く）
     Buffer skyDist_;  // 空の明るさの地図（空の光を直接狙うときに使う。空を描いたあとに作る）
     Vec3 skySun_;
