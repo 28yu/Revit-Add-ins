@@ -64,6 +64,7 @@ public:
     // GPU 専用メモリの大きさと、この描画プログラムが GPU 専用メモリに確保している量（大きなモデルの調査用）
     VkDeviceSize deviceLocalBytes = 0;
     VkDeviceSize allocatedDeviceBytes = 0;
+    VkDeviceSize peakDeviceBytes = 0;  // allocatedDeviceBytes の最大（加速構造を作る途中の一時領域も含む。性能測定用）
 
 private:
     uint32_t findMemoryType(uint32_t typeBits, VkMemoryPropertyFlags props) const;

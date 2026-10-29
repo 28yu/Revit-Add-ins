@@ -137,6 +137,22 @@ cmake -S . -B build-linux -DT28_SYSTEM_GLFW=ON && cmake --build build-linux -j
   （Wine には日本語フォントが無いので、`drive_c/windows/Fonts/YuGothM.ttc` に Noto CJK を置くと案内の確認ができる）
 - ダウンロードは git で行う（この開発環境では GitHub の圧縮ファイルのダウンロードが通らないため）
 
+## 性能測定（改善の前後を数値で比べる）
+
+```bash
+tools/bench/run.sh                 # small と large を測って表にする（結果は build-linux/bench/）
+tools/bench/run.sh huge            # いちばん大きいモデル
+tools/bench/run.sh --quality       # 画質: small を「512 回足し合わせた正解」と比べる（RMSE・まだら・白とび）
+FRAMES=16 SIZE=1280x720 tools/bench/run.sh small   # フレーム数・画像の大きさを変える
+```
+
+- 測定用のモデルは**立体駐車場**（`src/bench_scene.cpp`）。屋根の下から外を見る構図（白とび・屋根の下のノイズが出やすい）で、
+  同じ形（柱・梁・車止め・車・照明）を位置だけ変えて何度も置く（今の Revit の書き出しと同じ持ち方）
+  - small 約 3 万三角形 / large 約 170 万 / huge 約 670 万。画像は 512 / 2048 / 4096 画素四方
+- 測るもの（ログの `BENCH {...}`）: シーンファイルの大きさ（ビューアの exe に入る量）、準備の時間（BVH・加速構造）、
+  GPU メモリ（最大）、止まっている間・動いている間の 1 フレームの時間、PNG の大きさ、白とびの割合
+- lavapipe（CPU）で測るので**速さの絶対値は実機と違う**。同じ環境で変更の前と後を比べるためだけに使う
+
 ## コマンドライン
 
 ```
@@ -149,6 +165,8 @@ Tools28Render --scene model.t28s --output out.png       画像を作って終わ
         --render-scale 倍率（小さく描いて拡大＝速い。既定は RT コアあり 1.0・なし 0.5）
         --software（RT コアがあっても予備の方式で描く） / --exit-after フレーム数（動作確認用）
         --motion-test フレーム数 / --motion-reference フレーム数（動いている間の残像の確認。DEVLOG 参照）
+        --bench-scene small|large|huge（測定用のモデル）/ --bench（時間・メモリ・大きさを測る）/ --bench-frames 回数 /
+        --save-scene 保存先.t28s（シーンファイルを保存する）
 ```
 
 ## アイコン

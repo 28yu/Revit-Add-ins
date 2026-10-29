@@ -114,5 +114,7 @@ Vec3 sunDirectionAt(const Scene& scene, float hour);
 float hourOfSun(const Scene& scene, Vec3 dir);
 // 動作確認用の部屋（窓・柱・ガラス・鏡）
 Scene makeTestScene();
+// 性能測定用のモデル（立体駐車場）。preset = small / large / huge。知らない名前なら false
+bool makeBenchScene(const std::string& preset, Scene& scene);
 
 }  // namespace t28

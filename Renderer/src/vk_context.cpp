@@ -197,6 +197,7 @@ Buffer VkContext::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMe
     if (props & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) {
         b.allocated = req.size;
         allocatedDeviceBytes += req.size;
+        peakDeviceBytes = std::max(peakDeviceBytes, allocatedDeviceBytes);
     }
     vkCheck(vkBindBufferMemory(device, b.buffer, b.memory, 0), "vkBindBufferMemory");
 
@@ -255,6 +256,7 @@ Image VkContext::createImage(uint32_t w, uint32_t h, VkFormat format, VkImageUsa
     vkCheck(vkAllocateMemory(device, &mai, nullptr, &img.memory), "vkAllocateMemory (image)");
     img.allocated = req.size;
     allocatedDeviceBytes += req.size;
+    peakDeviceBytes = std::max(peakDeviceBytes, allocatedDeviceBytes);
     vkCheck(vkBindImageMemory(device, img.image, img.memory, 0), "vkBindImageMemory");
 
     VkImageViewCreateInfo vci{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};

@@ -76,6 +76,7 @@ add_executable(Tools28Render
   src/log.cpp
   src/i18n.cpp
   src/scene.cpp
+  src/bench_scene.cpp
   src/vk_context.cpp
   src/renderer.cpp
   src/offscreen.cpp

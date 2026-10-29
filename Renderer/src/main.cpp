@@ -9,7 +9,10 @@
 //         --lighting sun|artificial|both / --clouds 0〜1（画像だけ作るとき）
 // その他: --log ファイル / --gpu 番号 / --bounces 回数 / --exposure EV / --no-auto-exposure / --render-scale 倍率
 //         --software（RT コアを使わない予備の方式で描く。動作確認用）
+// 性能測定: --bench-scene small|large|huge（測定用の立体駐車場）/ --bench（画像だけ作るときに時間・メモリ・大きさを測る）/
+//         --bench-frames 回数 / --save-scene 保存先.t28s
 #include <algorithm>
+#include <chrono>
 #include <cstdlib>
 #include <cstring>
 #include <string>
@@ -44,12 +47,17 @@ static std::string defaultLogPath() {
 static int run(int argc, char** argv) {
     Options opt;
     bool testScene = false;
+    std::string benchScene;  // 性能測定用のモデル（small / large / huge）
     const char* lang = nullptr;
     for (int i = 1; i < argc; ++i) {
         std::string a = argv[i];
         auto next = [&]() -> const char* { return i + 1 < argc ? argv[++i] : ""; };
         if (a == "--scene") opt.scenePath = next();
         else if (a == "--test-scene") testScene = true;
+        else if (a == "--bench-scene") benchScene = next();
+        else if (a == "--bench") opt.bench = true;
+        else if (a == "--bench-frames") opt.benchFrames = std::max(1, std::atoi(next()));
+        else if (a == "--save-scene") opt.saveScenePath = next();
         else if (a == "--output") opt.outputPath = next();
         else if (a == "--log") opt.logPath = next();
         else if (a == "--title") opt.title = next();
@@ -86,7 +94,7 @@ static int run(int argc, char** argv) {
     // シーンの指定が無ければ、自分の exe に埋め込まれたシーンを探す（書き出したビューアとして開かれたとき）
     std::string embeddedExe;
     long embeddedOffset = 0;
-    bool embedded = opt.scenePath.empty() && !testScene &&
+    bool embedded = opt.scenePath.empty() && !testScene && benchScene.empty() &&
                     findEmbeddedScene(embeddedExe, embeddedOffset, opt.title);
     // ビュー名: 指定が無ければ題名（モデル名 - ビュー名）の後ろの部分（書き出したビューアの exe でも使えるように）
     if (opt.viewName.empty()) {
@@ -102,7 +110,12 @@ static int run(int argc, char** argv) {
             embedded ? 1 : 0);
 
     Scene scene;
-    if (embedded) {
+    auto loadStart = std::chrono::steady_clock::now();
+    if (!benchScene.empty()) {
+        if (!makeBenchScene(benchScene, scene)) fatal("unknown bench scene: %s (small / large / huge)", benchScene.c_str());
+        logInfo("Bench scene %s: %zu triangles, %zu vertices, %zu textures", benchScene.c_str(), scene.triangleCount(),
+                scene.vertices.size(), scene.textures.size());
+    } else if (embedded) {
         std::string error;
         if (!loadScene(embeddedExe, scene, error, embeddedOffset)) fatal("%s\n%s", tr("SceneLoadFailed"), error.c_str());
     } else if (!opt.scenePath.empty() && !testScene) {
@@ -111,6 +124,7 @@ static int run(int argc, char** argv) {
     } else {
         scene = makeTestScene();
     }
+    opt.sceneLoadSeconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - loadStart).count();
     // 確認用: レンダリング設定の照明・雲の量を置き換える
     if (!opt.lighting.empty()) {
         scene.revitLook.sun = opt.lighting != "artificial";
