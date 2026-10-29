@@ -362,6 +362,7 @@ int runWindow(const Options& opt, Scene& scene) {
     renderer.skyWidth_ = static_cast<uint32_t>(opt.skySize);
     renderer.init(ctx, scene, glassStart, bvh);
     renderer.setLocalToneMapping(opt.localToneMapping);
+    renderer.setSkySampling(opt.skySampling);
 
     // RT コアの無い GPU では、半分の大きさで描いて拡大する（速さを保つため）
     float renderScale = opt.renderScale > 0 ? opt.renderScale : (ctx.hardwareRt ? 1.0f : 0.5f);

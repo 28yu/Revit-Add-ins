@@ -44,6 +44,8 @@ struct Options {
     int bands = 0;                 // 光の計算を帯に分ける数（0 = 自動。--bands で決め打ち。動作確認用）
     bool instancing = true;        // 同じ形を 1 回だけ持つ（--no-instancing で切る。比較用）
     float localToneMapping = 1.0f;  // ローカルトーンマッピングの強さ（0 = 使わない。--local-tonemap で変える。比較用）
+    bool skySampling = true;       // 空と地面の光を直接狙う（--sky-sampling 0 で切る。比較用）
+    bool spatialDenoise = true;    // 周りの画素と平均する（--no-spatial-denoise で切る。ノイズの量を測るとき用）
     bool bench = false;
     int benchFrames = 16;          // 止まっている間・動いている間それぞれ何フレーム測るか
     std::string saveScenePath;     // 指定があれば、読み込んだシーンを .t28s で保存する（ファイルの大きさの確認用）

@@ -38,6 +38,9 @@ static const uint32_t kOverlaySpv[] =      // 操作の案内を重ねる
 static const uint32_t kSkySpv[] =          // 空と雲の画像を前もって描く
 #include "sky.spv.inc"
     ;
+static const uint32_t kSkyCdfSpv[] =       // 空の明るさの地図（空の光を直接狙うため）
+#include "sky_cdf.spv.inc"
+    ;
 
 namespace {
 
@@ -384,6 +387,9 @@ void Renderer::init(VkContext& ctx, const Scene& scene, uint32_t glassStart, con
     memset(exposure_.mapped, 0, sizeof(ExposureData));
     // 空と雲の画像（横 = 方位、縦 = 高度。縦は横の 1/4）
     skyImage_ = ctx.createImage(skyWidth_, skyWidth_ / 4, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_USAGE_STORAGE_BIT);
+    // 空と地面の明るさの地図: 行の累積 64 + 列の累積 64×64 + マスの割合 64×64（shaders/sky_cdf.comp）
+    skyDist_ = ctx.createBuffer((64 + 2 * 64 * 64) * sizeof(float), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
     uploadScene(scene, glassStart, bvh);
     createPasses();
     computeSky();
@@ -405,6 +411,16 @@ void Renderer::computeSky() {
         dispatch(cmd, skyPass_, 0, &sp, sizeof(sp), w, rows);
         ctx_->endOneShot(cmd);
     }
+    // 空と地面の明るさの地図を作り直す（1 つのまとまりで計算する小さな処理）。
+    // 地面の明るさはおおよそでよい（狙う割合を決めるだけ）: 地面の色 × (太陽の高さに応じた直射 + 空の光)
+    float sunZ = std::max(sunDir_.z, 0.0f);
+    float low = std::min(sunZ / 0.3f, 1.0f);
+    float groundLum = 0.4f * (effectiveSun() * sunZ * (0.3f + 0.7f * low * low * (3.0f - 2.0f * low)) + effectiveSky() * 0.8f);
+    writeSet(ctx_->device, skyCdfPass_.sets[0], {{0, skyImage_.view}, {1, {}, skyDist_.buffer}});
+    VkCommandBuffer cmd = ctx_->beginOneShot();
+    computeBarrier(cmd);
+    dispatch(cmd, skyCdfPass_, 0, &groundLum, sizeof(groundLum), 8, 8);
+    ctx_->endOneShot(cmd);
     skySun_ = sunDir_;
     double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
     logInfo("Sky computed: %ux%u in %.0f ms", w, h, ms);
@@ -769,7 +785,7 @@ void Renderer::createPasses() {
     std::vector<BindingSpec> pt = {
         {0, hardwareRt_ ? VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR : BUF},
         {1, IMG}, {2, IMG}, {3, BUF}, {4, BUF}, {5, BUF}, {6, BUF}, {7, IMG}, {9, IMG}, {10, BUF}, {11, BUF}, {12, BUF},
-        {13, IMG}, {14, BUF}, {15, BUF},
+        {13, IMG}, {14, BUF}, {15, BUF}, {16, BUF},
     };
     if (!hardwareRt_) pt.push_back({8, BUF});
     pathTrace_ = hardwareRt_
@@ -791,6 +807,7 @@ void Renderer::createPasses() {
     composite_ = createPass(dev, {{0, IMG}, {1, IMG}, {2, IMG}, {3, IMG}, {4, IMG}}, 2, sizeof(CompositePush),
                             kCompositeSpv, sizeof(kCompositeSpv), "composite");
     skyPass_ = createPass(dev, {{0, IMG}}, 1, sizeof(SkyPush), kSkySpv, sizeof(kSkySpv), "sky");
+    skyCdfPass_ = createPass(dev, {{0, IMG}, {1, BUF}}, 1, 4, kSkyCdfSpv, sizeof(kSkyCdfSpv), "sky distribution");
     overlayPass_ = createPass(dev, {{0, IMG}, {1, IMG}}, kOverlaySlots, sizeof(OverlayPush), kOverlaySpv, sizeof(kOverlaySpv), "overlay");
 }
 
@@ -802,7 +819,7 @@ void Renderer::writeDescriptors() {
             {1, noisy_.view}, {2, gpos_[cur].view}, {3, {}, vertices_.buffer}, {4, {}, indices_.buffer},
             {5, {}, triMaterials_.buffer}, {6, {}, materials_.buffer}, {7, gnormal_[cur].view}, {9, galbedo_.view},
             {10, {}, texInfos_.buffer}, {11, {}, texels_.buffer}, {12, {}, lights_.buffer}, {13, skyImage_.view},
-            {14, {}, sceneInstances_.buffer}, {15, {}, meshes_.buffer},
+            {14, {}, sceneInstances_.buffer}, {15, {}, meshes_.buffer}, {16, {}, skyDist_.buffer},
         };
         if (hardwareRt_) {
             Bind b{0};
@@ -1000,7 +1017,7 @@ void Renderer::record(VkCommandBuffer cmd, const ViewParams& view) {
     pt.sunDir[0] = sunDir_.x; pt.sunDir[1] = sunDir_.y; pt.sunDir[2] = sunDir_.z; pt.sunDir[3] = effectiveSun();
     pt.misc[0] = lightsOn_ ? static_cast<float>(lightCount_) : 0.0f;
     pt.misc[1] = effectiveSky();
-    pt.misc[2] = 0.0f;  // 未使用（ガラスは形ごとに分けた）
+    pt.misc[2] = skySampling_ ? 1.0f : 0.0f;  // 空と地面の光を直接狙う
     // 1 画素が 1 m 先で何 m の幅になるか（テクスチャの縮小した段を選ぶのに使う）
     pt.misc[3] = view.panorama ? 2.0f * 3.14159265f / static_cast<float>(w) : 2.0f * tanHalf / static_cast<float>(h);
     pt.frame[0] = frameIndex_;
@@ -1053,7 +1070,7 @@ void Renderer::record(VkCommandBuffer cmd, const ViewParams& view) {
 
     // 3. 周りの画素と平均する（間隔を広げながらくり返す）
     for (int i = 0; i < kAtrousIterations; ++i) {
-        AtrousPush ap{1 << i};
+        AtrousPush ap{spatialDenoise_ ? 1 << i : 0};
         dispatch(cmd, atrous_, cur * 2 + (i % 2), &ap, sizeof(ap), w, h);
         computeBarrier(cmd);
     }
@@ -1128,7 +1145,7 @@ void Renderer::destroy() {
     if (!ctx_) return;
     VkDevice dev = ctx_->device;
     vkDeviceWaitIdle(dev);
-    for (ComputePass* p : {&pathTrace_, &temporal_, &atrous_, &localDown_, &localBlur_, &composite_, &skyPass_, &overlayPass_})
+    for (ComputePass* p : {&pathTrace_, &temporal_, &atrous_, &localDown_, &localBlur_, &composite_, &skyPass_, &skyCdfPass_, &overlayPass_})
         destroyPass(dev, *p);
     Image* all[] = {&noisy_, &gpos_[0], &gpos_[1], &gnormal_[0], &gnormal_[1], &galbedo_, &history_[0], &history_[1],
                     &moments_[0], &moments_[1], &filtered_[0], &filtered_[1], &albedoHist_[0], &albedoHist_[1], &output_,
@@ -1136,6 +1153,7 @@ void Renderer::destroy() {
     for (Image* img : all) ctx_->destroyImage(*img);
     destroyScene();
     ctx_->destroyBuffer(exposure_);
+    ctx_->destroyBuffer(skyDist_);
     ctx_ = nullptr;
 }
 

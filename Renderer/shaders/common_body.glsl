@@ -182,6 +182,14 @@ vec3 groundRadiance(vec3 p, float distance) {
     return mix(c, far, haze);
 }
 
+// 跳ね返りで外（空・地面）に当たったときの重み。diffusePdf = 前の面で選んだ拡散の向きの確率（0 = 重み付けしない）
+// envRows = その面で空・地面を狙った高さの範囲
+float envMisWeight(float diffusePdf, uvec2 envRows, vec3 dir) {
+    if (diffusePdf <= 0.0) return 1.0;
+    float pl = skyPdf(dir, envRows);
+    return diffusePdf * diffusePdf / (diffusePdf * diffusePdf + pl * pl);
+}
+
 // --- 1本の光の通り道を追う -----------------------------------------------
 // 最初に当たった面の情報（ノイズ除去で使う）
 struct Primary {
@@ -218,6 +226,9 @@ vec3 radiance(vec3 origin, vec3 dir, out Primary primary) {
     vec3 camOrigin = origin, camDir = dir;
     bool viaMirror = false;
     vec3 mirrorN = vec3(0.0), mirrorTint = vec3(1.0);
+    // 前の面で拡散の向きを選んだときの、その向きの確率（空の光を直接狙ったときの重み付けに使う。0 = 重み付けしない）
+    float diffusePdf = 0.0;
+    uvec2 envRows = uvec2(0u);
 
     for (uint bounce = 0u; bounce <= pc.frame.z; ++bounce) {
         Hit h = traceClosest(origin, dir);
@@ -239,10 +250,11 @@ vec3 radiance(vec3 origin, vec3 dir, out Primary primary) {
                     primary.normal = viaMirror ? reflect(vec3(0.0, 0.0, 1.0), mirrorN) : vec3(0.0, 0.0, 1.0);
                     primary.albedo = viaMirror ? max(mirrorTint * groundAlbedo(), vec3(0.02)) : groundAlbedo();
                 }
-                result += throughput * groundRadiance(gp, travelled + tg);
+                result += throughput * groundRadiance(gp, travelled + tg) * envMisWeight(diffusePdf, envRows, dir);
                 break;
             }
-            result += throughput * (skyRadiance(dir) + (specularPath ? sunDisc(dir) : vec3(0.0)));
+            // 前の面で空・地面の光を直接狙っているときは、同じ光を二重に数えないよう、狙ったときと分け合う（下の「空と地面の光」）
+            result += throughput * (skyRadiance(dir) * envMisWeight(diffusePdf, envRows, dir) + (specularPath ? sunDisc(dir) : vec3(0.0)));
             break;
         }
         vec3 pos, n, gn;
@@ -320,6 +332,30 @@ vec3 radiance(vec3 origin, vec3 dir, out Primary primary) {
             }
         }
 
+        // 空と地面の光（拡散面のみ）。明るい空・日なたの地面の向きを選んで、そこまで遮る物が無いか調べる。
+        // 屋根の下では、跳ね返った光がたまたま外に抜けたときだけ数えると、まだらになりやすいため。
+        // 跳ね返りで空・地面に当たったときの分とは、向きの確率で重みを付けて分け合う（多重重点サンプリング）
+        // 深い跳ね返り（3 回目以降）では狙わない（明るさへの寄与が小さく、影の判定の分だけ遅くなるため）
+        bool envHere = skyLightSampling() && metallic <= 0.5 && bounce <= 1u;
+        uvec2 rows = envRowsFor(gn);
+        if (envHere) {
+            vec3 l;
+            float pl = sampleSky(rows, rand(), rand(), rand(), rand(), l);
+            float c = dot(n, l);
+            if (pl > 0.0 && c > 0.0 && dot(gn, l) > 0.0) {
+                vec3 o = pos + gn * 0.002;
+                // 跳ね返りで外に抜けたときと同じ扱い: 下向きで地面に当たれば地面の明るさ、それ以外は空
+                float tg = groundHit(o, l);
+                bool blocked = tg > 0.0 ? occludedDist(o, l, tg) : occluded(o, l);
+                if (!blocked) {
+                    vec3 le = tg > 0.0 ? groundRadiance(o + l * tg, tg) : skyRadiance(l);
+                    float pb = c / PI;
+                    float w = pl * pl / (pl * pl + pb * pb);
+                    result += throughput * (1.0 - specProb) * albedo * le * (pb / pl * w);
+                }
+            }
+        }
+
         // 照明器具の光（拡散面のみ）。毎回 1 つの光源を選んで、その光が届くか影の判定をする
         uint lightCount = uint(pc.misc.x);
         if (lightCount > 0u && metallic <= 0.5) {
@@ -354,8 +390,11 @@ vec3 radiance(vec3 origin, vec3 dir, out Primary primary) {
             coneSpread += roughness * roughness * 0.5;
             // ほぼ鏡のときだけ太陽の円盤を映す（ざらついた面では直接光として計算済み）
             specularPath = specularPath && roughness < 0.1;
+            diffusePdf = 0.0;
         } else {
             dir = cosineHemisphere(n);
+            diffusePdf = envHere ? max(dot(n, dir), 1e-6) / PI : 0.0;
+            envRows = rows;
             throughput *= albedo;
             coneSpread = max(coneSpread, 0.5);
             specularPath = false;

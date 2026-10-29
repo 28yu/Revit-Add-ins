@@ -37,6 +37,7 @@ endif()
 #   pathtrace_sw: BVH を自分でたどる予備の方式（Vulkan 1.0 で動く）
 #   temporal / atrous / composite: ノイズ除去と仕上げ
 #   localexp_down / localexp_blur: ローカルトーンマッピング（大まかな明るさ）
+#   sky / sky_cdf: 空と雲の画像・空の明るさの地図（空の光を直接狙うため）
 #   overlay:      操作の案内を重ねる
 find_program(GLSLC glslc)
 set(SHADER_DIR ${CMAKE_CURRENT_SOURCE_DIR}/shaders)
@@ -45,7 +46,7 @@ set(SHADER_DEPS "")
 if(GLSLC)
   set(SHADER_OUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/shaders)
   file(MAKE_DIRECTORY ${SHADER_OUT_DIR})
-  foreach(spec pathtrace_hw:vulkan1.2 pathtrace_sw:vulkan1.0 temporal:vulkan1.0 atrous:vulkan1.0 localexp_down:vulkan1.0 localexp_blur:vulkan1.0 composite:vulkan1.0 sky:vulkan1.0 overlay:vulkan1.0)
+  foreach(spec pathtrace_hw:vulkan1.2 pathtrace_sw:vulkan1.0 temporal:vulkan1.0 atrous:vulkan1.0 localexp_down:vulkan1.0 localexp_blur:vulkan1.0 composite:vulkan1.0 sky:vulkan1.0 sky_cdf:vulkan1.0 overlay:vulkan1.0)
     string(REPLACE ":" ";" pair ${spec})
     list(GET pair 0 name)
     list(GET pair 1 env)

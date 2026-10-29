@@ -53,6 +53,10 @@ public:
     float effectiveSky() const { return sunOn_ ? skyIntensity_ : skyIntensity_ * 0.04f; }
     // ローカルトーンマッピングの強さ（0 = 使わない、1 = 標準）。屋根の下から外を見たときに外が白くとばないようにする
     void setLocalToneMapping(float strength) { localStrength_ = strength; }
+    // 空と地面の光を直接狙う（屋根の下のまだらを減らす。false は比較用）
+    void setSkySampling(bool on) { if (on != skySampling_) { skySampling_ = on; resetHistory_ = true; } }
+    // 周りの画素と平均する処理（atrous）を使うか（false はノイズの量を測るとき用）
+    void setSpatialDenoise(bool on) { spatialDenoise_ = on; }
     // 背景（空・雲、地面を消したときはその分も）を透明にして描く（PNG の書き出し用）
     void setTransparentOutput(bool transparent);
     // 描く大きさ width × height のときに、描画とノイズ除去の画像が使う GPU メモリ（バイト）。書き出しの前の見積もりに使う
@@ -133,6 +137,8 @@ private:
     Image noisy_, gpos_[2], gnormal_[2], galbedo_, history_[2], moments_[2], filtered_[2], albedoHist_[2], output_;
     Image local_[2];  // 大まかな明るさ（縦横 1/8。ぼかしの行き来に 2 枚）
     float localStrength_ = 1.0f;
+    bool skySampling_ = true;
+    bool spatialDenoise_ = true;
     uint32_t ptBands_ = 1;
     float avgLog2_ = 0.0f;  // 前のフレームで測った画面の平均の明るさ（log2）
     bool hasAvgLog2_ = false;
@@ -146,8 +152,9 @@ private:
     uint32_t staticFrames_ = 0;
     uint32_t frameIndex_ = 0;
 
-    ComputePass pathTrace_, temporal_, atrous_, localDown_, localBlur_, composite_, skyPass_, overlayPass_;
+    ComputePass pathTrace_, temporal_, atrous_, localDown_, localBlur_, composite_, skyPass_, skyCdfPass_, overlayPass_;
     Image skyImage_;  // 空と雲（起動時・太陽が変わったときに描く）
+    Buffer skyDist_;  // 空の明るさの地図（空の光を直接狙うときに使う。空を描いたあとに作る）
     Vec3 skySun_;
 
     // 操作の案内

@@ -63,6 +63,7 @@ Revit 2023 以降は、同じファミリの形（SymbolGeometryId）の 2 回�
 | `localexp_blur.comp` | 大まかな明るさを、明るさの境目を守りながらぼかす（縦・横） |
 | `composite.comp` | 仕上げ: 面の色を掛け戻し、ローカルトーンマッピング、トーンマッピング |
 | `sky.comp` | 空と雲（体積の積雲・巻雲・うろこ雲）を起動時に 1 枚の画像に描く |
+| `sky_cdf.comp` | 空と地面の「明るさの地図」（方位 64 × 高さ 64）。拡散面で空・地面の光を直接狙う向きを選ぶのに使う |
 | `overlay.comp` | 操作の案内を画面に重ねる |
 
 **ローカルトーンマッピング**（屋根の下から外を見たときに外が白くとばないように）: 画面の平均と、明るい所（上位 5%）の明るさを毎フレーム測り、
@@ -181,6 +182,7 @@ Tools28Render --scene model.t28s --output out.png       画像を作って終わ
         --log ファイル / --gpu 番号 / --bounces 回数 / --exposure EV / --no-auto-exposure
         --render-scale 倍率（小さく描いて拡大＝速い。既定は RT コアあり 1.0・なし 0.5）
         --software（RT コアがあっても予備の方式で描く） / --exit-after フレーム数（動作確認用）
+        --sky-sampling 0（空と地面の光を直接狙わない。比較用）/ --no-spatial-denoise（周りの画素と平均しない。生のノイズを測る）
         --motion-test フレーム数 / --motion-reference フレーム数（動いている間の残像の確認。DEVLOG 参照）
         --bench-scene small|large|huge（測定用のモデル）/ --bench（時間・メモリ・大きさを測る）/ --bench-frames 回数 /
         --save-scene 保存先.t28s（シーンファイルを保存する）

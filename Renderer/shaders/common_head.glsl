@@ -81,7 +81,7 @@ layout(push_constant) uniform Params {
     vec4 camRight;    // xyz = 右, w = 横の倍率（縦横比）
     vec4 camUp;       // xyz = 上, w = 地面の高さ（モデルの一番下）
     vec4 sunDir;      // xyz = 太陽のある方向, w = 太陽の明るさ
-    vec4 misc;        // x = 照明器具の光源の数, y = 空の明るさ, z = ガラス三角形の開始位置（三角形番号）, w = 1 画素の幅（1 m 先で何 m か）
+    vec4 misc;        // x = 照明器具の光源の数, y = 空の明るさ, z = 1 なら空の光を直接狙う, w = 1 画素の幅（1 m 先で何 m か）
     uvec4 frame;      // x = フレーム番号, y = 止まってからのフレーム数, z = 最大反射回数, w = 1 フレームで計算する回数（下位 8 ビット）＋描き始める行（上位 24 ビット）
     uvec4 look;       // x = 背景色（RGBA8。a が 0 以外なら空・雲を出さずにこの色）, y = 単色（RGBA8。a が 0 以外なら全部この色）,
                       // z = 1 なら地面（と地平線）をまっすぐには見せない, w = 地面の色（RGBA8。a が 0 なら既定の色）
@@ -169,6 +169,62 @@ vec3 skyRadiance(vec3 dir) {
     vec3 a = mix(skyTexel(b, size), skyTexel(b + ivec2(1, 0), size), f.x);
     vec3 c = mix(skyTexel(b + ivec2(0, 1), size), skyTexel(b + ivec2(1, 1), size), f.x);
     return mix(a, c, f.y);
+}
+
+// 空と地面の光を直接狙う（misc.z が 1 のとき）。sky_cdf.comp が作った「明るさの地図」（方位 64 × sin(高度) 64 のマス。
+// 上半分が空、下半分が地面）で、明るい所ほど多く狙う。どのマスも広さが同じなので、
+// 向きの確率（立体角あたり）= マスの割合 × マスの数 / 4π
+layout(set = 0, binding = 16, std430) readonly buffer SkyDist { float skyDist[]; };
+const uint SKY_DIST_W = 64u, SKY_DIST_H = 64u;
+bool skyLightSampling() { return pc.misc.z > 0.5; }
+
+// 累積の割合の並び（first から count 個）から、x を超える最初の位置を探す
+uint findCdf(uint first, uint count, float x) {
+    uint lo = 0u, hi = count - 1u;
+    while (lo < hi) {
+        uint mid = (lo + hi) / 2u;
+        if (skyDist[first + mid] <= x) lo = mid + 1u; else hi = mid;
+    }
+    return lo;
+}
+
+float envCellPdf(uint row, uint col) {
+    return skyDist[SKY_DIST_H + SKY_DIST_W * SKY_DIST_H + row * SKY_DIST_W + col] * float(SKY_DIST_W * SKY_DIST_H) / (4.0 * PI);
+}
+uint envRow(float z) { return min(uint((clamp(z, -1.0, 1.0) * 0.5 + 0.5) * float(SKY_DIST_H)), SKY_DIST_H - 1u); }
+float envRowCdf(uint rowEnd) { return rowEnd == 0u ? 0.0 : skyDist[rowEnd - 1u]; }  // 行 0〜rowEnd-1 の割合の合計
+
+// 面の向き n から見える高さの範囲（行 rows.x〜rows.y-1）。面の裏側しか見えない行は狙わない（床なら空だけ、天井なら地面だけ）
+uvec2 envRowsFor(vec3 n) {
+    float side = sqrt(max(1.0 - n.z * n.z, 0.0));
+    float zMin = n.z > 0.0 ? -side : -1.0, zMax = n.z < 0.0 ? side : 1.0;
+    return uvec2(envRow(zMin), envRow(zMax) + 1u);
+}
+
+// 向き dir の確率（立体角あたり）。rows の範囲の中だけで選んだときの値（範囲外は 0）
+float skyPdf(vec3 dir, uvec2 rows) {
+    uint row = envRow(dir.z);
+    if (row < rows.x || row >= rows.y) return 0.0;
+    float mass = envRowCdf(rows.y) - envRowCdf(rows.x);
+    if (mass <= 0.0) return 0.0;
+    float u = atan(dir.y, dir.x) / (2.0 * PI) + 0.5;
+    uint col = min(uint(u * float(SKY_DIST_W)), SKY_DIST_W - 1u);
+    return envCellPdf(row, col) / mass;
+}
+
+// rows の範囲から向きを 1 つ選ぶ（r1〜r4 は 0〜1 の乱数）。戻り値は向きの確率（立体角あたり。0 なら選べなかった）
+float sampleSky(uvec2 rows, float r1, float r2, float r3, float r4, out vec3 dir) {
+    dir = vec3(0.0, 0.0, 1.0);
+    float c0 = envRowCdf(rows.x), c1 = envRowCdf(rows.y);
+    if (c1 - c0 <= 0.0) return 0.0;
+    uint row = clamp(findCdf(0u, SKY_DIST_H, c0 + r1 * (c1 - c0)), rows.x, rows.y - 1u);
+    uint col = findCdf(SKY_DIST_H + row * SKY_DIST_W, SKY_DIST_W, r2);
+    float s = clamp((float(row) + r3) / float(SKY_DIST_H) * 2.0 - 1.0, -1.0, 1.0);  // sin（高度）
+    float u = (float(col) + r4) / float(SKY_DIST_W);
+    float a = (u - 0.5) * 2.0 * PI;
+    float c = sqrt(max(1.0 - s * s, 0.0));
+    dir = vec3(c * cos(a), c * sin(a), s);
+    return envCellPdf(row, col) / (c1 - c0);
 }
 
 // 太陽そのもの（見える円盤）。直接光はシャドウレイで別に計算するので、カメラから直接見たときだけ使う

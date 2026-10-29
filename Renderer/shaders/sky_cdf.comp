@@ -1,0 +1,83 @@
+#version 450
+// 空と地面の光を直接狙うための「明るさの地図」を作る（空の画像を描き直したあとに 1 回だけ計算する）。
+//
+// 周り全部（上は空、下は地面）を、方位 64 × 高さ 64 のマスに分ける。高さは sin（高度）で等分するので、
+// どのマスも広さ（立体角）が同じになる。マスごとの明るさに比例して、光を狙う向きを選べるようにする
+// （明るい地平線・日なたの地面を多く狙う。屋根の下では、開いている横の方向から来る光を効率よく拾える）。
+// 下半分（地面）の明るさは、日なたの地面のおおよその明るさ（push の値。影は考えない）を使う。
+//
+// 出力（common_head.glsl の skyDist と同じ並び。H = 64, W = 64）:
+//   [0 .. H)                 行（高さ）の累積の割合（最後が 1）
+//   [H .. H + W*H)           行ごとに、列（方位）の累積の割合（各行の最後が 1）
+//   [H + W*H .. H + 2*W*H)   マスごとの選ばれる割合（合計 1）
+layout(local_size_x = 8, local_size_y = 8) in;
+layout(set = 0, binding = 0, rgba16f) uniform readonly image2D uSky;
+layout(set = 0, binding = 1, std430) writeonly buffer SkyDist { float skyDist[]; };
+layout(push_constant) uniform Params {
+    float groundLum;  // 日なたの地面のおおよその明るさ
+} pc;
+
+const uint W = 64u, H = 64u;
+const float PI = 3.14159265359;
+const float MIN_EL = -2.0 * PI / 180.0, EL_RANGE = 92.0 * PI / 180.0;
+
+shared float lum[W * H];
+
+void main() {
+    uint tid = gl_LocalInvocationIndex;  // 0〜63
+    ivec2 size = imageSize(uSky);
+    // マスごとの平均の明るさ（マスの中の 4×4 か所を空の画像から読む）
+    for (uint cell = tid; cell < W * H; cell += 64u) {
+        uint row = cell / W, col = cell % W;
+        if (row < H / 2u) {  // 地面
+            lum[cell] = max(pc.groundLum, 0.0);
+            continue;
+        }
+        float sum = 0.0;
+        for (uint j = 0u; j < 4u; ++j) {
+            float s = (float(row) + (float(j) + 0.5) / 4.0) / float(H) * 2.0 - 1.0;  // sin（高度）
+            float el = asin(s);
+            float v = sqrt(clamp((el - MIN_EL) / EL_RANGE, 0.0, 1.0));
+            int y = clamp(int((1.0 - v) * float(size.y)), 0, size.y - 1);
+            for (uint i = 0u; i < 4u; ++i) {
+                float u = (float(col) + (float(i) + 0.5) / 4.0) / float(W);
+                int x = clamp(int(u * float(size.x)), 0, size.x - 1);
+                vec3 c = imageLoad(uSky, ivec2(x, y)).rgb;
+                sum += dot(c, vec3(0.2126, 0.7152, 0.0722));
+            }
+        }
+        lum[cell] = max(sum / 16.0, 0.0);
+    }
+    barrier();
+    // 地平線の近くを多めに狙う。屋内・屋根の下では、窓や開口から見える外は地平線のあたり（ほぼ水平の向き）に限られるため
+    // （開けた場所では、跳ね返りの向きの選び方でも空に当たりやすいので、こちらで狙わなくても困らない）
+    for (uint cell = tid; cell < W * H; cell += 64u) {
+        float z = (float(cell / W) + 0.5) / float(H) * 2.0 - 1.0;
+        lum[cell] *= 0.25 + 3.0 * exp(-abs(z) / 0.12);
+    }
+    barrier();
+    if (tid != 0u) return;
+
+    // 暗いマスも少しは狙う（雲の切れ間などを取りこぼさないよう、平均の 1 割を足す）
+    float total = 0.0;
+    for (uint i = 0u; i < W * H; ++i) total += lum[i];
+    float floorLum = max(total / float(W * H), 1e-6) * 0.1;
+    total = 0.0;
+    for (uint i = 0u; i < W * H; ++i) {
+        lum[i] += floorLum;
+        total += lum[i];
+    }
+    float rowAcc = 0.0;
+    for (uint r = 0u; r < H; ++r) {
+        float rowSum = 0.0;
+        for (uint c = 0u; c < W; ++c) rowSum += lum[r * W + c];
+        float acc = 0.0;
+        for (uint c = 0u; c < W; ++c) {
+            acc += lum[r * W + c];
+            skyDist[H + r * W + c] = c + 1u == W ? 1.0 : acc / rowSum;
+            skyDist[H + W * H + r * W + c] = lum[r * W + c] / total;
+        }
+        rowAcc += rowSum;
+        skyDist[r] = r + 1u == H ? 1.0 : rowAcc / total;
+    }
+}

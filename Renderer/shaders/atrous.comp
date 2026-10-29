@@ -11,7 +11,7 @@ layout(set = 0, binding = 3, rgba16f) uniform readonly image2D uGNormal;
 layout(set = 0, binding = 4, rgba32f) uniform readonly image2D uHistory;  // a = 重ねた回数
 
 layout(push_constant) uniform Params {
-    int stepSize;  // 調べる画素の間隔
+    int stepSize;  // 調べる画素の間隔（0 = 平均しないでそのまま写す。ノイズの量を測るとき用）
 } pc;
 
 float luminance(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
@@ -25,7 +25,7 @@ void main() {
     vec4 gp = imageLoad(uGPos, p);
     float len = imageLoad(uHistory, p).a;
     // 空はノイズが無い。十分に重ねた画素は、もう平均しなくてよい（ぼかさず細部を残す）
-    if (gp.w < 0.0 || len >= 4096.0) {
+    if (gp.w < 0.0 || len >= 4096.0 || pc.stepSize == 0) {
         imageStore(uOut, p, c);
         return;
     }

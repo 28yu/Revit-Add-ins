@@ -65,6 +65,8 @@ static int run(int argc, char** argv) {
         else if (a == "--bands") opt.bands = std::max(1, std::atoi(next()));
         else if (a == "--gpu-memory-mb") opt.gpuMemoryMb = std::max(0, std::atoi(next()));
         else if (a == "--local-tonemap") opt.localToneMapping = static_cast<float>(std::atof(next()));
+        else if (a == "--sky-sampling") opt.skySampling = std::atoi(next()) != 0;
+        else if (a == "--no-spatial-denoise") opt.spatialDenoise = false;
         else if (a == "--camera") {
             // 確認用: カメラの位置と向き「x,y,z,前x,前y,前z」（メートル）
             float c[6] = {0, 0, 0, 0, 1, 0};
