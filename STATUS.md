@@ -14,6 +14,7 @@
 - ⚠ Wine で見つけた不具合を直し済み: OIDN の CPU 用の部品が `tbb12.dll` を見つけられない → 先に場所を指定して読む（実機の Windows でも起きたはず）
 - 確認用の新しいオプション: `--sky-sampling 0` / `--no-spatial-denoise` / `--final-denoise 0` / `--sparse 0|1`。`run.sh --quality` は明るさを決め打ちにした（正解の画像は作り直し済み）
 
+- 2026-10-29: 段階4（書き出しを小さく）を追加し、Revit 2024 の AutoBuild を再度依頼。確認点: ビューア exe の大きさ（前は約 150MB）・JPEG・360° の「画像を保存」
 - 2026-10-29: 運営者の指示で Revit 2024 の AutoBuild を依頼（段階1〜3 入り）。⚠ AutoBuild（QuickBuild）は `oidn` フォルダも配置する。
   描画ウィンドウを開いて止まると数秒でまだらが消えれば Open Image Denoise が動いている（`%LOCALAPPDATA%\Tools28\Render\render.log` に `Open Image Denoise loaded` と `Final denoise`）
 
