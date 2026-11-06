@@ -1393,6 +1393,16 @@ namespace Tools28.Localization
             { "DupInst.Popup.Clear", "清除此列的筛选" },
             { "DupInst.Popup.SelectAll", "(全选)" },
             { "DupInst.Popup.Blank", "(空白)" },
+            { "DupInst.Scope.Main", "要检查哪个范围的重复？" },
+            { "DupInst.Scope.Model", "整个模型" },
+            { "DupInst.Scope.Model.Desc", "列出模型中所有“同一位置有相同实例”的警告" },
+            { "DupInst.Scope.View", "当前视图: {0}" },
+            { "DupInst.Scope.View.Desc", "仅列出包含此视图中显示图元的组" },
+            { "DupInst.Scope.Selection", "所选图元（{0} 个）" },
+            { "DupInst.Scope.Selection.Desc", "仅列出包含所选图元的组（重叠的图元也一并显示）" },
+            { "DupInst.Scope.NoSelection", "* 先选择图元再运行，即可选择“所选图元”" },
+            { "DupInst.Scope.ViewNotSupported", "无法从此视图获取图元。请在平面图或三维视图中运行，或选择“整个模型”。" },
+            { "DupInst.NoWarningsInScope", "所选范围内没有“同一位置有相同实例”的警告。" },
         };
     }
 }

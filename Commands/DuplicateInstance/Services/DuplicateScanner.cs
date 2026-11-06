@@ -12,7 +12,9 @@ namespace Tools28.Commands.DuplicateInstance.Services
     /// </summary>
     public class DuplicateScanner
     {
-        public List<DuplicateRow> Scan(Document doc)
+        /// <param name="scopeIds">調べる範囲の要素 ID（null ならモデル全体）。
+        /// 組の要素のうち1つでも範囲内にあれば、その組を（見比べられるよう相手も含めて）一覧に出す。</param>
+        public List<DuplicateRow> Scan(Document doc, HashSet<long> scopeIds = null)
         {
             var dupGuid = BuiltInFailures.OverlapFailures.DuplicateInstances.Guid;
 
@@ -33,6 +35,7 @@ namespace Tools28.Commands.DuplicateInstance.Services
 
             var groups = uf.Groups()
                            .Where(g => g.Count >= 2)
+                           .Where(g => scopeIds == null || g.Any(id => scopeIds.Contains(id.LongValue())))
                            .Select(g => g.OrderBy(id => id.LongValue()).ToList())
                            .OrderBy(g => g[0].LongValue())
                            .ToList();

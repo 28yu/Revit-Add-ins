@@ -1394,6 +1394,16 @@ namespace Tools28.Localization
             { "DupInst.Popup.Clear", "Clear filter for this column" },
             { "DupInst.Popup.SelectAll", "(Select all)" },
             { "DupInst.Popup.Blank", "(Blank)" },
+            { "DupInst.Scope.Main", "Which range should be checked for duplicates?" },
+            { "DupInst.Scope.Model", "Entire model" },
+            { "DupInst.Scope.Model.Desc", "Lists all \"identical instances are in the same place\" warnings in the model" },
+            { "DupInst.Scope.View", "Current view: {0}" },
+            { "DupInst.Scope.View.Desc", "Lists only the sets that include elements shown in this view" },
+            { "DupInst.Scope.Selection", "Selected elements ({0})" },
+            { "DupInst.Scope.Selection.Desc", "Lists only the sets that include the selected elements (the overlapping elements are shown too)" },
+            { "DupInst.Scope.NoSelection", "* Select elements before running to also choose \"Selected elements\"" },
+            { "DupInst.Scope.ViewNotSupported", "Elements cannot be read from this view. Run it in a plan or 3D view, or choose \"Entire model\"." },
+            { "DupInst.NoWarningsInScope", "There are no \"identical instances are in the same place\" warnings in the selected range." },
         };
     }
 }
