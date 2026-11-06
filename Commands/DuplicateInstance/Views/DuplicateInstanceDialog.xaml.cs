@@ -203,7 +203,7 @@ namespace Tools28.Commands.DuplicateInstance.Views
             CompareGrid.Columns.Add(new DataGridTextColumn
             {
                 Header = Loc.S("DupInst.Compare.ColParam"),
-                Binding = new Binding(nameof(CompareRow.Name)),
+                Binding = new System.Windows.Data.Binding(nameof(CompareRow.Name)),
                 Width = new DataGridLength(220),
                 ElementStyle = (Style)FindResource("CellText")
             });
@@ -215,7 +215,7 @@ namespace Tools28.Commands.DuplicateInstance.Views
                 CompareGrid.Columns.Add(new DataGridTextColumn
                 {
                     Header = header,
-                    Binding = new Binding($"Values[{i}]"),
+                    Binding = new System.Windows.Data.Binding($"Values[{i}]"),
                     Width = new DataGridLength(1, DataGridLengthUnitType.Star),
                     MinWidth = 140,
                     ElementStyle = (Style)FindResource("CellText")
