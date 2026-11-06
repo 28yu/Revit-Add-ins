@@ -153,6 +153,9 @@
                   RowHeaderWidth="0" SelectionMode="Extended" SelectionUnit="FullRow" IsReadOnly="False"
                   BorderBrush="#CCCCCC" BorderThickness="1" FontSize="12"
                   SelectionChanged="RowGrid_SelectionChanged"
+                  Sorting="RowGrid_Sorting"
+                  FrozenColumnCount="3"
+                  EnableColumnVirtualization="True"
                   MouseDoubleClick="RowGrid_MouseDoubleClick"
                   EnableRowVirtualization="True" VirtualizingPanel.IsVirtualizing="True"
                   VirtualizingPanel.VirtualizationMode="Recycling">
@@ -180,14 +183,9 @@
                 </DataGridTemplateColumn>
                 <DataGridTextColumn x:Name="colGroup" Header="組" Binding="{Binding GroupNo}" Width="Auto" MinWidth="40" IsReadOnly="True" ElementStyle="{StaticResource CellCenter}"/>
                 <DataGridTextColumn x:Name="colId" Header="要素ID" Binding="{Binding IdValue}" Width="Auto" MinWidth="70" IsReadOnly="True" ElementStyle="{StaticResource CellCenter}"/>
-                <DataGridTextColumn x:Name="colCategory" Header="カテゴリ" Binding="{Binding Category}" Width="1*" IsReadOnly="True" ElementStyle="{StaticResource CellText}"/>
-                <DataGridTextColumn x:Name="colFamily" Header="ファミリ" Binding="{Binding Family}" Width="1.3*" IsReadOnly="True" ElementStyle="{StaticResource CellText}"/>
-                <DataGridTextColumn x:Name="colType" Header="タイプ" Binding="{Binding TypeName}" Width="1.3*" IsReadOnly="True" ElementStyle="{StaticResource CellText}"/>
-                <DataGridTextColumn x:Name="colLevel" Header="レベル" Binding="{Binding Level}" Width="0.8*" IsReadOnly="True" ElementStyle="{StaticResource CellText}"/>
-                <DataGridTextColumn x:Name="colWorkset" Header="ワークセット" Binding="{Binding Workset}" Width="0.9*" IsReadOnly="True" ElementStyle="{StaticResource CellText}"/>
-                <DataGridTextColumn x:Name="colMark" Header="マーク" Binding="{Binding Mark}" Width="0.7*" IsReadOnly="True" ElementStyle="{StaticResource CellText}"/>
-                <DataGridTextColumn x:Name="colComments" Header="コメント" Binding="{Binding Comments}" Width="1*" IsReadOnly="True" ElementStyle="{StaticResource CellText}"/>
-                <DataGridTextColumn x:Name="colHost" Header="ホスト" Binding="{Binding Host}" Width="0.8*" IsReadOnly="True" ElementStyle="{StaticResource CellText}"/>
+                <DataGridTextColumn x:Name="colCategory" Header="カテゴリ" Binding="{Binding Category}" Width="120" IsReadOnly="True" ElementStyle="{StaticResource CellText}"/>
+                <DataGridTextColumn x:Name="colFamily" Header="ファミリ" Binding="{Binding Family}" Width="160" IsReadOnly="True" ElementStyle="{StaticResource CellText}"/>
+                <DataGridTextColumn x:Name="colType" Header="タイプ" Binding="{Binding TypeName}" Width="160" IsReadOnly="True" ElementStyle="{StaticResource CellText}"/>
                 <DataGridTextColumn x:Name="colFilled" Header="値の数" Binding="{Binding FilledCount}" Width="Auto" MinWidth="56" IsReadOnly="True" ElementStyle="{StaticResource CellCenter}"/>
                 <DataGridTextColumn x:Name="colDiff" Header="違う値" Binding="{Binding DiffCount}" Width="Auto" MinWidth="56" IsReadOnly="True" ElementStyle="{StaticResource CellCenter}"/>
             </DataGrid.Columns>

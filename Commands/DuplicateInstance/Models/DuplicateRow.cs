@@ -42,6 +42,12 @@ namespace Tools28.Commands.DuplicateInstance.Models
         /// <summary>インスタンスパラメータ（表示名 → 表示用の値）。比較表に使う。</summary>
         public Dictionary<string, string> Parameters { get; set; } = new Dictionary<string, string>();
 
+        /// <summary>
+        /// 一覧のパラメータ列に並べる値（ダイアログが決めた列の順番どおり）。
+        /// 列はパラメータ名に記号が入ることがあるため、名前ではなく番号（Values[i]）で結び付ける。
+        /// </summary>
+        public string[] Values { get; set; } = new string[0];
+
         private bool _isSelected;
         /// <summary>削除対象としてチェックされているか</summary>
         public bool IsSelected
