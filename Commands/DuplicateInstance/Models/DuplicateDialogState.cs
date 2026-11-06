@@ -18,6 +18,9 @@ namespace Tools28.Commands.DuplicateInstance.Models
         public string SortKey { get; set; }
         public bool SortDescending { get; set; }
 
+        /// <summary>列ごとの値の絞り込み（列の名前 → 表示する値の集合。空欄は ""）</summary>
+        public Dictionary<string, HashSet<string>> ColumnFilters { get; } = new Dictionary<string, HashSet<string>>();
+
         public bool HasBounds { get; set; }
         public double Left { get; set; }
         public double Top { get; set; }
@@ -27,6 +30,25 @@ namespace Tools28.Commands.DuplicateInstance.Models
 
         /// <summary>ダイアログが閉じられたあと Revit 画面で表示したい要素（null なら終了）</summary>
         public List<ElementId> ShowRequest { get; set; }
+    }
+
+    /// <summary>値の絞り込みの一覧に並べる1項目</summary>
+    public class FilterItem : System.ComponentModel.INotifyPropertyChanged
+    {
+        public event System.ComponentModel.PropertyChangedEventHandler PropertyChanged;
+        public string Value { get; set; }
+        public string Display { get; set; }
+        private bool _isChecked;
+        public bool IsChecked
+        {
+            get => _isChecked;
+            set
+            {
+                if (_isChecked == value) return;
+                _isChecked = value;
+                PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(IsChecked)));
+            }
+        }
     }
 
     /// <summary>比較表の1行（パラメータ1つ分）。Values[i] が組の i 番目の要素の値。</summary>

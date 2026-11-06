@@ -37,6 +37,15 @@ namespace Tools28.Commands.DuplicateInstance.Views
         private readonly Dictionary<DataGridColumn, Func<DuplicateRow, string>> _sortGetters
             = new Dictionary<DataGridColumn, Func<DuplicateRow, string>>();
         private readonly Dictionary<DataGridColumn, string> _columnKeys = new Dictionary<DataGridColumn, string>();
+        // 列の名前 → 値の取り出し方 / 見出しの ▼ ボタン（Excel のような絞り込み用）
+        private readonly Dictionary<string, Func<DuplicateRow, string>> _gettersByKey
+            = new Dictionary<string, Func<DuplicateRow, string>>();
+        private readonly Dictionary<string, System.Windows.Controls.Button> _filterButtons
+            = new Dictionary<string, System.Windows.Controls.Button>();
+        // 開いている絞り込みポップアップの対象列と、その値の一覧
+        private string _popupKey;
+        private List<FilterItem> _popupItems = new List<FilterItem>();
+        private ICollectionView _popupView;
         private bool _ready;
 
         private string AllCategories => Loc.S("DupInst.Filter.AllCategories");
@@ -88,6 +97,14 @@ namespace Tools28.Commands.DuplicateInstance.Views
             btnShow.Content = Loc.S("DupInst.Btn.Show");
             btnShow.ToolTip = Loc.S("DupInst.Btn.Show.Tip");
             btnReload.Content = Loc.S("DupInst.Btn.Reload");
+            btnClearFilters.Content = Loc.S("DupInst.Btn.ClearFilters");
+            btnClearFilters.ToolTip = Loc.S("DupInst.Btn.ClearFilters.Tip");
+            btnPopupSortAsc.Content = Loc.S("DupInst.Popup.SortAsc");
+            btnPopupSortDesc.Content = Loc.S("DupInst.Popup.SortDesc");
+            btnPopupClear.Content = Loc.S("DupInst.Popup.Clear");
+            chkPopupAll.Content = Loc.S("DupInst.Popup.SelectAll");
+            btnPopupOk.Content = Loc.S("Common.OK");
+            btnPopupCancel.Content = Loc.S("Common.Cancel");
             btnReload.ToolTip = Loc.S("Common.Reload.Tip");
             btnDelete.Content = Loc.S("DupInst.Btn.Delete");
             btnClose.Content = Loc.S("DupInst.Btn.Close");
@@ -132,9 +149,17 @@ namespace Tools28.Commands.DuplicateInstance.Views
             UpdateCount();
         }
 
-        private bool RowFilter(object o)
+        private bool RowFilter(object o) => o is DuplicateRow r && PassesFilters(r, null);
+
+        /// <summary>絞り込み条件をすべて満たすか。skipKey の列の絞り込みだけは無視する（その列の値一覧を作るため）。</summary>
+        private bool PassesFilters(DuplicateRow r, string skipKey)
         {
-            if (!(o is DuplicateRow r)) return false;
+            foreach (var f in _state.ColumnFilters)
+            {
+                if (f.Key == skipKey) continue;
+                if (!_gettersByKey.TryGetValue(f.Key, out var get)) continue;   // 今は無い列
+                if (!f.Value.Contains(get(r) ?? "")) return false;
+            }
 
             string cat = cmbCategory?.SelectedItem as string;
             if (!string.IsNullOrEmpty(cat) && cat != AllCategories && r.Category != cat) return false;
@@ -181,6 +206,174 @@ namespace Tools28.Commands.DuplicateInstance.Views
             UpdateCount();
         }
 
+        // ===== Excel のような値の絞り込み =====
+
+        /// <summary>列見出し: 名前と、右端の ▼（絞り込み）ボタン。</summary>
+        private object MakeHeader(string text, string key)
+        {
+            var panel = new DockPanel { LastChildFill = true };
+            var btn = new System.Windows.Controls.Button
+            {
+                Content = "▼",
+                FontSize = 8,
+                Width = 16,
+                Height = 16,
+                Padding = new Thickness(0),
+                Margin = new Thickness(4, 0, 0, 0),
+                BorderThickness = new Thickness(1),
+                Cursor = Cursors.Hand,
+                Focusable = false,
+                ToolTip = Loc.S("DupInst.Filter.Tip")
+            };
+            // ボタンが押下を受け取るので、見出しの並べ替えは起きない
+            btn.Click += (s, e) => { e.Handled = true; OpenFilterPopup(key, btn); };
+            DockPanel.SetDock(btn, Dock.Right);
+            panel.Children.Add(btn);
+            panel.Children.Add(new TextBlock
+            {
+                Text = text,
+                VerticalAlignment = VerticalAlignment.Center,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                ToolTip = text
+            });
+            _filterButtons[key] = btn;
+            return panel;
+        }
+
+        /// <summary>絞り込み中の列の ▼ を青くする。</summary>
+        private void UpdateFilterButtons()
+        {
+            var on = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x00, 0x66, 0xCC));
+            var offBorder = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xBB, 0xBB, 0xBB));
+            foreach (var kv in _filterButtons)
+            {
+                bool active = _state.ColumnFilters.ContainsKey(kv.Key);
+                kv.Value.Background = active ? on : System.Windows.Media.Brushes.White;
+                kv.Value.Foreground = active ? System.Windows.Media.Brushes.White : System.Windows.Media.Brushes.DimGray;
+                kv.Value.BorderBrush = active ? on : offBorder;
+            }
+        }
+
+        private void OpenFilterPopup(string key, UIElement target)
+        {
+            if (!_gettersByKey.TryGetValue(key, out var get)) return;
+            _popupKey = key;
+
+            // 他の絞り込みで残っている行から、この列の値と件数を集める（Excel と同じ）
+            var counts = new Dictionary<string, int>();
+            foreach (var r in _rows.Where(r => PassesFilters(r, key)))
+            {
+                string v = get(r) ?? "";
+                counts[v] = counts.TryGetValue(v, out var n) ? n + 1 : 1;
+            }
+            _state.ColumnFilters.TryGetValue(key, out var allowed);
+
+            var values = counts.Keys.ToList();
+            values.Sort((a, b) =>
+            {
+                bool ea = a.Length == 0, eb = b.Length == 0;
+                if (ea || eb) return ea == eb ? 0 : (ea ? 1 : -1);   // 空白は最後
+                return RowComparer.CompareValues(a, b);
+            });
+            _popupItems = values.Select(v => new FilterItem
+            {
+                Value = v,
+                Display = (v.Length == 0 ? Loc.S("DupInst.Popup.Blank") : v) + "  (" + counts[v] + ")",
+                IsChecked = allowed == null || allowed.Contains(v)
+            }).ToList();
+
+            _popupView = CollectionViewSource.GetDefaultView(_popupItems);
+            _popupView.Filter = o =>
+            {
+                string q = PopupSearch.Text?.Trim();
+                return string.IsNullOrEmpty(q) ||
+                       ((FilterItem)o).Display.IndexOf(q, StringComparison.CurrentCultureIgnoreCase) >= 0;
+            };
+            PopupSearch.Text = "";
+            PopupList.ItemsSource = _popupView;
+            UpdatePopupAll();
+
+            FilterPopup.PlacementTarget = target;
+            FilterPopup.IsOpen = true;
+            PopupSearch.Focus();
+        }
+
+        private IEnumerable<FilterItem> VisiblePopupItems => _popupView?.Cast<FilterItem>() ?? Enumerable.Empty<FilterItem>();
+
+        private void UpdatePopupAll()
+        {
+            var vis = VisiblePopupItems.ToList();
+            if (vis.Count == 0) { chkPopupAll.IsChecked = false; return; }
+            int on = vis.Count(i => i.IsChecked);
+            chkPopupAll.IsChecked = on == vis.Count ? true : (on == 0 ? (bool?)false : null);
+        }
+
+        private void PopupSearch_Changed(object sender, TextChangedEventArgs e)
+        {
+            _popupView?.Refresh();
+            UpdatePopupAll();
+        }
+
+        private void PopupAll_Click(object sender, RoutedEventArgs e)
+        {
+            bool on = chkPopupAll.IsChecked != false;
+            foreach (var i in VisiblePopupItems) i.IsChecked = on;
+            UpdatePopupAll();
+        }
+
+        private void PopupItem_Click(object sender, RoutedEventArgs e) => UpdatePopupAll();
+
+        private void PopupOk_Click(object sender, RoutedEventArgs e)
+        {
+            if (_popupKey == null) return;
+            bool searching = !string.IsNullOrWhiteSpace(PopupSearch.Text);
+            // 検索中は、見えている項目のうちチェックしたものだけを表示する（Excel と同じ）
+            var considered = searching ? VisiblePopupItems.ToList() : _popupItems;
+            var allowed = new HashSet<string>(considered.Where(i => i.IsChecked).Select(i => i.Value));
+            if (allowed.Count == 0) return;   // 何も選ばないと全部消えてしまうので、確定させない
+
+            if (!searching && allowed.Count == _popupItems.Count)
+                _state.ColumnFilters.Remove(_popupKey);
+            else
+                _state.ColumnFilters[_popupKey] = allowed;
+
+            FilterPopup.IsOpen = false;
+            UpdateFilterButtons();
+            RefreshView();
+        }
+
+        private void PopupCancel_Click(object sender, RoutedEventArgs e) => FilterPopup.IsOpen = false;
+
+        private void PopupClear_Click(object sender, RoutedEventArgs e)
+        {
+            if (_popupKey != null) _state.ColumnFilters.Remove(_popupKey);
+            FilterPopup.IsOpen = false;
+            UpdateFilterButtons();
+            RefreshView();
+        }
+
+        private void PopupSortAsc_Click(object sender, RoutedEventArgs e) => SortFromPopup(ListSortDirection.Ascending);
+        private void PopupSortDesc_Click(object sender, RoutedEventArgs e) => SortFromPopup(ListSortDirection.Descending);
+
+        private void SortFromPopup(ListSortDirection dir)
+        {
+            var col = _columnKeys.FirstOrDefault(kv => kv.Value == _popupKey).Key;
+            FilterPopup.IsOpen = false;
+            if (col != null) ApplySort(col, dir);
+        }
+
+        private void ClearFilters_Click(object sender, RoutedEventArgs e)
+        {
+            _ready = false;
+            _state.ColumnFilters.Clear();
+            SearchBox.Text = "";
+            cmbCategory.SelectedItem = AllCategories;
+            chkCheckedOnly.IsChecked = false;
+            _ready = true;
+            UpdateFilterButtons();
+            RefreshView();
+        }
+
         // ===== パラメータ列と並べ替え =====
 
         private void RegisterFixedColumns()
@@ -188,8 +381,12 @@ namespace Tools28.Commands.DuplicateInstance.Views
             _fixedColumnCount = RowGrid.Columns.Count;
             void Reg(DataGridColumn c, string key, Func<DuplicateRow, string> get)
             {
+                string k = "fixed:" + key;
                 _sortGetters[c] = get;
-                _columnKeys[c] = "fixed:" + key;
+                _columnKeys[c] = k;
+                if (c == colCheck) return;
+                _gettersByKey[k] = get;
+                c.Header = MakeHeader(c.Header as string ?? "", k);
             }
             Reg(colCheck, "Check", r => r.IsSelected ? "1" : "0");
             Reg(colGroup, "Group", r => r.GroupNo.ToString());
@@ -199,6 +396,7 @@ namespace Tools28.Commands.DuplicateInstance.Views
             Reg(colType, "Type", r => r.TypeName);
             Reg(colFilled, "Filled", r => r.FilledCount.ToString());
             Reg(colDiff, "Diff", r => r.DiffCount.ToString());
+            UpdateFilterButtons();
         }
 
         /// <summary>固定列の後ろに、パラメータ1つにつき1列を作り直す。</summary>
@@ -207,6 +405,11 @@ namespace Tools28.Commands.DuplicateInstance.Views
             while (RowGrid.Columns.Count > _fixedColumnCount)
             {
                 var c = RowGrid.Columns[RowGrid.Columns.Count - 1];
+                if (_columnKeys.TryGetValue(c, out var oldKey))
+                {
+                    _gettersByKey.Remove(oldKey);
+                    _filterButtons.Remove(oldKey);
+                }
                 _sortGetters.Remove(c);
                 _columnKeys.Remove(c);
                 RowGrid.Columns.RemoveAt(RowGrid.Columns.Count - 1);
@@ -216,9 +419,10 @@ namespace Tools28.Commands.DuplicateInstance.Views
             for (int i = 0; i < _paramKeys.Count; i++)
             {
                 int idx = i;   // ラムダで使うため、ループ変数を写しておく
+                string key = "param:" + _paramKeys[i];
                 var col = new DataGridTextColumn
                 {
-                    Header = _paramKeys[i],
+                    Header = MakeHeader(_paramKeys[i], key),
                     Binding = new System.Windows.Data.Binding($"Values[{i}]") { Mode = BindingMode.OneWay },
                     IsReadOnly = true,
                     Width = DataGridLength.Auto,
@@ -228,9 +432,12 @@ namespace Tools28.Commands.DuplicateInstance.Views
                     SortMemberPath = "IdValue"   // 実際の並べ替えは RowGrid_Sorting で行う
                 };
                 RowGrid.Columns.Add(col);
-                _sortGetters[col] = r => idx < r.Values.Length ? r.Values[idx] : "";
-                _columnKeys[col] = "param:" + _paramKeys[i];
+                Func<DuplicateRow, string> get = r => idx < r.Values.Length ? r.Values[idx] : "";
+                _sortGetters[col] = get;
+                _gettersByKey[key] = get;
+                _columnKeys[col] = key;
             }
+            UpdateFilterButtons();
         }
 
         /// <summary>列見出しのクリック。数値は数として、空欄は常に最後に並べる独自の並べ替えにする。</summary>
@@ -299,7 +506,7 @@ namespace Tools28.Commands.DuplicateInstance.Views
                 return c != 0 ? c : a.IdValue.CompareTo(b.IdValue);
             }
 
-            private static int CompareValues(string a, string b)
+            internal static int CompareValues(string a, string b)
             {
                 bool na = TryNumber(a, out double da), nb = TryNumber(b, out double db);
                 if (na && nb)
@@ -525,57 +732,85 @@ namespace Tools28.Commands.DuplicateInstance.Views
                 return;
             }
 
-            var ids = selected.Select(r => r.Id).ToList();
-            int ok = 0, fail = 0;
-            List<string> warnings = null;
+            DeleteResult result;
+            var progress = new DeleteProgressWindow { Owner = this };
+            IsEnabled = false;
             try
             {
-                using (var t = new Transaction(_doc, Loc.S("DupInst.Txn.Delete")))
-                {
-                    t.Start();
-                    var fho = t.GetFailureHandlingOptions();
-                    fho = fho.SetForcedModalHandling(false);
-                    fho = fho.SetClearAfterRollback(true);
-                    var swallower = new WarningCollector();
-                    warnings = swallower.Messages;
-                    fho = fho.SetFailuresPreprocessor(swallower);
-                    t.SetFailureHandlingOptions(fho);
-
-                    // 1件ずつ消す（1つが失敗しても他は消せるように）
-                    foreach (var id in ids)
-                    {
-                        try
-                        {
-                            if (_doc.GetElement(id) == null) { fail++; continue; }
-                            _doc.Delete(id);
-                            ok++;
-                        }
-                        catch { fail++; }
-                    }
-                    t.CommitOrThrow();
-                }
+                progress.Show();
+                result = new DuplicateDeleter().Delete(_doc, selected, progress);
             }
             catch (Exception ex)
             {
+                result = null;
+                progress.Finish();
+                IsEnabled = true;
                 TaskDialog.Show(Loc.S("Common.Error"), string.Format(Loc.S("DupInst.Result.Error"), ex.Message));
                 this.BringToFrontDeferred();
                 return;
             }
-
-            string msg = string.Format(Loc.S("DupInst.Result.Msg"), ok, fail);
-            if (warnings != null && warnings.Count > 0)
+            finally
             {
-                msg += "\n\n" + Loc.S("Common.RevitWarnings") + "\n"
-                     + string.Join("\n", warnings.Take(10).Select(w => "・" + w));
-                if (warnings.Count > 10) msg += "\n…";
+                progress.Finish();
+                IsEnabled = true;
             }
-            TaskDialog.Show(Loc.S("DupInst.Result.Title"), msg);
 
-            foreach (var r in selected) _state.CheckedIds.Remove(r.IdValue);
-            foreach (var r in _rows) r.IsSelected = false;   // 再読み込み時に残っている要素へチェックを戻さない
+            if (result.Cancelled)
+            {
+                TaskDialog.Show(Loc.S("DupInst.Result.Title"), Loc.S("DupInst.Result.Cancelled"));
+                this.BringToFrontDeferred();
+                return;
+            }
+
+            ShowDeleteResult(result);
+
+            // 削除できた要素のチェックだけ外す。削除できなかった要素はチェックを残し、すぐ見つけられるようにする
+            foreach (var r in _rows)
+                r.IsSelected = r.IsSelected && !result.DeletedIds.Contains(r.IdValue);
+            CaptureChecks();
             LoadRows();
             RefreshView();
             this.BringToFrontDeferred();
+        }
+
+        /// <summary>削除の結果を表示する。削除できなかった要素は原因ごとにまとめ、要素IDを添える。</summary>
+        private void ShowDeleteResult(DeleteResult result)
+        {
+            int ok = result.DeletedIds.Count, ng = result.Failed.Count;
+            var td = new TaskDialog(Loc.S("DupInst.Result.Title"))
+            {
+                MainInstruction = string.Format(Loc.S("DupInst.Result.Msg"), ok, ng)
+            };
+
+            var sb = new System.Text.StringBuilder();
+            if (ng > 0)
+            {
+                sb.AppendLine(Loc.S("DupInst.Result.FailedHeader"));
+                const int maxGroups = 8, maxIds = 10;
+                var groups = result.Failed.GroupBy(f => f.Value).OrderByDescending(g => g.Count()).ToList();
+                foreach (var g in groups.Take(maxGroups))
+                {
+                    sb.AppendLine();
+                    sb.AppendLine(string.Format(Loc.S("DupInst.Result.ReasonLine"), g.Key, g.Count()));
+                    var ids = g.Select(f => f.Key.IdValue.ToString()).ToList();
+                    string idText = string.Join(", ", ids.Take(maxIds));
+                    if (ids.Count > maxIds) idText += string.Format(Loc.S("DupInst.Result.More"), ids.Count - maxIds);
+                    sb.AppendLine("    ID: " + idText);
+                }
+                if (groups.Count > maxGroups)
+                    sb.AppendLine().AppendLine(string.Format(Loc.S("DupInst.Result.MoreReasons"), groups.Count - maxGroups));
+                sb.AppendLine().Append(Loc.S("DupInst.Result.FailedHint"));
+            }
+            td.MainContent = sb.ToString().Trim();
+
+            if (result.Warnings.Count > 0)
+            {
+                string w = Loc.S("Common.RevitWarnings") + "\n"
+                         + string.Join("\n", result.Warnings.Take(15).Select(x => "・" + x));
+                if (result.Warnings.Count > 15) w += "\n…";
+                td.ExpandedContent = w;
+            }
+            td.Show();
         }
 
         private void Reload_Click(object sender, RoutedEventArgs e)
@@ -630,28 +865,6 @@ namespace Tools28.Commands.DuplicateInstance.Views
             RowGrid.SelectedItem = row;
             RowGrid.ScrollIntoView(row);
             UpdateCompare();
-        }
-
-        /// <summary>削除時の Revit の警告を画面に出さずに記録する（結果ダイアログでまとめて知らせる）。</summary>
-        private class WarningCollector : IFailuresPreprocessor
-        {
-            public List<string> Messages { get; } = new List<string>();
-
-            public FailureProcessingResult PreprocessFailures(FailuresAccessor a)
-            {
-                try
-                {
-                    foreach (var f in a.GetFailureMessages())
-                    {
-                        var text = f?.GetDescriptionText();
-                        if (!string.IsNullOrWhiteSpace(text) && !Messages.Contains(text))
-                            Messages.Add(text);
-                    }
-                }
-                catch { }
-                a.DeleteAllWarnings();
-                return FailureProcessingResult.Continue;
-            }
         }
     }
 }
