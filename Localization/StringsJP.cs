@@ -1393,6 +1393,16 @@ namespace Tools28.Localization
             { "DupInst.Popup.Clear", "この列の絞り込みを解除" },
             { "DupInst.Popup.SelectAll", "(すべて選択)" },
             { "DupInst.Popup.Blank", "(空白)" },
+            { "DupInst.Scope.Main", "どの範囲の重複を調べますか？" },
+            { "DupInst.Scope.Model", "モデル全体" },
+            { "DupInst.Scope.Model.Desc", "モデル内のすべての「同じ場所に同一のインスタンスがあります」を一覧にします" },
+            { "DupInst.Scope.View", "現在のビュー: {0}" },
+            { "DupInst.Scope.View.Desc", "このビューに表示されている要素を含む組だけを一覧にします" },
+            { "DupInst.Scope.Selection", "選択している要素（{0} 個）" },
+            { "DupInst.Scope.Selection.Desc", "選択している要素を含む組だけを一覧にします（重なっている相手も一緒に表示）" },
+            { "DupInst.Scope.NoSelection", "※ 要素を選択してから実行すると「選択している要素」も選べます" },
+            { "DupInst.Scope.ViewNotSupported", "このビューからは要素を取り出せません。平面図や3Dビューなどで実行するか、「モデル全体」を選んでください。" },
+            { "DupInst.NoWarningsInScope", "選んだ範囲には「同じ場所に同一のインスタンスがあります」の警告はありません。" },
         };
     }
 }

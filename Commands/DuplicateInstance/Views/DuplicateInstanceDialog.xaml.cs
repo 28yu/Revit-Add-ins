@@ -72,7 +72,9 @@ namespace Tools28.Commands.DuplicateInstance.Views
 
         private void ApplyLocalization()
         {
-            Title = Loc.S("DupInst.Title");
+            Title = string.IsNullOrEmpty(_state.ScopeLabel)
+                ? Loc.S("DupInst.Title")
+                : Loc.S("DupInst.Title") + " - " + _state.ScopeLabel;
             txtDescription.Text = Loc.S("DupInst.Description");
             lblSearch.Text = Loc.S("DupInst.Search");
             lblCategory.Text = Loc.S("DupInst.Filter.Category");
@@ -116,7 +118,7 @@ namespace Tools28.Commands.DuplicateInstance.Views
         {
             using (this.BlockRevitInput())
             {
-                _rows = _scanner.Scan(_doc);
+                _rows = _scanner.Scan(_doc, _state.ScopeIds);
             }
 
             foreach (var r in _rows)
@@ -549,7 +551,9 @@ namespace Tools28.Commands.DuplicateInstance.Views
                 _compareGroupNo = -1;
                 CompareGrid.Columns.Clear();
                 CompareGrid.ItemsSource = null;
-                txtCompareTitle.Text = _rows.Count == 0 ? Loc.S("DupInst.NoWarnings") : Loc.S("DupInst.Compare.Hint");
+                txtCompareTitle.Text = _rows.Count == 0
+                    ? (_state.ScopeIds == null ? Loc.S("DupInst.NoWarnings") : Loc.S("DupInst.NoWarningsInScope"))
+                    : Loc.S("DupInst.Compare.Hint");
                 return;
             }
             if (cur.GroupNo == _compareGroupNo) return;

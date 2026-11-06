@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
@@ -33,6 +34,7 @@ namespace Tools28.Commands.DuplicateInstance
             try
             {
                 var state = new DuplicateDialogState();
+                if (!AskScope(uidoc, state)) return Result.Cancelled;
                 while (true)
                 {
                     state.ShowRequest = null;
@@ -49,6 +51,69 @@ namespace Tools28.Commands.DuplicateInstance
             {
                 message = string.Format(Loc.S("Common.ErrorWithManual"), ex.Message);
                 return Result.Failed;
+            }
+        }
+
+        /// <summary>
+        /// 最初に、どの範囲の重複を調べるか（モデル全体／現在のビュー／選択している要素）を選んでもらう。
+        /// キャンセルなら false。
+        /// </summary>
+        private static bool AskScope(UIDocument uidoc, DuplicateDialogState state)
+        {
+            var doc = uidoc.Document;
+            var view = doc.ActiveView;
+            ICollection<ElementId> selected = null;
+            try { selected = uidoc.Selection.GetElementIds(); } catch { }
+            int selCount = selected?.Count ?? 0;
+
+            var td = new TaskDialog(Loc.S("DupInst.Title"))
+            {
+                MainInstruction = Loc.S("DupInst.Scope.Main"),
+                CommonButtons = TaskDialogCommonButtons.Cancel,
+                DefaultButton = TaskDialogResult.CommandLink1
+            };
+            td.AddCommandLink(TaskDialogCommandLinkId.CommandLink1, Loc.S("DupInst.Scope.Model"), Loc.S("DupInst.Scope.Model.Desc"));
+            if (view != null)
+                td.AddCommandLink(TaskDialogCommandLinkId.CommandLink2,
+                    string.Format(Loc.S("DupInst.Scope.View"), view.Name), Loc.S("DupInst.Scope.View.Desc"));
+            if (selCount > 0)
+                td.AddCommandLink(TaskDialogCommandLinkId.CommandLink3,
+                    string.Format(Loc.S("DupInst.Scope.Selection"), selCount), Loc.S("DupInst.Scope.Selection.Desc"));
+            else
+                td.FooterText = Loc.S("DupInst.Scope.NoSelection");
+
+            switch (td.Show())
+            {
+                case TaskDialogResult.CommandLink1:
+                    state.ScopeIds = null;
+                    state.ScopeLabel = Loc.S("DupInst.Scope.Model");
+                    return true;
+
+                case TaskDialogResult.CommandLink2:
+                    try
+                    {
+                        var ids = new HashSet<long>();
+                        foreach (var id in new FilteredElementCollector(doc, view.Id)
+                                     .WhereElementIsNotElementType().ToElementIds())
+                            ids.Add(id.LongValue());
+                        state.ScopeIds = ids;
+                        state.ScopeLabel = string.Format(Loc.S("DupInst.Scope.View"), view.Name);
+                        return true;
+                    }
+                    catch
+                    {
+                        // 集計表など、要素を取り出せないビュー
+                        TaskDialog.Show(Loc.S("DupInst.Title"), Loc.S("DupInst.Scope.ViewNotSupported"));
+                        return false;
+                    }
+
+                case TaskDialogResult.CommandLink3:
+                    state.ScopeIds = new HashSet<long>(selected.Select(id => id.LongValue()));
+                    state.ScopeLabel = string.Format(Loc.S("DupInst.Scope.Selection"), selCount);
+                    return true;
+
+                default:
+                    return false;
             }
         }
 

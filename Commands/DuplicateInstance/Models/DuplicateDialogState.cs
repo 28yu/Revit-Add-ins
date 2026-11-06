@@ -9,6 +9,13 @@ namespace Tools28.Commands.DuplicateInstance.Models
     public class DuplicateDialogState
     {
         public HashSet<long> CheckedIds { get; } = new HashSet<long>();
+
+        /// <summary>調べる範囲の要素 ID（null ならモデル全体）。起動時に1回だけ決める
+        /// （「画面で確認」で選択が変わっても範囲は変えない）。</summary>
+        public HashSet<long> ScopeIds { get; set; }
+
+        /// <summary>画面のタイトルに出す範囲の説明（例: 現在のビュー: 1FL）</summary>
+        public string ScopeLabel { get; set; }
         public string SearchText { get; set; } = "";
         public string Category { get; set; }
         public bool DiffOnly { get; set; }
