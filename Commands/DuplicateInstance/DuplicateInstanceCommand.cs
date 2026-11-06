@@ -69,8 +69,9 @@ namespace Tools28.Commands.DuplicateInstance
             var td = new TaskDialog(Loc.S("DupInst.Title"))
             {
                 MainInstruction = Loc.S("DupInst.Scope.Main"),
-                CommonButtons = TaskDialogCommonButtons.Cancel,
-                DefaultButton = TaskDialogResult.CommandLink1
+                // ※ DefaultButton に CommandLink を指定すると、リンクを追加する前の時点で
+                //   「対応するボタンがない」例外になる。指定しなくても先頭のリンクが既定になる
+                CommonButtons = TaskDialogCommonButtons.Cancel
             };
             td.AddCommandLink(TaskDialogCommandLinkId.CommandLink1, Loc.S("DupInst.Scope.Model"), Loc.S("DupInst.Scope.Model.Desc"));
             if (view != null)
