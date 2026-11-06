@@ -14,6 +14,10 @@ namespace Tools28.Commands.DuplicateInstance.Models
         public bool DiffOnly { get; set; }
         public long SelectedId { get; set; } = -1;
 
+        /// <summary>並べ替えに使っている列（"fixed:Id" や "param:マーク" など。null なら並べ替えなし）</summary>
+        public string SortKey { get; set; }
+        public bool SortDescending { get; set; }
+
         public bool HasBounds { get; set; }
         public double Left { get; set; }
         public double Top { get; set; }

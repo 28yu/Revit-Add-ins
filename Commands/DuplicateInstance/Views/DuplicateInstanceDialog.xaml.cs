@@ -29,6 +29,14 @@ namespace Tools28.Commands.DuplicateInstance.Views
         private List<CompareRow> _compareRows = new List<CompareRow>();
         private ICollectionView _compareView;
         private int _compareGroupNo = -1;
+
+        // 一覧のパラメータ列（全要素のインスタンスパラメータ名の和集合・名前順）
+        private List<string> _paramKeys = new List<string>();
+        private int _fixedColumnCount;
+        // 列ごとの「並べ替えに使う値の取り出し方」と、開き直したときに同じ列を探すための名前
+        private readonly Dictionary<DataGridColumn, Func<DuplicateRow, string>> _sortGetters
+            = new Dictionary<DataGridColumn, Func<DuplicateRow, string>>();
+        private readonly Dictionary<DataGridColumn, string> _columnKeys = new Dictionary<DataGridColumn, string>();
         private bool _ready;
 
         private string AllCategories => Loc.S("DupInst.Filter.AllCategories");
@@ -39,6 +47,7 @@ namespace Tools28.Commands.DuplicateInstance.Views
             _state = state ?? new DuplicateDialogState();
             InitializeComponent();
             ApplyLocalization();
+            RegisterFixedColumns();
             RestoreBounds();
 
             SearchBox.Text = _state.SearchText ?? "";
@@ -66,11 +75,6 @@ namespace Tools28.Commands.DuplicateInstance.Views
             colCategory.Header = Loc.S("DupInst.Col.Category");
             colFamily.Header = Loc.S("DupInst.Col.Family");
             colType.Header = Loc.S("DupInst.Col.Type");
-            colLevel.Header = Loc.S("DupInst.Col.Level");
-            colWorkset.Header = Loc.S("DupInst.Col.Workset");
-            colMark.Header = Loc.S("DupInst.Col.Mark");
-            colComments.Header = Loc.S("DupInst.Col.Comments");
-            colHost.Header = Loc.S("DupInst.Col.Host");
             colFilled.Header = Loc.S("DupInst.Col.Filled");
             colDiff.Header = Loc.S("DupInst.Col.Diff");
 
@@ -101,9 +105,17 @@ namespace Tools28.Commands.DuplicateInstance.Views
             foreach (var r in _rows)
                 r.IsSelected = _state.CheckedIds.Contains(r.IdValue);
 
+            // 全要素のパラメータ名を集めて列にし、各行の値をその順番に並べる
+            _paramKeys = _rows.SelectMany(r => r.Parameters.Keys).Distinct()
+                              .OrderBy(k => k, StringComparer.CurrentCulture).ToList();
+            foreach (var r in _rows)
+                r.Values = _paramKeys.Select(k => r.Parameters.TryGetValue(k, out var v) ? v ?? "" : "").ToArray();
+            BuildParamColumns();
+
             _view = CollectionViewSource.GetDefaultView(_rows);
             _view.Filter = RowFilter;
             RowGrid.ItemsSource = _view;
+            ApplySavedSort();
 
             // カテゴリの選択肢を作り直す（前回の選択を可能なら残す）
             bool wasReady = _ready;
@@ -132,8 +144,8 @@ namespace Tools28.Commands.DuplicateInstance.Views
             string q = SearchBox?.Text?.Trim();
             if (!string.IsNullOrEmpty(q))
             {
-                bool hit = new[] { r.IdValue.ToString(), r.Category, r.Family, r.TypeName, r.Level,
-                                   r.Workset, r.Mark, r.Comments, r.Host }
+                bool hit = new[] { r.IdValue.ToString(), r.Category, r.Family, r.TypeName, r.Host }
+                    .Concat(r.Values)
                     .Any(s => s != null && s.IndexOf(q, StringComparison.CurrentCultureIgnoreCase) >= 0);
                 if (!hit) return false;
             }
@@ -167,6 +179,147 @@ namespace Tools28.Commands.DuplicateInstance.Views
             _compareGroupNo = -1;
             UpdateCompare();
             UpdateCount();
+        }
+
+        // ===== パラメータ列と並べ替え =====
+
+        private void RegisterFixedColumns()
+        {
+            _fixedColumnCount = RowGrid.Columns.Count;
+            void Reg(DataGridColumn c, string key, Func<DuplicateRow, string> get)
+            {
+                _sortGetters[c] = get;
+                _columnKeys[c] = "fixed:" + key;
+            }
+            Reg(colCheck, "Check", r => r.IsSelected ? "1" : "0");
+            Reg(colGroup, "Group", r => r.GroupNo.ToString());
+            Reg(colId, "Id", r => r.IdValue.ToString());
+            Reg(colCategory, "Category", r => r.Category);
+            Reg(colFamily, "Family", r => r.Family);
+            Reg(colType, "Type", r => r.TypeName);
+            Reg(colFilled, "Filled", r => r.FilledCount.ToString());
+            Reg(colDiff, "Diff", r => r.DiffCount.ToString());
+        }
+
+        /// <summary>固定列の後ろに、パラメータ1つにつき1列を作り直す。</summary>
+        private void BuildParamColumns()
+        {
+            while (RowGrid.Columns.Count > _fixedColumnCount)
+            {
+                var c = RowGrid.Columns[RowGrid.Columns.Count - 1];
+                _sortGetters.Remove(c);
+                _columnKeys.Remove(c);
+                RowGrid.Columns.RemoveAt(RowGrid.Columns.Count - 1);
+            }
+
+            var style = (Style)FindResource("CellText");
+            for (int i = 0; i < _paramKeys.Count; i++)
+            {
+                int idx = i;   // ラムダで使うため、ループ変数を写しておく
+                var col = new DataGridTextColumn
+                {
+                    Header = _paramKeys[i],
+                    Binding = new System.Windows.Data.Binding($"Values[{i}]") { Mode = BindingMode.OneWay },
+                    IsReadOnly = true,
+                    Width = DataGridLength.Auto,
+                    MinWidth = 70,
+                    MaxWidth = 260,
+                    ElementStyle = style,
+                    SortMemberPath = "IdValue"   // 実際の並べ替えは RowGrid_Sorting で行う
+                };
+                RowGrid.Columns.Add(col);
+                _sortGetters[col] = r => idx < r.Values.Length ? r.Values[idx] : "";
+                _columnKeys[col] = "param:" + _paramKeys[i];
+            }
+        }
+
+        /// <summary>列見出しのクリック。数値は数として、空欄は常に最後に並べる独自の並べ替えにする。</summary>
+        private void RowGrid_Sorting(object sender, DataGridSortingEventArgs e)
+        {
+            e.Handled = true;
+            var dir = e.Column.SortDirection == ListSortDirection.Ascending
+                ? ListSortDirection.Descending
+                : ListSortDirection.Ascending;
+            ApplySort(e.Column, dir);
+        }
+
+        private void ApplySort(DataGridColumn col, ListSortDirection dir)
+        {
+            if (!(_view is ListCollectionView lcv) || !_sortGetters.TryGetValue(col, out var getter)) return;
+            foreach (var c in RowGrid.Columns)
+                if (c != col) c.SortDirection = null;
+            col.SortDirection = dir;
+            bool desc = dir == ListSortDirection.Descending;
+            lcv.CustomSort = new RowComparer(getter, desc);
+            _state.SortKey = _columnKeys.TryGetValue(col, out var k) ? k : null;
+            _state.SortDescending = desc;
+        }
+
+        /// <summary>前回と同じ列で並べ替える（再読み込み・「画面で確認」から戻ったとき）。</summary>
+        private void ApplySavedSort()
+        {
+            if (string.IsNullOrEmpty(_state.SortKey)) return;
+            var col = _columnKeys.FirstOrDefault(kv => kv.Value == _state.SortKey).Key;
+            if (col == null) return;
+            ApplySort(col, _state.SortDescending ? ListSortDirection.Descending : ListSortDirection.Ascending);
+        }
+
+        /// <summary>
+        /// 一覧の並べ替え。両方が数で始まる値（例: 1200 mm）は数の大小で比べ、
+        /// 空欄は昇順・降順どちらでも最後に置く。同じ値なら組 → 要素ID の順。
+        /// </summary>
+        private class RowComparer : System.Collections.IComparer
+        {
+            private static readonly System.Text.RegularExpressions.Regex NumRe =
+                new System.Text.RegularExpressions.Regex(@"^\s*[-+]?(\d[\d,]*)?(\.\d+)?");
+
+            private readonly Func<DuplicateRow, string> _get;
+            private readonly bool _desc;
+
+            public RowComparer(Func<DuplicateRow, string> get, bool desc) { _get = get; _desc = desc; }
+
+            public int Compare(object x, object y)
+            {
+                var a = x as DuplicateRow;
+                var b = y as DuplicateRow;
+                if (a == null || b == null) return 0;
+                string va = _get(a) ?? "", vb = _get(b) ?? "";
+
+                bool ea = string.IsNullOrWhiteSpace(va), eb = string.IsNullOrWhiteSpace(vb);
+                int c;
+                if (ea || eb)
+                    c = ea && eb ? 0 : (ea ? 1 : -1);   // 空欄は向きに関係なく最後
+                else
+                {
+                    c = CompareValues(va, vb);
+                    if (_desc) c = -c;
+                }
+                if (c != 0) return c;
+                c = a.GroupNo.CompareTo(b.GroupNo);
+                return c != 0 ? c : a.IdValue.CompareTo(b.IdValue);
+            }
+
+            private static int CompareValues(string a, string b)
+            {
+                bool na = TryNumber(a, out double da), nb = TryNumber(b, out double db);
+                if (na && nb)
+                {
+                    int c = da.CompareTo(db);
+                    return c != 0 ? c : string.Compare(a, b, StringComparison.CurrentCulture);
+                }
+                if (na != nb) return na ? -1 : 1;   // 数で始まる値を先に
+                return string.Compare(a, b, StringComparison.CurrentCulture);
+            }
+
+            private static bool TryNumber(string s, out double v)
+            {
+                v = 0;
+                var m = NumRe.Match(s);
+                if (!m.Success || (m.Groups[1].Length == 0 && m.Groups[2].Length == 0)) return false;
+                return double.TryParse(m.Value.Replace(",", "").Trim(),
+                    System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out v);
+            }
         }
 
         // ===== 比較表 =====
