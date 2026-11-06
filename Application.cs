@@ -42,6 +42,7 @@ namespace Tools28
             { "FireProtection", "Ribbon.FireProtection" },
             { "Formwork", "Ribbon.Formwork" },
             { "GenericModelMerge", "Ribbon.GmMerge" },
+            { "DuplicateInstance", "Ribbon.DupInst" },
             { "RealtimeRender", "Ribbon.RtRender" },
             { "ExcelExport", "Ribbon.Excel.Export" },
             { "ExcelImport", "Ribbon.Excel.Import" },
@@ -75,6 +76,7 @@ namespace Tools28
             { "FireProtection", "Ribbon.FireProtection.Tip" },
             { "Formwork", "Ribbon.Formwork.Tip" },
             { "GenericModelMerge", "Ribbon.GmMerge.Tip" },
+            { "DuplicateInstance", "Ribbon.DupInst.Tip" },
             { "RealtimeRender", "Ribbon.RtRender.Tip" },
             { "ExcelExport", "Ribbon.Excel.Export.Tip" },
             { "ExcelImport", "Ribbon.Excel.Import.Tip" },
@@ -452,6 +454,12 @@ namespace Tools28
             mergeData.Image = LoadImage("generic_model_merge_16.png");
             mergeData.LargeImage = LoadImage("generic_model_merge.png");
             AddButton(panel, mergeData);
+
+            var dupData = new PushButtonData("DuplicateInstance", Loc.S("Ribbon.DupInst"), assemblyPath, "Tools28.Commands.DuplicateInstance.DuplicateInstanceCommand");
+            dupData.ToolTip = Loc.S("Ribbon.DupInst.Tip");
+            dupData.Image = LoadImage("duplicate_instance_16.png");
+            dupData.LargeImage = LoadImage("duplicate_instance.png");
+            AddButton(panel, dupData);
         }
 
         private void CreateRenderPanel(UIControlledApplication application, string tabName, string assemblyPath)

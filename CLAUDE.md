@@ -477,6 +477,7 @@ _buttonTipKeys["FeatureName"] = "Ribbon.FeatureName.Button.Tip";
 | LanguageSwitch / Localization（多言語UI） | `Commands/LanguageSwitch/` + `Localization/` | `Docs/DEVLOG.md#LocSystem` |
 | AutoBackup（自動バックアップ/定期ローカル保存・クラウド同期） | `Commands/AutoBackup/` | `Docs/Features/AutoBackup.md` |
 | GenericModelMerge（一般モデル化/複数要素の形状を1つにまとめる） | `Commands/GenericModelMerge/` | `Docs/Features/GenericModelMerge.md` |
+| DuplicateInstance（重複要素整理/警告「同じ場所に同一のインスタンス」の要素を比較・削除） | `Commands/DuplicateInstance/` | `Docs/Features/DuplicateInstance.md` |
 | RealtimeRender（リアルタイムレンダリング/GPUレイトレーシング・ライブ同期・画像/360°/ビューア書き出し） | `Commands/RealtimeRender/` + `Renderer/` | `Docs/DEVLOG.md#RealtimeRender`, `Renderer/README.md` |
 
 ### リボンパネル構成（左から順）
@@ -485,7 +486,7 @@ _buttonTipKeys["FeatureName"] = "Ribbon.FeatureName.Button.Tip";
 3. **ビュー** — ビューポート位置合わせ・トリミング領域合わせ・視点合わせ・切断ボックス合わせ（コピー／ペーストを1ボタンにまとめた「〜合わせ」。MA と同じ感覚の操作）、フィルタ整理（使用ビュー確認・名前変更・削除）、テンプレート整理（使用ビュー確認・名前変更・削除）、DWGレイヤ表示設定の移行（モデル間直接コピー）
 4. **注釈・詳細** — 部屋タグ自動配置、部屋3D色分け、塗潰し領域 分割・統合、塗潰しパターン入出力
 5. **構造** — 梁下端色分け、梁天端色分け、耐火被覆色分け、型枠数量算出
-6. **モデル** — 一般モデル化（3Dビュー内の複数カテゴリの形状を1つの一般モデル／.rfa にまとめる）
+6. **モデル** — 一般モデル化（3Dビュー内の複数カテゴリの形状を1つの一般モデル／.rfa にまとめる）、重複要素整理（警告「同じ場所に同一のインスタンスがあります」の要素をパラメータで見比べて不要な方を削除）
 7. **レンダリング** — リアルタイムレンダリング（3Dビューを別ウィンドウの Tools28Render.exe で GPU レイトレーシング描画。ライブ同期・画像/360°/ビューア exe の書き出し）
 8. **データ** — EXCELエクスポート、EXCELインポート
 9. **パラメータ** — パラメータ整理（同名特定・値の有無確認・未使用削除）、値の一括置換（文字パラメータの値をモデル全体で置換・削除）、値の移動（同名でグループ違いのパラメータ間で要素ごとに移動）

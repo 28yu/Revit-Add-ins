@@ -1,0 +1,280 @@
+<Window x:Class="Tools28.Commands.DuplicateInstance.Views.DuplicateInstanceDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="重複インスタンス整理"
+        Width="1100"
+        Height="760"
+        MinWidth="820"
+        MinHeight="560"
+        WindowStartupLocation="CenterScreen"
+        Background="#F5F5F5">
+
+    <Window.Resources>
+        <SolidColorBrush x:Key="RevitBlue" Color="#0066CC"/>
+        <SolidColorBrush x:Key="RevitHoverBlue" Color="#0052A3"/>
+        <SolidColorBrush x:Key="RevitDarkGray" Color="#333333"/>
+
+        <Style x:Key="PrimaryButtonStyle" TargetType="Button">
+            <Setter Property="MinWidth" Value="120"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="Margin" Value="4,0,0,0"/>
+            <Setter Property="Background" Value="{StaticResource RevitBlue}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="{StaticResource RevitBlue}"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="2" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{StaticResource RevitHoverBlue}"/>
+                    <Setter Property="BorderBrush" Value="{StaticResource RevitHoverBlue}"/>
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Background" Value="#CCCCCC"/>
+                    <Setter Property="BorderBrush" Value="#CCCCCC"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="DangerButtonStyle" TargetType="Button" BasedOn="{StaticResource PrimaryButtonStyle}">
+            <Setter Property="Background" Value="#C0392B"/>
+            <Setter Property="BorderBrush" Value="#C0392B"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#A93226"/>
+                    <Setter Property="BorderBrush" Value="#A93226"/>
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Background" Value="#CCCCCC"/>
+                    <Setter Property="BorderBrush" Value="#CCCCCC"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="SecondaryButtonStyle" TargetType="Button">
+            <Setter Property="MinWidth" Value="90"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="Padding" Value="8,0"/>
+            <Setter Property="Margin" Value="4,0,0,0"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="Foreground" Value="{StaticResource RevitDarkGray}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="#CCCCCC"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="2" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#F0F0F0"/>
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Foreground" Value="#AAAAAA"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="CellText" TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="4,0"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="ToolTip" Value="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+        </Style>
+        <Style x:Key="CellCenter" TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="4,0"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition x:Name="TopPaneRow" Height="*" MinHeight="120"/>
+            <RowDefinition Height="6"/>
+            <RowDefinition Height="*" MinHeight="120"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- 説明 -->
+        <TextBlock x:Name="txtDescription" Grid.Row="0" Text="" TextWrapping="Wrap" FontSize="12"
+                   Foreground="#333333" Margin="0,0,0,8"/>
+
+        <!-- 絞り込み -->
+        <Grid Grid.Row="1" Margin="0,0,0,6">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="220"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock x:Name="lblSearch" Grid.Column="0" Text="検索:" VerticalAlignment="Center" FontSize="12" Margin="0,0,4,0"/>
+            <TextBox x:Name="SearchBox" Grid.Column="1" Height="26" FontSize="12" VerticalContentAlignment="Center"
+                     BorderBrush="#CCCCCC" TextChanged="Filter_Changed"/>
+            <TextBlock x:Name="lblCategory" Grid.Column="2" Text="カテゴリ:" VerticalAlignment="Center" FontSize="12" Margin="16,0,4,0"/>
+            <ComboBox x:Name="cmbCategory" Grid.Column="3" Height="26" FontSize="12" VerticalContentAlignment="Center"
+                      SelectionChanged="Filter_Changed"/>
+            <CheckBox x:Name="chkCheckedOnly" Grid.Column="4" Content="チェックした行のみ" VerticalAlignment="Center"
+                      FontSize="12" Margin="16,0,0,0" Click="Filter_Changed"/>
+        </Grid>
+
+        <!-- 一覧（1要素1行） -->
+        <DataGrid x:Name="RowGrid" Grid.Row="2"
+                  AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
+                  CanUserSortColumns="True" CanUserResizeColumns="True" CanUserReorderColumns="True"
+                  HeadersVisibility="Column" GridLinesVisibility="Horizontal"
+                  HorizontalGridLinesBrush="#ECECEC"
+                  RowHeaderWidth="0" SelectionMode="Extended" SelectionUnit="FullRow" IsReadOnly="False"
+                  BorderBrush="#CCCCCC" BorderThickness="1" FontSize="12"
+                  SelectionChanged="RowGrid_SelectionChanged"
+                  MouseDoubleClick="RowGrid_MouseDoubleClick"
+                  EnableRowVirtualization="True" VirtualizingPanel.IsVirtualizing="True"
+                  VirtualizingPanel.VirtualizationMode="Recycling">
+            <DataGrid.RowStyle>
+                <Style TargetType="DataGridRow">
+                    <Setter Property="Background" Value="White"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsEvenGroup}" Value="True">
+                            <Setter Property="Background" Value="#F2F7FC"/>
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                            <Setter Property="Background" Value="#FBE3E1"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </DataGrid.RowStyle>
+            <DataGrid.Columns>
+                <DataGridTemplateColumn x:Name="colCheck" Header="削除" Width="46" SortMemberPath="IsSelected">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <CheckBox IsChecked="{Binding IsSelected, UpdateSourceTrigger=PropertyChanged}"
+                                      HorizontalAlignment="Center" VerticalAlignment="Center" Click="RowCheck_Click"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTextColumn x:Name="colGroup" Header="組" Binding="{Binding GroupNo}" Width="Auto" MinWidth="40" IsReadOnly="True" ElementStyle="{StaticResource CellCenter}"/>
+                <DataGridTextColumn x:Name="colId" Header="要素ID" Binding="{Binding IdValue}" Width="Auto" MinWidth="70" IsReadOnly="True" ElementStyle="{StaticResource CellCenter}"/>
+                <DataGridTextColumn x:Name="colCategory" Header="カテゴリ" Binding="{Binding Category}" Width="1*" IsReadOnly="True" ElementStyle="{StaticResource CellText}"/>
+                <DataGridTextColumn x:Name="colFamily" Header="ファミリ" Binding="{Binding Family}" Width="1.3*" IsReadOnly="True" ElementStyle="{StaticResource CellText}"/>
+                <DataGridTextColumn x:Name="colType" Header="タイプ" Binding="{Binding TypeName}" Width="1.3*" IsReadOnly="True" ElementStyle="{StaticResource CellText}"/>
+                <DataGridTextColumn x:Name="colLevel" Header="レベル" Binding="{Binding Level}" Width="0.8*" IsReadOnly="True" ElementStyle="{StaticResource CellText}"/>
+                <DataGridTextColumn x:Name="colWorkset" Header="ワークセット" Binding="{Binding Workset}" Width="0.9*" IsReadOnly="True" ElementStyle="{StaticResource CellText}"/>
+                <DataGridTextColumn x:Name="colMark" Header="マーク" Binding="{Binding Mark}" Width="0.7*" IsReadOnly="True" ElementStyle="{StaticResource CellText}"/>
+                <DataGridTextColumn x:Name="colComments" Header="コメント" Binding="{Binding Comments}" Width="1*" IsReadOnly="True" ElementStyle="{StaticResource CellText}"/>
+                <DataGridTextColumn x:Name="colHost" Header="ホスト" Binding="{Binding Host}" Width="0.8*" IsReadOnly="True" ElementStyle="{StaticResource CellText}"/>
+                <DataGridTextColumn x:Name="colFilled" Header="値の数" Binding="{Binding FilledCount}" Width="Auto" MinWidth="56" IsReadOnly="True" ElementStyle="{StaticResource CellCenter}"/>
+                <DataGridTextColumn x:Name="colDiff" Header="違う値" Binding="{Binding DiffCount}" Width="Auto" MinWidth="56" IsReadOnly="True" ElementStyle="{StaticResource CellCenter}"/>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <GridSplitter Grid.Row="3" Height="6" HorizontalAlignment="Stretch" VerticalAlignment="Center"
+                      Background="#E0E0E0" ResizeDirection="Rows" ResizeBehavior="PreviousAndNext"/>
+
+        <!-- 比較表（選んだ組の全パラメータを横に並べる） -->
+        <Grid Grid.Row="4">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <Grid Grid.Row="0" Margin="0,4,0,4">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="txtCompareTitle" Grid.Column="0" Text="" FontSize="12" FontWeight="SemiBold"
+                           Foreground="#333333" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                <TextBlock x:Name="lblParamSearch" Grid.Column="1" Text="パラメータ名:" VerticalAlignment="Center" FontSize="12" Margin="8,0,4,0"/>
+                <StackPanel Grid.Column="2" Orientation="Horizontal">
+                    <TextBox x:Name="ParamSearchBox" Width="160" Height="24" FontSize="12" VerticalContentAlignment="Center"
+                             BorderBrush="#CCCCCC" TextChanged="Compare_Changed"/>
+                    <CheckBox x:Name="chkDiffOnly" Content="違う値のみ表示" VerticalAlignment="Center"
+                              FontSize="12" Margin="12,0,0,0" Click="Compare_Changed"/>
+                </StackPanel>
+            </Grid>
+            <DataGrid x:Name="CompareGrid" Grid.Row="1"
+                      AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
+                      CanUserSortColumns="True" IsReadOnly="True"
+                      HeadersVisibility="Column" GridLinesVisibility="All"
+                      HorizontalGridLinesBrush="#ECECEC" VerticalGridLinesBrush="#ECECEC"
+                      RowHeaderWidth="0" SelectionMode="Extended" SelectionUnit="Cell"
+                      BorderBrush="#CCCCCC" BorderThickness="1" FontSize="12"
+                      EnableRowVirtualization="True" VirtualizingPanel.IsVirtualizing="True">
+                <DataGrid.RowStyle>
+                    <Style TargetType="DataGridRow">
+                        <Setter Property="Background" Value="White"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsDiff}" Value="True">
+                                <Setter Property="Background" Value="#FFF3C4"/>
+                                <Setter Property="FontWeight" Value="SemiBold"/>
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IsHeader}" Value="True">
+                                <Setter Property="Background" Value="#EAF2FB"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </DataGrid.RowStyle>
+            </DataGrid>
+        </Grid>
+
+        <!-- 選択操作・件数 -->
+        <Grid Grid.Row="5" Margin="0,8,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="0" Orientation="Horizontal">
+                <Button x:Name="btnAutoSelect" Content="値が少ないほうを選択" Style="{StaticResource SecondaryButtonStyle}"
+                        Margin="0,0,4,0" Click="AutoSelect_Click"/>
+                <Button x:Name="btnDeselectAll" Content="選択解除" Style="{StaticResource SecondaryButtonStyle}"
+                        Margin="0,0,4,0" Click="DeselectAll_Click"/>
+                <Button x:Name="btnShow" Content="画面で確認" Style="{StaticResource SecondaryButtonStyle}"
+                        Click="Show_Click"/>
+            </StackPanel>
+            <TextBlock x:Name="txtCount" Grid.Column="1" Text="" FontSize="11" Foreground="#555555" VerticalAlignment="Center"/>
+        </Grid>
+
+        <!-- ボタン行 -->
+        <Grid Grid.Row="6" Margin="0,8,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <Button x:Name="btnReload" Grid.Column="0" Content="再読み込み"
+                    Style="{StaticResource SecondaryButtonStyle}" Click="Reload_Click"/>
+            <StackPanel Grid.Column="2" Orientation="Horizontal">
+                <Button x:Name="btnDelete" Content="チェックした要素を削除"
+                        Style="{StaticResource DangerButtonStyle}" MinWidth="180" Click="Delete_Click"/>
+                <Button x:Name="btnClose" Content="閉じる"
+                        Style="{StaticResource SecondaryButtonStyle}" Click="Close_Click"/>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>

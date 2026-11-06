@@ -116,6 +116,8 @@
     <Resource Include="Resources\Icons\dwg_layer_transfer_16.png" />
     <Resource Include="Resources\Icons\generic_model_merge.png" />
     <Resource Include="Resources\Icons\generic_model_merge_16.png" />
+    <Resource Include="Resources\Icons\duplicate_instance.png" />
+    <Resource Include="Resources\Icons\duplicate_instance_16.png" />
     <Resource Include="Resources\Icons\realtime_render.png" />
     <Resource Include="Resources\Icons\realtime_render_16.png" />
   </ItemGroup>

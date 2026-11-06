@@ -268,6 +268,18 @@
       }
     },
     {
+      "id": "DuplicateInstance",
+      "category": "model",
+      "icon": "icons/features/duplicate_instance.png",
+      "manual": "Features/DuplicateInstance.md",
+      "added_in": "2.9",
+      "names": {
+        "ja": "重複要素整理（同じ場所の同一インスタンスを比較・削除）",
+        "en": "Duplicate Cleanup (Compare and Delete Identical Instances)",
+        "zh": "重复图元整理（比较并删除同一位置的相同实例）"
+      }
+    },
+    {
       "id": "RealtimeRender",
       "category": "render",
       "icon": "icons/features/realtime_render.png",
