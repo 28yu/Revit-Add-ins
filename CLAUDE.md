@@ -138,6 +138,8 @@ msbuild Tools28.csproj /p:Configuration=Release /p:RevitVersion=2024
 - `scripts/compile-check/run.sh`（引数なしで Revit 2021〜2026 すべて。`run.sh 2022 2024` で指定）。アドイン全体を各版の API でコンパイルする
 - dotnet が無ければ `apt-get install dotnet-sdk-8.0`。XAML は `gen_xaml_stub.py` が部品の定義だけを作って補う（XAML 自体の誤りは検査できない）
 - **API の有無は版ごとに違うので、push 前に必ず全版で確認する**（2021/2024/2026 だけ試して 2022 で失敗した前例あり）
+- ⚠ **WPF と Revit の同名クラスの衝突（`Binding` など）は Linux では見つからない**。WPF 画面を新しく作った・大きく変えたときは
+  `build/<名前>` ブランチへ push して Windows CI のビルドも通す（詳細は `Docs/DEVLOG.md#DuplicateInstance`）
 
 ## 配布パッケージ
 
@@ -477,7 +479,7 @@ _buttonTipKeys["FeatureName"] = "Ribbon.FeatureName.Button.Tip";
 | LanguageSwitch / Localization（多言語UI） | `Commands/LanguageSwitch/` + `Localization/` | `Docs/DEVLOG.md#LocSystem` |
 | AutoBackup（自動バックアップ/定期ローカル保存・クラウド同期） | `Commands/AutoBackup/` | `Docs/Features/AutoBackup.md` |
 | GenericModelMerge（一般モデル化/複数要素の形状を1つにまとめる） | `Commands/GenericModelMerge/` | `Docs/Features/GenericModelMerge.md` |
-| DuplicateInstance（重複要素整理/警告「同じ場所に同一のインスタンス」の要素を比較・削除） | `Commands/DuplicateInstance/` | `Docs/Features/DuplicateInstance.md` |
+| DuplicateInstance（重複要素整理/警告「同じ場所に同一のインスタンス」の要素を比較・削除） | `Commands/DuplicateInstance/` | `Docs/DEVLOG.md#DuplicateInstance`, `Docs/Features/DuplicateInstance.md` |
 | RealtimeRender（リアルタイムレンダリング/GPUレイトレーシング・ライブ同期・画像/360°/ビューア書き出し） | `Commands/RealtimeRender/` + `Renderer/` | `Docs/DEVLOG.md#RealtimeRender`, `Renderer/README.md` |
 
 ### リボンパネル構成（左から順）

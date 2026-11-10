@@ -5,6 +5,46 @@
 
 ---
 
+## DuplicateInstance（重複要素整理）開発知見（2026-11-06〜10） {#DuplicateInstance}
+
+警告「同じ場所に同一のインスタンスがあります」の要素を一覧にし、パラメータを見比べて不要な方を削除する機能。
+リボン「モデル」パネル（一般モデル化の右）。v2.9 の新機能（`features.json` の `added_in: "2.9"`）。**Revit 2024 で実機確認済み（2026-11-10）**。
+
+### 構成（`Commands/DuplicateInstance/`）
+| ファイル | 役割 |
+|--|--|
+| `DuplicateInstanceCommand.cs` | 起動時の範囲選択 → ダイアログ表示のループ（「画面で確認」で閉じて開き直す） |
+| `Services/DuplicateScanner.cs` | `doc.GetWarnings()` から `BuiltInFailures.OverlapFailures.DuplicateInstances` を集め、共通の要素を持つ警告を Union-Find で1組にまとめる。行ごとに全インスタンスパラメータを読む |
+| `Services/DuplicateDeleter.cs` | 削除（100個ずつ・進捗通知・原因の記録・確定エラー時のやり直し） |
+| `Views/DuplicateInstanceDialog.xaml(.cs)` | 一覧（全パラメータ列・並べ替え・Excel 風絞り込み）＋下の比較表 |
+| `Views/DeleteProgressWindow.xaml(.cs)` | 削除の％メーター・中止 |
+| `Models/` | 行・ダイアログ状態（開き直しても残すもの）・比較表の行・絞り込みの項目 |
+
+### 仕様で決めたこと（運営者と合意）
+- **範囲**: 起動時に「モデル全体／現在のビュー／選択している要素」を TaskDialog のコマンドリンクで選ぶ（選択は要素を選んでいるときだけ出す）。
+  組の要素が1つでも範囲内なら、相手も含めて組ごと出す。範囲は起動時に1回だけ決める（「画面で確認」で選択が変わっても変えない）
+- **一覧**: 1要素1行。固定列（削除・組・要素ID・カテゴリ・ファミリ・タイプ・値の数・違う値）の後ろに**全インスタンスパラメータを1つ1列**。タイプパラメータは出さない（運営者の判断）
+- **並べ替え**: 列見出しクリック。数で始まる値（`1200 mm`）は数の大小、空欄は昇順・降順どちらでも最後
+- **絞り込み**: 列見出しの ▼ で Excel 風（値と件数のチェック一覧・検索・昇順/降順・解除）。一覧は「他の列の絞り込みで残っている行」から作る。絞り込み中は ▼ が青
+- **自動選択**: 「値が少ないほうを選択」＝組ごとに値の入ったパラメータが一番多い要素を残し、他にチェック（同数なら要素IDが小さい＝先に作った方を残す）
+- **削除**: 組の全員にチェックがあると確認で警告。削除できなかった要素はチェックを残し、原因ごとにまとめて要素IDと表示
+
+### つまずいた点・知見
+- ⚠ **WPF と Revit の同名クラスの衝突は Linux のコンパイル確認では見つからない**。`using System.Windows.Data;` と `using Autodesk.Revit.DB;` の両方があると
+  `new Binding(...)` が CS0104（あいまい）で Windows ビルドが失敗する。Linux の `run.sh` は全版 OK だった。→ `System.Windows.Data.Binding` と完全な名前で書く。
+  同様に `TextBox` / `ComboBox` / `Button` なども Revit.UI 側に同名がありうるので、コードで型名を書くときは完全な名前にする。
+  **新しい画面を作ったら `build/*` ブランチへ push して Windows CI でも確認する**（`build/test2` を強制 push できないときは新しい `build/<名前>` を作る）
+- ⚠ **TaskDialog の `DefaultButton` にコマンドリンクを指定すると、`AddCommandLink` する前の時点で例外**（`Corresponding button not found. Parameter name: defaultButton`）。
+  オブジェクト初期化子で書くと必ずこの順になる。指定しなくても先頭のリンクが既定になるので指定しない
+- **列見出しに ▼ ボタンを置いても並べ替えは起きない**: ボタンがマウス押下を処理済みにするため、見出し（ButtonBase）のクリックにならない
+- **パラメータ列は名前でなく番号で結び付ける**（`Values[i]`）。パラメータ名に `[` `]` `.` などが入るとバインドのパスが壊れるため。同名パラメータは `名前 [2]` と番号を付けて区別
+- **並べ替えは `ListCollectionView.CustomSort`**（`DataGrid.Sorting` で `e.Handled = true`）。既定の並べ替えでは数値が文字順（10 < 9）になり、空欄も先頭に来る
+- **「画面で確認」はモーダルのまま**: ダイアログを閉じる → `ShowElements` ＋選択 → `Selection.PickObject` で Esc 待ち → 状態（チェック・絞り込み・並び順・選択行・位置）を渡して開き直す
+- **削除の進捗**: Revit API は同じスレッドでしか呼べないので、ExcelExport と同じく処理の合間に `Dispatcher.Invoke(Background)` で画面を更新し中止ボタンを受け付ける。
+  最後の確定（Commit）中は％が出せないので「確定しています」表示に切り替え、中止もできなくする
+- **削除できない原因**: 事前確認（もう無い／他のユーザーが所有 `GetCheckoutStatus`／中央で更新済み `GetModelUpdatesStatus`）→ まとめて削除が失敗したら1つずつ消して例外の内容を記録（グループ内の要素は案内を付ける）→
+  確定時のエラーは `IFailuresPreprocessor` で原因の要素 ID と一緒に記録して `ProceedWithRollBack`、その要素を外して最大5回やり直す（1つのせいで全部失敗しないように）
+
 ## RealtimeRender（リアルタイムレンダリング）開発知見（2026-10-16） {#RealtimeRender}
 
 Enscape 相当の「Revit だけで完結する」レンダリングを目指す試作。経緯と決定事項:
