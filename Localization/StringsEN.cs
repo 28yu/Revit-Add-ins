@@ -1408,6 +1408,11 @@ namespace Tools28.Localization
             { "PrintHiddenText.TxHide", "Temporarily hide \"非表示\" text notes for print/PDF" },
             { "PrintHiddenText.TxRestore", "Show \"非表示\" text notes again" },
             { "PrintHiddenText.RestoreFailed", "After printing or PDF export, text notes whose type name contains \"非表示\" could not be shown again in the following views.\n\n{0}\n\nOpen the view, click the light bulb icon (Reveal Hidden Elements) on the View Control Bar, select the text, and right-click > Unhide in View > Elements." },
+            { "PrintHiddenText.TxGroupHide", "Temporarily hide for print/PDF (28 Tools)" },
+            { "PrintHiddenText.TxGroupRestore", "Restore items hidden for print/PDF (28 Tools)" },
+            { "PrintHiddenText.TxPanelOff", "Temporarily turn off \"幅数値表示\" on curtain panels" },
+            { "PrintHiddenText.TxPanelRestore", "Restore \"幅数値表示\" on curtain panels" },
+            { "PrintHiddenText.PanelRestoreFailed", "After printing or PDF export, \"{0}\" could not be restored for the following curtain panel types.\n\n{1}\n\nOpen Type Properties and check \"{0}\" again." },
         };
     }
 }

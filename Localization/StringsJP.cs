@@ -1407,6 +1407,11 @@ namespace Tools28.Localization
             { "PrintHiddenText.TxHide", "印刷・PDF用に「非表示」テキストを一時的に隠す" },
             { "PrintHiddenText.TxRestore", "「非表示」テキストを表示に戻す" },
             { "PrintHiddenText.RestoreFailed", "印刷・PDF出力のあと、次のビューでタイプ名に「非表示」を含むテキストを表示に戻せませんでした。\n\n{0}\n\nビューを開き、ビューコントロールバーの電球アイコン（非表示要素の一時表示）でテキストを選び、右クリック ＞ ビューで再表示 ＞ 要素 で戻してください。" },
+            { "PrintHiddenText.TxGroupHide", "印刷・PDF用に一時的に隠す（28 Tools）" },
+            { "PrintHiddenText.TxGroupRestore", "印刷・PDF用に隠したものを戻す（28 Tools）" },
+            { "PrintHiddenText.TxPanelOff", "カーテンパネルの「幅数値表示」を一時的にオフ" },
+            { "PrintHiddenText.TxPanelRestore", "カーテンパネルの「幅数値表示」を元に戻す" },
+            { "PrintHiddenText.PanelRestoreFailed", "印刷・PDF出力のあと、次のカーテンパネルのタイプで「{0}」を元に戻せませんでした。\n\n{1}\n\nタイプ プロパティを開き、「{0}」にチェックを入れ直してください。" },
         };
     }
 }

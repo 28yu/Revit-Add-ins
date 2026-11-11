@@ -1407,6 +1407,11 @@ namespace Tools28.Localization
             { "PrintHiddenText.TxHide", "为打印/PDF临时隐藏“非表示”文字" },
             { "PrintHiddenText.TxRestore", "恢复显示“非表示”文字" },
             { "PrintHiddenText.RestoreFailed", "打印或导出PDF后，以下视图中类型名包含“非表示”的文字未能恢复显示。\n\n{0}\n\n请打开该视图，点击视图控制栏的灯泡图标（显示隐藏的图元），选中文字后右键 > 在视图中取消隐藏 > 图元。" },
+            { "PrintHiddenText.TxGroupHide", "为打印/PDF临时隐藏（28 Tools）" },
+            { "PrintHiddenText.TxGroupRestore", "恢复为打印/PDF隐藏的内容（28 Tools）" },
+            { "PrintHiddenText.TxPanelOff", "临时关闭幕墙嵌板的“幅数値表示”" },
+            { "PrintHiddenText.TxPanelRestore", "恢复幕墙嵌板的“幅数値表示”" },
+            { "PrintHiddenText.PanelRestoreFailed", "打印或导出PDF后，以下幕墙嵌板类型的“{0}”未能恢复。\n\n{1}\n\n请打开类型属性，重新勾选“{0}”。" },
         };
     }
 }
