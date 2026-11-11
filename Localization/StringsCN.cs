@@ -1403,6 +1403,10 @@ namespace Tools28.Localization
             { "DupInst.Scope.NoSelection", "* 先选择图元再运行，即可选择“所选图元”" },
             { "DupInst.Scope.ViewNotSupported", "无法从此视图获取图元。请在平面图或三维视图中运行，或选择“整个模型”。" },
             { "DupInst.NoWarningsInScope", "所选范围内没有“同一位置有相同实例”的警告。" },
+            { "PrintHiddenText.Title", "不打印的文字" },
+            { "PrintHiddenText.TxHide", "为打印/PDF临时隐藏“非表示”文字" },
+            { "PrintHiddenText.TxRestore", "恢复显示“非表示”文字" },
+            { "PrintHiddenText.RestoreFailed", "打印或导出PDF后，以下视图中类型名包含“非表示”的文字未能恢复显示。\n\n{0}\n\n请打开该视图，点击视图控制栏的灯泡图标（显示隐藏的图元），选中文字后右键 > 在视图中取消隐藏 > 图元。" },
         };
     }
 }

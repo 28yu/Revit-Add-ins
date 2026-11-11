@@ -1404,6 +1404,10 @@ namespace Tools28.Localization
             { "DupInst.Scope.NoSelection", "* Select elements before running to also choose \"Selected elements\"" },
             { "DupInst.Scope.ViewNotSupported", "Elements cannot be read from this view. Run it in a plan or 3D view, or choose \"Entire model\"." },
             { "DupInst.NoWarningsInScope", "There are no \"identical instances are in the same place\" warnings in the selected range." },
+            { "PrintHiddenText.Title", "Non-printing Text" },
+            { "PrintHiddenText.TxHide", "Temporarily hide \"非表示\" text notes for print/PDF" },
+            { "PrintHiddenText.TxRestore", "Show \"非表示\" text notes again" },
+            { "PrintHiddenText.RestoreFailed", "After printing or PDF export, text notes whose type name contains \"非表示\" could not be shown again in the following views.\n\n{0}\n\nOpen the view, click the light bulb icon (Reveal Hidden Elements) on the View Control Bar, select the text, and right-click > Unhide in View > Elements." },
         };
     }
 }

@@ -127,6 +127,18 @@
       }
     },
     {
+      "id": "PrintHiddenText",
+      "category": "annotation",
+      "icon": "icons/features/print_hidden_text.png",
+      "manual": "Features/PrintHiddenText.md",
+      "added_in": "2.9",
+      "names": {
+        "ja": "印刷しないテキスト（タイプ名「非表示」を印刷・PDFで自動非表示）",
+        "en": "Non-printing Text (Auto-hide \"非表示\" Types in Print/PDF)",
+        "zh": "不打印的文字（打印/PDF时自动隐藏“非表示”类型）"
+      }
+    },
+    {
       "id": "BeamLevelColor",
       "category": "structure",
       "icon": "icons/features/beam_top_level.png",

@@ -154,6 +154,8 @@ namespace Tools28
                 UpdateRibbonLanguage();
 
                 Tools28.Commands.AutoBackup.Services.AutoBackupService.Instance.Initialize(application);
+                // 印刷・PDF 出力の間だけ、タイプ名に「非表示」を含むテキストを隠す（ボタンなし・常時有効）
+                Tools28.Commands.PrintHiddenText.PrintHiddenTextService.Instance.Initialize(application);
                 Log("OnStartup 完了");
 
                 if (ExpiryManager.ShouldShowWarning)
@@ -178,6 +180,7 @@ namespace Tools28
         public Result OnShutdown(UIControlledApplication application)
         {
             Tools28.Commands.AutoBackup.Services.AutoBackupService.Instance.Shutdown();
+            Tools28.Commands.PrintHiddenText.PrintHiddenTextService.Instance.Shutdown();
             Loc.LanguageChanged -= UpdateRibbonLanguage;
             AppDomain.CurrentDomain.AssemblyResolve -= OnAssemblyResolve;
             return Result.Succeeded;

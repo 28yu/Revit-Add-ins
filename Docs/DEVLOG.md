@@ -3092,3 +3092,18 @@ v2.7 を公開した当日に、全機能レビューの修正（上の節）を
 - **モデルを使わないボタンを新しく足すときは `AlwaysAvailable` を指定する**こと。逆に、モデルを使うコマンドには付けない
   （`ActiveUIDocument` が null になり落ちる）
 - どちらも実機未確認
+
+## PrintHiddenText（印刷しないテキスト）開発知見（2026-11-11） {#PrintHiddenText}
+
+タイプ名に「非表示」を含むテキストノートを、印刷・PDF 出力の間だけ `View.HideElements` で隠し、終わったら `UnhideElements` で戻す。ボタンなし（`Application.OnStartup` でイベント登録するだけ）。実装は `Commands/PrintHiddenText/PrintHiddenTextService.cs`。
+
+- **PDF 書き出しのイベント名は `FileExporting` / `FileExported`**。`DocumentExporting` という API は存在しない。
+  `FileExportingEventArgs.Format` は `ImportExportFileFormat`（PDF は `ImportExportFileFormat.PDF`）。`ToString()` に "PDF" を含むか、保存先が `.pdf` かで判定し、それ以外の形式（DWG 等）では何もしない
+- `FileExportingEventArgs` には**出力するビューの一覧が無い**。そのため PDF のときは、対象テキストの所属ビュー（`OwnerViewId`）と、その親ビュー・従属ビューをすべて調べて隠す。
+  印刷（`DocumentPrintingEventArgs.GetViewElementIds()`）は一覧が取れるので、シートなら `GetAllPlacedViews()`（凡例を含む）まで広げてそのビューだけ処理する
+- 隠す対象は `new FilteredElementCollector(doc, view.Id)`（＝そのビューで今見えているもの）から選ぶ。**元から非表示だったテキストは記録に入らない**ので、出力後に勝手に表示してしまうことはない
+- 出力が失敗・取り消しされた直後の post イベントでは、API の仕様で**モデルを変更できない**ことがある。そのときは記録を残したまま `UIControlledApplication.Idling` で戻し直す。30 回試して戻せなければ、ビュー名を TaskDialog で知らせる（黙っているとテキストが消えたと誤解されるため）
+- モデルを閉じる途中（`DocumentClosing`）では変更しない（保存確認が再度出るなどの副作用を避ける）。出力中は保存できないので、隠した状態がファイルに残ることはない
+- ビューごとに `SubTransaction` にしている。ワークシェアで他の人が編集中のビューなど、1 つのビューで失敗しても残りは処理する
+- 既知の制限: 「元に戻す」の履歴に「隠す」「戻す」の 2 件が残る。出力直後に「元に戻す」を押すと隠れた状態になる（「やり直し」で戻る）
+- ⚠ **実機未確認**（2026-11-11 時点）: Revit 2022 以降の標準 PDF 書き出しで `FileExporting` が発生し、隠した状態が PDF に反映されること。`C:\temp\Tools28_debug.txt` の「PrintHiddenText 書き出し前: 形式=…」行で確認できる

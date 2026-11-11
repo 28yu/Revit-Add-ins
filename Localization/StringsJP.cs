@@ -1403,6 +1403,10 @@ namespace Tools28.Localization
             { "DupInst.Scope.NoSelection", "※ 要素を選択してから実行すると「選択している要素」も選べます" },
             { "DupInst.Scope.ViewNotSupported", "このビューからは要素を取り出せません。平面図や3Dビューなどで実行するか、「モデル全体」を選んでください。" },
             { "DupInst.NoWarningsInScope", "選んだ範囲には「同じ場所に同一のインスタンスがあります」の警告はありません。" },
+            { "PrintHiddenText.Title", "印刷しないテキスト" },
+            { "PrintHiddenText.TxHide", "印刷・PDF用に「非表示」テキストを一時的に隠す" },
+            { "PrintHiddenText.TxRestore", "「非表示」テキストを表示に戻す" },
+            { "PrintHiddenText.RestoreFailed", "印刷・PDF出力のあと、次のビューでタイプ名に「非表示」を含むテキストを表示に戻せませんでした。\n\n{0}\n\nビューを開き、ビューコントロールバーの電球アイコン（非表示要素の一時表示）でテキストを選び、右クリック ＞ ビューで再表示 ＞ 要素 で戻してください。" },
         };
     }
 }

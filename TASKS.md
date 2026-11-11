@@ -76,6 +76,13 @@
 - [ ] v2.9 リリース時: サイト（28tools-download）にマニュアルページ `manual/duplicate-instance.html`・機能カード・アイコン・`PAGE_LABELS`・sitemap を追加、機能数 24 → 25
 - [ ] 不要になったテスト用ブランチ `build/dupinst-check`〜`build/dupinst-check5` を削除（Claude からは削除できないため運営者が GitHub で）
 
+### 印刷しないテキスト（2026-11-11・実機未確認）
+- [x] タイプ名に「非表示」を含むテキストを、印刷（DocumentPrinting/Printed）・PDF 書き出し（FileExporting/Exported）の間だけ自動で隠す。ボタンなし
+- [ ] 実機確認（Revit 2024）: 印刷・PDF 書き出し（単体ビュー／シート／凡例入りシート）で消えること、終わったら戻ること、DWG 書き出しで何もしないこと
+- [ ] 実機確認: 書き出しを途中でキャンセルしたときも戻ること（Idling での戻し直し）
+- [ ] マニュアルのスクショ 2 枚（`Docs/Features/images/PrintHiddenText/`）
+- [ ] v2.9 リリース時: サイトにマニュアルページ・機能カード・アイコン・`PAGE_LABELS`・sitemap を追加、機能数を +1
+
 ### 優先度: 中
 - [ ] FormworkCalculator: 特殊形状の接触面検出漏れ改善
 
