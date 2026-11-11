@@ -3,7 +3,7 @@
 詳細は `Docs/DEVLOG.md#PrintHiddenText` と `TASKS.md`（「印刷しないテキスト」）。v2.9 の新機能（未リリース・**実機未確認**）。
 
 ### 次のセッションでやること
-1. Revit 2024 で実機確認（印刷・PDF・DWG・キャンセル時）。PDF の検知は `C:\temp\Tools28_debug.txt` の「PrintHiddenText 書き出し前: 形式=…」行で確認
+1. Revit 2024 で実機確認（印刷・PDF・DWG・キャンセル時。2026-11-12 追加のカーテンパネル「幅数値表示」の一時オフも）。PDF の検知は `C:\temp\Tools28_debug.txt` の「PrintHiddenText 書き出し前: 形式=…」行で確認
 
 ## 最新セッション: 2026-11-06〜10（新機能: 重複要素整理）
 詳細は `Docs/DEVLOG.md#DuplicateInstance` と `TASKS.md`（「重複要素整理」）。**Revit 2024 で実機確認済み（2026-11-10）**。v2.9 の新機能（未リリース）。
