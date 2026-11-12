@@ -3128,7 +3128,9 @@ v2.7 を公開した当日に、全機能レビューの修正（上の節）を
 - **ON/OFF（2026-11-12 追加）**: 設定パネルのボタン（`PrintHiddenToggleCommand`。並びのバランスのため大きいボタンにし、言語・バージョン情報・マニュアルは縦3つに戻した）。`%AppData%\Tools28\PrintHidden.setting` に on/off、既定 ON。
   OFF のときは隠す処理だけ止め、戻す処理は記録があれば常に行う。ボタンの文字は状態で変わるので `_buttonTextKeys` ではなく `Application.UpdatePrintHiddenButton()` で更新する
 - **アイコン（2026-11-12）**: 最初に作った 96px の ON/OFF アイコンに 288 DPI（pHYs）を入れ忘れ、リボンで大きく表示された（既知の「96px は 288DPI で保存」の再発）。
-  `Resources/Icons/DesignConcept/draw_print_hidden_icons.py` で描き直し（共通パレットの DARK/MID・32 単位で設計して縮小）。**アイコンを作るときは既存の draw_*.py をひな形にする**
+  `Resources/Icons/DesignConcept/draw_print_hidden_icons.py` で描き直し（共通パレットの DARK/MID・32 単位で設計して縮小）。
+  その後、運営者が用意したフリー素材のプリンタ線画（`DesignConcept/print_hidden_source.png`）に差し替え。線を DARK（#323232）一色に塗り替え、
+  縮小で細くならないよう MaxFilter で太らせてから（16px はさらに太く）右下に状態バッジを重ねる。**アイコンを作るときは既存の draw_*.py をひな形にする**
 - **CAD 書き出しも対象（2026-11-12）**: `FileExportingEventArgs.Format`（`ImportExportFileFormat`）が DWG・DXF・DGN・SAT のときも PDF と同じ処理をする（`TargetExportKind()`）。
   ビュー一覧が取れないのも PDF と同じ。IFC・画像・FBX などは対象外
 - **ボタンの文字は「印刷非表示\nON」**: 大きいボタンは `ItemText` の改行（`\n`）で 2 行になる
