@@ -56,3 +56,4 @@ Revit Peeler（revitpeeler.com）の書き方を参考にしています。
 | | `03-delete.png` | 「値が少ないほうを選択」と「チェックした要素を削除」を赤枠 |
 | PrintHiddenText（印刷しないテキスト） | `01-type-name.png` | タイププロパティでタイプ名に「非表示」を入れたところ（名前を赤枠） |
 | | `02-result.png` | 左に Revit の画面（テキストが見える）、右に出力した PDF（テキストが無い）を並べたもの |
+| | `03-toggle.png` | リボン「設定」パネルの「印刷非表示 ON」を赤枠 |

@@ -55,7 +55,7 @@ string sheetName = string.Format(Loc.S("Sheet.NewSheetName", modelLang), sheetNu
   `ParameterIdSheet.SheetName`（`Tools28_ParamIds`：列→パラメータ識別番号の隠しシート）とその見出し
 - `Commands/GenericModelMerge/` — 生成した DirectShape の識別マーカー
   `ApplicationId = "Tools28"` / `ApplicationDataId = "GenericModelMerge"`
-- `Commands/PrintHiddenText/` — `PrintHiddenTextService.Keyword`（`非表示`：印刷・PDF で隠すテキスト・寸法タイプを見分けるタイプ名の文字列）、
+- `Commands/PrintHiddenText/` — `PrintHiddenTextService.Keyword`（`非表示`：印刷・PDF で隠すテキスト・寸法のタイプ名／詳細線分の線種名を見分ける文字列）、
   `PrintHiddenTextService.PanelParamName`（`幅数値表示`：出力の間だけ 0 にするカーテンパネルのタイプパラメータ名）
 
 **新しく C に該当する定数を追加する場合は、この一覧にも追記すること。**
@@ -482,7 +482,7 @@ _buttonTipKeys["FeatureName"] = "Ribbon.FeatureName.Button.Tip";
 | AutoBackup（自動バックアップ/定期ローカル保存・クラウド同期） | `Commands/AutoBackup/` | `Docs/Features/AutoBackup.md` |
 | GenericModelMerge（一般モデル化/複数要素の形状を1つにまとめる） | `Commands/GenericModelMerge/` | `Docs/Features/GenericModelMerge.md` |
 | DuplicateInstance（重複要素整理/警告「同じ場所に同一のインスタンス」の要素を比較・削除） | `Commands/DuplicateInstance/` | `Docs/DEVLOG.md#DuplicateInstance`, `Docs/Features/DuplicateInstance.md` |
-| PrintHiddenText（印刷しない注釈/タイプ名に「非表示」を含むテキスト・寸法と、カーテンパネルの「幅数値表示」に連動するネスト注釈を印刷・PDF の間だけ自動で隠す。ボタンなし） | `Commands/PrintHiddenText/` | `Docs/Features/PrintHiddenText.md`, `Docs/DEVLOG.md#PrintHiddenText` |
+| PrintHiddenText（印刷しない注釈/タイプ名に「非表示」を含むテキスト・寸法、線種名に「非表示」を含む詳細線分、カーテンパネルの「幅数値表示」に連動するネスト注釈を印刷・PDF の間だけ自動で隠す。設定パネルの小ボタンで ON/OFF・既定 ON） | `Commands/PrintHiddenText/` | `Docs/Features/PrintHiddenText.md`, `Docs/DEVLOG.md#PrintHiddenText` |
 | RealtimeRender（リアルタイムレンダリング/GPUレイトレーシング・ライブ同期・画像/360°/ビューア書き出し） | `Commands/RealtimeRender/` + `Renderer/` | `Docs/DEVLOG.md#RealtimeRender`, `Renderer/README.md` |
 
 ### リボンパネル構成（左から順）
@@ -495,7 +495,7 @@ _buttonTipKeys["FeatureName"] = "Ribbon.FeatureName.Button.Tip";
 7. **レンダリング** — リアルタイムレンダリング（3Dビューを別ウィンドウの Tools28Render.exe で GPU レイトレーシング描画。ライブ同期・画像/360°/ビューア exe の書き出し）
 8. **データ** — EXCELエクスポート、EXCELインポート
 9. **パラメータ** — パラメータ整理（同名特定・値の有無確認・未使用削除）、値の一括置換（文字パラメータの値をモデル全体で置換・削除）、値の移動（同名でグループ違いのパラメータ間で要素ごとに移動）
-10. **設定** — 自動バックアップ（定期ローカル保存・ワークシェア/クラウド中央同期）、言語切替（JP/US/CN）、バージョン情報、マニュアル
+10. **設定** — 自動バックアップ（定期ローカル保存・ワークシェア/クラウド中央同期）、言語切替（JP/US/CN）、バージョン情報、マニュアル、印刷非表示 ON/OFF（小ボタン。[言語・バージョン情報][マニュアル・印刷非表示] の2列）
 
 実装: `Application.cs` の `CreateGridLevelPanel()` 等、パネル別メソッドで構築
 

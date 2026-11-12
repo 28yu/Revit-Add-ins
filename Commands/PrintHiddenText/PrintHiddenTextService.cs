@@ -13,7 +13,8 @@ namespace Tools28.Commands.PrintHiddenText
     /// <summary>
     /// 「画面には出るが、印刷・PDF には出ないテキスト」を実現する常駐処理。
     ///
-    /// タイプ名に「非表示」を含むテキストノート（TextNote）と寸法（Dimension。スポット寸法を含む）を、
+    /// タイプ名に「非表示」を含むテキストノート（TextNote）と寸法（Dimension。スポット寸法を含む）、
+    /// 線種名に「非表示」を含む詳細線分（DetailCurve）を、
     ///   印刷:  DocumentPrinting で隠す → DocumentPrinted で戻す
     ///   PDF:   FileExporting   で隠す → FileExported   で戻す（形式が PDF のときだけ）
     /// という流れで、出力の間だけビューから隠す（View.HideElements / UnhideElements）。
@@ -129,6 +130,7 @@ namespace Tools28.Commands.PrintHiddenText
             try
             {
                 _printHandled = false;
+                if (!PrintHiddenSettings.Enabled) { _printHandled = true; return; }   // OFF のときは何もしない
                 var viewIds = e.GetViewElementIds();
                 DiagLog.Write($"PrintHiddenText 印刷前: ビュー {viewIds?.Count ?? 0} 件");
                 _printHandled = PrepareForOutput(e.Document, viewIds, "印刷前");
@@ -173,6 +175,7 @@ namespace Tools28.Commands.PrintHiddenText
                 string format = SafeFormat(e);
                 DiagLog.Write($"PrintHiddenText 書き出し前: 形式={format}, 保存先={e.Path}");
                 if (!IsPdf(format, e.Path)) return;   // DWG などには一切手を出さない
+                if (!PrintHiddenSettings.Enabled) return;   // OFF のときは何もしない（戻す処理は記録があれば常に行う）
 
                 // FileExporting では出力するビューの一覧が取れないため、
                 // 対象テキストが見えるビューをモデル全体から探して隠す
@@ -419,31 +422,76 @@ namespace Tools28.Commands.PrintHiddenText
         // ---------------- 注釈（テキスト・寸法） ----------------
 
         /// <summary>
-        /// タイプ名に「非表示」を含むテキストタイプ・寸法タイプ（スポット寸法を含む）。
+        /// 隠す対象の見分け方。
+        ///  - テキスト・寸法（スポット寸法を含む）: タイプ名に「非表示」を含む
+        ///  - 詳細線分（直線・円弧など DetailCurve）: 線種名に「非表示」を含む
+        ///    （詳細線分には要素タイプが無く、プロパティの「線種」がタイプ名に当たるため）
         /// </summary>
-        private static HashSet<ElementId> FindTargetTypeIds(Document doc)
+        private sealed class TargetMatcher
         {
-            return new HashSet<ElementId>(
-                new FilteredElementCollector(doc)
-                    .WhereElementIsElementType()
-                    .Where(t => (t is TextNoteType || t is DimensionType) && IsTargetTypeName(SafeElementName(t)))
-                    .Select(t => t.Id));
+            public readonly HashSet<ElementId> TypeIds = new HashSet<ElementId>();
+            public readonly HashSet<ElementId> LineStyleIds = new HashSet<ElementId>();
+            public bool IsEmpty => TypeIds.Count == 0 && LineStyleIds.Count == 0;
+
+            public static TargetMatcher Build(Document doc)
+            {
+                var m = new TargetMatcher();
+                foreach (var t in new FilteredElementCollector(doc).WhereElementIsElementType())
+                {
+                    if ((t is TextNoteType || t is DimensionType) && IsTargetTypeName(SafeElementName(t)))
+                        m.TypeIds.Add(t.Id);
+                }
+                try
+                {
+                    // 線種 = 「線分」カテゴリのサブカテゴリ。詳細線分の LineStyle はその GraphicsStyle
+                    var lines = doc.Settings.Categories.get_Item(BuiltInCategory.OST_Lines);
+                    if (lines != null)
+                    {
+                        foreach (Category sub in lines.SubCategories)
+                        {
+                            if (!IsTargetTypeName(sub.Name)) continue;
+                            foreach (var gst in new[] { GraphicsStyleType.Projection, GraphicsStyleType.Cut })
+                            {
+                                var gs = sub.GetGraphicsStyle(gst);
+                                if (gs != null) m.LineStyleIds.Add(gs.Id);
+                            }
+                        }
+                    }
+                }
+                catch { /* 線種が取れなくてもテキスト・寸法は処理する */ }
+                return m;
+            }
+
+            public bool IsMatch(Element e)
+            {
+                if (TypeIds.Count > 0 && TypeIds.Contains(e.GetTypeId())) return true;
+                if (LineStyleIds.Count > 0 && e is DetailCurve dc)
+                {
+                    try
+                    {
+                        var ls = dc.LineStyle;
+                        return ls != null && LineStyleIds.Contains(ls.Id);
+                    }
+                    catch { return false; }
+                }
+                return false;
+            }
         }
 
         private List<KeyValuePair<View, List<ElementId>>> BuildAnnotationPlan(Document doc, ICollection<ElementId> viewIds)
         {
             var plan = new List<KeyValuePair<View, List<ElementId>>>();
 
-            var typeIds = FindTargetTypeIds(doc);
-            if (typeIds.Count == 0) return plan;
+            var matcher = TargetMatcher.Build(doc);
+            if (matcher.IsEmpty) return plan;
 
             var candidateViews = viewIds != null
                 ? ExpandPrintedViews(doc, viewIds)
-                : FindViewsShowingTargets(doc, typeIds);
+                : FindViewsShowingTargets(doc, matcher);
 
             foreach (var view in candidateViews)
             {
-                var ids = CollectVisibleTargets(doc, view, typeIds);
+                var ids = CollectVisibleTargets(doc, view, matcher);
                 if (ids.Count > 0) plan.Add(new KeyValuePair<View, List<ElementId>>(view, ids));
             }
             return plan;
@@ -582,12 +630,14 @@ namespace Tools28.Commands.PrintHiddenText
         /// テキスト・寸法はビュー固有の要素なので「所属ビュー」で見える。
         /// 従属ビューは親ビューの注釈を共有するので、親と従属ビューもあわせて調べる。
         /// </summary>
-        private static List<View> FindViewsShowingTargets(Document doc, HashSet<ElementId> typeIds)
+        private static List<View> FindViewsShowingTargets(Document doc, TargetMatcher matcher)
         {
+            // ビュー固有の要素（注釈・詳細線分）だけを調べる
             var ownerIds = new HashSet<ElementId>(
                 new FilteredElementCollector(doc)
                     .WhereElementIsNotElementType()
-                    .Where(e => typeIds.Contains(e.GetTypeId()))
+                    .WherePasses(new ElementOwnerViewFilter(ElementId.InvalidElementId, true))
+                    .Where(matcher.IsMatch)
                     .Select(e => e.OwnerViewId)
                     .Where(id => id != null && id != ElementId.InvalidElementId));
 
@@ -620,7 +670,7 @@ namespace Tools28.Commands.PrintHiddenText
         }
 
         /// <summary>ビューで今見えている対象の注釈のうち、隠せるものだけを返す。</summary>
-        private static List<ElementId> CollectVisibleTargets(Document doc, View view, HashSet<ElementId> typeIds)
+        private static List<ElementId> CollectVisibleTargets(Document doc, View view, TargetMatcher matcher)
         {
             var ids = new List<ElementId>();
             try
@@ -629,7 +679,7 @@ namespace Tools28.Commands.PrintHiddenText
                 // （すでに非表示の要素は入らない＝元から隠れていた要素を後で表示してしまうことがない）
                 foreach (var e in new FilteredElementCollector(doc, view.Id).WhereElementIsNotElementType())
                 {
-                    if (!typeIds.Contains(e.GetTypeId())) continue;
+                    if (!matcher.IsMatch(e)) continue;
                     if (e.IsHidden(view)) continue;
                     if (!e.CanBeHidden(view)) continue;
                     ids.Add(e.Id);
