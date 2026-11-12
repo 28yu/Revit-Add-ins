@@ -13,7 +13,7 @@ namespace Tools28.Commands.PrintHiddenText
     /// <summary>
     /// 「画面には出るが、印刷・PDF には出ないテキスト」を実現する常駐処理。
     ///
-    /// タイプ名に「非表示」を含むテキストノート（TextNote）を、
+    /// タイプ名に「非表示」を含むテキストノート（TextNote）と寸法（Dimension。スポット寸法を含む）を、
     ///   印刷:  DocumentPrinting で隠す → DocumentPrinted で戻す
     ///   PDF:   FileExporting   で隠す → FileExported   で戻す（形式が PDF のときだけ）
     /// という流れで、出力の間だけビューから隠す（View.HideElements / UnhideElements）。
@@ -59,6 +59,9 @@ namespace Tools28.Commands.PrintHiddenText
         private UIControlledApplication _app;
         private bool _idlingHooked;
 
+        /// <summary>今回の印刷で DocumentPrinting が処理を終えたか（終えていればビューごとの予備処理はしない）</summary>
+        private bool _printHandled;
+
         /// <summary>モデルごとの「隠したもの」の記録。</summary>
         private readonly List<HiddenRecord> _records = new List<HiddenRecord>();
 
@@ -86,6 +89,7 @@ namespace Tools28.Commands.PrintHiddenText
                 _app = app;
                 var ca = app.ControlledApplication;
                 ca.DocumentPrinting += OnDocumentPrinting;
+                ca.ViewPrinting += OnViewPrinting;
                 ca.DocumentPrinted += OnDocumentPrinted;
                 ca.FileExporting += OnFileExporting;
                 ca.FileExported += OnFileExported;
@@ -105,6 +109,7 @@ namespace Tools28.Commands.PrintHiddenText
             {
                 var ca = _app.ControlledApplication;
                 ca.DocumentPrinting -= OnDocumentPrinting;
+                ca.ViewPrinting -= OnViewPrinting;
                 ca.DocumentPrinted -= OnDocumentPrinted;
                 ca.FileExporting -= OnFileExporting;
                 ca.FileExported -= OnFileExported;
@@ -123,9 +128,10 @@ namespace Tools28.Commands.PrintHiddenText
         {
             try
             {
+                _printHandled = false;
                 var viewIds = e.GetViewElementIds();
                 DiagLog.Write($"PrintHiddenText 印刷前: ビュー {viewIds?.Count ?? 0} 件");
-                PrepareForOutput(e.Document, viewIds);
+                _printHandled = PrepareForOutput(e.Document, viewIds, "印刷前");
             }
             catch (Exception ex)
             {
@@ -134,8 +140,29 @@ namespace Tools28.Commands.PrintHiddenText
             }
         }
 
+        /// <summary>
+        /// 予備: ビュー1枚ごとの印刷直前。DocumentPrinting で隠せなかった場合だけ、
+        /// このビュー（シートなら配置ビューも）についてもう一度隠す。戻すのは DocumentPrinted でまとめて行う。
+        /// </summary>
+        private void OnViewPrinting(object sender, ViewPrintingEventArgs e)
+        {
+            try
+            {
+                var view = e.View;
+                var doc = view?.Document;
+                if (doc == null || _printHandled) return;
+                DiagLog.Write($"PrintHiddenText ビュー印刷前（予備）: 「{SafeName(view)}」 {e.Index + 1}/{e.TotalViews}");
+                PrepareForOutput(doc, new List<ElementId> { view.Id }, "ビュー印刷前（予備）");
+            }
+            catch (Exception ex)
+            {
+                DiagLog.Write($"PrintHiddenText ビュー印刷前の処理で例外: {ex}");
+            }
+        }
+
         private void OnDocumentPrinted(object sender, DocumentPrintedEventArgs e)
         {
+            _printHandled = false;
             AfterOutput(e.Document, "印刷後");
         }
 
@@ -149,7 +176,7 @@ namespace Tools28.Commands.PrintHiddenText
 
                 // FileExporting では出力するビューの一覧が取れないため、
                 // 対象テキストが見えるビューをモデル全体から探して隠す
-                PrepareForOutput(e.Document, null);
+                PrepareForOutput(e.Document, null, "PDF書き出し前");
             }
             catch (Exception ex)
             {
@@ -274,49 +301,72 @@ namespace Tools28.Commands.PrintHiddenText
         // ================================================================
 
         /// <param name="viewIds">出力するビュー。null ならモデル全体から対象が見えるビューを探す（PDF 書き出し用）</param>
-        private void PrepareForOutput(Document doc, ICollection<ElementId> viewIds)
+        /// <param name="phase">ログ用の呼び出し元</param>
+        /// <returns>対象が無かった、または変更できたら true。対象があるのに何も変更できなければ false</returns>
+        private bool PrepareForOutput(Document doc, ICollection<ElementId> viewIds, string phase)
         {
-            if (!CanModify(doc)) return;
+            DiagLog.Write($"PrintHiddenText {phase}: モデルの状態 {DescribeState(doc)}");
+            if (!CanModify(doc))
+            {
+                DiagLog.Write($"PrintHiddenText {phase}: このモデルは変更できないため何もしません");
+                return false;
+            }
 
             // 前回戻せなかった分があれば、先に戻しておく（記録を重ねないため）
             var old = FindRecord(doc);
             if (old != null) TryRestore(old);
 
             // 何を変えるかを先に決める（ここではモデルを変更しない）
-            var textPlan = BuildTextPlan(doc, viewIds);
+            var annoPlan = BuildAnnotationPlan(doc, viewIds);
             var panelPlan = BuildPanelPlan(doc);
-            if (textPlan.Count == 0 && panelPlan.Count == 0) return;   // 対象が無ければ何もしない（通常どおり出力）
+            DiagLog.Write($"PrintHiddenText {phase}: 対象 注釈 {annoPlan.Sum(x => x.Value.Count)} 個（{annoPlan.Count} ビュー）／ カーテンパネル {panelPlan.Count} タイプ");
+            if (annoPlan.Count == 0 && panelPlan.Count == 0) return true;   // 対象が無ければ何もしない（通常どおり出力）
 
             var hiddenNow = new Dictionary<ElementId, HashSet<ElementId>>();
             var panelNow = new Dictionary<ElementId, int>();
 
-            // テキストとパネルの変更を 1 つのグループにまとめる（元に戻す履歴は 1 件）。
+            // 印刷の直前は、Revit 自身のトランザクションが開いたまま（IsModifiable = true）のことがある。
+            // そのときは新しい Transaction / TransactionGroup を始められないので、SubTransaction で変更する。
+            // それ以外は注釈とパネルの変更を 1 つのグループにまとめる（元に戻す履歴は 1 件）。
             // どこかで例外が出たらグループごと RollBack し、何も変えずに通常どおり出力させる
-            using (var tg = new TransactionGroup(doc, Loc.S("PrintHiddenText.TxGroupHide")))
+            bool useGroup = !doc.IsModifiable;
+            TransactionGroup tg = useGroup ? new TransactionGroup(doc, Loc.S("PrintHiddenText.TxGroupHide")) : null;
+            try
             {
-                try
-                {
-                    tg.Start();
-                    if (textPlan.Count > 0) HideTexts(doc, textPlan, hiddenNow);
-                    if (panelPlan.Count > 0) SwitchPanelsOff(doc, panelPlan, panelNow);
+                tg?.Start();
+                if (annoPlan.Count > 0) HideAnnotations(doc, annoPlan, hiddenNow);
+                if (panelPlan.Count > 0) SwitchPanelsOff(doc, panelPlan, panelNow);
 
+                if (tg != null)
+                {
                     if (hiddenNow.Count == 0 && panelNow.Count == 0)
                     {
                         tg.RollBack();
-                        return;
+                        DiagLog.Write($"PrintHiddenText {phase}: 何も変更できませんでした");
+                        return false;
                     }
                     if (tg.Assimilate() != TransactionStatus.Committed)
                     {
-                        DiagLog.Write("PrintHiddenText 出力前の変更を確定できませんでした（通常どおり出力されます）");
-                        return;
+                        DiagLog.Write($"PrintHiddenText {phase}: 変更を確定できませんでした（通常どおり出力されます）");
+                        return false;
                     }
                 }
-                catch (Exception ex)
-                {
-                    if (tg.GetStatus() == TransactionStatus.Started) tg.RollBack();
-                    DiagLog.Write($"PrintHiddenText 出力前の処理で例外（通常どおり出力されます）: {ex.Message}");
-                    return;
-                }
+            }
+            catch (Exception ex)
+            {
+                if (tg != null && tg.GetStatus() == TransactionStatus.Started) tg.RollBack();
+                DiagLog.Write($"PrintHiddenText {phase}: 例外（通常どおり出力されます）: {ex}");
+                return false;
+            }
+            finally
+            {
+                tg?.Dispose();
+            }
+
+            if (hiddenNow.Count == 0 && panelNow.Count == 0)
+            {
+                DiagLog.Write($"PrintHiddenText {phase}: 何も変更できませんでした");
+                return false;
             }
 
             // 確定できたものだけ記録する（これが後で戻すときの唯一の情報源）
@@ -335,30 +385,62 @@ namespace Tools28.Commands.PrintHiddenText
             rec.Attempts = 0;
             if (!_records.Contains(rec)) _records.Add(rec);
 
-            DiagLog.Write($"PrintHiddenText テキスト: {hiddenNow.Count} ビューで計 {hiddenNow.Sum(x => x.Value.Count)} 個を隠しました / " +
-                          $"カーテンパネル: {panelNow.Count} タイプの「{PanelParamName}」を 0 にしました");
+            DiagLog.Write($"PrintHiddenText {phase}: 注釈 {hiddenNow.Count} ビューで計 {hiddenNow.Sum(x => x.Value.Count)} 個を隠し、" +
+                          $"カーテンパネル {panelNow.Count} タイプの「{PanelParamName}」を 0 にしました" +
+                          (useGroup ? "" : "（Revit のトランザクション内で変更）"));
+            return true;
         }
 
-        // ---------------- テキスト ----------------
+        /// <summary>
+        /// 変更を 1 ステップ実行する。モデルにトランザクションが開いていれば SubTransaction、
+        /// 開いていなければ Transaction で囲む。body は「何か変更したか」を返す。確定できたら true。
+        /// body 内の例外は外へ出す（呼び出し側でグループごと取り消すため）。
+        /// </summary>
+        private static bool RunStep(Document doc, string name, Func<bool> body)
+        {
+            if (doc.IsModifiable)
+            {
+                using (var st = new SubTransaction(doc))
+                {
+                    st.Start();
+                    if (!body()) { st.RollBack(); return false; }
+                    return st.Commit() == TransactionStatus.Committed;
+                }
+            }
+            using (var t = new Transaction(doc, name))
+            {
+                SetQuietFailureHandling(t);
+                t.Start();
+                if (!body()) { t.RollBack(); return false; }
+                return t.Commit() == TransactionStatus.Committed;
+            }
+        }
 
-        private List<KeyValuePair<View, List<ElementId>>> BuildTextPlan(Document doc, ICollection<ElementId> viewIds)
+        // ---------------- 注釈（テキスト・寸法） ----------------
+
+        /// <summary>
+        /// タイプ名に「非表示」を含むテキストタイプ・寸法タイプ（スポット寸法を含む）。
+        /// </summary>
+        private static HashSet<ElementId> FindTargetTypeIds(Document doc)
+        {
+            return new HashSet<ElementId>(
+                new FilteredElementCollector(doc)
+                    .WhereElementIsElementType()
+                    .Where(t => (t is TextNoteType || t is DimensionType) && IsTargetTypeName(SafeElementName(t)))
+                    .Select(t => t.Id));
+        }
+
+        private List<KeyValuePair<View, List<ElementId>>> BuildAnnotationPlan(Document doc, ICollection<ElementId> viewIds)
         {
             var plan = new List<KeyValuePair<View, List<ElementId>>>();
 
-            // 1. 対象のテキストタイプ（タイプ名に「非表示」を含む）
-            var typeIds = new HashSet<ElementId>(
-                new FilteredElementCollector(doc)
-                    .OfClass(typeof(TextNoteType))
-                    .Where(t => IsTargetTypeName(t.Name))
-                    .Select(t => t.Id));
+            var typeIds = FindTargetTypeIds(doc);
             if (typeIds.Count == 0) return plan;
 
-            // 2. どのビューを調べるか
             var candidateViews = viewIds != null
                 ? ExpandPrintedViews(doc, viewIds)
                 : FindViewsShowingTargets(doc, typeIds);
 
-            // 3. ビューごとに、そのビューで見えている対象テキストを集める
             foreach (var view in candidateViews)
             {
                 var ids = CollectVisibleTargets(doc, view, typeIds);
@@ -367,18 +449,13 @@ namespace Tools28.Commands.PrintHiddenText
             return plan;
         }
 
-        /// <summary>
-        /// テキストを隠す（1 トランザクション）。ビューごとに SubTransaction にして、
-        /// 1 つのビューで失敗しても他のビューは隠せるようにする。確定できたら hiddenNow に入れる。
-        /// </summary>
-        private static void HideTexts(Document doc, List<KeyValuePair<View, List<ElementId>>> plan,
+        /// <summary>注釈を隠す。ビューごとに SubTransaction にして、1 つのビューで失敗しても他は続ける。</summary>
+        private static void HideAnnotations(Document doc, List<KeyValuePair<View, List<ElementId>>> plan,
             Dictionary<ElementId, HashSet<ElementId>> hiddenNow)
         {
             var done = new Dictionary<ElementId, HashSet<ElementId>>();
-            using (var t = new Transaction(doc, Loc.S("PrintHiddenText.TxHide")))
+            bool ok = RunStep(doc, Loc.S("PrintHiddenText.TxHide"), () =>
             {
-                SetQuietFailureHandling(t);
-                t.Start();
                 foreach (var kv in plan)
                 {
                     using (var st = new SubTransaction(doc))
@@ -397,14 +474,9 @@ namespace Tools28.Commands.PrintHiddenText
                         }
                     }
                 }
-
-                if (done.Count == 0) { t.RollBackIfStarted(); return; }
-                if (t.Commit() != TransactionStatus.Committed)
-                {
-                    DiagLog.Write("PrintHiddenText テキストを隠す処理を確定できませんでした");
-                    return;
-                }
-            }
+                return done.Count > 0;
+            });
+            if (!ok) return;
             foreach (var kv in done) hiddenNow[kv.Key] = kv.Value;
         }
 
@@ -444,14 +516,11 @@ namespace Tools28.Commands.PrintHiddenText
             return plan;
         }
 
-        /// <summary>「幅数値表示」を 0 にする（1 トランザクション）。確定できたら panelNow に変更前の値を入れる。</summary>
         private static void SwitchPanelsOff(Document doc, Dictionary<ElementId, int> plan, Dictionary<ElementId, int> panelNow)
         {
             var done = new Dictionary<ElementId, int>();
-            using (var t = new Transaction(doc, Loc.S("PrintHiddenText.TxPanelOff")))
+            bool ok = RunStep(doc, Loc.S("PrintHiddenText.TxPanelOff"), () =>
             {
-                SetQuietFailureHandling(t);
-                t.Start();
                 foreach (var kv in plan)
                 {
                     try
@@ -465,14 +534,9 @@ namespace Tools28.Commands.PrintHiddenText
                         DiagLog.Write($"PrintHiddenText パネルタイプ {kv.Key} の「{PanelParamName}」を変更できませんでした: {ex.Message}");
                     }
                 }
-
-                if (done.Count == 0) { t.RollBackIfStarted(); return; }
-                if (t.Commit() != TransactionStatus.Committed)
-                {
-                    DiagLog.Write($"PrintHiddenText 「{PanelParamName}」の変更を確定できませんでした");
-                    return;
-                }
-            }
+                return done.Count > 0;
+            });
+            if (!ok) return;
             foreach (var kv in done) panelNow[kv.Key] = kv.Value;
         }
 
@@ -485,6 +549,8 @@ namespace Tools28.Commands.PrintHiddenText
             }
             catch { return false; }
         }
+
+        // ---------------- ビューの洗い出し ----------------
 
         /// <summary>印刷するビュー一覧を、シートに配置されたビュー（凡例を含む）まで広げる。</summary>
         private static List<View> ExpandPrintedViews(Document doc, ICollection<ElementId> viewIds)
@@ -512,15 +578,14 @@ namespace Tools28.Commands.PrintHiddenText
         }
 
         /// <summary>
-        /// 出力ビューが分からない場合（PDF 書き出し）に、対象テキストが見える可能性のあるビューを集める。
-        /// テキストノートはビュー固有の要素なので「所属ビュー」で見える。
+        /// 出力ビューが分からない場合（PDF 書き出し）に、対象の注釈が見える可能性のあるビューを集める。
+        /// テキスト・寸法はビュー固有の要素なので「所属ビュー」で見える。
         /// 従属ビューは親ビューの注釈を共有するので、親と従属ビューもあわせて調べる。
         /// </summary>
         private static List<View> FindViewsShowingTargets(Document doc, HashSet<ElementId> typeIds)
         {
             var ownerIds = new HashSet<ElementId>(
                 new FilteredElementCollector(doc)
-                    .OfClass(typeof(TextNote))
                     .WhereElementIsNotElementType()
                     .Where(e => typeIds.Contains(e.GetTypeId()))
                     .Select(e => e.OwnerViewId)
@@ -554,7 +619,7 @@ namespace Tools28.Commands.PrintHiddenText
             return result;
         }
 
-        /// <summary>ビューで今見えている対象テキストのうち、隠せるものだけを返す。</summary>
+        /// <summary>ビューで今見えている対象の注釈のうち、隠せるものだけを返す。</summary>
         private static List<ElementId> CollectVisibleTargets(Document doc, View view, HashSet<ElementId> typeIds)
         {
             var ids = new List<ElementId>();
@@ -562,9 +627,7 @@ namespace Tools28.Commands.PrintHiddenText
             {
                 // ビューを指定した収集は「そのビューで表示されている要素」だけを返す
                 // （すでに非表示の要素は入らない＝元から隠れていた要素を後で表示してしまうことがない）
-                foreach (var e in new FilteredElementCollector(doc, view.Id)
-                             .OfClass(typeof(TextNote))
-                             .WhereElementIsNotElementType())
+                foreach (var e in new FilteredElementCollector(doc, view.Id).WhereElementIsNotElementType())
                 {
                     if (!typeIds.Contains(e.GetTypeId())) continue;
                     if (e.IsHidden(view)) continue;
@@ -597,27 +660,29 @@ namespace Tools28.Commands.PrintHiddenText
             var viewsDone = new List<ElementId>();
             var panelsDone = new List<ElementId>();
 
-            // 出力前と同じく 1 つのグループにまとめる（元に戻す履歴は 1 件）
-            using (var tg = new TransactionGroup(doc, Loc.S("PrintHiddenText.TxGroupRestore")))
+            bool useGroup = !doc.IsModifiable;
+            TransactionGroup tg = useGroup ? new TransactionGroup(doc, Loc.S("PrintHiddenText.TxGroupRestore")) : null;
+            try
             {
-                try
-                {
-                    tg.Start();
-                    if (rec.ByView.Count > 0) RestoreTexts(doc, rec, viewsDone);
-                    if (rec.PanelTypeValues.Count > 0) RestorePanels(doc, rec, panelsDone);
+                tg?.Start();
+                if (rec.ByView.Count > 0) RestoreAnnotations(doc, rec, viewsDone);
+                if (rec.PanelTypeValues.Count > 0) RestorePanels(doc, rec, panelsDone);
 
-                    if (tg.Assimilate() != TransactionStatus.Committed)
-                    {
-                        DiagLog.Write("PrintHiddenText 戻す処理を確定できませんでした");
-                        return false;
-                    }
-                }
-                catch (Exception ex)
+                if (tg != null && tg.Assimilate() != TransactionStatus.Committed)
                 {
-                    if (tg.GetStatus() == TransactionStatus.Started) tg.RollBack();
-                    DiagLog.Write($"PrintHiddenText 戻す処理で例外: {ex.Message}");
+                    DiagLog.Write("PrintHiddenText 戻す処理を確定できませんでした");
                     return false;
                 }
+            }
+            catch (Exception ex)
+            {
+                if (tg != null && tg.GetStatus() == TransactionStatus.Started) tg.RollBack();
+                DiagLog.Write($"PrintHiddenText 戻す処理で例外: {ex.Message}");
+                return false;
+            }
+            finally
+            {
+                tg?.Dispose();
             }
 
             foreach (var id in viewsDone) rec.ByView.Remove(id);
@@ -630,23 +695,23 @@ namespace Tools28.Commands.PrintHiddenText
             return false;
         }
 
-        private static void RestoreTexts(Document doc, HiddenRecord rec, List<ElementId> viewsDone)
+        private static void RestoreAnnotations(Document doc, HiddenRecord rec, List<ElementId> viewsDone)
         {
             var done = new List<ElementId>();
-            using (var t = new Transaction(doc, Loc.S("PrintHiddenText.TxRestore")))
+            // 何も変更しない（すべて戻し済み）場合も「済み」にするため、変更の有無とは別に数える
+            var nothingToDo = new List<ElementId>();
+            bool ok = RunStep(doc, Loc.S("PrintHiddenText.TxRestore"), () =>
             {
-                SetQuietFailureHandling(t);
-                t.Start();
                 foreach (var kv in rec.ByView)
                 {
                     var view = doc.GetElement(kv.Key) as View;
-                    if (view == null) { done.Add(kv.Key); continue; }   // ビューが消えていれば戻す必要なし
+                    if (view == null) { nothingToDo.Add(kv.Key); continue; }   // ビューが消えていれば戻す必要なし
 
                     // 出力の間に削除された要素や、すでに表示に戻っている要素は除く
                     var ids = kv.Value
                         .Where(id => doc.GetElement(id) is Element el && el.IsHidden(view))
                         .ToList();
-                    if (ids.Count == 0) { done.Add(kv.Key); continue; }
+                    if (ids.Count == 0) { nothingToDo.Add(kv.Key); continue; }
 
                     using (var st = new SubTransaction(doc))
                     {
@@ -664,28 +729,27 @@ namespace Tools28.Commands.PrintHiddenText
                         }
                     }
                 }
-
-                if (t.Commit() != TransactionStatus.Committed) return;
-            }
-            viewsDone.AddRange(done);
+                return done.Count > 0;
+            });
+            viewsDone.AddRange(nothingToDo);
+            if (ok) viewsDone.AddRange(done);
         }
 
         private static void RestorePanels(Document doc, HiddenRecord rec, List<ElementId> panelsDone)
         {
             var done = new List<ElementId>();
-            using (var t = new Transaction(doc, Loc.S("PrintHiddenText.TxPanelRestore")))
+            var nothingToDo = new List<ElementId>();
+            bool ok = RunStep(doc, Loc.S("PrintHiddenText.TxPanelRestore"), () =>
             {
-                SetQuietFailureHandling(t);
-                t.Start();
                 foreach (var kv in rec.PanelTypeValues)
                 {
                     try
                     {
                         var p = doc.GetElement(kv.Key)?.LookupParameter(PanelParamName);
                         // タイプが消えた・パラメータが無くなった場合は戻すものが無い
-                        if (p == null || p.StorageType != StorageType.Integer) { done.Add(kv.Key); continue; }
-                        // 出力の間に誰かが値を変えていたら（0 以外）、その値を尊重して触らない
-                        if (p.AsInteger() != 0) { done.Add(kv.Key); continue; }
+                        if (p == null || p.StorageType != StorageType.Integer) { nothingToDo.Add(kv.Key); continue; }
+                        // すでに 0 以外（Revit 側で取り消された・誰かが変えた）なら、その値を尊重して触らない
+                        if (p.AsInteger() != 0) { nothingToDo.Add(kv.Key); continue; }
                         if (p.IsReadOnly) continue;
                         if (p.Set(kv.Value)) done.Add(kv.Key);
                     }
@@ -694,10 +758,10 @@ namespace Tools28.Commands.PrintHiddenText
                         DiagLog.Write($"PrintHiddenText パネルタイプ {kv.Key} の「{PanelParamName}」を戻せませんでした: {ex.Message}");
                     }
                 }
-
-                if (t.Commit() != TransactionStatus.Committed) return;
-            }
-            panelsDone.AddRange(done);
+                return done.Count > 0;
+            });
+            panelsDone.AddRange(nothingToDo);
+            if (ok) panelsDone.AddRange(done);
         }
 
         // ================================================================
@@ -724,8 +788,10 @@ namespace Tools28.Commands.PrintHiddenText
             {
                 return doc != null && doc.IsValidObject
                     && !doc.IsReadOnly
-                    && !doc.IsLinked
-                    && !doc.IsModifiable;   // 他のトランザクションが開いている最中は触らない
+                    && !doc.IsLinked;
+                // ⚠ IsModifiable（トランザクションが開いている）は除外しない。印刷の直前は Revit 自身の
+                //   トランザクションが開いていることがあり、v1 ではここで弾いて印刷で何も隠れなかった。
+                //   開いているときは RunStep が SubTransaction で変更する
             }
             catch { return false; }
         }
@@ -760,6 +826,20 @@ namespace Tools28.Commands.PrintHiddenText
             if (!string.IsNullOrEmpty(format) && format.IndexOf("PDF", StringComparison.OrdinalIgnoreCase) >= 0)
                 return true;
             return !string.IsNullOrEmpty(path) && path.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string DescribeState(Document doc)
+        {
+            try
+            {
+                return $"(読み取り専用={doc.IsReadOnly}, リンク={doc.IsLinked}, トランザクション中={doc.IsModifiable}, ワークシェア={doc.IsWorkshared})";
+            }
+            catch (Exception ex) { return $"(取得失敗: {ex.Message})"; }
+        }
+
+        private static string SafeElementName(Element e)
+        {
+            try { return e.Name; } catch { return null; }
         }
 
         private static string SafeTypeName(Element e)
