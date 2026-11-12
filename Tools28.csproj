@@ -62,6 +62,8 @@
     <Resource Include="Resources\Icons\both.png" />
     <Resource Include="Resources\Icons\print_hidden_on_16.png" />
     <Resource Include="Resources\Icons\print_hidden_off_16.png" />
+    <Resource Include="Resources\Icons\print_hidden_on.png" />
+    <Resource Include="Resources\Icons\print_hidden_off.png" />
     <Resource Include="Resources\Icons\left.png" />
     <Resource Include="Resources\Icons\right.png" />
     <Resource Include="Resources\Icons\both_16.png" />

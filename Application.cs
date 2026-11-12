@@ -197,6 +197,8 @@ namespace Tools28
                 btn.ItemText = Loc.S(on ? "Ribbon.PrintHidden.On" : "Ribbon.PrintHidden.Off");
                 var img = LoadImage(on ? "print_hidden_on_16.png" : "print_hidden_off_16.png");
                 if (img != null) btn.Image = img;
+                var large = LoadImage(on ? "print_hidden_on.png" : "print_hidden_off.png");
+                if (large != null) btn.LargeImage = large;
             }
             catch { }
         }
@@ -546,6 +548,17 @@ namespace Tools28
             backupData.AvailabilityClassName = AlwaysAvailable.ClassName;
             AddButton(panel, backupData);
 
+            // 印刷・PDF の間だけ「非表示」の注釈を隠す機能の ON/OFF（自動バックアップと同じ大きいボタン。既定は ON）
+            bool printHiddenOn = Tools28.Commands.PrintHiddenText.PrintHiddenSettings.Enabled;
+            var printHiddenData = new PushButtonData("PrintHiddenToggle",
+                Loc.S(printHiddenOn ? "Ribbon.PrintHidden.On" : "Ribbon.PrintHidden.Off"),
+                assemblyPath, "Tools28.Commands.PrintHiddenText.PrintHiddenToggleCommand");
+            printHiddenData.ToolTip = Loc.S("Ribbon.PrintHidden.Tip");
+            printHiddenData.Image = LoadImage(printHiddenOn ? "print_hidden_on_16.png" : "print_hidden_off_16.png");
+            printHiddenData.LargeImage = LoadImage(printHiddenOn ? "print_hidden_on.png" : "print_hidden_off.png");
+            printHiddenData.AvailabilityClassName = AlwaysAvailable.ClassName;
+            AddButton(panel, printHiddenData);
+
             string currentLang = Loc.CurrentLang;
             string flagIcon = $"flag_{currentLang.ToLower()}_16.png";
             if (currentLang == "US") flagIcon = "flag_us_16.png";
@@ -564,22 +577,10 @@ namespace Tools28
             manualData.Image = LoadImage("manual_16.png");
             manualData.AvailabilityClassName = AlwaysAvailable.ClassName;
 
-            // 印刷・PDF の間だけ「非表示」の注釈を隠す機能の ON/OFF（小さいボタン。既定は ON）
-            bool printHiddenOn = Tools28.Commands.PrintHiddenText.PrintHiddenSettings.Enabled;
-            var printHiddenData = new PushButtonData("PrintHiddenToggle",
-                Loc.S(printHiddenOn ? "Ribbon.PrintHidden.On" : "Ribbon.PrintHidden.Off"),
-                assemblyPath, "Tools28.Commands.PrintHiddenText.PrintHiddenToggleCommand");
-            printHiddenData.ToolTip = Loc.S("Ribbon.PrintHidden.Tip");
-            printHiddenData.Image = LoadImage(printHiddenOn ? "print_hidden_on_16.png" : "print_hidden_off_16.png");
-            printHiddenData.AvailabilityClassName = AlwaysAvailable.ClassName;
-
-            // 小さいボタンは縦に 2〜3 個ずつしか積めないため、[言語・バージョン情報] [マニュアル・印刷非表示] の 2 列にする
-            var stackedItems = panel.AddStackedItems(langData, aboutData);
-            var stackedItems2 = panel.AddStackedItems(manualData, printHiddenData);
+            var stackedItems = panel.AddStackedItems(langData, aboutData, manualData);
 
             _buttons["About"] = stackedItems[1] as RibbonItem;
-            _buttons["Manual"] = stackedItems2[0] as RibbonItem;
-            _buttons["PrintHiddenToggle"] = stackedItems2[1] as RibbonItem;
+            _buttons["Manual"] = stackedItems[2] as RibbonItem;
 
             LanguagePulldown = stackedItems[0] as PulldownButton;
             if (LanguagePulldown != null)

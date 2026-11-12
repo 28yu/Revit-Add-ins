@@ -3125,7 +3125,7 @@ v2.7 を公開した当日に、全機能レビューの修正（上の節）を
 - **詳細線分（2026-11-12 追加）**: 詳細線分には要素タイプが無い（プロパティの「線種」がタイプに当たる）ので、
   「線分」カテゴリのサブカテゴリ（線種）名に「非表示」を含むものの GraphicsStyle（投影・切断）を集め、`DetailCurve.LineStyle` がそれかで判定する（`TargetMatcher`）。
   PDF でビューを探すときは `ElementOwnerViewFilter(InvalidElementId, inverted: true)` でビュー固有の要素だけに絞る
-- **ON/OFF（2026-11-12 追加）**: 設定パネルの小ボタン（`PrintHiddenToggleCommand`）。`%AppData%\Tools28\PrintHidden.setting` に on/off、既定 ON。
+- **ON/OFF（2026-11-12 追加）**: 設定パネルのボタン（`PrintHiddenToggleCommand`。並びのバランスのため大きいボタンにし、言語・バージョン情報・マニュアルは縦3つに戻した）。`%AppData%\Tools28\PrintHidden.setting` に on/off、既定 ON。
   OFF のときは隠す処理だけ止め、戻す処理は記録があれば常に行う。ボタンの文字は状態で変わるので `_buttonTextKeys` ではなく `Application.UpdatePrintHiddenButton()` で更新する
 - **印刷プレビューは非対応**: Revit API にプレビューのイベントが無い。印刷ダイアログ内の「プレビュー」ボタンはコマンドでもないので割り込めない。
   ファイル ＞ 印刷 ＞ 印刷プレビュー（`PostableCommand.PrintPreview`）は `AddInCommandBinding` で割り込める可能性があるが、閉じた瞬間を知る手段が無く未実装
