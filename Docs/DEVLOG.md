@@ -3127,6 +3127,8 @@ v2.7 を公開した当日に、全機能レビューの修正（上の節）を
   PDF でビューを探すときは `ElementOwnerViewFilter(InvalidElementId, inverted: true)` でビュー固有の要素だけに絞る
 - **ON/OFF（2026-11-12 追加）**: 設定パネルのボタン（`PrintHiddenToggleCommand`。並びのバランスのため大きいボタンにし、言語・バージョン情報・マニュアルは縦3つに戻した）。`%AppData%\Tools28\PrintHidden.setting` に on/off、既定 ON。
   OFF のときは隠す処理だけ止め、戻す処理は記録があれば常に行う。ボタンの文字は状態で変わるので `_buttonTextKeys` ではなく `Application.UpdatePrintHiddenButton()` で更新する
+- **アイコン（2026-11-12）**: 最初に作った 96px の ON/OFF アイコンに 288 DPI（pHYs）を入れ忘れ、リボンで大きく表示された（既知の「96px は 288DPI で保存」の再発）。
+  `Resources/Icons/DesignConcept/draw_print_hidden_icons.py` で描き直し（共通パレットの DARK/MID・32 単位で設計して縮小）。**アイコンを作るときは既存の draw_*.py をひな形にする**
 - **印刷プレビューは非対応**: Revit API にプレビューのイベントが無い。印刷ダイアログ内の「プレビュー」ボタンはコマンドでもないので割り込めない。
   ファイル ＞ 印刷 ＞ 印刷プレビュー（`PostableCommand.PrintPreview`）は `AddInCommandBinding` で割り込める可能性があるが、閉じた瞬間を知る手段が無く未実装
 - ⚠ **実機未確認**（2026-11-11 時点）: Revit 2022 以降の標準 PDF 書き出しで `FileExporting` が発生し、隠した状態が PDF に反映されること。`C:\temp\Tools28_debug.txt` の「PrintHiddenText 書き出し前: 形式=…」行で確認できる
