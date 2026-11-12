@@ -16,7 +16,7 @@ namespace Tools28.Commands.PrintHiddenText
     /// タイプ名に「非表示」を含むテキストノート（TextNote）と寸法（Dimension。スポット寸法を含む）、
     /// 線種名に「非表示」を含む詳細線分（DetailCurve）を、
     ///   印刷:  DocumentPrinting で隠す → DocumentPrinted で戻す
-    ///   PDF:   FileExporting   で隠す → FileExported   で戻す（形式が PDF のときだけ）
+    ///   PDF・CAD: FileExporting で隠す → FileExported で戻す（PDF と DWG・DXF・DGN・SAT のときだけ）
     /// という流れで、出力の間だけビューから隠す（View.HideElements / UnhideElements）。
     /// 要素の削除・作り直しはしない。ボタンは無く、OnStartup で登録すれば自動で働く。
     ///
@@ -174,12 +174,13 @@ namespace Tools28.Commands.PrintHiddenText
             {
                 string format = SafeFormat(e);
                 DiagLog.Write($"PrintHiddenText 書き出し前: 形式={format}, 保存先={e.Path}");
-                if (!IsPdf(format, e.Path)) return;   // DWG などには一切手を出さない
+                string kind = TargetExportKind(format, e.Path);
+                if (kind == null) return;   // PDF・CAD 以外（IFC・画像・FBX など）には一切手を出さない
                 if (!PrintHiddenSettings.Enabled) return;   // OFF のときは何もしない（戻す処理は記録があれば常に行う）
 
                 // FileExporting では出力するビューの一覧が取れないため、
                 // 対象テキストが見えるビューをモデル全体から探して隠す
-                PrepareForOutput(e.Document, null, "PDF書き出し前");
+                PrepareForOutput(e.Document, null, kind + "書き出し前");
             }
             catch (Exception ex)
             {
@@ -869,13 +870,22 @@ namespace Tools28.Commands.PrintHiddenText
         }
 
         /// <summary>
-        /// PDF の書き出しか。形式名（Revit 2022 以降の標準 PDF 書き出し）か、保存先の拡張子で判定する。
+        /// 隠す対象の書き出しなら種類名（"PDF" / "CAD"）、それ以外は null。
+        /// PDF（Revit 2022 以降の標準 PDF 書き出し）と、書き出し ＞ CAD フォーマット（DWG・DXF・DGN・ACIS(SAT)）が対象。
+        /// 形式名（ImportExportFileFormat）で判定し、取れないときは保存先の拡張子で判定する。
         /// </summary>
-        internal static bool IsPdf(string format, string path)
+        internal static string TargetExportKind(string format, string path)
         {
-            if (!string.IsNullOrEmpty(format) && format.IndexOf("PDF", StringComparison.OrdinalIgnoreCase) >= 0)
-                return true;
-            return !string.IsNullOrEmpty(path) && path.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase);
+            string f = (format ?? "").Trim().ToUpperInvariant();
+            if (f == "PDF") return "PDF";
+            if (f == "DWG" || f == "DXF" || f == "DGN" || f == "SAT") return "CAD";
+            if (f.Length > 0 && f != "0") return null;   // 形式名が取れて対象外（IFC・画像など）
+
+            string ext = "";
+            try { ext = (System.IO.Path.GetExtension(path ?? "") ?? "").ToUpperInvariant(); } catch { }
+            if (ext == ".PDF") return "PDF";
+            if (ext == ".DWG" || ext == ".DXF" || ext == ".DGN" || ext == ".SAT") return "CAD";
+            return null;
         }
 
         private static string DescribeState(Document doc)

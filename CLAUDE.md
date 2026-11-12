@@ -482,7 +482,7 @@ _buttonTipKeys["FeatureName"] = "Ribbon.FeatureName.Button.Tip";
 | AutoBackup（自動バックアップ/定期ローカル保存・クラウド同期） | `Commands/AutoBackup/` | `Docs/Features/AutoBackup.md` |
 | GenericModelMerge（一般モデル化/複数要素の形状を1つにまとめる） | `Commands/GenericModelMerge/` | `Docs/Features/GenericModelMerge.md` |
 | DuplicateInstance（重複要素整理/警告「同じ場所に同一のインスタンス」の要素を比較・削除） | `Commands/DuplicateInstance/` | `Docs/DEVLOG.md#DuplicateInstance`, `Docs/Features/DuplicateInstance.md` |
-| PrintHiddenText（印刷しない注釈/タイプ名に「非表示」を含むテキスト・寸法、線種名に「非表示」を含む詳細線分、カーテンパネルの「幅数値表示」に連動するネスト注釈を印刷・PDF の間だけ自動で隠す。設定パネルのボタンで ON/OFF・既定 ON） | `Commands/PrintHiddenText/` | `Docs/Features/PrintHiddenText.md`, `Docs/DEVLOG.md#PrintHiddenText` |
+| PrintHiddenText（印刷しない注釈/タイプ名に「非表示」を含むテキスト・寸法、線種名に「非表示」を含む詳細線分、カーテンパネルの「幅数値表示」に連動するネスト注釈を印刷・PDF・CAD（DWG/DXF/DGN/SAT）書き出しの間だけ自動で隠す。設定パネルのボタンで ON/OFF・既定 ON） | `Commands/PrintHiddenText/` | `Docs/Features/PrintHiddenText.md`, `Docs/DEVLOG.md#PrintHiddenText` |
 | RealtimeRender（リアルタイムレンダリング/GPUレイトレーシング・ライブ同期・画像/360°/ビューア書き出し） | `Commands/RealtimeRender/` + `Renderer/` | `Docs/DEVLOG.md#RealtimeRender`, `Renderer/README.md` |
 
 ### リボンパネル構成（左から順）
