@@ -82,20 +82,48 @@ namespace Tools28.Commands.LineMerge
                 using (var t = new Transaction(doc, Loc.S("LineMerge.Txn")))
                 {
                     t.Start();
-                    foreach (var r in results)
+                    SetQuietFailureHandling(t);
+
+                    // 削除はまとめて1回で行う（組ごとに Delete を呼ぶと、そのたびに Revit がモデルを
+                    // 再計算して非常に遅くなるため）。まとめて消せなかったときだけ組ごとにやり直す。
+                    var merged = new List<MergeResult<ElementId>>();
+                    try
+                    {
+                        doc.Delete(results.SelectMany(r => r.Remove).Select(s => s.Tag).ToList());
+                        merged.AddRange(results);
+                    }
+                    catch (Exception ex)
+                    {
+                        DiagLog.Write($"LineMerge: 一括削除に失敗したため組ごとに削除します: {ex.Message}");
+                        foreach (var r in results)
+                        {
+                            try
+                            {
+                                doc.Delete(r.Remove.Select(s => s.Tag).ToList());
+                                merged.Add(r);
+                            }
+                            catch (Exception ex2)
+                            {
+                                failed++;
+                                DiagLog.Write($"LineMerge: 1組を削除できませんでした: {ex2.Message}");
+                            }
+                        }
+                    }
+
+                    // 残す線を、まとめた長さまで伸ばす
+                    foreach (var r in merged)
                     {
                         try
                         {
                             var keep = (CurveElement)doc.GetElement(r.Keep.Tag);
                             keep.SetGeometryCurve(Line.CreateBound(ToXyz(r.NewStart), ToXyz(r.NewEnd)), true);
-                            doc.Delete(r.Remove.Select(s => s.Tag).ToList());
-                            removed += r.Remove.Count;
                         }
                         catch (Exception ex)
                         {
-                            failed++;
-                            DiagLog.Write($"LineMerge: 1組をまとめられませんでした: {ex.Message}");
+                            // 伸ばせなくても、重なっていた線は消えているので見た目はほぼ変わらない
+                            DiagLog.Write($"LineMerge: 線を伸ばせませんでした: {ex.Message}");
                         }
+                        removed += r.Remove.Count;
                     }
                     t.Commit();
                 }
@@ -138,6 +166,29 @@ namespace Tools28.Commands.LineMerge
             if (locked > 0) s += "\n" + string.Format(Loc.S("LineMerge.SkippedLocked"), locked);
             if (cad > 0) s += "\n" + Loc.S("LineMerge.CadHint");
             return s.Length > 0 ? "\n" + s : s;
+        }
+
+        /// <summary>
+        /// 線を伸ばしたときの「わずかに軸からずれています」などの警告で、確定のたびに
+        /// 警告画面が出て止まらないよう、警告だけは黙って消す（エラーはそのまま Revit に任せる）。
+        /// </summary>
+        private static void SetQuietFailureHandling(Transaction t)
+        {
+            var opt = t.GetFailureHandlingOptions();
+            opt.SetFailuresPreprocessor(new SwallowWarnings());
+            t.SetFailureHandlingOptions(opt);
+        }
+
+        private sealed class SwallowWarnings : IFailuresPreprocessor
+        {
+            public FailureProcessingResult PreprocessFailures(FailuresAccessor a)
+            {
+                foreach (var f in a.GetFailureMessages())
+                {
+                    if (f.GetSeverity() == FailureSeverity.Warning) a.DeleteWarning(f);
+                }
+                return FailureProcessingResult.Continue;
+            }
         }
 
         private static Vec3 ToVec(XYZ p) => new Vec3(p.X, p.Y, p.Z);
