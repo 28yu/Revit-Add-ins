@@ -37,6 +37,7 @@ namespace Tools28
             { "Room3DColor", "Ribbon.Room3DColor" },
             { "FilledRegionSplitMerge2", "Ribbon.FilledRegion" },
             { "FillPatternIO", "Ribbon.FillPatternIO" },
+            { "LineMerge", "Ribbon.LineMerge" },
             { "BeamUnderLevel", "Ribbon.BeamUnder" },
             { "BeamTopLevel", "Ribbon.BeamTop" },
             { "FireProtection", "Ribbon.FireProtection" },
@@ -71,6 +72,7 @@ namespace Tools28
             { "Room3DColor", "Ribbon.Room3DColor.Tip" },
             { "FilledRegionSplitMerge2", "Ribbon.FilledRegion.Tip" },
             { "FillPatternIO", "Ribbon.FillPatternIO.Tip" },
+            { "LineMerge", "Ribbon.LineMerge.Tip" },
             { "BeamUnderLevel", "Ribbon.BeamUnder.Tip" },
             { "BeamTopLevel", "Ribbon.BeamTop.Tip" },
             { "FireProtection", "Ribbon.FireProtection.Tip" },
@@ -430,6 +432,11 @@ namespace Tools28
             fillPatternData.ToolTip = Loc.S("Ribbon.FillPatternIO.Tip");
             fillPatternData.LargeImage = LoadImage("fill_pattern_io.png");
             AddButton(panel, fillPatternData);
+
+            var lineMergeData = new PushButtonData("LineMerge", Loc.S("Ribbon.LineMerge"), assemblyPath, "Tools28.Commands.LineMerge.LineMergeCommand");
+            lineMergeData.ToolTip = Loc.S("Ribbon.LineMerge.Tip");
+            lineMergeData.LargeImage = LoadImage("line_merge.png");
+            AddButton(panel, lineMergeData);
         }
 
         private void CreateStructuralPanel(UIControlledApplication application, string tabName, string assemblyPath)

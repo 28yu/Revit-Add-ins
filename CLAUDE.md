@@ -469,6 +469,7 @@ _buttonTipKeys["FeatureName"] = "Ribbon.FeatureName.Button.Tip";
 | Room3DColor（部屋3D色分け） | `Commands/Room3DColor/` | `Docs/DEVLOG.md#Room3DColor` |
 | FilledRegionSplitMerge（塗潰し領域分割統合） | `Commands/FilledRegionSplitMerge/` | `Docs/DEVLOG.md#FilledRegionSplitMerge` |
 | FillPatternIO（塗潰しパターン入出力/.pat） | `Commands/FillPatternIO/` | `Docs/DEVLOG.md#FillPatternIO` |
+| LineMerge（直線まとめ/同一直線上の詳細線・モデル線を1本に。離れた線もつなぐ・線種は問わない・角度のある線はつながない。いちばん長い線を伸ばして残し他を削除。CAD は分解後の線のみ） | `Commands/LineMerge/` | `Docs/Features/LineMerge.md` |
 | ExcelExportImport（Excel連携） | `Commands/ExcelExportImport/` | `Docs/DEVLOG.md#ExcelExportImport` |
 | FireProtection（耐火被覆色分け） | `Commands/FireProtection/` | `Docs/DEVLOG.md#FireProtection` |
 | FormworkCalculator（型枠数量算出） | `Commands/FormworkCalculator/` | `Docs/DEVLOG.md#FormworkCalculator` |
@@ -489,7 +490,7 @@ _buttonTipKeys["FeatureName"] = "Ribbon.FeatureName.Button.Tip";
 1. **通り芯・レベル** — 符号表示切替（両方/左/右）
 2. **シート** — シート一括作成
 3. **ビュー** — ビューポート位置合わせ・トリミング領域合わせ・視点合わせ・切断ボックス合わせ（コピー／ペーストを1ボタンにまとめた「〜合わせ」。MA と同じ感覚の操作）、フィルタ整理（使用ビュー確認・名前変更・削除）、テンプレート整理（使用ビュー確認・名前変更・削除）、DWGレイヤ表示設定の移行（モデル間直接コピー）
-4. **注釈・詳細** — 部屋タグ自動配置、部屋3D色分け、塗潰し領域 分割・統合、塗潰しパターン入出力
+4. **注釈・詳細** — 部屋タグ自動配置、部屋3D色分け、塗潰し領域 分割・統合、塗潰しパターン入出力、直線まとめ
 5. **構造** — 梁下端色分け、梁天端色分け、耐火被覆色分け、型枠数量算出
 6. **モデル** — 一般モデル化（3Dビュー内の複数カテゴリの形状を1つの一般モデル／.rfa にまとめる）、重複要素整理（警告「同じ場所に同一のインスタンスがあります」の要素をパラメータで見比べて不要な方を削除）
 7. **レンダリング** — リアルタイムレンダリング（3Dビューを別ウィンドウの Tools28Render.exe で GPU レイトレーシング描画。ライブ同期・画像/360°/ビューア exe の書き出し）

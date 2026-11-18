@@ -127,6 +127,18 @@
       }
     },
     {
+      "id": "LineMerge",
+      "category": "annotation",
+      "icon": "icons/features/line_merge.png",
+      "manual": "Features/LineMerge.md",
+      "added_in": "2.9",
+      "names": {
+        "ja": "直線まとめ（同じ直線上の詳細線・モデル線を1本に）",
+        "en": "Merge Lines (Join Collinear Detail/Model Lines into One)",
+        "zh": "直线合并（将同一直线上的详图线/模型线合并为一条）"
+      }
+    },
+    {
       "id": "PrintHiddenText",
       "category": "annotation",
       "icon": "icons/features/print_hidden_text.png",
